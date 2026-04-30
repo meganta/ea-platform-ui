@@ -1,0 +1,142 @@
+import React, { createContext, useContext, useState, useEffect } from 'react'
+
+type Locale = 'EN' | 'AR'
+interface LangCtx { locale: Locale; setLocale: (l: Locale) => void; t: (key: string) => string; isAR: boolean }
+
+const translations: Record<string, Record<Locale, string>> = {
+  'nav.main': { EN: 'Main', AR: 'الرئيسية' },
+  'nav.dashboard': { EN: 'Dashboard', AR: 'لوحة التحكم' },
+  'nav.adm': { EN: 'ADM Cycles', AR: 'دورات ADM' },
+  'nav.copilot': { EN: 'EA Copilot', AR: 'مساعد الهندسة' },
+  'nav.repo_section': { EN: 'Repository', AR: 'المستودع' },
+  'nav.repository': { EN: 'EA Repository', AR: 'مستودع الهندسة' },
+  'nav.knowledge': { EN: 'Knowledge Base', AR: 'قاعدة المعرفة' },
+  'auth.signout': { EN: 'Sign Out', AR: 'تسجيل الخروج' },
+  'auth.tagline': { EN: 'ENTERPRISE ARCHITECTURE INTELLIGENCE PLATFORM', AR: 'منصة ذكاء هندسة المؤسسات' },
+  'auth.signin': { EN: 'Sign In', AR: 'تسجيل الدخول' },
+  'auth.signin_loading': { EN: 'Signing in...', AR: 'جارٍ الدخول...' },
+  'auth.organization': { EN: 'Organization', AR: 'المنظمة' },
+  'auth.email': { EN: 'Email', AR: 'البريد الإلكتروني' },
+  'auth.password': { EN: 'Password', AR: 'كلمة المرور' },
+  'dash.title': { EN: 'Command Center', AR: 'مركز التحكم' },
+  'dash.subtitle': { EN: 'EA PLATFORM — OPERATIONAL OVERVIEW', AR: 'منصة الهندسة — نظرة عامة' },
+  'dash.status': { EN: '● SYSTEM OPERATIONAL', AR: '● النظام يعمل' },
+  'dash.adm_cycles': { EN: 'ADM Cycles', AR: 'دورات ADM' },
+  'dash.capabilities': { EN: 'Capabilities', AR: 'القدرات' },
+  'dash.documents': { EN: 'Documents', AR: 'الوثائق' },
+  'dash.ai_sessions': { EN: 'AI Sessions', AR: 'جلسات الذكاء' },
+  'dash.active': { EN: 'active', AR: 'نشطة' },
+  'dash.indexed': { EN: 'indexed', AR: 'مفهرسة' },
+  'dash.active_cycles': { EN: 'Active ADM Cycles', AR: 'دورات ADM النشطة' },
+  'dash.no_cycles': { EN: 'No cycles yet', AR: 'لا توجد دورات بعد' },
+  'dash.create_cycle': { EN: 'Create Cycle', AR: 'إنشاء دورة' },
+  'dash.quick_actions': { EN: 'Quick Actions', AR: 'الإجراءات السريعة' },
+  'dash.latest_cycle': { EN: 'Latest Cycle', AR: 'آخر دورة' },
+  'qa.adm': { EN: 'Start new ADM cycle', AR: 'بدء دورة ADM جديدة' },
+  'qa.adm_sub': { EN: 'Plan and execute EA transformation', AR: 'خطط ونفذ تحول الهندسة' },
+  'qa.copilot': { EN: 'Ask EA Copilot', AR: 'اسأل مساعد الهندسة' },
+  'qa.copilot_sub': { EN: 'AI-powered architecture guidance', AR: 'توجيه هندسي بالذكاء الاصطناعي' },
+  'qa.repo': { EN: 'Update EA Repository', AR: 'تحديث مستودع الهندسة' },
+  'qa.repo_sub': { EN: 'Manage capabilities and applications', AR: 'إدارة القدرات والتطبيقات' },
+  'qa.knowledge': { EN: 'Upload Knowledge', AR: 'رفع المعرفة' },
+  'qa.knowledge_sub': { EN: 'Add strategy docs and policies', AR: 'أضف وثائق الاستراتيجية' },
+  'adm.title': { EN: 'ADM Cycles', AR: 'دورات ADM' },
+  'adm.subtitle': { EN: 'ARCHITECTURE DEVELOPMENT METHOD', AR: 'منهج تطوير الهندسة' },
+  'adm.new': { EN: '+ New Cycle', AR: '+ دورة جديدة' },
+  'adm.no_cycles': { EN: 'No ADM cycles', AR: 'لا توجد دورات ADM' },
+  'adm.modal_title': { EN: 'New ADM Cycle', AR: 'دورة ADM جديدة' },
+  'adm.name': { EN: 'Cycle Name', AR: 'اسم الدورة' },
+  'adm.description': { EN: 'Description', AR: 'الوصف' },
+  'adm.framework': { EN: 'Framework', AR: 'الإطار' },
+  'adm.start_phase': { EN: 'Start Phase', AR: 'بدء المرحلة' },
+  'adm.gap_analysis': { EN: 'Run Gap Analysis', AR: 'تحليل الفجوات' },
+  'adm.analysing': { EN: 'Analysing...', AR: 'جارٍ التحليل...' },
+  'adm.deliverables': { EN: 'Deliverables', AR: 'المخرجات' },
+  'adm.gap_result': { EN: 'Gap Analysis', AR: 'تحليل الفجوات' },
+  'adm.col_title': { EN: 'Title', AR: 'العنوان' },
+  'adm.col_type': { EN: 'Type', AR: 'النوع' },
+  'adm.col_phase': { EN: 'Phase', AR: 'المرحلة' },
+  'adm.col_status': { EN: 'Status', AR: 'الحالة' },
+  'copilot.title': { EN: 'EA Copilot', AR: 'مساعد الهندسة' },
+  'copilot.subtitle': { EN: 'AI-POWERED ARCHITECTURE ASSISTANT', AR: 'مساعد الهندسة بالذكاء الاصطناعي' },
+  'copilot.ready': { EN: 'EA Copilot Ready', AR: 'مساعد الهندسة جاهز' },
+  'copilot.hint': { EN: 'Ask about ADM phases, capabilities, or architecture strategy', AR: 'اسأل عن مراحل ADM أو القدرات أو استراتيجية الهندسة' },
+  'copilot.send': { EN: 'Send', AR: 'إرسال' },
+  'copilot.placeholder': { EN: 'Ask about your enterprise architecture...', AR: 'اسأل عن هندسة مؤسستك...' },
+  'copilot.q1': { EN: 'What is Enterprise Architecture?', AR: 'ما هي هندسة المؤسسات؟' },
+  'copilot.q2': { EN: 'Help me plan Phase A', AR: 'ساعدني في تخطيط المرحلة أ' },
+  'copilot.q3': { EN: 'Analyse capability gaps', AR: 'تحليل فجوات القدرات' },
+  'copilot.q4': { EN: 'Explain TOGAF ADM', AR: 'اشرح منهج TOGAF ADM' },
+  'repo.title': { EN: 'EA Repository', AR: 'مستودع الهندسة' },
+  'repo.subtitle': { EN: 'ARCHITECTURE ARTIFACTS & COMPONENTS', AR: 'مكونات وأدوات الهندسة' },
+  'repo.add': { EN: '+ Add', AR: '+ إضافة' },
+  'repo.capabilities': { EN: 'Capabilities', AR: 'القدرات' },
+  'repo.applications': { EN: 'Applications', AR: 'التطبيقات' },
+  'repo.decisions': { EN: 'Decisions', AR: 'القرارات' },
+  'repo.no_capabilities': { EN: 'No capabilities', AR: 'لا توجد قدرات' },
+  'repo.no_applications': { EN: 'No applications', AR: 'لا توجد تطبيقات' },
+  'repo.no_decisions': { EN: 'No decisions', AR: 'لا توجد قرارات' },
+  'repo.add_cap': { EN: 'Add Capability', AR: 'إضافة قدرة' },
+  'repo.add_app': { EN: 'Add Application', AR: 'إضافة تطبيق' },
+  'repo.name_en': { EN: 'Name (English)', AR: 'الاسم (إنجليزي)' },
+  'repo.name_ar': { EN: 'Name (Arabic)', AR: 'الاسم (عربي)' },
+  'repo.domain': { EN: 'Domain', AR: 'المجال' },
+  'repo.level': { EN: 'Level', AR: 'المستوى' },
+  'repo.type': { EN: 'Type', AR: 'النوع' },
+  'repo.owner': { EN: 'Owner', AR: 'المالك' },
+  'repo.col_name': { EN: 'Name', AR: 'الاسم' },
+  'repo.col_arabic': { EN: 'Arabic', AR: 'عربي' },
+  'repo.col_domain': { EN: 'Domain', AR: 'المجال' },
+  'repo.col_level': { EN: 'Level', AR: 'المستوى' },
+  'repo.col_type': { EN: 'Type', AR: 'النوع' },
+  'repo.col_owner': { EN: 'Owner', AR: 'المالك' },
+  'repo.col_adc': { EN: 'ADC #', AR: 'رقم القرار' },
+  'repo.col_title': { EN: 'Title', AR: 'العنوان' },
+  'repo.col_status': { EN: 'Status', AR: 'الحالة' },
+  'know.title': { EN: 'Knowledge Base', AR: 'قاعدة المعرفة' },
+  'know.subtitle': { EN: 'DOCUMENTS & SEMANTIC SEARCH', AR: 'الوثائق والبحث الدلالي' },
+  'know.upload': { EN: 'Upload Document', AR: 'رفع وثيقة' },
+  'know.uploading': { EN: 'Uploading...', AR: 'جارٍ الرفع...' },
+  'know.documents': { EN: 'Documents', AR: 'الوثائق' },
+  'know.search': { EN: 'Semantic Search', AR: 'البحث الدلالي' },
+  'know.no_docs': { EN: 'No documents uploaded', AR: 'لا توجد وثائق' },
+  'know.upload_first': { EN: 'Upload First Document', AR: 'رفع أول وثيقة' },
+  'know.placeholder': { EN: 'Search your knowledge base...', AR: 'ابحث في قاعدة المعرفة...' },
+  'know.search_btn': { EN: 'Search', AR: 'بحث' },
+  'know.searching': { EN: 'Searching...', AR: 'جارٍ البحث...' },
+  'know.no_results': { EN: 'No results', AR: 'لا توجد نتائج' },
+  'know.col_name': { EN: 'Name', AR: 'الاسم' },
+  'know.col_type': { EN: 'Type', AR: 'النوع' },
+  'know.col_lang': { EN: 'Language', AR: 'اللغة' },
+  'know.col_chunks': { EN: 'Chunks', AR: 'المقاطع' },
+  'know.col_status': { EN: 'Status', AR: 'الحالة' },
+  'know.score': { EN: 'Score', AR: 'الدرجة' },
+  'common.cancel': { EN: 'Cancel', AR: 'إلغاء' },
+  'common.add': { EN: 'Add', AR: 'إضافة' },
+  'common.create': { EN: 'Create', AR: 'إنشاء' },
+  'common.creating': { EN: 'Creating...', AR: 'جارٍ الإنشاء...' },
+}
+
+const Ctx = createContext<LangCtx>({} as LangCtx)
+export const useLang = () => useContext(Ctx)
+
+export function LangProvider({ children }: { children: React.ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>(() => (localStorage.getItem('ea_locale') as Locale) || 'EN')
+
+  const setLocale = (l: Locale) => {
+    setLocaleState(l)
+    localStorage.setItem('ea_locale', l)
+    document.documentElement.dir = l === 'AR' ? 'rtl' : 'ltr'
+    document.documentElement.lang = l === 'AR' ? 'ar' : 'en'
+  }
+
+  useEffect(() => {
+    document.documentElement.dir = locale === 'AR' ? 'rtl' : 'ltr'
+    document.documentElement.lang = locale === 'AR' ? 'ar' : 'en'
+  }, [])
+
+  const t = (key: string) => translations[key]?.[locale] ?? translations[key]?.EN ?? key
+  const isAR = locale === 'AR'
+
+  return <Ctx.Provider value={{ locale, setLocale, t, isAR }}>{children}</Ctx.Provider>
+}

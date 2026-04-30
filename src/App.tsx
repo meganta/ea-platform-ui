@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { LangProvider } from './contexts/LangContext'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 import Layout from './components/Layout'
 import DashboardPage from './pages/DashboardPage'
 import AdmPage from './pages/AdmPage'
@@ -18,19 +20,22 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-            <Route index element={<DashboardPage />} />
-            <Route path="adm" element={<AdmPage />} />
-            <Route path="copilot" element={<CopilotPage />} />
-            <Route path="repository" element={<RepositoryPage />} />
-            <Route path="knowledge" element={<KnowledgePage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    <LangProvider>
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route index element={<DashboardPage />} />
+              <Route path="adm" element={<AdmPage />} />
+              <Route path="copilot" element={<CopilotPage />} />
+              <Route path="repository" element={<RepositoryPage />} />
+              <Route path="knowledge" element={<KnowledgePage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </LangProvider>
   )
 }
