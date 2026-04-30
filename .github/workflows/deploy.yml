@@ -1,0 +1,33 @@
+name: EA Platform UI — Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+        env:
+          REACT_APP_API_URL: https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - run: |
+          gcloud run deploy ea-platform-ui \
+            --source . \
+            --region me-central1 \
+            --allow-unauthenticated \
+            --port 8080 \
+            --cpu 1 \
+            --memory 512Mi \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --quiet
