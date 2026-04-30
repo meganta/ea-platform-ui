@@ -1,0 +1,31 @@
+[debug] [2026-04-30T18:09:57.719Z] ----------------------------------------------------------------------
+[debug] [2026-04-30T18:09:57.721Z] Command:       /usr/local/nvm/versions/node/v24.15.0/bin/node /usr/local/node_packages/node_modules/.bin/firebase deploy --only hosting
+[debug] [2026-04-30T18:09:57.722Z] CLI Version:   15.10.1
+[debug] [2026-04-30T18:09:57.722Z] Platform:      linux
+[debug] [2026-04-30T18:09:57.722Z] Node Version:  v24.15.0
+[debug] [2026-04-30T18:09:57.722Z] Time:          Thu Apr 30 2026 18:09:57 GMT+0000 (Coordinated Universal Time)
+[debug] [2026-04-30T18:09:57.722Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-04-30T18:09:59.042Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-04-30T18:09:59.043Z] > authorizing via signed-in user (zoz30us@gmail.com)
+[debug] [2026-04-30T18:09:59.043Z] [iam] checking project ea-platform-20260428 for permissions ["firebase.projects.get","firebasehosting.sites.update"]
+[debug] [2026-04-30T18:09:59.045Z] Checked if tokens are valid: true, expires at: 1777576077085
+[debug] [2026-04-30T18:09:59.046Z] Checked if tokens are valid: true, expires at: 1777576077085
+[debug] [2026-04-30T18:09:59.047Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/ea-platform-20260428:testIamPermissions [none]
+[debug] [2026-04-30T18:09:59.047Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/ea-platform-20260428:testIamPermissions  x-goog-user-project=ea-platform-20260428
+[debug] [2026-04-30T18:09:59.047Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ea-platform-20260428:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-04-30T18:09:59.716Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/ea-platform-20260428:testIamPermissions 200
+[debug] [2026-04-30T18:09:59.717Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/ea-platform-20260428:testIamPermissions {"permissions":["firebase.projects.get","firebasehosting.sites.update"]}
+[debug] [2026-04-30T18:09:59.717Z] Checked if tokens are valid: true, expires at: 1777576077085
+[debug] [2026-04-30T18:09:59.718Z] Checked if tokens are valid: true, expires at: 1777576077085
+[debug] [2026-04-30T18:09:59.718Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/ea-platform-20260428 [none]
+[debug] [2026-04-30T18:09:59.718Z] >>> [apiv2][(partial)header] GET https://firebase.googleapis.com/v1beta1/projects/ea-platform-20260428  x-goog-user-project=ea-platform-20260428
+[debug] [2026-04-30T18:09:59.834Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/ea-platform-20260428 403
+[debug] [2026-04-30T18:09:59.835Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/ea-platform-20260428 {"error":{"code":403,"message":"Firebase Management API has not been used in project ea-platform-20260428 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/firebase.googleapis.com/overview?project=ea-platform-20260428 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.","status":"PERMISSION_DENIED","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"SERVICE_DISABLED","domain":"googleapis.com","metadata":{"activationUrl":"https://console.developers.google.com/apis/api/firebase.googleapis.com/overview?project=ea-platform-20260428","serviceTitle":"Firebase Management API","containerInfo":"ea-platform-20260428","consumer":"projects/ea-platform-20260428","service":"firebase.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"Firebase Management API has not been used in project ea-platform-20260428 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/firebase.googleapis.com/overview?project=ea-platform-20260428 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."},{"@type":"type.googleapis.com/google.rpc.Help","links":[{"description":"Google developers console API activation","url":"https://console.developers.google.com/apis/api/firebase.googleapis.com/overview?project=ea-platform-20260428"}]}]}}
+[debug] [2026-04-30T18:09:59.836Z] Request to https://firebase.googleapis.com/v1beta1/projects/ea-platform-20260428 had HTTP Error: 403, Firebase Management API has not been used in project ea-platform-20260428 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/firebase.googleapis.com/overview?project=ea-platform-20260428 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
+[debug] [2026-04-30T18:09:59.837Z] FirebaseError: Request to https://firebase.googleapis.com/v1beta1/projects/ea-platform-20260428 had HTTP Error: 403, Firebase Management API has not been used in project ea-platform-20260428 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/firebase.googleapis.com/overview?project=ea-platform-20260428 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry.
+    at responseToError (/usr/local/node_packages/node_modules/firebase-tools/lib/responseToError.js:53:12)
+    at RetryOperation._fn (/usr/local/node_packages/node_modules/firebase-tools/lib/apiv2.js:333:77)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+[error] 
+[error] Error: Failed to get Firebase project ea-platform-20260428. Please make sure the project exists and your account has permission to access it.
