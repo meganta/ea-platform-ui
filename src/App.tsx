@@ -9,6 +9,7 @@ import AdmPage from './pages/AdmPage'
 import CopilotPage from './pages/CopilotPage'
 import RepositoryPage from './pages/RepositoryPage'
 import KnowledgePage from './pages/KnowledgePage'
+import SettingsPage from './pages/SettingsPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,7 @@ export default function App() {
               <Route path="copilot" element={<CopilotPage />} />
               <Route path="repository" element={<RepositoryPage />} />
               <Route path="knowledge" element={<KnowledgePage />} />
+              <Route path="settings" element={<SettingsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
