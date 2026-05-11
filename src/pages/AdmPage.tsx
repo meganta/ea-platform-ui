@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import ReactMarkdown from 'react-markdown'
+function DiagramBlock({ chart }: { chart: string }) {
+  // Parse mermaid-style text into a readable styled block
+  return (
+    <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', padding: '12px 16px', margin: '8px 0', overflowX: 'auto' }}>
+      <div style={{ fontSize: 10, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 8, letterSpacing: '0.08em' }}>📊 DIAGRAM</div>
+      <pre style={{ margin: 0, fontSize: 11, color: 'var(--text)', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{chart}</pre>
+    </div>
+  )
+}
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -104,6 +113,37 @@ function ScopeSelector({ cycle, onScopeSet }: any) {
   )
 }
 
+
+
+// Pre-process markdown to extract mermaid blocks before rendering
+function preprocessMarkdown(text: string): string {
+  return text // pass through — handled by components
+}
+
+function extractDiagrams(text: string): Array<{type: 'text'|'diagram', content: string}> {
+  const parts: Array<{type: 'text'|'diagram', content: string}> = []
+  // Split on code fences
+  const segments = text.split(/(```[\s\S]*?```)/g)
+  for (const seg of segments) {
+    if (!seg) continue
+    if (seg.startsWith('```')) {
+      // Extract language and content
+      const firstNewline = seg.indexOf('\n')
+      const lang = firstNewline > 0 ? seg.slice(3, firstNewline).trim().toLowerCase() : ''
+      const body = firstNewline > 0 ? seg.slice(firstNewline + 1).replace(/```\s*$/, '').trim() : seg.slice(3).replace(/```\s*$/, '').trim()
+      const isDiagram = lang === 'mermaid' || lang === 'flowchart' || lang === 'graph' ||
+        body.match(/^(flowchart|graph|sequenceDiagram|classDiagram|quadrantChart|mindmap|gitGraph|timeline)/)
+      if (isDiagram) {
+        parts.push({ type: 'diagram', content: (lang && !body.startsWith(lang) ? lang + '\n' + body : body) })
+      } else {
+        parts.push({ type: 'text', content: seg })
+      }
+    } else {
+      parts.push({ type: 'text', content: seg })
+    }
+  }
+  return parts.length ? parts : [{ type: 'text', content: text }]
+}
 
 // ── Input Source Panel ────────────────────────────────────
 function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
@@ -746,27 +786,35 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 
                         {/* Content view */}
                         {expandedOutput === out.id && out.content && !editingOutput && (
-                          <div style={{ marginTop: 8, padding: '12px 16px', background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius)', fontSize: 12, lineHeight: 1.8, maxHeight: 350, overflow: 'auto', color: 'var(--text)' }} className="md-output">
-                            <ReactMarkdown
-                              components={{
-                                h1: ({children}) => <h1 style={{fontSize:16,fontWeight:700,color:'var(--accent)',borderBottom:'1px solid var(--border)',paddingBottom:4,marginBottom:8,marginTop:12}}>{children}</h1>,
-                                h2: ({children}) => <h2 style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:6,marginTop:10}}>{children}</h2>,
-                                h3: ({children}) => <h3 style={{fontSize:13,fontWeight:600,color:'var(--gold)',marginBottom:4,marginTop:8}}>{children}</h3>,
-                                p: ({children}) => <p style={{marginBottom:8,lineHeight:1.7}}>{children}</p>,
-                                strong: ({children}) => <strong style={{color:'var(--text)',fontWeight:700}}>{children}</strong>,
-                                em: ({children}) => <em style={{color:'var(--text-dim)'}}>{children}</em>,
-                                ul: ({children}) => <ul style={{paddingLeft:20,marginBottom:8}}>{children}</ul>,
-                                ol: ({children}) => <ol style={{paddingLeft:20,marginBottom:8}}>{children}</ol>,
-                                li: ({children}) => <li style={{marginBottom:3,lineHeight:1.6}}>{children}</li>,
-                                table: ({children}) => <div style={{overflowX:'auto',marginBottom:12}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>{children}</table></div>,
-                                thead: ({children}) => <thead style={{background:'var(--navy-mid)'}}>{children}</thead>,
-                                th: ({children}) => <th style={{padding:'6px 10px',textAlign:'left',border:'1px solid var(--border)',color:'var(--accent)',fontWeight:600,fontSize:11}}>{children}</th>,
-                                td: ({children}) => <td style={{padding:'5px 10px',border:'1px solid var(--border)',color:'var(--text)',fontSize:11}}>{children}</td>,
-                                hr: () => <hr style={{border:'none',borderTop:'1px solid var(--border)',margin:'12px 0'}} />,
-                                code: ({children}) => <code style={{background:'rgba(0,180,216,0.1)',padding:'1px 5px',borderRadius:3,fontSize:11,fontFamily:'var(--font-mono)',color:'var(--accent)'}}>{children}</code>,
-                                blockquote: ({children}) => <blockquote style={{borderLeft:'3px solid var(--accent)',paddingLeft:12,marginLeft:0,color:'var(--text-dim)',fontStyle:'italic'}}>{children}</blockquote>,
-                              }}
-                            >{out.content}</ReactMarkdown>
+                          <div style={{ marginTop: 8, padding: '12px 16px', background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius)', fontSize: 12, lineHeight: 1.8, maxHeight: 'none', color: 'var(--text)' }}>
+                            {extractDiagrams(out.content).map((part, idx) =>
+                              part.type === 'diagram'
+                                ? <DiagramBlock key={idx} chart={part.content} />
+                                : <ReactMarkdown key={idx} components={{
+                                    h1: ({children}) => <h1 style={{fontSize:16,fontWeight:700,color:'var(--accent)',borderBottom:'1px solid var(--border)',paddingBottom:4,marginBottom:8,marginTop:12}}>{children}</h1>,
+                                    h2: ({children}) => <h2 style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:6,marginTop:10}}>{children}</h2>,
+                                    h3: ({children}) => <h3 style={{fontSize:13,fontWeight:600,color:'var(--gold)',marginBottom:4,marginTop:8}}>{children}</h3>,
+                                    p: ({children}) => <p style={{marginBottom:8,lineHeight:1.7}}>{children}</p>,
+                                    strong: ({children}) => <strong style={{color:'var(--text)',fontWeight:700}}>{children}</strong>,
+                                    ul: ({children}) => <ul style={{paddingLeft:20,marginBottom:8}}>{children}</ul>,
+                                    ol: ({children}) => <ol style={{paddingLeft:20,marginBottom:8}}>{children}</ol>,
+                                    li: ({children}) => <li style={{marginBottom:3,lineHeight:1.6}}>{children}</li>,
+                                    table: ({children}) => <div style={{overflowX:'auto',marginBottom:12}}><table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>{children}</table></div>,
+                                    thead: ({children}) => <thead style={{background:'var(--navy-mid)'}}>{children}</thead>,
+                                    th: ({children}) => <th style={{padding:'6px 10px',textAlign:'left',border:'1px solid var(--border)',color:'var(--accent)',fontWeight:600,fontSize:11}}>{children}</th>,
+                                    td: ({children}) => <td style={{padding:'5px 10px',border:'1px solid var(--border)',color:'var(--text)',fontSize:11}}>{children}</td>,
+                                    hr: () => <hr style={{border:'none',borderTop:'1px solid var(--border)',margin:'12px 0'}} />,
+                                    code: ({className, children}: any) => {
+                                      const lang = (className || '').replace('language-', '')
+                                      const text = String(children || '').trim()
+                                      if (lang === 'mermaid' || text.match(/^(graph|flowchart|sequenceDiagram|classDiagram|quadrantChart|mindmap|gitGraph|timeline)/)) {
+                                        return <DiagramBlock chart={text} />
+                                      }
+                                      return <code style={{background:'rgba(0,180,216,0.1)',padding:'1px 5px',borderRadius:3,fontSize:11,fontFamily:'var(--font-mono)',color:'var(--accent)'}}>{children}</code>
+                                    },
+                                    blockquote: ({children}) => <blockquote style={{borderLeft:'3px solid var(--accent)',paddingLeft:12,marginLeft:0,color:'var(--text-dim)',fontStyle:'italic'}}>{children}</blockquote>,
+                                  }}>{part.content}</ReactMarkdown>
+                            )}
                           </div>
                         )}
 
@@ -954,7 +1002,7 @@ export default function AdmPage() {
                 {gapResult && (
                   <div className="card">
                     <div className="section-title">⚡ Gap Analysis</div>
-                    <div style={{ fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap', color: 'var(--text-dim)', maxHeight: 400, overflow: 'auto', fontFamily: 'var(--font-mono)' }}>{gapResult}</div>
+                    <div style={{ fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap', color: 'var(--text-dim)', maxHeight: 'none', fontFamily: 'var(--font-mono)' }}>{gapResult}</div>
                   </div>
                 )}
               </div>
