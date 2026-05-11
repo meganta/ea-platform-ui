@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import ReactMarkdown from 'react-markdown'
+import { DiagramViewer } from '../components/DiagramViewer'
 function DiagramBlock({ chart }: { chart: string }) {
   // Parse mermaid-style text into a readable styled block
   return (
@@ -775,6 +776,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                         <OutputSourcePanel out={out} onUpdated={(updated: any) => setPhaseOutputs(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))} />
 
                         <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />
+                        {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
 
 
                         {/* Tracability */}
