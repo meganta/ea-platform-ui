@@ -276,7 +276,7 @@ export default function RepositoryPage() {
   })
 
   const domains = config?.enabledDomains || []
-  const repoAssetTypes: string[] = [...new Set(assets.map((a:any) => a.assetType).filter(Boolean))].sort()
+  const repoAssetTypes: string[] = Array.from(new Set(assets.map((a:any) => a.assetType).filter(Boolean))).sort()
 
   return (
     <div>
