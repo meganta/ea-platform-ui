@@ -22,6 +22,7 @@ export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps)
   const [selected, setSelected] = useState<Diagram | null>(null)
   const [mode, setMode] = useState<'visual' | 'source'>('visual')
   const [fullscreen, setFullscreen] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const token = () => localStorage.getItem('ea_token')
 
   useEffect(() => {
@@ -71,10 +72,14 @@ export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps)
           ))}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setMode(m => m === 'visual' ? 'source' : 'visual')}
+          <button onClick={() => setCollapsed(c => !c)}
+            style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: '1px solid var(--accent)', background: collapsed ? 'transparent' : 'rgba(0,180,216,0.1)', color: 'var(--accent)' }}>
+            {collapsed ? '▼ View' : '▲ Hide'}
+          </button>
+          {!collapsed && <button onClick={() => setMode(m => m === 'visual' ? 'source' : 'visual')}
             style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)' }}>
             {mode === 'visual' ? '< Source' : '👁 Visual'}
-          </button>
+          </button>}
           {selected && <>
             <button onClick={() => downloadSvg(selected)}
               style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)' }}>
@@ -93,7 +98,7 @@ export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps)
       </div>
 
       {/* Content */}
-      {selected && (
+      {selected && !collapsed && (
         <div style={{ position: fullscreen ? 'fixed' : 'relative', top: fullscreen ? 0 : undefined, left: fullscreen ? 0 : undefined, width: fullscreen ? '100vw' : '100%', height: fullscreen ? '100vh' : undefined, background: 'var(--navy)', zIndex: fullscreen ? 9999 : undefined, overflow: 'auto', padding: 12 }}>
           {fullscreen && <button onClick={() => setFullscreen(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'var(--danger)', border: 'none', color: 'white', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>✕ Close</button>}
           {mode === 'visual' ? (

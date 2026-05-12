@@ -229,6 +229,9 @@ export default function RepositoryPage() {
   const [summary, setSummary] = useState<any>(null)
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL')
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL')
+  const [selectedSource, setSelectedSource] = useState<string>('ALL')
+  const [selectedAssetType, setSelectedAssetType] = useState<string>('ALL')
+  const [groupByCycle, setGroupByCycle] = useState<boolean>(false)
   const [showAdd, setShowAdd] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<any>(null)
   const [editAsset, setEditAsset] = useState<any>(null)
@@ -273,6 +276,7 @@ export default function RepositoryPage() {
   })
 
   const domains = config?.enabledDomains || []
+  const repoAssetTypes: string[] = [...new Set(assets.map((a:any) => a.assetType).filter(Boolean))].sort()
 
   return (
     <div>
@@ -308,7 +312,24 @@ export default function RepositoryPage() {
         {/* Filters */}
         <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
           <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
-          <select className="form-input" style={{ width: 160 }} value={selectedDomain} onChange={e => setSelectedDomain(e.target.value)}>
+          <select className="form-input" style={{ width: 140 }} value={selectedSource} onChange={e => setSelectedSource(e.target.value)}>
+            <option value="ALL">All Sources</option>
+            <option value="ADM_OUTPUT">ADM Output</option>
+            <option value="MANUAL">Manual</option>
+            <option value="UPLOAD">Upload</option>
+          </select>
+          <select className="form-input" style={{ width: 140 }} value={selectedAssetType} onChange={e => setSelectedAssetType(e.target.value)}>
+            <option value="ALL">All Types</option>
+            {repoAssetTypes.map((t:any) => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+          </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+            <input type="checkbox" checked={groupByCycle} onChange={e => setGroupByCycle(e.target.checked)} />
+            Group by Cycle
+          </label>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+            {filtered.length}/{assets.length}
+          </div>
+          <select className="form-input" style={{ width: 140 }} value={selectedDomain} onChange={e => setSelectedDomain(e.target.value)}>
             <option value="ALL">All Domains</option>
             {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
           </select>
@@ -319,7 +340,35 @@ export default function RepositoryPage() {
         </div>
 
         {/* Assets table */}
-        {filtered.length === 0 ? (
+        {groupByCycle && Object.keys(groupedAssets).length > 0 ? (
+          <div>
+            {Object.entries(groupedAssets).map(([group, items]) => (
+              <div key={group} style={{ marginBottom: 24 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+                  📁 {group} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} assets)</span>
+                </div>
+                <table>
+                  <thead><tr>
+                    <th>{t('repo.col_name')}</th>
+                    <th>Domain</th>
+                    <th>Type</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr></thead>
+                  <tbody>{items.map((a:any) => (
+                    <tr key={a.id} onClick={() => setSelectedAsset(a)} style={{ cursor: 'pointer' }}>
+                      <td><div style={{ fontWeight: 500 }}>{a.name}</div>{a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}</td>
+                      <td style={{ fontSize: 11 }}>{(a.domain||'').replace(/_/g,' ')}</td>
+                      <td style={{ fontSize: 11 }}>{(a.assetType||'').replace(/_/g,' ')}</td>
+                      <td><span className={`badge ${STATUS_COLORS[a.status]||''}`}>{a.status}</span></td>
+                      <td><button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} onClick={e => { e.stopPropagation(); deleteAsset(a.id) }}>🗑</button></td>
+                    </tr>
+                  ))}</tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="empty">
             <div style={{ fontSize: 40 }}>🗄</div>
             <div className="empty-title">No assets found</div>
