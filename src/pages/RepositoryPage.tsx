@@ -278,6 +278,20 @@ export default function RepositoryPage() {
   const domains = config?.enabledDomains || []
   const repoAssetTypes: string[] = Array.from(new Set(assets.map((a:any) => a.assetType).filter(Boolean))).sort()
 
+  // Group by cycle
+  const groupedAssets: Record<string, any[]> = {}
+  if (groupByCycle) {
+    filtered.forEach((a:any) => {
+      const key = a.source === 'ADM_OUTPUT' && a.sourceRef
+        ? `ADM Cycle: ${a.sourceRef.slice(0,8)}`
+        : a.source === 'MANUAL' ? 'Manual Entries'
+        : a.source === 'UPLOAD' ? 'Uploads'
+        : 'Other'
+      if (!groupedAssets[key]) groupedAssets[key] = []
+      groupedAssets[key].push(a)
+    })
+  }
+
   return (
     <div>
       <div className="page-header">
