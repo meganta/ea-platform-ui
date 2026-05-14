@@ -146,6 +146,64 @@ function extractDiagrams(text: string): Array<{type: 'text'|'diagram', content: 
   return parts.length ? parts : [{ type: 'text', content: text }]
 }
 
+
+// Section Progress Component
+function SectionProgress({ outputId }: { outputId: string }) {
+  const [sections, setSections] = useState<any[]>([])
+  const token = () => localStorage.getItem('ea_token')
+  const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+
+  useEffect(() => {
+    const load = () => {
+      fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/sections`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      }).then(r => r.json()).then(data => {
+        if (Array.isArray(data)) setSections(data)
+      }).catch(() => {})
+    }
+    load()
+    const interval = setInterval(load, 3000)
+    return () => clearInterval(interval)
+  }, [outputId])
+
+  if (sections.length === 0) return (
+    <div style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-dim)' }}>
+      <span className="spinner" style={{ marginRight: 6 }}>⟳</span> Generating outline...
+    </div>
+  )
+
+  const statusIcon: Record<string, string> = {
+    PENDING: '○', GENERATING: '⟳', COMPLETE: '✓', FAILED: '✗', INCOMPLETE: '⚠'
+  }
+  const statusColor: Record<string, string> = {
+    PENDING: 'var(--text-dim)', GENERATING: 'var(--accent)', COMPLETE: 'var(--success)',
+    FAILED: 'var(--danger)', INCOMPLETE: 'var(--gold)'
+  }
+
+  return (
+    <div style={{ padding: '8px 12px', background: 'rgba(0,0,0,0.1)', borderRadius: 4, marginTop: 4 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 6, fontFamily: 'var(--font-mono)' }}>
+        GENERATING SECTIONS ({sections.filter(s => s.status === 'COMPLETE').length}/{sections.length})
+      </div>
+      {sections.map((s: any) => (
+        <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+          <span style={{ fontSize: 12, color: statusColor[s.status] || 'var(--text-dim)', fontFamily: 'var(--font-mono)', animation: s.status === 'GENERATING' ? 'spin 1s linear infinite' : 'none' }}>
+            {statusIcon[s.status] || '○'}
+          </span>
+          <span style={{ fontSize: 11, color: s.status === 'COMPLETE' ? 'var(--text)' : 'var(--text-dim)' }}>
+            {s.title}
+          </span>
+          {s.status === 'COMPLETE' && s.tokenCount && (
+            <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginLeft: 'auto' }}>
+              {s.tokenCount} tokens
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Input Source Panel ────────────────────────────────────
 function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
   const [showOptions, setShowOptions] = useState(false)
@@ -569,6 +627,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<string | null>(null)
   const [expandedOutput, setExpandedOutput] = useState<string | null>(null)
+  const [outputSections, setOutputSections] = useState<Record<string, any[]>>({})
   const [editingInput, setEditingInput] = useState<string | null>(null)
   const [inputContent, setInputContent] = useState('')
   const [editingOutput, setEditingOutput] = useState<string | null>(null)
