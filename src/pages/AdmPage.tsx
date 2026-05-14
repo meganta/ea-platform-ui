@@ -660,7 +660,22 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     try {
       const result = await api.post(`/adm-intelligence/outputs/${outputId}/generate`)
       setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
-    } finally { setGenerating(null) }
+      // Poll for updates while GENERATING
+      if (result?.status === 'GENERATING') {
+        const pollInterval = setInterval(async () => {
+          try {
+            const updated = await api.get(`/adm-intelligence/outputs/${outputId}`)
+            setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...updated } : o))
+            if (updated?.status !== 'GENERATING') {
+              clearInterval(pollInterval)
+              setGenerating(null)
+            }
+          } catch(e) { clearInterval(pollInterval); setGenerating(null) }
+        }, 4000)
+        return // Don't clear generating state yet
+      }
+    } catch(e) {}
+    setGenerating(null)
   }
 
   const approveOutput = async (outputId: string) => {
