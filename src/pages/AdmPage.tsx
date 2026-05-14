@@ -827,7 +827,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                                   await fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/reset`, {
                                     method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }
                                   })
-                                  loadPhaseData(phase)
+                                  window.location.reload()
                                 }}>✕ Cancel</button>
                             </div>
                           )}
