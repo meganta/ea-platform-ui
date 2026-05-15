@@ -822,7 +822,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 
                         {/* Actions */}
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: out.content ? 6 : 0 }}>
-                          {out.status === 'GENERATING' && (
+                          {(out.status === 'GENERATING' || generating === out.id) && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               <span style={{ fontSize: 10, color: 'var(--accent)' }}>⟳ Generating sections...</span>
                               <button className='btn btn-secondary btn-sm' style={{ fontSize: 10 }}
@@ -834,7 +834,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                                 }}>✕ Cancel</button>
                             </div>
                           )}
-                          {out.status === 'GENERATING' && <SectionProgress outputId={out.id} />}
+                          {(out.status === 'GENERATING' || generating === out.id) && <SectionProgress outputId={out.id} />}
                           {(out.status === 'PENDING' || out.status === 'AI_DRAFT') && (
                             <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={generating === out.id} onClick={() => generateOutput(out.id)}>
                               {generating === out.id ? '⏳ Generating...' : '🤖 AI Generate'}
