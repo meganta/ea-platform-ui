@@ -672,9 +672,11 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
             if (isDone) {
               clearInterval(pollInterval)
               setGenerating(null)
+              // Reload full phase data to get latest content
+              setPhaseOutputs(prev => prev.map(o => o.id === outputId ? { ...o, ...updated } : o))
             }
           } catch(e) { clearInterval(pollInterval); setGenerating(null) }
-        }, 4000)
+        }, 2000)
         return // Don't clear generating state yet
       }
     } catch(e) {}
