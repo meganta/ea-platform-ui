@@ -204,6 +204,42 @@ function SectionProgress({ outputId }: { outputId: string }) {
   )
 }
 
+
+// Diagram Generation Status
+function DiagramStatus({ outputId, onDone }: { outputId: string, onDone: () => void }) {
+  const [status, setStatus] = useState<{status: string, count: number}>({ status: 'pending', count: 0 })
+  const [checked, setChecked] = useState(false)
+  const token = () => localStorage.getItem('ea_token')
+  const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+
+  useEffect(() => {
+    const load = () => {
+      fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/diagram-status`, {
+        headers: { Authorization: `Bearer ${token()}` }
+      }).then(r => r.json()).then(data => {
+        setStatus(data)
+        setChecked(true)
+        if (data.count > 0) onDone()
+      }).catch(() => {})
+    }
+    load()
+    const interval = setInterval(load, 3000)
+    return () => clearInterval(interval)
+  }, [outputId])
+
+  if (!checked) return null
+  if (status.count > 0) return (
+    <div style={{ fontSize: 10, color: 'var(--accent)', padding: '4px 8px', fontFamily: 'var(--font-mono)' }}>
+      ✅ {status.count} diagrams ready
+    </div>
+  )
+  return (
+    <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: '4px 8px', fontFamily: 'var(--font-mono)' }}>
+      ⟳ Generating architecture diagrams...
+    </div>
+  )
+}
+
 // ── Input Source Panel ────────────────────────────────────
 function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
   const [showOptions, setShowOptions] = useState(false)
@@ -869,6 +905,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 
                         <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />
                         {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
+                        {out.status === 'AI_DRAFT' && <DiagramStatus outputId={out.id} onDone={() => {}} />}
 
 
                         {/* Tracability */}
