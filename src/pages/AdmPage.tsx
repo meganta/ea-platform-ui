@@ -666,7 +666,10 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
           try {
             const updated = await api.get(`/adm-intelligence/outputs/${outputId}`)
             setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...updated } : o))
-            if (updated?.status !== 'GENERATING') {
+            // Keep polling if GENERATING or AI_DRAFT with no content yet
+            const isDone = updated?.status !== 'GENERATING' && 
+              (updated?.status !== 'AI_DRAFT' || (updated?.content && updated.content.length > 100))
+            if (isDone) {
               clearInterval(pollInterval)
               setGenerating(null)
             }
