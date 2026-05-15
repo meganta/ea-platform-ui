@@ -234,8 +234,9 @@ function DiagramStatus({ outputId, onDone }: { outputId: string, onDone: () => v
     </div>
   )
   return (
-    <div style={{ fontSize: 10, color: 'var(--text-dim)', padding: '4px 8px', fontFamily: 'var(--font-mono)' }}>
-      ⟳ Generating architecture diagrams...
+    <div style={{ fontSize: 10, color: 'var(--accent)', padding: '4px 8px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
+      Generating architecture diagrams...
     </div>
   )
 }
