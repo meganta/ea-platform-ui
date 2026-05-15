@@ -213,17 +213,27 @@ function DiagramStatus({ outputId, onDone }: { outputId: string, onDone: () => v
   const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
   useEffect(() => {
+    let triggered = false
     const load = () => {
       fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/diagram-status`, {
         headers: { Authorization: `Bearer ${token()}` }
       }).then(r => r.json()).then(data => {
         setStatus(data)
         setChecked(true)
-        if (data.count > 0) onDone()
+        if (data.count > 0) {
+          onDone()
+        } else if (!triggered) {
+          // Trigger diagram generation if not started
+          triggered = true
+          fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/generate-diagrams`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token()}` }
+          }).catch(() => {})
+        }
       }).catch(() => {})
     }
     load()
-    const interval = setInterval(load, 3000)
+    const interval = setInterval(load, 4000)
     return () => clearInterval(interval)
   }, [outputId])
 
