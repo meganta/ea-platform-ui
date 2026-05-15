@@ -905,7 +905,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 
                         <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />
                         {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
-                        {out.status === 'AI_DRAFT' && <DiagramStatus outputId={out.id} onDone={() => {}} />}
+                        {(out.status === 'AI_DRAFT' || out.status === 'APPROVED') && out.content && <DiagramStatus outputId={out.id} onDone={() => {}} />}
 
 
                         {/* Tracability */}
