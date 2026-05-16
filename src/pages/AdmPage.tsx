@@ -522,7 +522,7 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
 
   if (!mapping) return null
 
-  const isFilled = !!outputId  // outputId means content exists
+  const isFilled = !!outputId  // outputId means AI_DRAFT or APPROVED with content
 
   return (
     <div style={{ marginTop: 8, padding: '10px 12px', background: isFilled ? 'rgba(46,204,113,0.06)' : 'rgba(201,168,76,0.06)', border: `1px solid ${isFilled ? 'rgba(46,204,113,0.3)' : 'rgba(201,168,76,0.25)'}`, borderRadius: 'var(--radius)' }}>
@@ -914,7 +914,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 
                         <OutputSourcePanel out={out} onUpdated={(updated: any) => setPhaseOutputs(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))} />
 
-                        <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />
+                        {(out.status === 'AI_DRAFT' || out.status === 'APPROVED') && out.content && out.content.length > 100 && <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />}
                         {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
                         {out.content && out.content.length > 100 && <DiagramStatus outputId={out.id} outputStatus={out.status} onDone={() => setPhaseOutputs(prev => [...prev])} />}
 
