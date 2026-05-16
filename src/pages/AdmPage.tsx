@@ -206,7 +206,7 @@ function SectionProgress({ outputId }: { outputId: string }) {
 
 
 // Diagram Generation Status
-function DiagramStatus({ outputId, onDone }: { outputId: string, onDone: () => void }) {
+function DiagramStatus({ outputId, onDone, outputStatus }: { outputId: string, onDone: () => void, outputStatus: string }) {
   const [status, setStatus] = useState<{status: string, count: number}>({ status: 'pending', count: 0 })
   const [checked, setChecked] = useState(false)
   const token = () => localStorage.getItem('ea_token')
@@ -222,8 +222,8 @@ function DiagramStatus({ outputId, onDone }: { outputId: string, onDone: () => v
         setChecked(true)
         if (data.count > 0) {
           onDone()
-        } else if (!triggered) {
-          // Trigger diagram generation if not started
+        } else if (!triggered && outputStatus === 'AI_DRAFT') {
+          // Only trigger after sections are complete (AI_DRAFT status)
           triggered = true
           fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/generate-diagrams`, {
             method: 'POST',
@@ -916,7 +916,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 
                         <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />
                         {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
-                        {out.content && out.content.length > 100 && <DiagramStatus outputId={out.id} onDone={() => setPhaseOutputs(prev => [...prev])} />}
+                        {out.content && out.content.length > 100 && <DiagramStatus outputId={out.id} outputStatus={out.status} onDone={() => setPhaseOutputs(prev => [...prev])} />}
 
 
                         {/* Tracability */}
