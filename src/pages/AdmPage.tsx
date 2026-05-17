@@ -235,7 +235,7 @@ function DiagramStatus({ outputId, onDone, outputStatus }: { outputId: string, o
     load()
     const interval = setInterval(load, 4000)
     return () => clearInterval(interval)
-  }, [outputId])
+  }, [outputId, outputStatus])
 
   if (!checked) return null
   if (status.count > 0) return (
@@ -507,7 +507,10 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
       const res = await fetch(`${API_URL}/adm-templates/output/${outputKey}/download/${format}?${params}`, {
         headers: { Authorization: `Bearer ${token()}` }
       })
-      if (!res.ok) throw new Error('Download failed')
+      if (!res.ok) {
+        const errText = await res.text()
+        throw new Error('Download failed: ' + res.status + ' ' + errText.slice(0, 100))
+      }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -515,8 +518,8 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
       a.download = `${outputKey}_template.${format}`
       a.click()
       URL.revokeObjectURL(url)
-    } catch (e) {
-      alert('Download failed')
+    } catch (e: any) {
+      alert(e.message || 'Download failed')
     } finally { setLoading(false) }
   }
 
