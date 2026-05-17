@@ -214,28 +214,34 @@ function DiagramStatus({ outputId, onDone, outputStatus }: { outputId: string, o
 
   useEffect(() => {
     let triggered = false
-    const load = () => {
-      fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/diagram-status`, {
-        headers: { Authorization: `Bearer ${token()}` }
-      }).then(r => r.json()).then(data => {
+    const load = async () => {
+      try {
+        const res = await fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/diagram-status`, {
+          headers: { Authorization: `Bearer ${token()}` }
+        })
+        if (res.status === 401) {
+          clearInterval(interval)
+          setChecked(true)
+          return
+        }
+        const data = await res.json()
         setStatus(data)
         setChecked(true)
         if (data.count > 0) {
           onDone()
         } else if (!triggered && outputStatus === 'AI_DRAFT') {
-          // Only trigger after sections are complete (AI_DRAFT status)
           triggered = true
           fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/generate-diagrams`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token()}` }
           }).catch(() => {})
         }
-      }).catch(() => {})
+      } catch(e) {}
     }
     load()
     const interval = setInterval(load, 4000)
     return () => clearInterval(interval)
-  }, [outputId, outputStatus])
+  }, [outputId, outputStatus])  // eslint-disable-line
 
   if (!checked) return null
   if (status.count > 0) return (
