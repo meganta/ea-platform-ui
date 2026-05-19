@@ -22,6 +22,7 @@ export default function Layout() {
           <NavLink to="/repository" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗄 {t('nav.repository')}</NavLink>
           <NavLink to="/knowledge" className={({isActive})=>`nav-item${isActive?' active':''}`}>📚 {t('nav.knowledge')}</NavLink>
           <div className="nav-label" style={{marginTop:8}}>Admin</div>
+          <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Governance</NavLink>
           <NavLink to="/settings" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ Settings</NavLink>
         </nav>
         <div className="sidebar-footer">
