@@ -713,6 +713,12 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   }
 
   const generateOutput = async (outputId: string) => {
+    // Auto-save any open input before generating so backend has latest content
+    if (editingInput) {
+      await api.put(`/adm-intelligence/inputs/${editingInput}`, { content: inputContent, source: 'PROVIDED' })
+      setPhaseInputs(inp => inp.map(i => i.id === editingInput ? { ...i, content: inputContent, source: 'PROVIDED' } : i))
+      setEditingInput(null)
+    }
     setGenerating(outputId)
     try {
       const result = await api.post(`/adm-intelligence/outputs/${outputId}/generate`)
