@@ -777,6 +777,8 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     ? phaseOutputs.filter(o => currentStep.outputs.some((def: any) => def.key === o.outputKey))
     : phaseOutputs
 
+  console.log('PHASE_DEF:', !!phaseDef, 'CURRENT_STEP:', currentStep?.key, 'STEP_OUTPUTS:', stepOutputs.length, 'STEP_DEF_OUTPUTS:', currentStep?.outputs?.length)
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div style={{ background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, width: '95vw', maxWidth: 1100, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
@@ -875,7 +877,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>No outputs for this step</div>
                   ) : stepOutputs.map(out => {
                     const def = currentStep?.outputs.find((d: any) => d.key === out.outputKey)
-                    console.log('OUTPUT DEF:', out.outputKey, def)
+                    console.log('STEP:', activeStep, 'CURRENT_STEP:', currentStep?.key, 'OUT:', out.outputKey, 'DEF:', def, 'BEHAVIOR:', def?.behaviorType)
                     const statusColor = OUTPUT_STATUS_COLOR[out.status] || '#8baac8'
                     return (
                       <div key={out.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
