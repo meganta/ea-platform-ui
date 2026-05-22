@@ -880,7 +880,22 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                       <div key={out.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                           <div style={{ fontSize: 12, fontWeight: 500 }}>{out.title}</div>
-                          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: `${statusColor}22`, color: statusColor, border: `1px solid ${statusColor}44` }}>{out.status.replace('_', ' ')}</span>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            {def?.behaviorType && (() => {
+                              const behaviorLabels: Record<string, { label: string; color: string }> = {
+                                DISCOVERY:  { label: '🔍 Discovery',  color: '#f39c12' },
+                                ANALYSIS:   { label: '📊 Analysis',   color: '#3498db' },
+                                DESIGN:     { label: '🏗 Design',     color: '#9b59b6' },
+                                GOVERNANCE: { label: '📋 Governance', color: '#2ecc71' },
+                                PLANNING:   { label: '🗺 Planning',   color: '#e74c3c' },
+                              }
+                              const b = behaviorLabels[def.behaviorType]
+                              return b ? (
+                                <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 2, background: `${b.color}18`, color: b.color, border: `1px solid ${b.color}33` }}>{b.label}</span>
+                              ) : null
+                            })()}
+                            <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: `${statusColor}22`, color: statusColor, border: `1px solid ${statusColor}44` }}>{out.status.replace('_', ' ')}</span>
+                          </div>
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{out.description}</div>
 
@@ -888,7 +903,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: out.content ? 6 : 0 }}>
                           {(out.status === 'GENERATING' || generating === out.id) && (
                             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: 10, color: 'var(--accent)' }}>⟳ Generating sections...</span>
+                              <span style={{ fontSize: 10, color: 'var(--accent)' }}>⟳ {def?.behaviorType === 'DISCOVERY' ? 'Analyzing & structuring...' : 'Generating sections...'}</span>
                               <button className='btn btn-secondary btn-sm' style={{ fontSize: 10 }}
                                 onClick={async () => {
                                   await fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/reset`, {
@@ -899,11 +914,35 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                             </div>
                           )}
                           {(out.status === 'GENERATING' || generating === out.id) && <SectionProgress outputId={out.id} />}
-                          {(out.status === 'PENDING' || out.status === 'AI_DRAFT') && (
-                            <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={generating === out.id} onClick={() => generateOutput(out.id)}>
-                              {generating === out.id ? '⏳ Generating...' : '🤖 AI Generate'}
-                            </button>
-                          )}
+                          {(out.status === 'PENDING' || out.status === 'AI_DRAFT') && (() => {
+                            const behaviorType = def?.behaviorType || 'ANALYSIS'
+                            const buttonConfig: Record<string, { label: string; icon: string; tooltip: string }> = {
+                              DISCOVERY: { label: 'Analyze & Structure', icon: '🔍', tooltip: 'AI will extract and organize architecture evidence from your inputs — not generate architecture' },
+                              ANALYSIS:  { label: 'AI Generate', icon: '🤖', tooltip: 'AI will analyze and interpret the current state' },
+                              DESIGN:    { label: 'AI Design', icon: '🏗', tooltip: 'AI will design the target architecture' },
+                              GOVERNANCE:{ label: 'AI Generate', icon: '📋', tooltip: 'AI will produce a governance artifact' },
+                              PLANNING:  { label: 'AI Plan', icon: '🗺', tooltip: 'AI will sequence and prioritize initiatives' },
+                            }
+                            const cfg = buttonConfig[behaviorType] || buttonConfig.ANALYSIS
+                            return (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {behaviorType === 'DISCOVERY' && (
+                                  <div style={{ fontSize: 10, color: 'var(--gold)', padding: '4px 8px', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 4, marginBottom: 2 }}>
+                                    🔍 Discovery mode — AI will structure your evidence, not generate architecture
+                                  </div>
+                                )}
+                                <button
+                                  className="btn btn-primary btn-sm"
+                                  style={{ fontSize: 10 }}
+                                  disabled={generating === out.id}
+                                  title={cfg.tooltip}
+                                  onClick={() => generateOutput(out.id)}
+                                >
+                                  {generating === out.id ? `⏳ ${behaviorType === 'DISCOVERY' ? 'Analyzing...' : 'Generating...'}` : `${cfg.icon} ${cfg.label}`}
+                                </button>
+                              </div>
+                            )
+                          })()}
                           {out.content && out.status !== 'APPROVED' && (
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, color: '#2ecc71', borderColor: 'rgba(46,204,113,0.4)' }} onClick={() => approveOutput(out.id)}>✓ Approve</button>
                           )}
