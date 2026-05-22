@@ -1048,6 +1048,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 export default function AdmPage() {
   const { t } = useLang()
   const api = useApi()
+  if (!(window as any)._buildCheck) { (window as any)._buildCheck = true; alert('BUILD V2 LOADED') }
   const [cycles, setCycles] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [showCreate, setShowCreate] = useState(false)
