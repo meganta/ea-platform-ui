@@ -874,7 +874,8 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                   {stepOutputs.length === 0 ? (
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>No outputs for this step</div>
                   ) : stepOutputs.map(out => {
-                    const def = { ...(currentStep?.outputs.find((d: any) => d.key === out.outputKey) || {}), ...(out.def || {}) }
+                    const def = currentStep?.outputs.find((d: any) => d.key === out.outputKey)
+                    console.log('OUTPUT DEF:', out.outputKey, def)
                     const statusColor = OUTPUT_STATUS_COLOR[out.status] || '#8baac8'
                     return (
                       <div key={out.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
