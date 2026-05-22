@@ -778,7 +778,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     ? phaseOutputs.filter(o => currentStep.outputs.some((def: any) => def.key === o.outputKey))
     : phaseOutputs
 
-  if (stepOutputs.length > 0 && !window._admDebugShown) {
+  if (stepOutputs.length > 0 && !(window as any)._admDebugShown) {
     (window as any)._admDebugShown = true
     const firstOut = stepOutputs[0]
     const firstDef = currentStep?.outputs.find((d: any) => d.key === firstOut.outputKey)
