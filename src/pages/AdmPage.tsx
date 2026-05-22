@@ -777,13 +777,6 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     ? phaseOutputs.filter(o => currentStep.outputs.some((def: any) => def.key === o.outputKey))
     : phaseOutputs
 
-  if (stepOutputs.length > 0 && !(window as any)._admDebugShown) {
-    (window as any)._admDebugShown = true
-    const firstOut = stepOutputs[0]
-    const firstDef = currentStep?.outputs.find((d: any) => d.key === firstOut.outputKey)
-    alert(`DEBUG — outputKey: ${firstOut.outputKey} | behaviorType: ${firstDef?.behaviorType || 'NOT FOUND'} | phaseDef: ${!!phaseDef}`)
-  }
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div style={{ background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, width: '95vw', maxWidth: 1100, maxHeight: '92vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
@@ -921,6 +914,13 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                             </div>
                           )}
                           {(out.status === 'GENERATING' || generating === out.id) && <SectionProgress outputId={out.id} />}
+                          {/* Discovery post-generation guidance */}
+                          {def?.behaviorType === 'DISCOVERY' && out.status === 'AI_DRAFT' && out.content && (
+                            <div style={{ fontSize: 11, padding: '8px 10px', background: 'rgba(243,156,18,0.08)', border: '1px solid rgba(243,156,18,0.25)', borderRadius: 4, marginBottom: 6, lineHeight: 1.6 }}>
+                              <div style={{ color: '#f39c12', fontWeight: 600, marginBottom: 4 }}>🔍 Architecture Evidence Structured</div>
+                              <div style={{ color: 'var(--text-dim)' }}>The AI has organized and structured your collected architecture data. Review the output, make corrections if needed, then <strong style={{ color: 'var(--text)' }}>Approve</strong> to make it available as input to the next step.</div>
+                            </div>
+                          )}
                           {(out.status === 'PENDING' || out.status === 'AI_DRAFT') && (() => {
                             const behaviorType = def?.behaviorType || 'ANALYSIS'
                             const buttonConfig: Record<string, { label: string; icon: string; tooltip: string }> = {
@@ -933,9 +933,9 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                             const cfg = buttonConfig[behaviorType] || buttonConfig.ANALYSIS
                             return (
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                {behaviorType === 'DISCOVERY' && (
-                                  <div style={{ fontSize: 10, color: 'var(--gold)', padding: '4px 8px', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.2)', borderRadius: 4, marginBottom: 2 }}>
-                                    🔍 Discovery mode — AI will structure your evidence, not generate architecture
+                                {behaviorType === 'DISCOVERY' && out.status === 'PENDING' && (
+                                  <div style={{ fontSize: 10, color: '#f39c12', padding: '4px 8px', background: 'rgba(243,175,55,0.08)', border: '1px solid rgba(243,175,55,0.2)', borderRadius: 4, marginBottom: 2 }}>
+                                    🔍 Discovery mode — provide your collected architecture data as inputs, then click Analyze & Structure
                                   </div>
                                 )}
                                 <button
@@ -1048,7 +1048,6 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 export default function AdmPage() {
   const { t } = useLang()
   const api = useApi()
-  if (!(window as any)._buildCheck) { (window as any)._buildCheck = true; alert('BUILD V2 LOADED') }
   const [cycles, setCycles] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [showCreate, setShowCreate] = useState(false)
