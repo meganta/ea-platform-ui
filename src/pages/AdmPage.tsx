@@ -962,7 +962,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
       setPhaseOutputs(out.outputs || [])
       // Auto-expand outputs that have content or are not in initial PENDING state
       const autoExpand = new Set<string>()
-      ;(out.outputs || []).filter((o: any) => o.status !== 'PENDING' || o.content).forEach((o: any) => autoExpand.add(o.id))
+      ;(out.outputs || []).filter((o: any) => o.status === 'GENERATING').forEach((o: any) => autoExpand.add(o.id))
       setExpandedOutputs(autoExpand)
       setPhaseDef(inp.phaseDef || out.phaseDef)
       // Auto-select first step
