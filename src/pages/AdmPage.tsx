@@ -676,6 +676,134 @@ function OutputSourcePanel({ out, onUpdated }: any) {
 }
 
 // ── Evidence Collection Form (DISCOVERY outputs) ──────────────────────────
+function EvidenceFieldInput({ field, value, onChange, outId }: { field: any; value: string; onChange: (v: string) => void; outId: string }) {
+  const [showPull, setShowPull] = useState(false)
+  const [kbQuery, setKbQuery] = useState('')
+  const [kbSearching, setKbSearching] = useState(false)
+  const [repoAssets, setRepoAssets] = useState<any[]>([])
+  const [repoLoading, setRepoLoading] = useState(false)
+  const [showRepo, setShowRepo] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const token = () => localStorage.getItem('ea_token')
+
+  const pullFromKb = async () => {
+    if (!kbQuery.trim()) return
+    setKbSearching(true)
+    try {
+      const res = await fetch(`${API_URL}/adm-intelligence/outputs/${outId}/pull-from-kb`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: kbQuery })
+      })
+      const data = await res.json()
+      if (data.content) {
+        onChange((value ? value + '\n\n' : '') + data.content)
+        setShowPull(false)
+        setKbQuery('')
+      }
+    } finally { setKbSearching(false) }
+  }
+
+  const loadRepo = async () => {
+    setRepoLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/ea-repository/assets`, { headers: { Authorization: `Bearer ${token()}` } })
+      setRepoAssets(await res.json())
+    } finally { setRepoLoading(false) }
+  }
+
+  const pullFromRepo = async (assetId: string) => {
+    const res = await fetch(`${API_URL}/adm-intelligence/outputs/${outId}/pull-from-repo`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ assetId })
+    })
+    const data = await res.json()
+    if (data.content) {
+      onChange((value ? value + '\n\n' : '') + data.content)
+      setShowRepo(false)
+      setShowPull(false)
+    }
+  }
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true)
+    try {
+      const text = file.type.startsWith('text') || file.name.endsWith('.txt') || file.name.endsWith('.md')
+        ? await file.text()
+        : `Uploaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`
+      onChange((value ? value + '\n\n' : '') + text)
+      setShowPull(false)
+    } finally { setUploading(false) }
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 3, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>{field.label}</span>
+        <button
+          style={{ fontSize: 10, background: 'none', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 6px', color: 'var(--text-dim)', cursor: 'pointer' }}
+          onClick={() => { setShowPull(s => !s); if (!repoAssets.length) loadRepo() }}
+        >⬇ Pull / Upload</button>
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{field.hint}</div>
+
+      {showPull && (
+        <div style={{ marginBottom: 8, padding: 10, background: 'rgba(0,0,0,0.15)', borderRadius: 6, border: '1px solid var(--border)' }}>
+          {/* KB Pull */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>📚 Pull from Knowledge Base</div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input className="form-input" value={kbQuery} onChange={e => setKbQuery(e.target.value)}
+                placeholder={`Search KB for ${field.label.toLowerCase()}...`}
+                style={{ flex: 1, fontSize: 10 }} onKeyDown={e => e.key === 'Enter' && pullFromKb()} />
+              <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>
+                {kbSearching ? '...' : 'Pull'}
+              </button>
+            </div>
+          </div>
+          {/* Repo Pull */}
+          <div style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)' }}>🗄 Pull from EA Repository</div>
+              <button className="btn btn-secondary btn-sm" style={{ fontSize: 9 }}
+                onClick={() => setShowRepo(s => !s)}>{showRepo ? 'Hide' : 'Browse'}</button>
+            </div>
+            {showRepo && (
+              <div style={{ maxHeight: 120, overflow: 'auto' }}>
+                {repoLoading ? <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Loading...</div> :
+                  repoAssets.slice(0, 15).map((a: any) => (
+                    <div key={a.id} onClick={() => pullFromRepo(a.id)}
+                      style={{ padding: '4px 8px', marginBottom: 2, background: 'var(--navy-light)', borderRadius: 3, cursor: 'pointer', fontSize: 10, display: 'flex', justifyContent: 'space-between' }}>
+                      <div><div style={{ fontWeight: 500 }}>{a.name}</div><div style={{ color: 'var(--text-dim)' }}>{a.domain} / {a.assetType}</div></div>
+                      <span style={{ color: 'var(--accent)' }}>+ Use</span>
+                    </div>
+                  ))
+                }
+              </div>
+            )}
+          </div>
+          {/* File Upload */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#2ecc71', marginBottom: 4 }}>⬆ Upload File</div>
+            <input type="file" disabled={uploading}
+              onChange={e => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
+              style={{ fontSize: 10, color: 'var(--text)' }} />
+            {uploading && <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>Processing...</span>}
+          </div>
+          <button onClick={() => setShowPull(false)} style={{ marginTop: 6, background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 10, cursor: 'pointer' }}>× Close</button>
+        </div>
+      )}
+
+      <textarea
+        className="form-input"
+        style={{ width: '100%', minHeight: 72, fontSize: 11, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+        placeholder={field.placeholder}
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+      />
+    </div>
+  )
+}
+
 function EvidenceCollectionForm({ out, onEvidenceSaved }: { out: any; onEvidenceSaved: (evidence: any) => void }) {
   const [fields, setFields] = useState<any[]>([])
   const [evidence, setEvidence] = useState<Record<string, string>>({})
@@ -688,17 +816,9 @@ function EvidenceCollectionForm({ out, onEvidenceSaved }: { out: any; onEvidence
       headers: { Authorization: `Bearer ${token()}` }
     })
       .then(r => r.json())
-      .then(data => {
-        setFields(data.fields || [])
-        setEvidence(data.evidence || {})
-        setLoaded(true)
-      })
+      .then(data => { setFields(data.fields || []); setEvidence(data.evidence || {}); setLoaded(true) })
       .catch(() => setLoaded(true))
   }, [out.id])
-
-  const handleChange = (key: string, value: string) => {
-    setEvidence(prev => ({ ...prev, [key]: value }))
-  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -724,36 +844,27 @@ function EvidenceCollectionForm({ out, onEvidenceSaved }: { out: any; onEvidence
         <span>🔍 Architecture Evidence Collection</span>
         <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>{filledCount}/{fields.length} fields provided</span>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {fields.map((field: any) => (
-          <div key={field.key}>
-            <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 3, color: 'var(--text)' }}>
-              {field.label}
-              <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400, marginLeft: 6 }}>{field.hint}</span>
-            </div>
-            <textarea
-              className="form-input"
-              style={{ width: '100%', minHeight: 72, fontSize: 11, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
-              placeholder={field.placeholder}
-              value={evidence[field.key] || ''}
-              onChange={e => handleChange(field.key, e.target.value)}
-            />
-          </div>
+          <EvidenceFieldInput
+            key={field.key}
+            field={field}
+            value={evidence[field.key] || ''}
+            onChange={v => setEvidence(prev => ({ ...prev, [field.key]: v }))}
+            outId={out.id}
+          />
         ))}
       </div>
-      <button
-        className="btn btn-secondary btn-sm"
-        style={{ fontSize: 10, marginTop: 8 }}
-        disabled={saving}
-        onClick={handleSave}
-      >
-        {saving ? '💾 Saving...' : '💾 Save Evidence'}
-      </button>
-      {filledCount > 0 && (
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-          Evidence saved — click "Analyze & Structure" to process with AI
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} disabled={saving} onClick={handleSave}>
+          {saving ? '💾 Saving...' : '💾 Save Evidence'}
+        </button>
+        {filledCount > 0 && (
+          <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+            {filledCount}/{fields.length} fields filled — click "Analyze & Structure" to process
+          </span>
+        )}
+      </div>
     </div>
   )
 }
