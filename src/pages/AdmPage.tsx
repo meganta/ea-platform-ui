@@ -960,9 +960,8 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
       setPhaseInputs(inp.inputs || [])
       setPhaseOutputs(out.outputs || [])
       // Auto-expand outputs that have content or are not in initial PENDING state
-      const autoExpand = new Set<string>(
-        (out.outputs || []).filter((o: any) => o.status !== 'PENDING' || o.content).map((o: any) => o.id)
-      )
+      const autoExpand = new Set<string>()
+      ;(out.outputs || []).filter((o: any) => o.status !== 'PENDING' || o.content).forEach((o: any) => autoExpand.add(o.id))
       setExpandedOutputs(autoExpand)
       setPhaseDef(inp.phaseDef || out.phaseDef)
       // Auto-select first step
@@ -985,7 +984,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
       setEditingInput(null)
     }
     setGenerating(outputId)
-    setExpandedOutputs(prev => new Set([...prev, outputId]))
+    setExpandedOutputs(prev => { const s = new Set(prev); s.add(outputId); return s })
     try {
       const result = await api.post(`/adm-intelligence/outputs/${outputId}/generate`)
       setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
