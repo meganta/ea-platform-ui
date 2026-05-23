@@ -675,6 +675,89 @@ function OutputSourcePanel({ out, onUpdated }: any) {
   )
 }
 
+// ── Evidence Collection Form (DISCOVERY outputs) ──────────────────────────
+function EvidenceCollectionForm({ out, onEvidenceSaved }: { out: any; onEvidenceSaved: (evidence: any) => void }) {
+  const [fields, setFields] = useState<any[]>([])
+  const [evidence, setEvidence] = useState<Record<string, string>>({})
+  const [saving, setSaving] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const token = () => localStorage.getItem('ea_token')
+
+  useEffect(() => {
+    fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/evidence-def`, {
+      headers: { Authorization: `Bearer ${token()}` }
+    })
+      .then(r => r.json())
+      .then(data => {
+        setFields(data.fields || [])
+        setEvidence(data.evidence || {})
+        setLoaded(true)
+      })
+      .catch(() => setLoaded(true))
+  }, [out.id])
+
+  const handleChange = (key: string, value: string) => {
+    setEvidence(prev => ({ ...prev, [key]: value }))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/evidence`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ evidence })
+      })
+      const updated = await res.json()
+      if (updated.id) onEvidenceSaved(evidence)
+    } finally { setSaving(false) }
+  }
+
+  const filledCount = Object.values(evidence).filter(v => v && v.trim().length > 0).length
+
+  if (!loaded) return <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '8px 0' }}>Loading collection form...</div>
+  if (fields.length === 0) return null
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: '#f39c12', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span>🔍 Architecture Evidence Collection</span>
+        <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>{filledCount}/{fields.length} fields provided</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {fields.map((field: any) => (
+          <div key={field.key}>
+            <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 3, color: 'var(--text)' }}>
+              {field.label}
+              <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400, marginLeft: 6 }}>{field.hint}</span>
+            </div>
+            <textarea
+              className="form-input"
+              style={{ width: '100%', minHeight: 72, fontSize: 11, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.5 }}
+              placeholder={field.placeholder}
+              value={evidence[field.key] || ''}
+              onChange={e => handleChange(field.key, e.target.value)}
+            />
+          </div>
+        ))}
+      </div>
+      <button
+        className="btn btn-secondary btn-sm"
+        style={{ fontSize: 10, marginTop: 8 }}
+        disabled={saving}
+        onClick={handleSave}
+      >
+        {saving ? '💾 Saving...' : '💾 Save Evidence'}
+      </button>
+      {filledCount > 0 && (
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+          Evidence saved — click "Analyze & Structure" to process with AI
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Phase Workspace (Step-based) ──────────────────────────
 function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const api = useApi()
@@ -974,7 +1057,17 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                           </div>
                         )}
 
-                        <OutputSourcePanel out={out} onUpdated={(updated: any) => setPhaseOutputs(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))} />
+                        {/* Evidence Collection Form for DISCOVERY outputs */}
+                        {def?.behaviorType === 'DISCOVERY' && (out.status === 'PENDING' || out.status === 'AI_DRAFT') && (
+                          <EvidenceCollectionForm
+                            out={out}
+                            onEvidenceSaved={(ev: any) => setPhaseOutputs(prev => prev.map(o => o.id === out.id ? { ...o, outputEvidence: ev } : o))}
+                          />
+                        )}
+                        {/* Pull/Upload panel — hidden for DISCOVERY outputs, evidence form replaces it */}
+                        {def?.behaviorType !== 'DISCOVERY' && (
+                          <OutputSourcePanel out={out} onUpdated={(updated: any) => setPhaseOutputs(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))} />
+                        )}
 
                         {(out.status === 'AI_DRAFT' || out.status === 'APPROVED') && out.content && out.content.length > 100 && <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />}
                         {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
