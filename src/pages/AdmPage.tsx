@@ -942,6 +942,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const [phaseDef, setPhaseDef] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState<string | null>(null)
+  const [expandedOutputs, setExpandedOutputs] = useState<Set<string>>(new Set())
   const [expandedOutput, setExpandedOutput] = useState<string | null>(null)
   const [outputSections, setOutputSections] = useState<Record<string, any[]>>({})
   const [editingInput, setEditingInput] = useState<string | null>(null)
@@ -958,6 +959,11 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     ]).then(([inp, out]) => {
       setPhaseInputs(inp.inputs || [])
       setPhaseOutputs(out.outputs || [])
+      // Auto-expand outputs that have content or are not in initial PENDING state
+      const autoExpand = new Set<string>(
+        (out.outputs || []).filter((o: any) => o.status !== 'PENDING' || o.content).map((o: any) => o.id)
+      )
+      setExpandedOutputs(autoExpand)
       setPhaseDef(inp.phaseDef || out.phaseDef)
       // Auto-select first step
       const steps = inp.phaseDef?.steps || out.phaseDef?.steps || []
@@ -979,6 +985,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
       setEditingInput(null)
     }
     setGenerating(outputId)
+    setExpandedOutputs(prev => new Set([...prev, outputId]))
     try {
       const result = await api.post(`/adm-intelligence/outputs/${outputId}/generate`)
       setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
@@ -1136,11 +1143,19 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                   ) : stepOutputs.map(out => {
                     const def = currentStep?.outputs.find((d: any) => d.key === out.outputKey)
                     const statusColor = OUTPUT_STATUS_COLOR[out.status] || '#8baac8'
+                    const isExpanded = expandedOutputs.has(out.id)
                     return (
-                      <div key={out.id} style={{ marginBottom: 10, padding: '10px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <div style={{ fontSize: 12, fontWeight: 500 }}>{out.title}</div>
-                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <div key={out.id} style={{ marginBottom: 6, background: 'var(--navy)', border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)', overflow: 'hidden', transition: 'border-color 0.15s' }}>
+                        {/* Collapsed header — always visible */}
+                        <div
+                          onClick={() => setExpandedOutputs(prev => { const s = new Set(prev); s.has(out.id) ? s.delete(out.id) : s.add(out.id); return s })}
+                          style={{ padding: '8px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', userSelect: 'none' }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            <span style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0 }}>{isExpanded ? '▾' : '▸'}</span>
+                            <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{out.title}</div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
                             {def?.behaviorType && (() => {
                               const behaviorLabels: Record<string, { label: string; color: string }> = {
                                 DISCOVERY:  { label: '🔍 Discovery',  color: '#f39c12' },
@@ -1157,6 +1172,10 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                             <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: `${statusColor}22`, color: statusColor, border: `1px solid ${statusColor}44` }}>{out.status.replace('_', ' ')}</span>
                           </div>
                         </div>
+
+                        {/* Expandable body */}
+                        {isExpanded && (
+                        <div style={{ padding: '0 12px 10px 12px' }}>
                         <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{out.description}</div>
 
                         {/* Actions */}
@@ -1301,6 +1320,8 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                               <button className="btn btn-secondary btn-sm" onClick={() => setEditingOutput(null)}>Cancel</button>
                             </div>
                           </div>
+                        )}
+                        </div>
                         )}
                       </div>
                     )
