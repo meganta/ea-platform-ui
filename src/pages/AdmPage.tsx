@@ -675,15 +675,27 @@ function OutputSourcePanel({ out, onUpdated }: any) {
 }
 
 // ── Evidence Collection Form (DISCOVERY outputs) ──────────────────────────
-function EvidenceFieldInput({ field, value, onChange, outId }: { field: any; value: string; onChange: (v: string) => void; outId: string }) {
-  const [showPull, setShowPull] = useState(false)
+function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field: any; value: string; onChange: (v: string) => void; outId: string; cycleId: string }) {
+  const [showOptions, setShowOptions] = useState(false)
   const [kbQuery, setKbQuery] = useState('')
   const [kbSearching, setKbSearching] = useState(false)
+  const [showRepoSearch, setShowRepoSearch] = useState(false)
   const [repoAssets, setRepoAssets] = useState<any[]>([])
+  const [allRepoAssets, setAllRepoAssets] = useState<any[]>([])
   const [repoLoading, setRepoLoading] = useState(false)
-  const [showRepo, setShowRepo] = useState(false)
+  const [repoSearch, setRepoSearch] = useState('')
+  const [repoSourceFilter, setRepoSourceFilter] = useState('CYCLE')
+  const [repoDomainFilter, setRepoDomainFilter] = useState('ALL')
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [includeInKb, setIncludeInKb] = useState(false)
   const [uploading, setUploading] = useState(false)
   const token = () => localStorage.getItem('ea_token')
+
+  const appendContent = (text: string) => {
+    onChange((value ? value + '\n\n' : '') + text)
+    setShowOptions(false)
+    setShowRepoSearch(false)
+  }
 
   const pullFromKb = async () => {
     if (!kbQuery.trim()) return
@@ -694,101 +706,154 @@ function EvidenceFieldInput({ field, value, onChange, outId }: { field: any; val
         body: JSON.stringify({ query: kbQuery })
       })
       const data = await res.json()
-      if (data.content) {
-        onChange((value ? value + '\n\n' : '') + data.content)
-        setShowPull(false)
-        setKbQuery('')
-      }
+      if (data.content) appendContent(data.content)
+      else alert(data.message || 'No content found in KB')
     } finally { setKbSearching(false) }
   }
 
-  const loadRepo = async () => {
+  const loadRepoAssets = async () => {
     setRepoLoading(true)
     try {
       const res = await fetch(`${API_URL}/ea-repository/assets`, { headers: { Authorization: `Bearer ${token()}` } })
-      setRepoAssets(await res.json())
+      const all = await res.json()
+      setAllRepoAssets(all)
+      setRepoAssets(all.filter((a: any) => a.sourceRef === cycleId || a.source === 'MANUAL'))
+      setRepoSourceFilter('CYCLE')
     } finally { setRepoLoading(false) }
   }
 
   const pullFromRepo = async (assetId: string) => {
-    const res = await fetch(`${API_URL}/adm-intelligence/outputs/${outId}/pull-from-repo`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ assetId })
-    })
-    const data = await res.json()
-    if (data.content) {
-      onChange((value ? value + '\n\n' : '') + data.content)
-      setShowRepo(false)
-      setShowPull(false)
-    }
+    try {
+      const res = await fetch(`${API_URL}/adm-intelligence/outputs/${outId}/pull-from-repo`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assetId })
+      })
+      const data = await res.json()
+      if (data.content) appendContent(data.content)
+      else alert('Failed to pull from repository: ' + (data.message || JSON.stringify(data)))
+    } catch (e: any) { alert('Error: ' + e.message) }
   }
 
-  const handleFileUpload = async (file: File) => {
+  const handleUpload = async () => {
+    if (!uploadFile) return
     setUploading(true)
     try {
-      const text = file.type.startsWith('text') || file.name.endsWith('.txt') || file.name.endsWith('.md')
-        ? await file.text()
-        : `Uploaded: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`
-      onChange((value ? value + '\n\n' : '') + text)
-      setShowPull(false)
+      const text = await uploadFile.text()
+      if (includeInKb) {
+        const fd = new FormData(); fd.append('file', uploadFile); fd.append('type', 'REFERENCE_ARCHITECTURE')
+        await fetch(`${API_URL}/knowledge/documents/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
+      }
+      appendContent(text)
+      setUploadFile(null)
     } finally { setUploading(false) }
   }
 
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 3, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ fontSize: 11, fontWeight: 500, marginBottom: 2, color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>{field.label}</span>
-        <button
-          style={{ fontSize: 10, background: 'none', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 6px', color: 'var(--text-dim)', cursor: 'pointer' }}
-          onClick={() => { setShowPull(s => !s); if (!repoAssets.length) loadRepo() }}
-        >⬇ Pull / Upload</button>
+        <button style={{ fontSize: 10, background: 'none', border: '1px solid var(--border)', borderRadius: 3, padding: '1px 7px', color: 'var(--text-dim)', cursor: 'pointer' }}
+          onClick={() => { setShowOptions(s => !s); if (!allRepoAssets.length) loadRepoAssets() }}>
+          ⬇ Pull From...
+        </button>
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 4 }}>{field.hint}</div>
 
-      {showPull && (
-        <div style={{ marginBottom: 8, padding: 10, background: 'rgba(0,0,0,0.15)', borderRadius: 6, border: '1px solid var(--border)' }}>
-          {/* KB Pull */}
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>📚 Pull from Knowledge Base</div>
+      {showOptions && (
+        <div style={{ marginBottom: 8, padding: 12, background: 'rgba(0,0,0,0.15)', borderRadius: 6, border: '1px solid var(--border)' }}>
+          {/* KB */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>📚 Pull from Knowledge Base</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <input className="form-input" value={kbQuery} onChange={e => setKbQuery(e.target.value)}
                 placeholder={`Search KB for ${field.label.toLowerCase()}...`}
-                style={{ flex: 1, fontSize: 10 }} onKeyDown={e => e.key === 'Enter' && pullFromKb()} />
+                style={{ flex: 1, fontSize: 11 }} onKeyDown={e => e.key === 'Enter' && pullFromKb()} />
               <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>
-                {kbSearching ? '...' : 'Pull'}
+                {kbSearching ? '...' : 'Search'}
               </button>
             </div>
           </div>
-          {/* Repo Pull */}
-          <div style={{ marginBottom: 8 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-              <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--gold)' }}>🗄 Pull from EA Repository</div>
-              <button className="btn btn-secondary btn-sm" style={{ fontSize: 9 }}
-                onClick={() => setShowRepo(s => !s)}>{showRepo ? 'Hide' : 'Browse'}</button>
+
+          <div className="divider" style={{ margin: '8px 0' }} />
+
+          {/* Repo */}
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)' }}>🗄 Pull from EA Repository</div>
+              <button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }}
+                onClick={() => setShowRepoSearch(s => !s)}>{showRepoSearch ? 'Hide' : 'Browse Assets'}</button>
             </div>
-            {showRepo && (
-              <div style={{ maxHeight: 120, overflow: 'auto' }}>
-                {repoLoading ? <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>Loading...</div> :
-                  repoAssets.slice(0, 15).map((a: any) => (
-                    <div key={a.id} onClick={() => pullFromRepo(a.id)}
-                      style={{ padding: '4px 8px', marginBottom: 2, background: 'var(--navy-light)', borderRadius: 3, cursor: 'pointer', fontSize: 10, display: 'flex', justifyContent: 'space-between' }}>
-                      <div><div style={{ fontWeight: 500 }}>{a.name}</div><div style={{ color: 'var(--text-dim)' }}>{a.domain} / {a.assetType}</div></div>
-                      <span style={{ color: 'var(--accent)' }}>+ Use</span>
-                    </div>
-                  ))
-                }
+            {showRepoSearch && (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '4px 8px', background: 'rgba(0,180,216,0.06)', borderRadius: 4 }}>
+                  <div style={{ fontSize: 10, color: 'var(--accent)' }}>
+                    {repoSourceFilter === 'CYCLE' ? '📍 This cycle assets only' : '🌐 All repository assets'}
+                  </div>
+                  <button style={{ fontSize: 9, background: 'none', border: '1px solid var(--border)', borderRadius: 3, color: 'var(--text-dim)', padding: '1px 6px', cursor: 'pointer' }}
+                    onClick={() => {
+                      const next = repoSourceFilter === 'CYCLE' ? 'ALL' : 'CYCLE'
+                      setRepoSourceFilter(next)
+                      setRepoAssets(next === 'CYCLE' ? allRepoAssets.filter((a: any) => a.sourceRef === cycleId || a.source === 'MANUAL') : allRepoAssets)
+                    }}>{repoSourceFilter === 'CYCLE' ? 'Show All' : 'This Cycle Only'}</button>
+                </div>
+                <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                  <input className="form-input" value={repoSearch} onChange={e => setRepoSearch(e.target.value)}
+                    placeholder="Search assets..." style={{ flex: 1, fontSize: 10, padding: '3px 6px' }} />
+                  <select className="form-input" value={repoDomainFilter} onChange={e => setRepoDomainFilter(e.target.value)}
+                    style={{ fontSize: 10, padding: '3px 4px', width: 110 }}>
+                    <option value="ALL">All Domains</option>
+                    {(Array.from(new Set(allRepoAssets.map((a: any) => a.domain).filter(Boolean))) as string[]).sort().map((d: string) =>
+                      <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>
+                    )}
+                  </select>
+                </div>
+                <div style={{ maxHeight: 200, overflow: 'auto' }}>
+                  {repoLoading ? <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Loading...</div> : (() => {
+                    const display = repoAssets.filter((a: any) =>
+                      (repoDomainFilter === 'ALL' || a.domain === repoDomainFilter) &&
+                      (!repoSearch || a.name.toLowerCase().includes(repoSearch.toLowerCase()) || (a.nameAr || '').includes(repoSearch))
+                    )
+                    return display.length === 0
+                      ? <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '8px 0', textAlign: 'center' }}>No assets found — try "Show All"</div>
+                      : display.map((a: any) => (
+                        <div key={a.id} onClick={() => pullFromRepo(a.id)}
+                          style={{ padding: '6px 8px', marginBottom: 3, background: 'var(--navy-light)', borderRadius: 3, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, border: '1px solid transparent' }}
+                          onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
+                          onMouseLeave={e => (e.currentTarget.style.borderColor = 'transparent')}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</div>
+                            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{(a.domain || '').replace(/_/g, ' ')} / {(a.assetType || '').replace(/_/g, ' ')}</div>
+                          </div>
+                          <span style={{ fontSize: 10, color: 'var(--accent)', flexShrink: 0, marginLeft: 6 }}>+ Use</span>
+                        </div>
+                      ))
+                  })()}
+                </div>
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4 }}>{repoAssets.length} assets in view · {allRepoAssets.length} total</div>
               </div>
             )}
           </div>
-          {/* File Upload */}
+
+          <div className="divider" style={{ margin: '8px 0' }} />
+
+          {/* Upload */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#2ecc71', marginBottom: 4 }}>⬆ Upload File</div>
-            <input type="file" disabled={uploading}
-              onChange={e => e.target.files?.[0] && handleFileUpload(e.target.files[0])}
-              style={{ fontSize: 10, color: 'var(--text)' }} />
-            {uploading && <span style={{ fontSize: 10, color: 'var(--text-dim)', marginLeft: 6 }}>Processing...</span>}
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: '#2ecc71' }}>⬆ Upload File</div>
+            <input type="file" onChange={e => setUploadFile(e.target.files?.[0] || null)} style={{ fontSize: 11, marginBottom: 6, color: 'var(--text)' }} />
+            {uploadFile && (
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>📄 {uploadFile.name}</div>
+                <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', marginBottom: 8 }}>
+                  <input type="checkbox" checked={includeInKb} onChange={e => setIncludeInKb(e.target.checked)} /> Add to Knowledge Base
+                </label>
+                <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={uploading} onClick={handleUpload}>
+                  {uploading ? 'Uploading...' : 'Upload & Use'}
+                </button>
+              </div>
+            )}
           </div>
-          <button onClick={() => setShowPull(false)} style={{ marginTop: 6, background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 10, cursor: 'pointer' }}>× Close</button>
+
+          <button onClick={() => setShowOptions(false)} style={{ marginTop: 8, background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 11, cursor: 'pointer' }}>× Close</button>
         </div>
       )}
 
@@ -803,7 +868,7 @@ function EvidenceFieldInput({ field, value, onChange, outId }: { field: any; val
   )
 }
 
-function EvidenceCollectionForm({ out, onEvidenceSaved }: { out: any; onEvidenceSaved: (evidence: any) => void }) {
+function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; cycleId: string; onEvidenceSaved: (evidence: any) => void }) {
   const [fields, setFields] = useState<any[]>([])
   const [evidence, setEvidence] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -851,6 +916,7 @@ function EvidenceCollectionForm({ out, onEvidenceSaved }: { out: any; onEvidence
             value={evidence[field.key] || ''}
             onChange={v => setEvidence(prev => ({ ...prev, [field.key]: v }))}
             outId={out.id}
+            cycleId={cycleId}
           />
         ))}
       </div>
@@ -1171,6 +1237,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                         {def?.behaviorType === 'DISCOVERY' && (out.status === 'PENDING' || out.status === 'AI_DRAFT') && (
                           <EvidenceCollectionForm
                             out={out}
+                            cycleId={cycle.id}
                             onEvidenceSaved={(ev: any) => setPhaseOutputs(prev => prev.map(o => o.id === out.id ? { ...o, outputEvidence: ev } : o))}
                           />
                         )}
