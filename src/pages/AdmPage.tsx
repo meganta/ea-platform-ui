@@ -193,9 +193,9 @@ function SectionProgress({ outputId }: { outputId: string }) {
           <span style={{ fontSize: 11, color: s.status === 'COMPLETE' ? 'var(--text)' : 'var(--text-dim)' }}>
             {s.title}
           </span>
-          {s.status === 'COMPLETE' && s.tokenCount && (
-            <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginLeft: 'auto' }}>
-              {s.tokenCount} tokens
+          {s.status === 'COMPLETE' && (
+            <span style={{ fontSize: 9, color: s.tokenCount > 0 ? 'var(--text-dim)' : 'var(--gold)', fontFamily: 'var(--font-mono)', marginLeft: 'auto' }}>
+              {s.tokenCount > 0 ? `${s.tokenCount} tokens` : '⚠ empty'}
             </span>
           )}
         </div>
