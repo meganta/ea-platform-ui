@@ -1090,6 +1090,16 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                 </div>
               )}
 
+              {/* Architecture Scope Selector — Step 1.2 only */}
+              {activeStep === '1.2' && (
+                <ScopeSelector
+                  cycle={cycle}
+                  onScopeSet={(domains: string[]) => {
+                    cycle.scopeDomains = domains
+                  }}
+                />
+              )}
+
               <div className="grid-2" style={{ gap: 16 }}>
                 {/* Inputs */}
                 <div>
@@ -1427,9 +1437,6 @@ export default function AdmPage() {
             {/* Cycle detail */}
             {selected && (
               <div>
-                {/* Scope selector */}
-                <ScopeSelector cycle={selected} onScopeSet={(domains: string[]) => setSelected((s: any) => ({ ...s, scopeDomains: domains }))} />
-
                 {/* Phase map */}
                 <div className="card mb-4">
                   <div className="flex items-center justify-between mb-4">
