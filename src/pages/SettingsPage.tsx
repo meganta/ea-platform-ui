@@ -17,6 +17,315 @@ const ALL_DOMAINS: Record<string, string[]> = {
   CUSTOM: ['BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY', 'CROSS_CUTTING'],
 }
 
+function BrandingTab() {
+  const [form, setForm] = useState({ organizationNameEn: '', organizationNameAr: '', primaryColor: '#00b4d8', accentColor: '#f39c12', logoUrl: '' })
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  useEffect(() => {
+    authFetch('/config').then(c => {
+      const b = c.ai?.branding || {}
+      setForm(f => ({ ...f, ...b }))
+    })
+  }, [])
+
+  const save = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch('/config/branding', { method: 'PUT', body: JSON.stringify(form) })
+      if (res.message) setMsg({ type: 'success', text: 'Branding saved' })
+      else setMsg({ type: 'error', text: 'Failed to save' })
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>🎨 Branding</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Customize the platform appearance for your organization</div>
+      {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[['organizationNameEn', 'Organization Name (EN)', 'text', false], ['organizationNameAr', 'Organization Name (AR)', 'text', true], ['logoUrl', 'Logo URL', 'url', false]].map(([k, l, t, rtl]) => (
+            <div key={k as string}>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>{l as string}</div>
+              <input className="form-input" type={t as string} value={(form as any)[k as string]} onChange={e => setForm(f => ({ ...f, [k as string]: e.target.value }))} style={{ width: '100%', fontSize: 11, direction: rtl ? 'rtl' : 'ltr' }} />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[['primaryColor', 'Primary Color'], ['accentColor', 'Accent Color']].map(([k, l]) => (
+            <div key={k}>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>{l}</div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input type="color" value={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} style={{ width: 40, height: 32, border: 'none', background: 'none', cursor: 'pointer' }} />
+                <input className="form-input" value={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} style={{ flex: 1, fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+                <div style={{ width: 32, height: 32, borderRadius: 4, background: (form as any)[k], border: '1px solid var(--border)' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        {form.logoUrl && <div style={{ padding: 12, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <img src={form.logoUrl} alt="Logo preview" style={{ maxHeight: 48, maxWidth: 120, objectFit: 'contain' }} onError={e => (e.currentTarget.style.display = 'none')} />
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Logo preview</div>
+        </div>}
+        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Branding'}</button>
+      </div>
+    </div>
+  )
+}
+
+function ExportSettingsTab() {
+  const [form, setForm] = useState({ defaultLanguage: 'AR', includeCharts: true, includeTableOfContents: true, includePageNumbers: true, templateStyle: 'PROFESSIONAL', footerText: '', headerLogoEnabled: true })
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  useEffect(() => {
+    authFetch('/config').then(c => { const s = c.ai?.exportSettings || {}; setForm(f => ({ ...f, ...s })) })
+  }, [])
+
+  const save = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch('/config/export-settings', { method: 'PUT', body: JSON.stringify(form) })
+      if (res.message) setMsg({ type: 'success', text: 'Export settings saved' })
+      else setMsg({ type: 'error', text: 'Failed to save' })
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>📤 Export Settings</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Configure default behavior for Word and PowerPoint exports</div>
+      {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Default Export Language</div>
+            <select className="form-input" value={form.defaultLanguage} onChange={e => setForm(f => ({ ...f, defaultLanguage: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
+              <option value="AR">Arabic (العربية)</option>
+              <option value="EN">English</option>
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Template Style</div>
+            <select className="form-input" value={form.templateStyle} onChange={e => setForm(f => ({ ...f, templateStyle: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
+              <option value="PROFESSIONAL">Professional</option>
+              <option value="GOVERNMENT">Government</option>
+              <option value="MINIMAL">Minimal</option>
+            </select>
+          </div>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Footer Text</div>
+            <input className="form-input" value={form.footerText} onChange={e => setForm(f => ({ ...f, footerText: e.target.value }))} placeholder="e.g. Confidential — For internal use only" style={{ fontSize: 11, width: '100%' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[['includeCharts', 'Include Charts & Diagrams'], ['includeTableOfContents', 'Include Table of Contents'], ['includePageNumbers', 'Include Page Numbers'], ['headerLogoEnabled', 'Include Organization Logo in Header']].map(([k, l]) => (
+            <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12 }}>
+              <input type="checkbox" checked={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.checked }))} />
+              {l}
+            </label>
+          ))}
+        </div>
+        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Export Settings'}</button>
+      </div>
+    </div>
+  )
+}
+
+function GovernanceSettingsTab() {
+  const [form, setForm] = useState({ requireApprovalForPublish: true, reviewerApprovalRequired: false, minReviewers: 1, autoApproveAfterDays: 0, approvalNotifyEmail: '', governanceMode: 'STANDARD' })
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  useEffect(() => {
+    authFetch('/config').then(c => { const g = c.ai?.governance || {}; setForm(f => ({ ...f, ...g })) })
+  }, [])
+
+  const save = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch('/config/governance-settings', { method: 'PUT', body: JSON.stringify(form) })
+      if (res.message) setMsg({ type: 'success', text: 'Governance settings saved' })
+      else setMsg({ type: 'error', text: 'Failed to save' })
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>⚖ Governance Settings</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Configure architecture governance workflows and approval thresholds</div>
+      {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Governance Mode</div>
+            <select className="form-input" value={form.governanceMode} onChange={e => setForm(f => ({ ...f, governanceMode: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
+              <option value="OPEN">Open — No approval required</option>
+              <option value="STANDARD">Standard — Architect approval</option>
+              <option value="STRICT">Strict — Admin approval required</option>
+            </select>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Minimum Reviewers</div>
+            <input type="number" className="form-input" min={1} max={5} value={form.minReviewers} onChange={e => setForm(f => ({ ...f, minReviewers: Number(e.target.value) }))} style={{ fontSize: 11, width: '100%' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Auto-approve After (days, 0 = disabled)</div>
+            <input type="number" className="form-input" min={0} max={30} value={form.autoApproveAfterDays} onChange={e => setForm(f => ({ ...f, autoApproveAfterDays: Number(e.target.value) }))} style={{ fontSize: 11, width: '100%' }} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Governance Notification Email</div>
+            <input type="email" className="form-input" value={form.approvalNotifyEmail} onChange={e => setForm(f => ({ ...f, approvalNotifyEmail: e.target.value }))} placeholder="governance@organization.gov.sa" style={{ fontSize: 11, width: '100%' }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[['requireApprovalForPublish', 'Require approval before publishing outputs'], ['reviewerApprovalRequired', 'Require reviewer sign-off in addition to architect']].map(([k, l]) => (
+            <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12 }}>
+              <input type="checkbox" checked={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.checked }))} />
+              {l}
+            </label>
+          ))}
+        </div>
+        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Governance Settings'}</button>
+      </div>
+    </div>
+  )
+}
+
+function DiagramSettingsTab() {
+  const [form, setForm] = useState({ defaultStyle: 'PROFESSIONAL', colorScheme: 'BLUE', autoGenerateDiagrams: true, diagramDensity: 'MEDIUM', showLegend: true, showRelationships: true, arabicLabels: true })
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  useEffect(() => {
+    authFetch('/config').then(c => { const d = c.ai?.diagramSettings || {}; setForm(f => ({ ...f, ...d })) })
+  }, [])
+
+  const save = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch('/config/diagram-settings', { method: 'PUT', body: JSON.stringify(form) })
+      if (res.message) setMsg({ type: 'success', text: 'Diagram settings saved' })
+      else setMsg({ type: 'error', text: 'Failed to save' })
+    } finally { setSaving(false) }
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>📐 Diagram Settings</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Configure architecture diagram generation preferences</div>
+      {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[['defaultStyle', 'Diagram Style', [['PROFESSIONAL', 'Professional'], ['MINIMAL', 'Minimal'], ['DETAILED', 'Detailed']]], ['colorScheme', 'Color Scheme', [['BLUE', 'Blue (Default)'], ['GREEN', 'Green'], ['MONOCHROME', 'Monochrome'], ['GOVERNMENT', 'Government']]], ['diagramDensity', 'Information Density', [['LOW', 'Low — Key elements only'], ['MEDIUM', 'Medium — Balanced'], ['HIGH', 'High — Full detail']]]].map(([k, l, opts]) => (
+            <div key={k as string}>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>{l as string}</div>
+              <select className="form-input" value={(form as any)[k as string]} onChange={e => setForm(f => ({ ...f, [k as string]: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
+                {(opts as string[][]).map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+              </select>
+            </div>
+          ))}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[['autoGenerateDiagrams', 'Auto-generate diagrams during output generation'], ['showLegend', 'Include legend in diagrams'], ['showRelationships', 'Show relationship lines between components'], ['arabicLabels', 'Use Arabic labels in diagrams (NORA outputs)']].map(([k, l]) => (
+            <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12 }}>
+              <input type="checkbox" checked={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.checked }))} />
+              {l}
+            </label>
+          ))}
+        </div>
+        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Diagram Settings'}</button>
+      </div>
+    </div>
+  )
+}
+
+function NotificationsTab() {
+  const [form, setForm] = useState({ emailEnabled: false, notifyOnApproval: true, notifyOnGeneration: false, notifyOnComment: true, webhookEnabled: false, webhookUrl: '', webhookSecret: '', notifyEmails: '' })
+  const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  useEffect(() => {
+    authFetch('/config').then(c => { const n = c.ai?.notifications || {}; setForm(f => ({ ...f, ...n })) })
+  }, [])
+
+  const save = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch('/config/notification-settings', { method: 'PUT', body: JSON.stringify(form) })
+      if (res.message) setMsg({ type: 'success', text: 'Notification settings saved' })
+      else setMsg({ type: 'error', text: 'Failed to save' })
+    } finally { setSaving(false) }
+  }
+
+  const testWebhook = async () => {
+    if (!form.webhookUrl) { setMsg({ type: 'error', text: 'Enter a webhook URL first' }); return }
+    setTesting(true); setMsg(null)
+    try {
+      await fetch(form.webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'test', platform: 'ArchMind EA', timestamp: new Date().toISOString() }) })
+      setMsg({ type: 'success', text: 'Test webhook sent' })
+    } catch { setMsg({ type: 'error', text: 'Webhook delivery failed — check the URL' }) }
+    finally { setTesting(false) }
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>🔔 Notification Settings</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Configure email and webhook notifications for platform events</div>
+      {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {/* Email */}
+        <div style={{ padding: 14, background: 'var(--navy)', border: `1px solid ${form.emailEnabled ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: form.emailEnabled ? 12 : 0 }}>
+            <div><div style={{ fontSize: 13, fontWeight: 600 }}>Email Notifications</div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Send email alerts for platform events</div></div>
+            <div style={{ position: 'relative', width: 40, height: 22, cursor: 'pointer', flexShrink: 0 }} onClick={() => setForm(f => ({ ...f, emailEnabled: !f.emailEnabled }))}>
+              <div style={{ position: 'absolute', inset: 0, background: form.emailEnabled ? 'var(--accent)' : 'var(--border)', borderRadius: 11, transition: 'background 0.2s' }} />
+              <div style={{ position: 'absolute', top: 2, left: form.emailEnabled ? 20 : 2, width: 18, height: 18, background: 'white', borderRadius: 9, transition: 'left 0.2s' }} />
+            </div>
+          </div>
+          {form.emailEnabled && <>
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>Notification Recipients (comma-separated)</div>
+              <input className="form-input" value={form.notifyEmails} onChange={e => setForm(f => ({ ...f, notifyEmails: e.target.value }))} placeholder="user@org.gov.sa, admin@org.gov.sa" style={{ fontSize: 11, width: '100%' }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[['notifyOnApproval', 'Notify when output is approved'], ['notifyOnGeneration', 'Notify when generation completes'], ['notifyOnComment', 'Notify on review comments']].map(([k, l]) => (
+                <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 11 }}>
+                  <input type="checkbox" checked={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.checked }))} />{l}
+                </label>
+              ))}
+            </div>
+          </>}
+        </div>
+        {/* Webhook */}
+        <div style={{ padding: 14, background: 'var(--navy)', border: `1px solid ${form.webhookEnabled ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: form.webhookEnabled ? 12 : 0 }}>
+            <div><div style={{ fontSize: 13, fontWeight: 600 }}>Webhook</div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>POST events to an external endpoint</div></div>
+            <div style={{ position: 'relative', width: 40, height: 22, cursor: 'pointer', flexShrink: 0 }} onClick={() => setForm(f => ({ ...f, webhookEnabled: !f.webhookEnabled }))}>
+              <div style={{ position: 'absolute', inset: 0, background: form.webhookEnabled ? 'var(--accent)' : 'var(--border)', borderRadius: 11, transition: 'background 0.2s' }} />
+              <div style={{ position: 'absolute', top: 2, left: form.webhookEnabled ? 20 : 2, width: 18, height: 18, background: 'white', borderRadius: 9, transition: 'left 0.2s' }} />
+            </div>
+          </div>
+          {form.webhookEnabled && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>Webhook URL</div>
+              <input className="form-input" value={form.webhookUrl} onChange={e => setForm(f => ({ ...f, webhookUrl: e.target.value }))} placeholder="https://your-service.com/webhook" style={{ fontSize: 11, width: '100%' }} />
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>Webhook Secret (optional)</div>
+              <input className="form-input" type="password" value={form.webhookSecret} onChange={e => setForm(f => ({ ...f, webhookSecret: e.target.value }))} placeholder="Signing secret" style={{ fontSize: 11, width: '100%' }} />
+            </div>
+            <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} disabled={testing} onClick={testWebhook}>{testing ? 'Sending...' : '🧪 Test Webhook'}</button>
+          </div>}
+        </div>
+        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Notification Settings'}</button>
+      </div>
+    </div>
+  )
+}
+
 function RagKbTab() {
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -666,7 +975,13 @@ export default function SettingsPage() {
         <div className="page-title">⚙ Settings</div>
         <div className="page-subtitle">TENANT CONFIGURATION — {config?.tenant?.slug?.toUpperCase()}</div>
         <div className="page-tabs">
-          {[['general', 'General'], ['framework', 'EA Framework'], ['ai', 'AI Configuration'], ['apikeys', '🔑 API Keys'], ['rag', '🧠 Knowledge Base'], ['users', '👥 Users'], ['terminology', '🌐 Terminology'], ['billing', 'Subscription']].map(([k, l]) => (
+          {[
+            ['general', 'General'], ['framework', 'EA Framework'], ['ai', 'AI Configuration'],
+            ['apikeys', '🔑 API Keys'], ['rag', '🧠 Knowledge Base'],
+            ['branding', '🎨 Branding'], ['export', '📤 Export'], ['governance', '⚖ Governance'],
+            ['diagrams', '📐 Diagrams'], ['notifications', '🔔 Notifications'],
+            ['users', '👥 Users'], ['terminology', '🌐 Terminology'], ['billing', 'Subscription']
+          ].map(([k, l]) => (
             <button key={k} className={`tab-btn${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
           ))}
         </div>
@@ -816,6 +1131,11 @@ export default function SettingsPage() {
         {/* ── Billing ── */}
         {tab === 'apikeys' && <ApiKeysTab />}
         {tab === 'rag' && <RagKbTab />}
+        {tab === 'branding' && <BrandingTab />}
+        {tab === 'export' && <ExportSettingsTab />}
+        {tab === 'governance' && <GovernanceSettingsTab />}
+        {tab === 'diagrams' && <DiagramSettingsTab />}
+        {tab === 'notifications' && <NotificationsTab />}
         {tab === 'users' && <UsersTab />}
         {tab === 'terminology' && <TerminologyTab />}
 
