@@ -14,6 +14,8 @@ function DiagramBlock({ chart }: { chart: string }) {
 }
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const authFetch = (path: string, opts: any = {}) =>
+  fetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
 
 function useApi() {
   const token = () => localStorage.getItem('ea_token')
@@ -1347,6 +1349,170 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   )
 }
 
+// ── Cycle Repository View ────────────────────────────────────────────────────
+const ARTIFACT_TYPE_LABELS: Record<string, { icon: string; label: string; color: string }> = {
+  OUTPUT:      { icon: '📄', label: 'Output',      color: 'var(--accent)' },
+  DIAGRAM:     { icon: '📐', label: 'Diagram',     color: '#9b59b6' },
+  WORD_EXPORT: { icon: '📝', label: 'Word',        color: '#2980b9' },
+  PPT_EXPORT:  { icon: '📊', label: 'PPT',         color: '#e67e22' },
+  PDF_EXPORT:  { icon: '📋', label: 'PDF',         color: '#e74c3c' },
+  INPUT:       { icon: '📥', label: 'Input',       color: '#27ae60' },
+  EVIDENCE:    { icon: '🔍', label: 'Evidence',    color: '#f39c12' },
+  JSON:        { icon: '{ }', label: 'JSON',       color: 'var(--text-dim)' },
+  MARKDOWN:    { icon: '📝', label: 'Markdown',    color: 'var(--text-dim)' },
+  TEMPLATE:    { icon: '🗒', label: 'Template',    color: '#1abc9c' },
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  APPROVED: '#2ecc71', DRAFT: '#f39c12', DEPRECATED: '#e74c3c',
+}
+
+function CycleRepositoryView({ cycle }: { cycle: any }) {
+  const [data, setData] = useState<any>(null)
+  const [summary, setSummary] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [filterPhase, setFilterPhase] = useState('ALL')
+  const [filterType, setFilterType] = useState('ALL')
+  const [filterStatus, setFilterStatus] = useState('ALL')
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+
+  const load = () => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (filterPhase !== 'ALL') params.set('phase', filterPhase)
+    if (filterType !== 'ALL') params.set('artifactType', filterType)
+    if (filterStatus !== 'ALL') params.set('status', filterStatus)
+
+    Promise.all([
+      authFetch(`/cycle-artifacts/cycles/${cycle.id}?${params}`),
+      authFetch(`/cycle-artifacts/cycles/${cycle.id}/summary`),
+    ]).then(([d, s]) => { setData(d); setSummary(s) }).finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [filterPhase, filterType, filterStatus]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sync = async () => {
+    setSyncing(true); setMsg(null)
+    try {
+      const res = await authFetch(`/cycle-artifacts/cycles/${cycle.id}/sync`, { method: 'POST' })
+      setMsg({ type: 'success', text: `Synced: ${res.synced} new, ${res.updated} updated` })
+      load()
+    } finally { setSyncing(false) }
+  }
+
+  const phases = Array.from(new Set(data?.artifacts?.map((a: any) => a.phase) || [])).sort()
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>📦 Cycle Artifact Repository</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>All outputs, diagrams, and exports organized by phase and step</div>
+        </div>
+        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} disabled={syncing} onClick={sync}>
+          {syncing ? '⟳ Syncing...' : '⟳ Sync Outputs'}
+        </button>
+      </div>
+
+      {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 10 }}>{msg.text}</div>}
+
+      {/* Summary badges */}
+      {summary && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
+          <div style={{ padding: '4px 10px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 11 }}>
+            <span style={{ color: 'var(--text-dim)' }}>Total </span><strong>{summary.total}</strong>
+          </div>
+          {Object.entries(summary.byStatus || {}).map(([s, c]: any) => (
+            <div key={s} style={{ padding: '4px 10px', background: 'var(--navy)', border: `1px solid ${STATUS_COLORS[s] || 'var(--border)'}33`, borderRadius: 4, fontSize: 11 }}>
+              <span style={{ color: STATUS_COLORS[s] || 'var(--text-dim)' }}>{s} </span><strong>{c}</strong>
+            </div>
+          ))}
+          {Object.entries(summary.byType || {}).map(([t, c]: any) => (
+            <div key={t} style={{ padding: '4px 10px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 10, color: 'var(--text-dim)' }}>
+              {ARTIFACT_TYPE_LABELS[t]?.icon} {t.replace('_', ' ')} <strong>{c}</strong>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <select className="form-input" value={filterPhase} onChange={e => setFilterPhase(e.target.value)} style={{ fontSize: 11 }}>
+          <option value="ALL">All Phases</option>
+          {phases.map((p: any) => <option key={p} value={p}>Phase {p}</option>)}
+        </select>
+        <select className="form-input" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ fontSize: 11 }}>
+          <option value="ALL">All Types</option>
+          {Object.entries(ARTIFACT_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
+        </select>
+        <select className="form-input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ fontSize: 11 }}>
+          <option value="ALL">All Statuses</option>
+          <option value="APPROVED">Approved</option>
+          <option value="DRAFT">Draft</option>
+          <option value="DEPRECATED">Deprecated</option>
+        </select>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', marginLeft: 'auto' }}>
+          {data?.total || 0} artifacts
+        </div>
+      </div>
+
+      {/* Artifact list */}
+      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Loading artifacts...</div> : (
+        data?.total === 0 ? (
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12, border: '1px dashed var(--border)', borderRadius: 'var(--radius)' }}>
+            No artifacts yet. Click "Sync Outputs" to register existing outputs as artifacts.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {Object.entries(data?.grouped || {}).sort(([a], [b]) => a.localeCompare(b)).map(([phaseKey, phaseData]: any) => (
+              <div key={phaseKey} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+                <div style={{ padding: '8px 12px', background: 'var(--navy-mid)', fontSize: 12, fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Phase {phaseKey} — {phaseData.phaseName || ''}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{phaseData.count} artifacts</span>
+                </div>
+                {Object.entries(phaseData.steps || {}).map(([stepKey, stepData]: any) => (
+                  <div key={stepKey} style={{ borderTop: '1px solid var(--border)' }}>
+                    {stepData.stepId && (
+                      <div style={{ padding: '5px 12px', background: 'rgba(0,180,216,0.04)', fontSize: 10, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+                        {stepData.stepId} — {stepData.stepName || ''}
+                      </div>
+                    )}
+                    {stepData.artifacts.map((a: any) => {
+                      const typeInfo = ARTIFACT_TYPE_LABELS[a.artifactType] || { icon: '📄', label: a.artifactType, color: 'var(--text-dim)' }
+                      return (
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px', borderTop: '1px solid rgba(255,255,255,0.03)', fontSize: 11 }}>
+                          <span style={{ fontSize: 13, flexShrink: 0 }}>{typeInfo.icon}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.titleAr || a.title}</div>
+                            <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1, display: 'flex', gap: 8 }}>
+                              <span style={{ fontFamily: 'var(--font-mono)' }}>{a.outputKey || ''}</span>
+                              {a.domain && <span>{a.domain.replace(/_/g, ' ')}</span>}
+                              {a.isPhysical && <span style={{ color: '#2ecc71' }}>● physical</span>}
+                              {!a.isPhysical && <span style={{ color: 'var(--text-dim)' }}>◌ logical</span>}
+                              <span>{new Date(a.createdAt).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
+                            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: `${STATUS_COLORS[a.status] || '#666'}18`, color: STATUS_COLORS[a.status] || 'var(--text-dim)', border: `1px solid ${STATUS_COLORS[a.status] || '#666'}33` }}>{a.status}</span>
+                            <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'var(--navy-mid)', color: typeInfo.color, border: '1px solid var(--border)' }}>{typeInfo.label}</span>
+                            <span style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>v{a.version}</span>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  )
+}
+
 // ── Main ADM Page ─────────────────────────────────────────
 export default function AdmPage() {
   const { t } = useLang()
@@ -1354,6 +1520,7 @@ export default function AdmPage() {
   const [selected, setSelected] = useState<any>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [activePhase, setActivePhase] = useState<string | null>(null)
+  const [cycleView, setCycleView] = useState<'phases' | 'repository'>('phases')
 
   const PHASES: Record<string, string[]> = {
     TOGAF: ['PRELIM', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
@@ -1438,6 +1605,19 @@ export default function AdmPage() {
             {/* Cycle detail */}
             {selected && (
               <div>
+                {/* Cycle view tabs */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  {[['phases', '🗺 Phases'], ['repository', '📦 Cycle Repository']].map(([k, l]) => (
+                    <button key={k} onClick={() => setCycleView(k as any)}
+                      style={{ fontSize: 11, padding: '5px 12px', borderRadius: 'var(--radius)', border: `1px solid ${cycleView === k ? 'var(--accent)' : 'var(--border)'}`, background: cycleView === k ? 'rgba(0,180,216,0.12)' : 'transparent', color: cycleView === k ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer' }}>
+                      {l}
+                    </button>
+                  ))}
+                </div>
+
+                {cycleView === 'repository' && <CycleRepositoryView cycle={selected} />}
+                {cycleView === 'phases' && (
+                <>
                 {/* Phase map */}
                 <div className="card mb-4">
                   <div className="flex items-center justify-between mb-4">
@@ -1461,7 +1641,8 @@ export default function AdmPage() {
                     ))}
                   </div>
                 </div>
-
+                </>
+                )}
               </div>
             )}
           </div>
