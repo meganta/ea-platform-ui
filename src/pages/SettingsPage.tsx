@@ -17,6 +17,195 @@ const ALL_DOMAINS: Record<string, string[]> = {
   CUSTOM: ['BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY', 'CROSS_CUTTING'],
 }
 
+const API_URL_LOCAL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const token = () => localStorage.getItem('ea_token')
+const authFetch = (path: string, opts: any = {}) =>
+  fetch(`${API_URL_LOCAL}${path}`, { ...opts, headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
+
+const CATEGORY_LABELS: Record<string, string> = {
+  EA_CORE: '🏛 EA Core', BUSINESS: '💼 Business', BENEFICIARY_EXPERIENCE: '👤 Beneficiary Experience',
+  APPLICATIONS: '📱 Applications', DATA: '🗄 Data', TECHNOLOGY: '⚙ Technology',
+  SECURITY: '🔒 Security', GOVERNANCE: '📋 Governance', WORKFLOW: '🔄 Workflow', ADM: '🔁 ADM Phases',
+}
+
+function TerminologyTab() {
+  const [terms, setTerms] = useState<any[]>([])
+  const [categories, setCategories] = useState<string[]>([])
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
+  const [search, setSearch] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [editingTerm, setEditingTerm] = useState<any>(null)
+  const [showOverrideForm, setShowOverrideForm] = useState(false)
+  const [overrideForm, setOverrideForm] = useState({ termKey: '', category: '', arabic: '', arabicNormalized: '', aiPreferred: true, uiPreferred: true, notes: '' })
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showGlobalOnly, setShowGlobalOnly] = useState(false)
+
+  const load = () => {
+    setLoading(true)
+    Promise.all([
+      authFetch('/localization/terms'),
+      authFetch('/localization/categories'),
+    ]).then(([t, c]) => {
+      setTerms(Array.isArray(t) ? t : [])
+      setCategories(Array.isArray(c) ? c : [])
+    }).finally(() => setLoading(false))
+  }
+
+  useEffect(() => { load() }, [])
+
+  const filteredTerms = terms.filter(t => {
+    if (selectedCategory !== 'ALL' && t.category !== selectedCategory) return false
+    if (showGlobalOnly && t.tenantId) return false
+    if (search) {
+      const s = search.toLowerCase()
+      return t.english?.toLowerCase().includes(s) || t.arabic?.includes(search) || t.termKey?.includes(s)
+    }
+    return true
+  })
+
+  const saveOverride = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch('/localization/terms/override', { method: 'POST', body: JSON.stringify(overrideForm) })
+      if (res.id) { setMsg({ type: 'success', text: 'Override saved' }); setShowOverrideForm(false); load() }
+      else setMsg({ type: 'error', text: res.message || 'Failed to save' })
+    } finally { setSaving(false) }
+  }
+
+  const disableTerm = async (termKey: string, category: string) => {
+    if (!window.confirm(`Disable "${termKey}" for this tenant?`)) return
+    await authFetch(`/localization/terms/${termKey}/${category}/disable`, { method: 'PUT' })
+    setMsg({ type: 'success', text: 'Term disabled for this tenant' }); load()
+  }
+
+  const startOverride = (term: any) => {
+    setOverrideForm({ termKey: term.termKey, category: term.category, arabic: term.arabic, arabicNormalized: term.arabicNormalized || term.arabic, aiPreferred: term.aiPreferred, uiPreferred: term.uiPreferred, notes: term.notes || '' })
+    setShowOverrideForm(true); setEditingTerm(term)
+  }
+
+  return (
+    <div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>🌐 EA Terminology Management</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
+        Manage NORA/DGA standard terminology. Global terms are platform defaults. Create tenant-specific overrides to customize Arabic terminology for your organization.
+      </div>
+
+      {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
+
+      {/* Controls */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input className="form-input" placeholder="Search terms..." value={search} onChange={e => setSearch(e.target.value)}
+          style={{ width: 200, fontSize: 11 }} />
+        <select className="form-input" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} style={{ fontSize: 11 }}>
+          <option value="ALL">All Categories</option>
+          {categories.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
+        </select>
+        <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+          <input type="checkbox" checked={showGlobalOnly} onChange={e => setShowGlobalOnly(e.target.checked)} />
+          Global only
+        </label>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+          <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={load}>↻ Refresh</button>
+          <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => { setEditingTerm(null); setOverrideForm({ termKey: '', category: '', arabic: '', arabicNormalized: '', aiPreferred: true, uiPreferred: true, notes: '' }); setShowOverrideForm(true) }}>
+            + Add Override
+          </button>
+        </div>
+      </div>
+
+      {/* Override form */}
+      {showOverrideForm && (
+        <div style={{ marginBottom: 16, padding: 16, background: 'var(--navy)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{editingTerm ? `Override: ${editingTerm.english}` : 'New Terminology Override'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            {!editingTerm && <>
+              <div>
+                <div style={{ fontSize: 11, marginBottom: 3 }}>Term Key</div>
+                <input className="form-input" value={overrideForm.termKey} onChange={e => setOverrideForm(f => ({ ...f, termKey: e.target.value }))} placeholder="e.g. enterprise_architecture" style={{ fontSize: 11, width: '100%' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 11, marginBottom: 3 }}>Category</div>
+                <select className="form-input" value={overrideForm.category} onChange={e => setOverrideForm(f => ({ ...f, category: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
+                  <option value="">Select...</option>
+                  {categories.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
+                </select>
+              </div>
+            </>}
+            <div>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>Arabic Term</div>
+              <input className="form-input" value={overrideForm.arabic} onChange={e => setOverrideForm(f => ({ ...f, arabic: e.target.value }))} placeholder="Arabic translation" style={{ fontSize: 11, width: '100%', direction: 'rtl' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>Normalized Form (used in AI)</div>
+              <input className="form-input" value={overrideForm.arabicNormalized} onChange={e => setOverrideForm(f => ({ ...f, arabicNormalized: e.target.value }))} placeholder="Preferred AI form" style={{ fontSize: 11, width: '100%', direction: 'rtl' }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>Notes</div>
+              <input className="form-input" value={overrideForm.notes} onChange={e => setOverrideForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" style={{ fontSize: 11, width: '100%' }} />
+            </div>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingTop: 18 }}>
+              <label style={{ fontSize: 11, display: 'flex', gap: 4, cursor: 'pointer' }}>
+                <input type="checkbox" checked={overrideForm.aiPreferred} onChange={e => setOverrideForm(f => ({ ...f, aiPreferred: e.target.checked }))} /> AI preferred
+              </label>
+              <label style={{ fontSize: 11, display: 'flex', gap: 4, cursor: 'pointer' }}>
+                <input type="checkbox" checked={overrideForm.uiPreferred} onChange={e => setOverrideForm(f => ({ ...f, uiPreferred: e.target.checked }))} /> UI preferred
+              </label>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} disabled={saving} onClick={saveOverride}>{saving ? 'Saving...' : '💾 Save Override'}</button>
+            <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setShowOverrideForm(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Terms table */}
+      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Loading terminology...</div> : (
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{filteredTerms.length} terms</div>
+          <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr 0.8fr 80px 80px', background: 'var(--navy-mid)', padding: '8px 12px', fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', gap: 8 }}>
+              <div>ENGLISH</div><div>ARABIC</div><div>NORMALIZED (AI)</div><div>CATEGORY</div><div>FLAGS</div><div>ACTIONS</div>
+            </div>
+            {filteredTerms.slice(0, 100).map(term => (
+              <div key={`${term.termKey}-${term.category}-${term.tenantId || 'global'}`}
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr 0.8fr 80px 80px', padding: '8px 12px', borderTop: '1px solid var(--border)', fontSize: 11, gap: 8, alignItems: 'center', background: term.tenantId ? 'rgba(0,180,216,0.04)' : 'transparent', opacity: term.isActive === false ? 0.4 : 1 }}>
+                <div>
+                  <div style={{ fontWeight: 500 }}>{term.english}</div>
+                  <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{term.termKey}</div>
+                </div>
+                <div style={{ direction: 'rtl', textAlign: 'right' }}>{term.arabic}</div>
+                <div style={{ direction: 'rtl', textAlign: 'right', color: term.arabicNormalized !== term.arabic ? 'var(--accent)' : 'var(--text)' }}>{term.arabicNormalized}</div>
+                <div>
+                  <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 2, background: 'var(--navy-mid)', fontFamily: 'var(--font-mono)' }}>{CATEGORY_LABELS[term.category]?.replace(/^[^ ]+ /, '') || term.category}</span>
+                  {term.tenantId && <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>● tenant override</div>}
+                  {term.isGlobal && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>◉ global</div>}
+                </div>
+                <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                  {term.aiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(0,180,216,0.15)', color: 'var(--accent)' }}>AI</span>}
+                  {term.uiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(100,200,100,0.15)', color: '#4caf50' }}>UI</span>}
+                  {term.isActive === false && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(255,0,0,0.1)', color: '#f44' }}>OFF</span>}
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button onClick={() => startOverride(term)} style={{ fontSize: 9, padding: '2px 6px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', color: 'var(--text)' }}>✏</button>
+                  {!term.tenantId && <button onClick={() => disableTerm(term.termKey, term.category)} style={{ fontSize: 9, padding: '2px 6px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', color: '#f44' }}>✕</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+          {filteredTerms.length > 100 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>Showing first 100 — use search or category filter to narrow results</div>}
+        </div>
+      )}
+
+      {/* Resolution info */}
+      <div style={{ marginTop: 16, padding: 12, background: 'rgba(0,180,216,0.05)', border: '1px solid rgba(0,180,216,0.15)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)' }}>
+        <strong style={{ color: 'var(--text)' }}>Resolution order:</strong> Tenant override → Global NORA/DGA baseline → Raw key<br />
+        <span style={{ color: 'var(--accent)' }}>● Tenant overrides</span> are shown with a blue indicator. They take precedence over global terms in AI generation and UI display.
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const { t, locale, setLocale } = useLang()
   const api = useApi()
@@ -73,7 +262,7 @@ export default function SettingsPage() {
         <div className="page-title">⚙ Settings</div>
         <div className="page-subtitle">TENANT CONFIGURATION — {config?.tenant?.slug?.toUpperCase()}</div>
         <div className="page-tabs">
-          {[['general', 'General'], ['framework', 'EA Framework'], ['ai', 'AI Configuration'], ['billing', 'Subscription']].map(([k, l]) => (
+          {[['general', 'General'], ['framework', 'EA Framework'], ['ai', 'AI Configuration'], ['terminology', '🌐 Terminology'], ['billing', 'Subscription']].map(([k, l]) => (
             <button key={k} className={`tab-btn${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
           ))}
         </div>
@@ -221,6 +410,8 @@ export default function SettingsPage() {
         )}
 
         {/* ── Billing ── */}
+        {tab === 'terminology' && <TerminologyTab />}
+
         {tab === 'billing' && (
           <div className="card">
             <div className="section-title">💳 Subscription & Usage</div>
