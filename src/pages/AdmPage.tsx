@@ -1343,8 +1343,6 @@ export default function AdmPage() {
   const [selected, setSelected] = useState<any>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [activePhase, setActivePhase] = useState<string | null>(null)
-  const [gapResult, setGapResult] = useState('')
-  const [loading, setLoading] = useState(false)
 
   const PHASES: Record<string, string[]> = {
     TOGAF: ['PRELIM', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
@@ -1376,16 +1374,6 @@ export default function AdmPage() {
   const create = async (data: any) => {
     await fetch(`${API_URL}/adm/cycles`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
     setShowCreate(false); await load()
-  }
-
-  const runGap = async () => {
-    if (!selected) return
-    setLoading(true); setGapResult('')
-    try {
-      const res = await fetch(`${API_URL}/adm/cycles/${selected.id}/gap-analysis`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
-      const r = await res.json(); setGapResult(r.analysis || JSON.stringify(r))
-      await load()
-    } finally { setLoading(false) }
   }
 
   const phases = PHASES[selected?.frameworkType] || PHASES.NORA
@@ -1449,15 +1437,6 @@ export default function AdmPage() {
                       <div className="card-title">{selected.name}</div>
                       <div className="card-subtitle">{selected.frameworkType} · {selected.status}</div>
                     </div>
-                    <button className="btn btn-secondary btn-sm" disabled={loading} onClick={runGap}>⚡ {loading ? 'Analysing...' : 'Gap Analysis'}</button>
-                    <button className="btn btn-secondary btn-sm" style={{ color: 'var(--gold)', borderColor: 'rgba(201,168,76,0.4)' }} onClick={async () => {
-                      const token = localStorage.getItem('ea_token')
-                      const res = await fetch(`${API_URL}/adm-templates/cycle/${selected.id}/export`, { headers: { Authorization: `Bearer ${token}` } })
-                      const blob = await res.blob()
-                      const url = URL.createObjectURL(blob)
-                      const a = document.createElement('a'); a.href = url; a.download = 'ADM_Cycle_Export.zip'; a.click()
-                      URL.revokeObjectURL(url)
-                    }}>📦 Export Cycle</button>
                   </div>
 
                   <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-dim)' }}>Click a phase to open its workspace</div>
@@ -1492,13 +1471,6 @@ export default function AdmPage() {
                   </div>
                 )}
 
-                {/* Gap result */}
-                {gapResult && (
-                  <div className="card">
-                    <div className="section-title">⚡ Gap Analysis</div>
-                    <div style={{ fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap', color: 'var(--text-dim)', maxHeight: 'none', fontFamily: 'var(--font-mono)' }}>{gapResult}</div>
-                  </div>
-                )}
               </div>
             )}
           </div>
