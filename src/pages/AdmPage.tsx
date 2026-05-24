@@ -1110,7 +1110,13 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                       <div key={inp.id} style={{ marginBottom: 10, padding: '10px 12px', background: sourceColor, border: `1px solid ${sourceBorder}`, borderRadius: 'var(--radius)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                           <div style={{ fontSize: 12, fontWeight: 500 }}>{inp.title}</div>
-                          <div style={{ display: 'flex', gap: 4 }}>
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                            {inp.providedBy?.startsWith('AUTO_ADM:') && (
+                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(46,204,113,0.15)', color: '#2ecc71', border: '1px solid rgba(46,204,113,0.3)' }}>⚡ Auto — ADM Output</span>
+                            )}
+                            {inp.providedBy?.startsWith('AUTO_REPO:') && (
+                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(243,156,18,0.15)', color: 'var(--gold)', border: '1px solid rgba(243,156,18,0.3)' }}>🗄 Auto — Repository</span>
+                            )}
                             <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-dim)' }}>{def?.source?.replace('_', ' ')}</span>
                             <span className={`badge ${inp.source === 'PROVIDED' ? 'badge-approved' : 'badge-draft'}`} style={{ fontSize: 9 }}>{inp.source}</span>
                           </div>
