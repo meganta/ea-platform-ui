@@ -1461,23 +1461,6 @@ export default function AdmPage() {
                   </div>
                 </div>
 
-                {/* Deliverables */}
-                {selected.deliverables?.length > 0 && (
-                  <div className="card mb-4">
-                    <div className="section-title">📄 {t('adm.deliverables')}</div>
-                    <table>
-                      <thead><tr><th>{t('adm.col_title')}</th><th>{t('adm.col_phase')}</th><th>{t('adm.col_status')}</th></tr></thead>
-                      <tbody>{selected.deliverables.map((d: any) => (
-                        <tr key={d.id}>
-                          <td style={{ fontWeight: 500 }}>{d.title}</td>
-                          <td style={{ fontSize: 11, fontFamily: 'var(--font-mono)' }}>{d.phase}</td>
-                          <td><span className={`badge badge-${d.status?.toLowerCase().replace('_', '-')}`}>{d.status?.replace('_', ' ')}</span></td>
-                        </tr>
-                      ))}</tbody>
-                    </table>
-                  </div>
-                )}
-
               </div>
             )}
           </div>
