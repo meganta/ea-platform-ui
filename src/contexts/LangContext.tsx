@@ -66,7 +66,7 @@ const translations: Record<string, Record<Locale, string>> = {
   'copilot.q1': { EN: 'What is Enterprise Architecture?', AR: 'ما هي هندسة المؤسسات؟' },
   'copilot.q2': { EN: 'Help me plan Phase A', AR: 'ساعدني في تخطيط المرحلة أ' },
   'copilot.q3': { EN: 'Analyse capability gaps', AR: 'تحليل فجوات القدرات' },
-  'copilot.q4': { EN: 'Explain TOGAF ADM', AR: 'اشرح منهج TOGAF ADM' },
+  'copilot.q4': { EN: 'What are NORA 2.0 architecture principles?', AR: 'ما هي مبادئ البنية المؤسسية في نورا 2.0؟' },
   'repo.title': { EN: 'EA Repository', AR: 'مستودع الهندسة' },
   'repo.subtitle': { EN: 'ARCHITECTURE ARTIFACTS & COMPONENTS', AR: 'مكونات وأدوات الهندسة' },
   'repo.add': { EN: '+ Add', AR: '+ إضافة' },
@@ -133,7 +133,7 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.documentElement.dir = locale === 'AR' ? 'rtl' : 'ltr'
     document.documentElement.lang = locale === 'AR' ? 'ar' : 'en'
-  }, [])
+  }, [locale])
 
   const t = (key: string) => translations[key]?.[locale] ?? translations[key]?.EN ?? key
   const isAR = locale === 'AR'

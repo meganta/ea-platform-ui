@@ -112,7 +112,7 @@ export default function GovernancePage() {
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  useEffect(() => { loadReviews() }, [])
+  useEffect(() => { loadReviews() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadReviews = async () => {
     setLoading(true)
@@ -260,7 +260,6 @@ export default function GovernancePage() {
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
               <select className='form-input' value={form.framework} onChange={set('framework')}>
                 <option value='NORA'>NORA 2.0</option>
-                <option value='TOGAF'>TOGAF</option>
                 <option value='FEAF'>FEAF</option>
                 <option value='custom'>Custom</option>
               </select>

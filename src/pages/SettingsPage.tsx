@@ -10,7 +10,7 @@ function useApi() {
   return { get, put }
 }
 
-const FRAMEWORKS = ['TOGAF', 'NORA', 'CUSTOM']
+const FRAMEWORKS = ['NORA', 'CUSTOM']
 const ALL_DOMAINS: Record<string, string[]> = {
   TOGAF: ['BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY', 'CROSS_CUTTING'],
   NORA: ['STRATEGIC', 'BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY', 'SECURITY', 'CROSS_CUTTING'],
@@ -327,7 +327,6 @@ function NotificationsTab() {
 }
 
 function RagKbTab() {
-  const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -341,7 +340,6 @@ function RagKbTab() {
   const load = () => {
     setLoading(true)
     authFetch('/config').then(c => {
-      setConfig(c)
       const ai = c.ai || {}
       setRagEnabled(!!ai.RAG_GENERATION)
       const rag = ai.ragConfig || {}
@@ -920,7 +918,7 @@ function TerminologyTab() {
 }
 
 export default function SettingsPage() {
-  const { t, locale, setLocale } = useLang()
+  const { locale, setLocale } = useLang()
   const api = useApi()
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -930,7 +928,7 @@ export default function SettingsPage() {
 
   // Form states
   const [general, setGeneral] = useState({ name: '', locale: 'EN' })
-  const [framework, setFramework] = useState({ frameworkType: 'TOGAF', enabledDomains: [] as string[] })
+  const [framework, setFramework] = useState({ frameworkType: 'NORA', enabledDomains: [] as string[] })
   const [ai, setAi] = useState({ provider: 'openai', model: 'gpt-4o', language: 'EN' })
   const [newDomain, setNewDomain] = useState('')
 
@@ -938,9 +936,10 @@ export default function SettingsPage() {
     api.get('/config').then(c => {
       setConfig(c)
       setGeneral({ name: c.tenant?.name || '', locale: c.tenant?.locale || 'EN' })
-      setFramework({ frameworkType: c.framework?.type || 'TOGAF', enabledDomains: c.framework?.enabledDomains || [] })
+      setFramework({ frameworkType: c.framework?.type || 'NORA', enabledDomains: c.framework?.enabledDomains || [] })
       setAi(c.ai || { provider: 'openai', model: 'gpt-4o', language: 'EN' })
     }).finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const save = async (section: string, data: any) => {
@@ -1051,7 +1050,7 @@ export default function SettingsPage() {
               <div className="flex gap-2" style={{ marginBottom: 4 }}>
                 {FRAMEWORKS.map(f => (
                   <button key={f} onClick={() => {
-                    const defaults = ALL_DOMAINS[f] || ALL_DOMAINS.TOGAF
+                    const defaults = ALL_DOMAINS[f] || ALL_DOMAINS.NORA
                     setFramework({ frameworkType: f, enabledDomains: defaults })
                   }} className={`btn ${framework.frameworkType === f ? 'btn-primary' : 'btn-secondary'}`}>
                     {f}
@@ -1059,7 +1058,6 @@ export default function SettingsPage() {
                 ))}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                {framework.frameworkType === 'TOGAF' && 'The Open Group Architecture Framework — industry standard EA framework'}
                 {framework.frameworkType === 'NORA' && 'National Organization Reference Architecture — Saudi government EA standard'}
                 {framework.frameworkType === 'CUSTOM' && 'Define your own architecture domains and asset types'}
               </div>

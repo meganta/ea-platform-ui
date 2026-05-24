@@ -18,7 +18,7 @@ export default function RegisterPage() {
   const [result, setResult] = useState<any>(null)
 
   const [org, setOrg] = useState({
-    name: '', nameAr: '', slug: '', locale: 'EN', frameworkType: 'TOGAF',
+    name: '', nameAr: '', slug: '', locale: 'EN', frameworkType: 'NORA',
   })
   const [admin, setAdmin] = useState({
     fullName: '', fullNameAr: '', email: '', password: '', confirmPassword: '',
@@ -164,7 +164,6 @@ export default function RegisterPage() {
               <div className="form-group">
                 <label className="form-label">{isAR?'الإطار المرجعي':'EA Framework'}</label>
                 <select className="form-input" value={org.frameworkType} onChange={setO('frameworkType')}>
-                  <option value="TOGAF">TOGAF</option>
                   <option value="NORA">NORA</option>
                   <option value="CUSTOM">{isAR?'مخصص':'Custom'}</option>
                 </select>
