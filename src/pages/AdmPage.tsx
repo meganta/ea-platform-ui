@@ -43,7 +43,7 @@ const OUTPUT_STATUS_COLOR: Record<string, string> = {
 
 // ── Create Cycle Modal ────────────────────────────────────
 function CreateModal({ onClose, onCreate, t }: any) {
-  const [form, setForm] = useState({ name: '', description: '', frameworkType: 'TOGAF' })
+  const [form, setForm] = useState({ name: '', description: '', frameworkType: 'NORA' })
   const [loading, setLoading] = useState(false)
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
   const submit = async (e: any) => { e.preventDefault(); setLoading(true); try { await onCreate(form) } finally { setLoading(false) } }
@@ -57,7 +57,6 @@ function CreateModal({ onClose, onCreate, t }: any) {
           <div className="form-group">
             <label className="form-label">{t('adm.framework')}</label>
             <select className="form-input" value={form.frameworkType} onChange={set('frameworkType')}>
-              <option value="TOGAF">TOGAF 10.0</option>
               <option value="NORA">NORA 2.0 — المنهجية الوطنية</option>
             </select>
           </div>
@@ -78,7 +77,7 @@ function ScopeSelector({ cycle, onScopeSet }: any) {
     TOGAF: ['BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY'],
     NORA: ['BUSINESS', 'BENEFICIARY_EXPERIENCE', 'APPLICATIONS', 'DATA', 'TECHNOLOGY', 'SECURITY'],
   }
-  const domains = DOMAINS[cycle.frameworkType] || DOMAINS.TOGAF
+  const domains = DOMAINS[cycle.frameworkType] || DOMAINS.NORA
   const [selected, setSelected] = useState<string[]>(cycle.scopeDomains?.length ? cycle.scopeDomains : domains)
   const [saving, setSaving] = useState(false)
 
@@ -115,11 +114,6 @@ function ScopeSelector({ cycle, onScopeSet }: any) {
 }
 
 
-
-// Pre-process markdown to extract mermaid blocks before rendering
-function preprocessMarkdown(text: string): string {
-  return text // pass through — handled by components
-}
 
 function extractDiagrams(text: string): Array<{type: 'text'|'diagram', content: string}> {
   const parts: Array<{type: 'text'|'diagram', content: string}> = []
@@ -164,6 +158,7 @@ function SectionProgress({ outputId }: { outputId: string }) {
     load()
     const interval = setInterval(load, 3000)
     return () => clearInterval(interval)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [outputId])
 
   if (sections.length === 0) return (
@@ -944,7 +939,6 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const [generating, setGenerating] = useState<string | null>(null)
   const [expandedOutputs, setExpandedOutputs] = useState<Set<string>>(new Set())
   const [expandedOutput, setExpandedOutput] = useState<string | null>(null)
-  const [outputSections, setOutputSections] = useState<Record<string, any[]>>({})
   const [editingInput, setEditingInput] = useState<string | null>(null)
   const [inputContent, setInputContent] = useState('')
   const [editingOutput, setEditingOutput] = useState<string | null>(null)
@@ -968,6 +962,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
       const steps = inp.phaseDef?.steps || out.phaseDef?.steps || []
       if (steps.length > 0) setActiveStep(steps[0].key)
     }).finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycle.id, phase])
 
   const saveInput = async (inputId: string) => {
@@ -1344,7 +1339,6 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 // ── Main ADM Page ─────────────────────────────────────────
 export default function AdmPage() {
   const { t } = useLang()
-  const api = useApi()
   const [cycles, setCycles] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -1370,7 +1364,7 @@ export default function AdmPage() {
     else if (data.length) setSelected(data[0])
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const deleteCycle = async (cycleId: string) => {
     if (!window.confirm('Delete this ADM cycle? This cannot be undone.')) return
@@ -1394,8 +1388,8 @@ export default function AdmPage() {
     } finally { setLoading(false) }
   }
 
-  const phases = PHASES[selected?.frameworkType] || PHASES.TOGAF
-  const phaseNames = PHASE_NAMES[selected?.frameworkType] || PHASE_NAMES.TOGAF
+  const phases = PHASES[selected?.frameworkType] || PHASES.NORA
+  const phaseNames = PHASE_NAMES[selected?.frameworkType] || PHASE_NAMES.NORA
 
   return (
     <div>
