@@ -17,6 +17,175 @@ const ALL_DOMAINS: Record<string, string[]> = {
   CUSTOM: ['BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY', 'CROSS_CUTTING'],
 }
 
+const ROLE_COLORS: Record<string, string> = {
+  TENANT_ADMIN: '#e74c3c', ARCHITECT: '#3498db', REVIEWER: '#2ecc71',
+}
+const ROLE_LABELS: Record<string, string> = {
+  TENANT_ADMIN: '🔴 Admin', ARCHITECT: '🔵 Architect', REVIEWER: '🟢 Reviewer',
+}
+
+function UsersTab() {
+  const [users, setUsers] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showCreate, setShowCreate] = useState(false)
+  const [editingUser, setEditingUser] = useState<any>(null)
+  const [showResetPw, setShowResetPw] = useState<string | null>(null)
+  const [newPw, setNewPw] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [form, setForm] = useState({ email: '', fullName: '', fullNameAr: '', password: '', role: 'ARCHITECT' })
+
+  const load = () => {
+    setLoading(true)
+    authFetch('/users').then(u => setUsers(Array.isArray(u) ? u : [])).finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, [])
+
+  const createUser = async () => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch('/users', { method: 'POST', body: JSON.stringify(form) })
+      if (res.id) { setMsg({ type: 'success', text: `User ${res.email} created` }); setShowCreate(false); setForm({ email: '', fullName: '', fullNameAr: '', password: '', role: 'ARCHITECT' }); load() }
+      else setMsg({ type: 'error', text: res.message || 'Failed to create user' })
+    } finally { setSaving(false) }
+  }
+
+  const updateUser = async (userId: string, data: any) => {
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch(`/users/${userId}`, { method: 'PUT', body: JSON.stringify(data) })
+      if (res.id) { setMsg({ type: 'success', text: 'User updated' }); setEditingUser(null); load() }
+      else setMsg({ type: 'error', text: res.message || 'Failed to update' })
+    } finally { setSaving(false) }
+  }
+
+  const resetPw = async (userId: string) => {
+    if (!newPw || newPw.length < 8) { setMsg({ type: 'error', text: 'Password must be at least 8 characters' }); return }
+    setSaving(true); setMsg(null)
+    try {
+      const res = await authFetch(`/users/${userId}/password`, { method: 'PUT', body: JSON.stringify({ newPassword: newPw }) })
+      if (res.success) { setMsg({ type: 'success', text: 'Password reset' }); setShowResetPw(null); setNewPw('') }
+      else setMsg({ type: 'error', text: res.message || 'Failed' })
+    } finally { setSaving(false) }
+  }
+
+  const deactivate = async (userId: string, email: string) => {
+    if (!window.confirm(`Deactivate ${email}?`)) return
+    await authFetch(`/users/${userId}`, { method: 'DELETE' })
+    setMsg({ type: 'success', text: 'User deactivated' }); load()
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <div>
+          <div className="section-title" style={{ fontSize: 15, marginBottom: 2 }}>👥 User Management</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Manage team members, roles, and access for this tenant</div>
+        </div>
+        <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => setShowCreate(s => !s)}>+ Add User</button>
+      </div>
+
+      {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
+
+      {/* Create user form */}
+      {showCreate && (
+        <div style={{ marginBottom: 16, padding: 16, background: 'var(--navy)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>New User</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            {[['email', 'Email', 'email'], ['fullName', 'Full Name (EN)', 'text'], ['fullNameAr', 'Full Name (AR)', 'text'], ['password', 'Password', 'password']].map(([k, l, t]) => (
+              <div key={k}>
+                <div style={{ fontSize: 11, marginBottom: 3 }}>{l}</div>
+                <input className="form-input" type={t} value={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
+                  style={{ fontSize: 11, width: '100%', direction: k === 'fullNameAr' ? 'rtl' : 'ltr' }} />
+              </div>
+            ))}
+            <div>
+              <div style={{ fontSize: 11, marginBottom: 3 }}>Role</div>
+              <select className="form-input" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
+                <option value="ARCHITECT">Architect</option>
+                <option value="REVIEWER">Reviewer</option>
+                <option value="TENANT_ADMIN">Admin</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} disabled={saving} onClick={createUser}>{saving ? 'Creating...' : 'Create User'}</button>
+            <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setShowCreate(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Users list */}
+      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Loading users...</div> : (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 120px', background: 'var(--navy-mid)', padding: '8px 12px', fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', gap: 8 }}>
+            <div>USER</div><div>EMAIL</div><div>ROLE</div><div>STATUS</div><div>ACTIONS</div>
+          </div>
+          {users.map(u => (
+            <div key={u.id} style={{ display: 'grid', gridTemplateColumns: '2fr 1.5fr 1fr 1fr 120px', padding: '10px 12px', borderTop: '1px solid var(--border)', fontSize: 11, gap: 8, alignItems: 'center', opacity: u.isActive ? 1 : 0.5 }}>
+              <div>
+                <div style={{ fontWeight: 500 }}>{u.fullName}</div>
+                {u.fullNameAr && <div style={{ fontSize: 10, color: 'var(--text-dim)', direction: 'rtl', textAlign: 'left' }}>{u.fullNameAr}</div>}
+                <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{u.id.slice(0, 8)}...</div>
+              </div>
+              <div style={{ fontSize: 11 }}>{u.email}</div>
+              <div>
+                {editingUser?.id === u.id ? (
+                  <select className="form-input" value={editingUser.role} onChange={e => setEditingUser((eu: any) => ({ ...eu, role: e.target.value }))} style={{ fontSize: 10, padding: '2px 4px' }}>
+                    <option value="ARCHITECT">Architect</option>
+                    <option value="REVIEWER">Reviewer</option>
+                    <option value="TENANT_ADMIN">Admin</option>
+                  </select>
+                ) : (
+                  <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 2, background: `${ROLE_COLORS[u.role]}18`, color: ROLE_COLORS[u.role], border: `1px solid ${ROLE_COLORS[u.role]}33` }}>{ROLE_LABELS[u.role]}</span>
+                )}
+              </div>
+              <div>
+                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 2, background: u.isActive ? 'rgba(46,204,113,0.1)' : 'rgba(255,0,0,0.1)', color: u.isActive ? '#2ecc71' : '#e74c3c' }}>
+                  {u.isActive ? 'Active' : 'Inactive'}
+                </span>
+                {u.lastLoginAt && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>Last: {new Date(u.lastLoginAt).toLocaleDateString()}</div>}
+              </div>
+              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {editingUser?.id === u.id ? (
+                  <>
+                    <button className="btn btn-primary btn-sm" style={{ fontSize: 9, padding: '2px 6px' }} disabled={saving} onClick={() => updateUser(u.id, { role: editingUser.role })}>Save</button>
+                    <button className="btn btn-secondary btn-sm" style={{ fontSize: 9, padding: '2px 6px' }} onClick={() => setEditingUser(null)}>✕</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => setEditingUser(u)} style={{ fontSize: 9, padding: '2px 6px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', color: 'var(--text)' }}>✏ Role</button>
+                    <button onClick={() => { setShowResetPw(u.id); setNewPw('') }} style={{ fontSize: 9, padding: '2px 6px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', color: 'var(--gold)' }}>🔑 PW</button>
+                    {u.isActive && <button onClick={() => deactivate(u.id, u.email)} style={{ fontSize: 9, padding: '2px 6px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', color: '#e74c3c' }}>✕</button>}
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Reset password modal */}
+      {showResetPw && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: 24, width: 320 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Reset Password</div>
+            <input className="form-input" type="password" placeholder="New password (min 8 chars)" value={newPw} onChange={e => setNewPw(e.target.value)} style={{ width: '100%', marginBottom: 12, fontSize: 12 }} />
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-primary btn-sm" disabled={saving} onClick={() => resetPw(showResetPw)}>{saving ? '...' : 'Reset'}</button>
+              <button className="btn btn-secondary btn-sm" onClick={() => setShowResetPw(null)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ marginTop: 12, fontSize: 11, color: 'var(--text-dim)' }}>
+        {users.length} user{users.length !== 1 ? 's' : ''} · Roles: 🔴 Admin can manage all settings · 🔵 Architect can create and edit EA content · 🟢 Reviewer has read-only access
+      </div>
+    </div>
+  )
+}
+
 const API_URL_LOCAL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 const token = () => localStorage.getItem('ea_token')
 const authFetch = (path: string, opts: any = {}) =>
@@ -262,7 +431,7 @@ export default function SettingsPage() {
         <div className="page-title">⚙ Settings</div>
         <div className="page-subtitle">TENANT CONFIGURATION — {config?.tenant?.slug?.toUpperCase()}</div>
         <div className="page-tabs">
-          {[['general', 'General'], ['framework', 'EA Framework'], ['ai', 'AI Configuration'], ['terminology', '🌐 Terminology'], ['billing', 'Subscription']].map(([k, l]) => (
+          {[['general', 'General'], ['framework', 'EA Framework'], ['ai', 'AI Configuration'], ['users', '👥 Users'], ['terminology', '🌐 Terminology'], ['billing', 'Subscription']].map(([k, l]) => (
             <button key={k} className={`tab-btn${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
           ))}
         </div>
@@ -410,6 +579,7 @@ export default function SettingsPage() {
         )}
 
         {/* ── Billing ── */}
+        {tab === 'users' && <UsersTab />}
         {tab === 'terminology' && <TerminologyTab />}
 
         {tab === 'billing' && (
