@@ -11,13 +11,32 @@ import RepositoryPage from './pages/RepositoryPage'
 import KnowledgePage from './pages/KnowledgePage'
 import SettingsPage from './pages/SettingsPage'
 import GovernancePage from './pages/GovernancePage'
+import SetupAssistantPage from './pages/SetupAssistantPage'
 import './styles.css'
+
+import { useState, useEffect } from 'react'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  const [showSetup, setShowSetup] = useState(false)
+
+  useEffect(() => {
+    if (!user) return
+    const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    fetch(`${API_URL}/setup/profile`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
+      .then(r => r.json())
+      .then(p => { if (!p?.setupCompleted) setShowSetup(true) })
+      .catch(() => {})
+  }, [user])
+
   if (loading) return <div className="loading-screen"><div className="spinner"/></div>
   if (!user) return <Navigate to="/login" replace />
-  return <>{children}</>
+  return (
+    <>
+      {children}
+      {showSetup && <SetupAssistantPage modal={true} onClose={() => setShowSetup(false)} />}
+    </>
+  )
 }
 
 export default function App() {
@@ -36,6 +55,7 @@ export default function App() {
               <Route path="knowledge" element={<KnowledgePage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="governance" element={<GovernancePage />} />
+              <Route path="setup" element={<SetupAssistantPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
