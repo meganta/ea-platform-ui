@@ -97,6 +97,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
       setAsset(fresh)
       setAttachments(fresh.attachments || [])
     }).catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAsset.id])
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -248,7 +249,7 @@ export default function RepositoryPage() {
     setSummary(sum)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const createAsset = async (form: any) => {
     await api.post('/ea-repository/assets', form)
