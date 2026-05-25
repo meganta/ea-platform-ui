@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -918,16 +917,14 @@ function TerminologyTab() {
 }
 
 export default function SettingsPage() {
-  const { locale, setLocale } = useLang()
   const api = useApi()
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [tab, setTab] = useState('general')
+  const [tab, setTab] = useState('framework')
 
   // Form states
-  const [general, setGeneral] = useState({ name: '', locale: 'EN' })
   const [framework, setFramework] = useState({ frameworkType: 'NORA', enabledDomains: [] as string[] })
   const [ai, setAi] = useState({ provider: 'openai', model: 'gpt-4o', language: 'EN' })
   const [newDomain, setNewDomain] = useState('')
@@ -935,7 +932,6 @@ export default function SettingsPage() {
   useEffect(() => {
     api.get('/config').then(c => {
       setConfig(c)
-      setGeneral({ name: c.tenant?.name || '', locale: c.tenant?.locale || 'EN' })
       setFramework({ frameworkType: c.framework?.type || 'NORA', enabledDomains: c.framework?.enabledDomains || [] })
       setAi(c.ai || { provider: 'openai', model: 'gpt-4o', language: 'EN' })
     }).finally(() => setLoading(false))
@@ -975,7 +971,7 @@ export default function SettingsPage() {
         <div className="page-subtitle">TENANT CONFIGURATION — {config?.tenant?.slug?.toUpperCase()}</div>
         <div className="page-tabs">
           {[
-            ['general', 'General'], ['framework', 'EA Framework'], ['ai', 'AI Configuration'],
+            ['framework', 'EA Framework'], ['ai', 'AI Configuration'],
             ['apikeys', '🔑 API Keys'], ['rag', '🧠 Knowledge Base'],
             ['branding', '🎨 Branding'], ['export', '📤 Export'], ['governance', '⚖ Governance'],
             ['diagrams', '📐 Diagrams'], ['notifications', '🔔 Notifications'],
@@ -991,53 +987,6 @@ export default function SettingsPage() {
           <div style={{ padding: '10px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13, background: msg.type === 'success' ? 'rgba(46,204,113,0.1)' : 'rgba(231,76,60,0.1)', border: `1px solid ${msg.type === 'success' ? 'rgba(46,204,113,0.3)' : 'rgba(231,76,60,0.3)'}`, color: msg.type === 'success' ? 'var(--success)' : 'var(--danger)', display: 'flex', justifyContent: 'space-between' }}>
             <span>{msg.text}</span>
             <button onClick={() => setMsg(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>×</button>
-          </div>
-        )}
-
-        {/* ── General ── */}
-        {tab === 'general' && (
-          <div className="card">
-            <div className="section-title">🏢 General Settings</div>
-            <div className="form-group">
-              <label className="form-label">Organization Name</label>
-              <input className="form-input" value={general.name} onChange={e => setGeneral(g => ({ ...g, name: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Default Language</label>
-              <select className="form-input" value={general.locale} onChange={e => setGeneral(g => ({ ...g, locale: e.target.value }))}>
-                <option value="EN">English</option>
-                <option value="AR">العربية</option>
-              </select>
-            </div>
-            <div className="divider" />
-            <div className="form-group">
-              <label className="form-label">Interface Language</label>
-              <div className="flex gap-2">
-                {['EN', 'AR'].map(l => (
-                  <button key={l} onClick={() => setLocale(l as 'EN' | 'AR')} className={`btn ${locale === l ? 'btn-primary' : 'btn-secondary'}`}>
-                    {l === 'EN' ? '🇬🇧 English' : '🇸🇦 العربية'}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="divider" />
-            <div style={{ display: 'flex', gap: 12 }}>
-              <div className="card" style={{ flex: 1, padding: 16 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>ORGANIZATION ID</div>
-                <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{config?.tenant?.slug}</div>
-              </div>
-              <div className="card" style={{ flex: 1, padding: 16 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>SUBSCRIPTION</div>
-                <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--gold)' }}>{config?.tenant?.subscriptionTier}</div>
-              </div>
-              <div className="card" style={{ flex: 1, padding: 16 }}>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 6 }}>STATUS</div>
-                <div style={{ fontFamily: 'var(--font-mono)', color: 'var(--success)' }}>{config?.tenant?.status}</div>
-              </div>
-            </div>
-            <button className="btn btn-primary mt-4" disabled={saving === 'general'} onClick={() => save('general', general)}>
-              {saving === 'general' ? 'Saving...' : 'Save General Settings'}
-            </button>
           </div>
         )}
 
