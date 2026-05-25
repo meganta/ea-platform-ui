@@ -15,23 +15,37 @@ import SetupAssistantPage from './pages/SetupAssistantPage'
 import './styles.css'
 
 import { useState, useEffect } from 'react'
+import { useLang } from './contexts/LangContext'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
+  const { setLocale } = useLang()
   const [showSetup, setShowSetup] = useState(false)
 
   useEffect(() => {
     if (!user) return
     const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    // Load preferred language from tenant config
+    fetch(`${API_URL}/config`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
+      .then(r => r.json())
+      .then(c => {
+        const lang = c?.ai?.language || c?.tenant?.locale
+        if (lang === 'AR' || lang === 'EN') {
+          // Only update if different from current to avoid flicker
+          const current = localStorage.getItem('ea_locale')
+          if (!current) setLocale(lang as 'AR' | 'EN')
+        }
+      })
+      .catch(() => {})
+    // Check setup status for new tenants
     fetch(`${API_URL}/setup/profile`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
       .then(r => r.json())
       .then(p => {
-        // Only show modal if setup was never started (step=1 and no org name entered)
         const isNewTenant = !p?.organizationName && !p?.organizationNameAr && !p?.setupCompleted && p?.setupStep <= 1
         if (isNewTenant) setShowSetup(true)
       })
       .catch(() => {})
-  }, [user])
+  }, [user]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return <div className="loading-screen"><div className="spinner"/></div>
   if (!user) return <Navigate to="/login" replace />

@@ -2,10 +2,25 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 
+const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+
 export default function Layout() {
   const { user, logout } = useAuth()
   const { t, locale, setLocale } = useLang()
   const nav = useNavigate()
+
+  const switchLanguage = async (newLocale: 'EN' | 'AR') => {
+    setLocale(newLocale)
+    // Persist to backend: AI config language + setup profile language
+    const token = localStorage.getItem('ea_token')
+    if (token) {
+      Promise.all([
+        fetch(`${API_URL}/config/ai`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ language: newLocale }) }),
+        fetch(`${API_URL}/setup/profile`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ language: newLocale }) }),
+      ]).catch(() => {})
+    }
+  }
+
   return (
     <div className="layout">
       <div className="sidebar">
@@ -34,8 +49,8 @@ export default function Layout() {
               <div className="user-role">{user?.role}</div>
             </div>
           </div>
-          <button onClick={()=>setLocale(locale==='EN'?'AR':'EN')} style={{width:'100%',padding:'6px',background:'rgba(0,180,216,0.1)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--accent)',fontSize:12,marginBottom:6,cursor:'pointer'}}>
-            🌐 {locale==='EN'?'العربية':'English'}
+          <button onClick={() => switchLanguage(locale === 'EN' ? 'AR' : 'EN')} style={{width:'100%',padding:'6px',background:'rgba(0,180,216,0.1)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--accent)',fontSize:12,marginBottom:6,cursor:'pointer'}}>
+            🌐 {locale === 'EN' ? 'العربية' : 'English'}
           </button>
           <button className="logout-btn" onClick={()=>{logout();nav('/login')}}>{t('auth.signout')}</button>
         </div>

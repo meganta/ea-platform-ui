@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
@@ -59,6 +60,7 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 
 // ── Step 1: Profile + Framework ───────────────────────────────────────────────
 function Step1Profile({ profile, config, onSave }: any) {
+  const { setLocale } = useLang()
   const [form, setForm] = useState({
     organizationName: '', organizationNameAr: '', sector: 'GOVERNMENT',
     entityType: 'AUTHORITY', language: 'AR', eaMaturityLevel: 1,
@@ -138,7 +140,11 @@ function Step1Profile({ profile, config, onSave }: any) {
         </div>
         <div>
           <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>لغة المنصة</div>
-          <select className="form-input" value={form.language} onChange={e => setForm((f: any) => ({ ...f, language: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
+          <select className="form-input" value={form.language} onChange={e => {
+            const lang = e.target.value as 'AR' | 'EN'
+            setForm((f: any) => ({ ...f, language: lang }))
+            setLocale(lang)
+          }} style={{ fontSize: 11, width: '100%' }}>
             <option value="AR">العربية</option><option value="EN">English</option>
           </select>
         </div>
