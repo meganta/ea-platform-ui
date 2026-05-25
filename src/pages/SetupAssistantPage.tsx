@@ -60,7 +60,7 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 
 // ── Step 1: Profile + Framework ───────────────────────────────────────────────
 function Step1Profile({ profile, config, onSave }: any) {
-  const { setLocale } = useLang()
+  const { setLocale, isAR } = useLang()
   const [form, setForm] = useState({
     organizationName: '', organizationNameAr: '', sector: 'GOVERNMENT',
     entityType: 'AUTHORITY', language: 'AR', eaMaturityLevel: 1,
@@ -108,7 +108,7 @@ function Step1Profile({ profile, config, onSave }: any) {
       {/* Tenant info cards */}
       {tenant && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {[['ORGANIZATION ID', tenant.slug, '#00b4d8'], ['SUBSCRIPTION', tenant.subscriptionTier, '#f39c12'], ['STATUS', tenant.status, '#2ecc71']].map(([l, v, c]) => (
+          {[[(isAR ? 'معرف المنظمة' : 'ORGANIZATION ID'), tenant.slug, '#00b4d8'], [(isAR ? 'الاشتراك' : 'SUBSCRIPTION'), tenant.subscriptionTier, '#f39c12'], [(isAR ? 'الحالة' : 'STATUS'), tenant.status, '#2ecc71']].map(([l, v, c]) => (
             <div key={l as string} style={{ flex: 1, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${c as string}22`, borderRadius: 6 }}>
               <div style={{ fontSize: 9, color: '#888', fontFamily: 'monospace', marginBottom: 2 }}>{l as string}</div>
               <div style={{ fontSize: 11, color: c as string, fontFamily: 'monospace', fontWeight: 600 }}>{(v as string) || '—'}</div>
@@ -120,7 +120,7 @@ function Step1Profile({ profile, config, onSave }: any) {
       {msg && <div style={{ padding: '6px 10px', borderRadius: 4, background: msg.startsWith('✓') ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.15)', color: msg.startsWith('✓') ? '#2ecc71' : '#e74c3c', fontSize: 11, marginBottom: 10 }}>{msg}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11, marginBottom: 12 }}>
-        {([['organizationNameAr', 'اسم المنظمة (عربي)', true], ['organizationName', 'Organization Name (EN)', false]] as [string,string,boolean][]).map(([k, l, rtl]) => (
+        {([['organizationNameAr', 'اسم المنظمة (عربي)', true], ['organizationName', isAR ? 'اسم المنظمة (إنجليزي)' : 'Organization Name (EN)', false]] as [string,string,boolean][]).map(([k, l, rtl]) => (
           <div key={k}>
             <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>{l}</div>
             <input className="form-input" value={(form as any)[k]} onChange={e => setForm((f: any) => ({ ...f, [k]: e.target.value }))} style={{ width: '100%', fontSize: 11, direction: rtl ? 'rtl' : 'ltr' }} />
@@ -180,13 +180,14 @@ function Step1Profile({ profile, config, onSave }: any) {
         </div>
       </div>
 
-      <button className="btn btn-primary" style={{ fontSize: 12 }} disabled={saving} onClick={save}>{saving ? '⟳ جاري الحفظ...' : '💾 حفظ والمتابعة →'}</button>
+      <button className="btn btn-primary" style={{ fontSize: 12 }} disabled={saving} onClick={save}>{saving ? isAR ? '⟳ جاري الحفظ...' : '⟳ Saving...' : isAR ? '💾 حفظ والمتابعة →' : '💾 Save & Continue →'}</button>
     </div>
   )
 }
 
 // ── Step 2: KB Setup + KB Gap Detection + KB Generation ───────────────────────
 function Step2KB({ onNext }: any) {
+  const { isAR } = useLang()
   const [kbDocs, setKbDocs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
@@ -241,6 +242,7 @@ function Step2KB({ onNext }: any) {
 
 // ── Step 3: Repo Setup + Repo Gap Detection + Repo Generation ─────────────────
 function Step3Repo({ onNext }: any) {
+  const { isAR } = useLang()
   const [repoAssets, setRepoAssets] = useState<any[]>([])
   const [generating, setGenerating] = useState<string | null>(null)
   const [generatedContent, setGeneratedContent] = useState<Record<string, any>>({})
@@ -356,6 +358,7 @@ function Step3Repo({ onNext }: any) {
 
 // ── Step 4: Readiness ─────────────────────────────────────────────────────────
 function Step4Readiness({ onNext }: any) {
+  const { isAR } = useLang()
   const [r, setR] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => { authFetch('/setup/readiness').then(setR).finally(() => setLoading(false)) }, [])
@@ -387,6 +390,7 @@ function Step4Readiness({ onNext }: any) {
 
 // ── Step 5: Next Actions ──────────────────────────────────────────────────────
 function Step5Actions({ onComplete }: any) {
+  const { isAR } = useLang()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => { authFetch('/setup/actions').then(setData).finally(() => setLoading(false)) }, [])
@@ -419,7 +423,8 @@ function Step5Actions({ onComplete }: any) {
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
-export default function SetupAssistantPage({ modal = false, onClose }: { modal?: boolean; onClose?: () => void }) {
+function SetupAssistantPageInner({ modal = false, onClose }: { modal?: boolean; onClose?: () => void }) {
+  const { isAR } = useLang()
   const [step, setStep] = useState(1)
   const [profile, setProfile] = useState<any>(null)
   const [config, setConfig] = useState<any>(null)
@@ -459,8 +464,7 @@ export default function SetupAssistantPage({ modal = false, onClose }: { modal?:
           <button onClick={onClose} style={{ position: 'absolute' as const, top: 14, left: 14, background: 'rgba(255,255,255,0.06)', border: '1px solid #1e2d45', borderRadius: 4, cursor: 'pointer', fontSize: 14, color: '#888', width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
         )}
         <div style={{ textAlign: 'center', marginBottom: 22 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#eee', marginBottom: 4 }}>🏛 مساعد إعداد البنية المؤسسية</div>
-          <div style={{ fontSize: 11, color: '#666' }}>EA Readiness Setup Assistant</div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#eee', marginBottom: 4 }}>{isAR ? '🏛 مساعد إعداد البنية المؤسسية' : '🏛 EA Readiness Setup Assistant'}</div>
         </div>
 
         {/* Step indicators */}
@@ -468,7 +472,7 @@ export default function SetupAssistantPage({ modal = false, onClose }: { modal?:
           {STEPS.map(s => (
             <button key={s.id} onClick={() => setStep(s.id)} style={{ flexShrink: 0, padding: '6px 10px', borderRadius: 6, border: `1px solid ${step === s.id ? '#00b4d8' : '#1e2d45'}`, background: step === s.id ? 'rgba(0,180,216,0.15)' : 'rgba(255,255,255,0.02)', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, minWidth: 80 }}>
               <span style={{ fontSize: 16 }}>{s.icon}</span>
-              <span style={{ fontSize: 8, color: step === s.id ? '#00b4d8' : '#555', whiteSpace: 'nowrap' }}>{s.titleAr}</span>
+              <span style={{ fontSize: 8, color: step === s.id ? '#00b4d8' : '#555', whiteSpace: 'nowrap' }}>{isAR ? s.titleAr : s.titleEn}</span>
             </button>
           ))}
         </div>
@@ -477,8 +481,8 @@ export default function SetupAssistantPage({ modal = false, onClose }: { modal?:
         <div style={{ padding: 16, background: 'rgba(255,255,255,0.02)', border: '1px solid #1e2d45', borderRadius: 8 }}>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8, color: '#eee' }}>
             <span>{STEPS[step - 1]?.icon}</span>
-            <span>{STEPS[step - 1]?.titleAr}</span>
-            <span style={{ fontSize: 11, color: '#555', fontWeight: 400 }}>— {STEPS[step - 1]?.titleEn}</span>
+            <span>{isAR ? STEPS[step - 1]?.titleAr : STEPS[step - 1]?.titleEn}</span>
+            
           </div>
           {step === 1 && <Step1Profile profile={profile} config={config} onSave={() => setStep(2)} />}
           {step === 2 && <Step2KB onNext={() => setStep(3)} />}
@@ -488,10 +492,14 @@ export default function SetupAssistantPage({ modal = false, onClose }: { modal?:
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, fontSize: 11, color: '#444' }}>
-          <span>الخطوة {step} من {STEPS.length}</span>
-          {completed && <span style={{ color: '#2ecc71' }}>✓ تم الإعداد</span>}
+          <span>{isAR ? `الخطوة ${step} من ${STEPS.length}` : `Step ${step} of ${STEPS.length}`}</span>
+          {completed && <span style={{ color: '#2ecc71' }}>{isAR ? '✓ تم الإعداد' : '✓ Setup Complete'}</span>}
         </div>
       </div>
     </div>
   )
+}
+
+export default function SetupAssistantPage({ modal = false, onClose }: { modal?: boolean; onClose?: () => void }) {
+  return <SetupAssistantPageInner modal={modal} onClose={onClose} />
 }

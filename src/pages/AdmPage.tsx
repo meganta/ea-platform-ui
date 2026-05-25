@@ -75,6 +75,7 @@ function CreateModal({ onClose, onCreate, t }: any) {
 
 // ── Scope Selector ────────────────────────────────────────
 function ScopeSelector({ cycle, onScopeSet }: any) {
+  const { isAR } = useLang()
   const api = useApi()
   const DOMAINS: Record<string, string[]> = {
     TOGAF: ['BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY'],
@@ -101,7 +102,7 @@ function ScopeSelector({ cycle, onScopeSet }: any) {
           <div className="section-title" style={{ color: 'var(--gold)', marginBottom: 2 }}>🎯 Architecture Scope</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Select domains in scope. Only relevant phases and deliverables will be shown.</div>
         </div>
-        <button className="btn btn-primary btn-sm" disabled={saving} onClick={save}>{saving ? 'Saving...' : '✓ Save Scope'}</button>
+        <button className="btn btn-primary btn-sm" disabled={saving} onClick={save}>{saving ? isAR ? 'جارٍ الحفظ...' : 'Saving...' : '✓ Save Scope'}</button>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {domains.map((d: string) => (
@@ -146,6 +147,7 @@ function extractDiagrams(text: string): Array<{type: 'text'|'diagram', content: 
 
 // Section Progress Component
 function SectionProgress({ outputId }: { outputId: string }) {
+  const { isAR } = useLang()
   const [sections, setSections] = useState<any[]>([])
   const token = () => localStorage.getItem('ea_token')
   const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
@@ -193,7 +195,7 @@ function SectionProgress({ outputId }: { outputId: string }) {
           </span>
           {s.status === 'COMPLETE' && (
             <span style={{ fontSize: 9, color: s.tokenCount > 0 ? 'var(--text-dim)' : 'var(--gold)', fontFamily: 'var(--font-mono)', marginLeft: 'auto' }}>
-              {s.tokenCount > 0 ? `${s.tokenCount} tokens` : '⚠ empty'}
+              {s.tokenCount > 0 ? (isAR ? `${s.tokenCount} رمز` : `${s.tokenCount} tokens`) : '⚠ فارغ'}
             </span>
           )}
         </div>
@@ -257,6 +259,7 @@ function DiagramStatus({ outputId, onDone, outputStatus }: { outputId: string, o
 
 // ── Input Source Panel ────────────────────────────────────
 function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
+  const { isAR } = useLang()
   const [showOptions, setShowOptions] = useState(false)
   const [kbQuery, setKbQuery] = useState('')
   const [kbSearching, setKbSearching] = useState(false)
@@ -283,7 +286,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
       })
       const updated = await res.json()
       if (updated.id) { onUpdated(updated); setShowOptions(false) }
-      else alert(updated.message || 'No content found')
+      else alert(updated.message || isAR ? 'لم يتم العثور على محتوى' : 'No content found')
     } finally { setKbSearching(false) }
   }
 
@@ -314,7 +317,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
         alert('Failed to pull from repository: ' + (updated.message || JSON.stringify(updated)))
       }
     } catch (e: any) {
-      alert('Error pulling from repository: ' + e.message)
+      alert(isAR ? 'خطأ في جلب البيانات: ' : 'Error pulling from repository: ' + e.message)
     }
   }
 
@@ -369,7 +372,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
             <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>📚 Pull from Knowledge Base</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <input className="form-input" value={kbQuery} onChange={e => setKbQuery(e.target.value)} placeholder={`Search KB for "${inp.title}"`} style={{ flex: 1, fontSize: 11 }} onKeyDown={e => e.key === 'Enter' && pullFromKb()} />
-              <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>{kbSearching ? '...' : 'Search'}</button>
+              <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>{kbSearching ? '...' : isAR ? 'بحث' : 'Search'}</button>
             </div>
           </div>
 
@@ -380,7 +383,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)' }}>🗄 Pull from EA Repository</div>
               <button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} onClick={() => { setShowRepoSearch(s => !s); if (!allRepoAssets.length) loadRepoAssets() }}>
-                {showRepoSearch ? 'Hide' : 'Browse Assets'}
+                {showRepoSearch ? isAR ? 'إخفاء' : 'Hide' : isAR ? 'استعراض الأصول' : 'Browse Assets'}
               </button>
             </div>
             {showRepoSearch && (
@@ -388,7 +391,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
                 {/* Cycle scope toggle */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '4px 8px', background: 'rgba(0,180,216,0.06)', borderRadius: 4 }}>
                   <div style={{ fontSize: 10, color: 'var(--accent)' }}>
-                    {repoSourceFilter === 'CYCLE' ? '📍 This cycle assets only' : '🌐 All repository assets'}
+                    {repoSourceFilter === 'CYCLE' ? isAR ? '📍 أصول هذه الدورة فقط' : '📍 This cycle assets only' : isAR ? '🌐 كل أصول المستودع' : '🌐 All repository assets'}
                   </div>
                   <button style={{ fontSize: 9, background: 'none', border: '1px solid var(--border)', borderRadius: 3, color: 'var(--text-dim)', padding: '1px 6px', cursor: 'pointer' }}
                     onClick={() => {
@@ -399,7 +402,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
                         : allRepoAssets
                       )
                     }}>
-                    {repoSourceFilter === 'CYCLE' ? 'Show All' : 'This Cycle Only'}
+                    {repoSourceFilter === 'CYCLE' ? isAR ? 'عرض الكل' : 'Show All' : isAR ? 'هذه الدورة فقط' : 'This Cycle Only'}
                   </button>
                 </div>
                 {/* Search + domain filter */}
@@ -408,7 +411,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
                     placeholder="Search assets..." style={{ flex: 1, fontSize: 10, padding: '3px 6px' }} />
                   <select className="form-input" value={repoDomainFilter} onChange={e => setRepoDomainFilter(e.target.value)}
                     style={{ fontSize: 10, padding: '3px 4px', width: 120 }}>
-                    <option value="ALL">All Domains</option>
+                    <option value="ALL">{isAR ? 'كل المجالات' : 'All Domains'}</option>
                     {(Array.from(new Set(allRepoAssets.map((a:any) => a.domain).filter(Boolean))) as string[]).sort().map((d:string) =>
                       <option key={d} value={d}>{(d as string).replace(/_/g,' ')}</option>
                     )}
@@ -474,7 +477,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
                     Add to EA Repository
                   </label>
                 </div>
-                <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={uploading} onClick={handleUpload}>{uploading ? 'Uploading...' : 'Upload & Use'}</button>
+                <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={uploading} onClick={handleUpload}>{uploading ? isAR ? 'جارٍ الرفع...' : 'Uploading...' : isAR ? 'رفع واستخدام' : 'Upload & Use'}</button>
               </div>
             )}
           </div>
@@ -490,6 +493,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
 
 // ── Template Panel ────────────────────────────────────────
 function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
+  const { isAR } = useLang()
   const [mapping, setMapping] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const token = () => localStorage.getItem('ea_token')
@@ -542,10 +546,10 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{mapping.purposeAr || mapping.purposeEn}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(46,204,113,0.4)' } : {}) }} disabled={loading} onClick={() => download('docx')}>
-          📄 {loading ? '...' : isFilled ? 'Download Filled Word' : 'Word Template'}
+          📄 {loading ? '...' : isFilled ? (isAR ? 'تحميل Word معبأ' : isAR ? 'تحميل Word معبأ' : 'Download Filled Word') : (isAR ? 'قالب Word' : isAR ? 'قالب Word' : 'Word Template')}
         </button>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(46,204,113,0.4)' } : {}) }} disabled={loading} onClick={() => download('pptx')}>
-          📊 {loading ? '...' : isFilled ? 'Download Filled PPT' : 'PPT Template'}
+          📊 {loading ? '...' : isFilled ? (isAR ? 'تحميل PPT معبأ' : 'Download Filled PPT') : (isAR ? 'قالب PPT' : 'PPT Template')}
         </button>
       </div>
     </div>
@@ -553,6 +557,7 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
 }
 
 function OutputSourcePanel({ out, onUpdated }: any) {
+  const { isAR } = useLang()
   const [showOptions, setShowOptions] = useState(false)
   const [kbQuery, setKbQuery] = useState('')
   const [kbSearching, setKbSearching] = useState(false)
@@ -623,7 +628,7 @@ function OutputSourcePanel({ out, onUpdated }: any) {
             <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>📚 Pull from Knowledge Base</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <input className="form-input" value={kbQuery} onChange={e => setKbQuery(e.target.value)} placeholder={`Search KB for "${out.title}"`} style={{ flex: 1, fontSize: 11 }} onKeyDown={e => e.key === 'Enter' && pullFromKb()} />
-              <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>{kbSearching ? '...' : 'Search'}</button>
+              <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>{kbSearching ? '...' : isAR ? 'بحث' : 'Search'}</button>
             </div>
           </div>
           <div className="divider" style={{ margin: '8px 0' }} />
@@ -631,7 +636,7 @@ function OutputSourcePanel({ out, onUpdated }: any) {
           <div style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)' }}>🗄 Pull from EA Repository</div>
-              <button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} onClick={() => { setShowRepoSearch(s => !s); if (!repoAssets.length) loadRepoAssets() }}>{showRepoSearch ? 'Hide' : 'Browse'}</button>
+              <button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} onClick={() => { setShowRepoSearch(s => !s); if (!repoAssets.length) loadRepoAssets() }}>{showRepoSearch ? isAR ? 'إخفاء' : 'Hide' : 'Browse'}</button>
             </div>
             {showRepoSearch && (
               <div style={{ maxHeight: 140, overflow: 'auto' }}>
@@ -661,7 +666,7 @@ function OutputSourcePanel({ out, onUpdated }: any) {
                     <input type="checkbox" checked={includeInRepo} onChange={e => setIncludeInRepo(e.target.checked)} /> Add to Repository
                   </label>
                 </div>
-                <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={uploading} onClick={handleUpload}>{uploading ? 'Uploading...' : 'Upload & Use'}</button>
+                <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={uploading} onClick={handleUpload}>{uploading ? isAR ? 'جارٍ الرفع...' : 'Uploading...' : isAR ? 'رفع واستخدام' : 'Upload & Use'}</button>
               </div>
             )}
           </div>
@@ -674,6 +679,7 @@ function OutputSourcePanel({ out, onUpdated }: any) {
 
 // ── Evidence Collection Form (DISCOVERY outputs) ──────────────────────────
 function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field: any; value: string; onChange: (v: string) => void; outId: string; cycleId: string }) {
+  const { isAR } = useLang()
   const [showOptions, setShowOptions] = useState(false)
   const [kbQuery, setKbQuery] = useState('')
   const [kbSearching, setKbSearching] = useState(false)
@@ -767,7 +773,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
                 placeholder={`Search KB for ${field.label.toLowerCase()}...`}
                 style={{ flex: 1, fontSize: 11 }} onKeyDown={e => e.key === 'Enter' && pullFromKb()} />
               <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>
-                {kbSearching ? '...' : 'Search'}
+                {kbSearching ? '...' : isAR ? 'بحث' : 'Search'}
               </button>
             </div>
           </div>
@@ -779,27 +785,27 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
               <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--gold)' }}>🗄 Pull from EA Repository</div>
               <button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }}
-                onClick={() => setShowRepoSearch(s => !s)}>{showRepoSearch ? 'Hide' : 'Browse Assets'}</button>
+                onClick={() => setShowRepoSearch(s => !s)}>{showRepoSearch ? isAR ? 'إخفاء' : 'Hide' : isAR ? 'استعراض الأصول' : 'Browse Assets'}</button>
             </div>
             {showRepoSearch && (
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '4px 8px', background: 'rgba(0,180,216,0.06)', borderRadius: 4 }}>
                   <div style={{ fontSize: 10, color: 'var(--accent)' }}>
-                    {repoSourceFilter === 'CYCLE' ? '📍 This cycle assets only' : '🌐 All repository assets'}
+                    {repoSourceFilter === 'CYCLE' ? isAR ? '📍 أصول هذه الدورة فقط' : '📍 This cycle assets only' : isAR ? '🌐 كل أصول المستودع' : '🌐 All repository assets'}
                   </div>
                   <button style={{ fontSize: 9, background: 'none', border: '1px solid var(--border)', borderRadius: 3, color: 'var(--text-dim)', padding: '1px 6px', cursor: 'pointer' }}
                     onClick={() => {
                       const next = repoSourceFilter === 'CYCLE' ? 'ALL' : 'CYCLE'
                       setRepoSourceFilter(next)
                       setRepoAssets(next === 'CYCLE' ? allRepoAssets.filter((a: any) => a.sourceRef === cycleId || a.source === 'MANUAL') : allRepoAssets)
-                    }}>{repoSourceFilter === 'CYCLE' ? 'Show All' : 'This Cycle Only'}</button>
+                    }}>{repoSourceFilter === 'CYCLE' ? isAR ? 'عرض الكل' : 'Show All' : isAR ? 'هذه الدورة فقط' : 'This Cycle Only'}</button>
                 </div>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
                   <input className="form-input" value={repoSearch} onChange={e => setRepoSearch(e.target.value)}
                     placeholder="Search assets..." style={{ flex: 1, fontSize: 10, padding: '3px 6px' }} />
                   <select className="form-input" value={repoDomainFilter} onChange={e => setRepoDomainFilter(e.target.value)}
                     style={{ fontSize: 10, padding: '3px 4px', width: 110 }}>
-                    <option value="ALL">All Domains</option>
+                    <option value="ALL">{isAR ? 'كل المجالات' : 'All Domains'}</option>
                     {(Array.from(new Set(allRepoAssets.map((a: any) => a.domain).filter(Boolean))) as string[]).sort().map((d: string) =>
                       <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>
                     )}
@@ -845,7 +851,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
                   <input type="checkbox" checked={includeInKb} onChange={e => setIncludeInKb(e.target.checked)} /> Add to Knowledge Base
                 </label>
                 <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={uploading} onClick={handleUpload}>
-                  {uploading ? 'Uploading...' : 'Upload & Use'}
+                  {uploading ? isAR ? 'جارٍ الرفع...' : 'Uploading...' : isAR ? 'رفع واستخدام' : 'Upload & Use'}
                 </button>
               </div>
             )}
@@ -867,6 +873,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
 }
 
 function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; cycleId: string; onEvidenceSaved: (evidence: any) => void }) {
+  const { isAR } = useLang()
   const [fields, setFields] = useState<any[]>([])
   const [evidence, setEvidence] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -920,11 +927,11 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} disabled={saving} onClick={handleSave}>
-          {saving ? '💾 Saving...' : '💾 Save Evidence'}
+          {saving ? isAR ? '💾 جارٍ الحفظ...' : '💾 Saving...' : isAR ? '💾 حفظ الدليل' : '💾 Save Evidence'}
         </button>
         {filledCount > 0 && (
           <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>
-            {filledCount}/{fields.length} fields filled — click "Analyze & Structure" to process
+            {filledCount}/{fields.length} fields filled — click isAR ? "تحليل وهيكلة" : "Analyze & Structure" to process
           </span>
         )}
       </div>
@@ -1203,7 +1210,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                                     method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }
                                   })
                                   window.location.reload()
-                                }}>✕ Cancel</button>
+                                }}>{isAR ? '✕ إلغاء' : '✕ Cancel'}</button>
                             </div>
                           )}
                           {(out.status === 'GENERATING' || generating === out.id) && <SectionProgress outputId={out.id} />}
@@ -1217,11 +1224,11 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                           {(out.status === 'PENDING' || out.status === 'AI_DRAFT') && (() => {
                             const behaviorType = def?.behaviorType || 'ANALYSIS'
                             const buttonConfig: Record<string, { label: string; icon: string; tooltip: string }> = {
-                              DISCOVERY: { label: 'Analyze & Structure', icon: '🔍', tooltip: 'AI will extract and organize architecture evidence from your inputs — not generate architecture' },
-                              ANALYSIS:  { label: 'AI Generate', icon: '🤖', tooltip: 'AI will analyze and interpret the current state' },
-                              DESIGN:    { label: 'AI Design', icon: '🏗', tooltip: 'AI will design the target architecture' },
-                              GOVERNANCE:{ label: 'AI Generate', icon: '📋', tooltip: 'AI will produce a governance artifact' },
-                              PLANNING:  { label: 'AI Plan', icon: '🗺', tooltip: 'AI will sequence and prioritize initiatives' },
+                              DISCOVERY: { label: isAR ? 'تحليل وهيكلة' : 'Analyze & Structure', icon: '🔍', tooltip: isAR ? 'سيستخرج الذكاء الاصطناعي ويرتب الأدلة المعمارية من مدخلاتك' : 'AI will extract and organize architecture evidence from your inputs — not generate architecture' },
+                              ANALYSIS:  { label: isAR ? 'توليد ذكي' : 'AI Generate', icon: '🤖', tooltip: isAR ? 'سيحلل الذكاء الاصطناعي ويفسر الوضع الحالي' : 'AI will analyze and interpret the current state' },
+                              DESIGN:    { label: isAR ? 'تصميم ذكي' : 'AI Design', icon: '🏗', tooltip: isAR ? 'سيصمم الذكاء الاصطناعي البنية المستهدفة' : 'AI will design the target architecture' },
+                              GOVERNANCE:{ label: isAR ? 'توليد ذكي' : 'AI Generate', icon: '📋', tooltip: isAR ? 'سينتج الذكاء الاصطناعي مخرجاً حوكمياً' : 'AI will produce a governance artifact' },
+                              PLANNING:  { label: isAR ? 'تخطيط ذكي' : 'AI Plan', icon: '🗺', tooltip: isAR ? 'سيرتب الذكاء الاصطناعي ويحدد أولويات المبادرات' : 'AI will sequence and prioritize initiatives' },
                             }
                             const cfg = buttonConfig[behaviorType] || buttonConfig.ANALYSIS
                             return (
@@ -1238,7 +1245,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                                   title={cfg.tooltip}
                                   onClick={() => generateOutput(out.id)}
                                 >
-                                  {generating === out.id ? `⏳ ${behaviorType === 'DISCOVERY' ? 'Analyzing...' : 'Generating...'}` : `${cfg.icon} ${cfg.label}`}
+                                  {generating === out.id ? `⏳ ${behaviorType === 'DISCOVERY' ? (isAR ? 'جارٍ التحليل...' : 'Analyzing...') : (isAR ? 'جارٍ التوليد...' : 'Generating...')}` : `${cfg.icon} ${cfg.label}`}
                                 </button>
                               </div>
                             )
@@ -1258,10 +1265,10 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                         {out.content && (
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: 9, opacity: out.inRepository ? 0.5 : 1 }} disabled={out.inRepository} onClick={() => promoteToRepo(out.id)}>
-                              {out.inRepository ? '✓ In Repo' : '🗄 → Repository'}
+                              {out.inRepository ? isAR ? '✓ في المستودع' : '✓ In Repo' : isAR ? '🗄 → المستودع' : '🗄 → Repository'}
                             </button>
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: 9, opacity: out.inKnowledgeBase ? 0.5 : 1 }} disabled={out.inKnowledgeBase} onClick={() => promoteToKb(out.id)}>
-                              {out.inKnowledgeBase ? '✓ In KB' : '📚 → Knowledge Base'}
+                              {out.inKnowledgeBase ? isAR ? '✓ في قاعدة المعرفة' : '✓ In KB' : isAR ? '📚 → قاعدة المعرفة' : '📚 → Knowledge Base'}
                             </button>
                           </div>
                         )}
@@ -1398,7 +1405,7 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
     setSyncing(true); setMsg(null)
     try {
       const res = await authFetch(`/cycle-artifacts/cycles/${cycle.id}/sync`, { method: 'POST' })
-      setMsg({ type: 'success', text: `Synced: ${res.synced} new, ${res.updated} updated` })
+      setMsg({ type: 'success', text: isAR ? `تمت المزامنة: ${res.synced} جديد، ${res.updated} محدّث` : `Synced: ${res.synced} new, ${res.updated} updated` })
       load()
     } finally { setSyncing(false) }
   }
@@ -1453,12 +1460,12 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
           <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Export ADM Cycle Package</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
             {[
-              ['includeOutputs', 'Include Outputs (Markdown)'],
-              ['includeInputs', 'Include Inputs'],
-              ['includeWordPpt', 'Include Word / PPT Exports'],
+              ['includeOutputs', isAR ? 'تضمين المخرجات (Markdown)' : 'Include Outputs (Markdown)'],
+              ['includeInputs', isAR ? 'تضمين المدخلات' : 'Include Inputs'],
+              ['includeWordPpt', isAR ? 'تضمين تصديرات Word / PPT' : 'Include Word / PPT Exports'],
               ['includeJsonMarkdown', 'Include JSON'],
-              ['approvedOnly', 'Approved outputs only'],
-              ['latestOnly', 'Latest versions only'],
+              ['approvedOnly', isAR ? 'المخرجات المعتمدة فقط' : 'Approved outputs only'],
+              ['latestOnly', isAR ? 'الإصدارات الأخيرة فقط' : 'Latest versions only'],
             ].map(([k, l]) => (
               <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, cursor: 'pointer' }}>
                 <input type="checkbox" checked={(exportOptions as any)[k]} onChange={e => setExportOptions(o => ({ ...o, [k]: e.target.checked }))} />
@@ -1499,18 +1506,18 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <select className="form-input" value={filterPhase} onChange={e => setFilterPhase(e.target.value)} style={{ fontSize: 11 }}>
-          <option value="ALL">All Phases</option>
-          {phases.map((p: any) => <option key={p} value={p}>Phase {p}</option>)}
+          <option value="ALL">{isAR ? 'كل المراحل' : 'All Phases'}</option>
+          {phases.map((p: any) => <option key={p} value={p}>{isAR ? `المرحلة ${p}` : `Phase ${p}`}</option>)}
         </select>
         <select className="form-input" value={filterType} onChange={e => setFilterType(e.target.value)} style={{ fontSize: 11 }}>
-          <option value="ALL">All Types</option>
+          <option value="ALL">{isAR ? 'كل الأنواع' : 'All Types'}</option>
           {Object.entries(ARTIFACT_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v.icon} {v.label}</option>)}
         </select>
         <select className="form-input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ fontSize: 11 }}>
-          <option value="ALL">All Statuses</option>
+          <option value="ALL">{isAR ? 'كل الحالات' : 'All Statuses'}</option>
           <option value="APPROVED">Approved</option>
           <option value="DRAFT">Draft</option>
-          <option value="DEPRECATED">Deprecated</option>
+          <option value="DEPRECATED">{isAR ? 'مهمل' : 'Deprecated'}</option>
         </select>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', marginLeft: 'auto' }}>
           {data?.total || 0} artifacts
@@ -1686,7 +1693,7 @@ export default function AdmPage() {
                     </div>
                   </div>
 
-                  <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-dim)' }}>Click a phase to open its workspace</div>
+                  <div style={{ marginBottom: 8, fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'اضغط على مرحلة لفتح مساحة العمل' : 'Click a phase to open its workspace'}</div>
 
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {phases.map(p => (
