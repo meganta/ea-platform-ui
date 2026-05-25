@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -911,6 +912,7 @@ function TerminologyTab() {
 }
 
 export default function SettingsPage() {
+  const { setLocale } = useLang()
   const api = useApi()
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -1003,7 +1005,11 @@ export default function SettingsPage() {
             <div className="alert alert-info" style={{ marginTop: 16 }}>
               AI responses will be in {ai.language === 'AR' ? 'Arabic' : ai.language === 'BILINGUAL' ? 'both Arabic and English' : 'English'} by default. Users can still switch language in the Copilot.
             </div>
-            <button className="btn btn-primary mt-4" disabled={saving === 'ai'} onClick={() => save('ai', ai)}>
+            <button className="btn btn-primary mt-4" disabled={saving === 'ai'} onClick={() => {
+              save('ai', ai)
+              // Sync UI language with AI language preference
+              if (ai.language === 'AR' || ai.language === 'EN') setLocale(ai.language as 'AR' | 'EN')
+            }}>
               {saving === 'ai' ? 'Saving...' : 'Save AI Configuration'}
             </button>
           </div>
