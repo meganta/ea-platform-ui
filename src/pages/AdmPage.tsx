@@ -1400,6 +1400,30 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
     } finally { setSyncing(false) }
   }
 
+  const [showExportOptions, setShowExportOptions] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  const [exportOptions, setExportOptions] = useState({
+    includeInputs: true, includeOutputs: true, includeWordPpt: true,
+    includeJsonMarkdown: true, approvedOnly: false, latestOnly: true,
+  })
+
+  const exportZip = async () => {
+    setExporting(true)
+    try {
+      const params = new URLSearchParams(Object.entries(exportOptions).map(([k, v]) => [k, String(v)]))
+      const res = await fetch(`${API_URL}/adm-templates/cycle/${cycle.id}/export?${params}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }
+      })
+      if (!res.ok) { alert('Export failed: ' + res.status); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `${cycle.name.replace(/\s+/g, '_')}_Export.zip`; a.click()
+      URL.revokeObjectURL(url)
+      setShowExportOptions(false)
+    } finally { setExporting(false) }
+  }
+
   const phases = Array.from(new Set(data?.artifacts?.map((a: any) => a.phase) || [])).sort()
 
   return (
@@ -1410,10 +1434,43 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
           <div style={{ fontSize: 13, fontWeight: 600 }}>📦 Cycle Artifact Repository</div>
           <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>All outputs, diagrams, and exports organized by phase and step</div>
         </div>
-        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} disabled={syncing} onClick={sync}>
-          {syncing ? '⟳ Syncing...' : '⟳ Sync Outputs'}
-        </button>
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} disabled={syncing} onClick={sync}>
+            {syncing ? '⟳ Syncing...' : '⟳ Sync Outputs'}
+          </button>
+          <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => setShowExportOptions(s => !s)}>
+            📦 Export Package
+          </button>
+        </div>
       </div>
+
+      {/* Export options panel */}
+      {showExportOptions && (
+        <div style={{ marginBottom: 14, padding: 14, background: 'var(--navy)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 10 }}>Export ADM Cycle Package</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+            {[
+              ['includeOutputs', 'Include Outputs (Markdown)'],
+              ['includeInputs', 'Include Inputs'],
+              ['includeWordPpt', 'Include Word / PPT Exports'],
+              ['includeJsonMarkdown', 'Include JSON'],
+              ['approvedOnly', 'Approved outputs only'],
+              ['latestOnly', 'Latest versions only'],
+            ].map(([k, l]) => (
+              <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, cursor: 'pointer' }}>
+                <input type="checkbox" checked={(exportOptions as any)[k]} onChange={e => setExportOptions(o => ({ ...o, [k]: e.target.checked }))} />
+                {l}
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} disabled={exporting} onClick={exportZip}>
+              {exporting ? '⟳ Generating ZIP...' : '⬇ Download ZIP'}
+            </button>
+            <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setShowExportOptions(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 10 }}>{msg.text}</div>}
 
