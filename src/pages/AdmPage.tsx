@@ -934,6 +934,7 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
 
 // ── Phase Workspace (Step-based) ──────────────────────────
 function PhaseWorkspace({ cycle, phase, onClose }: any) {
+  const { isAR } = useLang()
   const api = useApi()
   const [phaseInputs, setPhaseInputs] = useState<any[]>([])
   const [phaseOutputs, setPhaseOutputs] = useState<any[]>([])
@@ -1106,7 +1107,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
               <div className="grid-2" style={{ gap: 16 }}>
                 {/* Inputs */}
                 <div>
-                  <div className="section-title" style={{ fontSize: 13, marginBottom: 10 }}>📥 Inputs</div>
+                  <div className="section-title" style={{ fontSize: 13, marginBottom: 10 }}>{isAR ? '📥 المدخلات' : isAR ? '📥 المدخلات' : '📥 Inputs'}</div>
                   {stepInputs.length === 0 ? (
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>No inputs for this step</div>
                   ) : stepInputs.map(inp => {
@@ -1119,10 +1120,10 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                           <div style={{ fontSize: 12, fontWeight: 500 }}>{inp.title}</div>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             {inp.providedBy?.startsWith('AUTO_ADM:') && (
-                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(46,204,113,0.15)', color: '#2ecc71', border: '1px solid rgba(46,204,113,0.3)' }}>⚡ Auto — ADM Output</span>
+                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(46,204,113,0.15)', color: '#2ecc71', border: '1px solid rgba(46,204,113,0.3)' }}>{isAR ? '⚡ تلقائي — مخرج ADM' : '⚡ Auto — ADM Output'}</span>
                             )}
                             {inp.providedBy?.startsWith('AUTO_REPO:') && (
-                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(243,156,18,0.15)', color: 'var(--gold)', border: '1px solid rgba(243,156,18,0.3)' }}>🗄 Auto — Repository</span>
+                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(243,156,18,0.15)', color: 'var(--gold)', border: '1px solid rgba(243,156,18,0.3)' }}>{isAR ? '🗄 تلقائي — المستودع' : '🗄 Auto — Repository'}</span>
                             )}
                             <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-dim)' }}>{def?.source?.replace('_', ' ')}</span>
                             <span className={`badge ${inp.source === 'PROVIDED' ? 'badge-approved' : 'badge-draft'}`} style={{ fontSize: 9 }}>{inp.source}</span>
@@ -1150,7 +1151,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 
                 {/* Outputs */}
                 <div>
-                  <div className="section-title" style={{ fontSize: 13, marginBottom: 10 }}>📤 Outputs</div>
+                  <div className="section-title" style={{ fontSize: 13, marginBottom: 10 }}>{isAR ? '📤 المخرجات' : isAR ? '📤 المخرجات' : '📤 Outputs'}</div>
                   {stepOutputs.length === 0 ? (
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>No outputs for this step</div>
                   ) : stepOutputs.map(out => {
@@ -1368,6 +1369,7 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 function CycleRepositoryView({ cycle }: { cycle: any }) {
+  const { isAR } = useLang()
   const [data, setData] = useState<any>(null)
   const [summary, setSummary] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -1437,7 +1439,7 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} disabled={syncing} onClick={sync}>
-            {syncing ? '⟳ Syncing...' : '⟳ Sync Outputs'}
+            {syncing ? isAR ? '⟳ جارٍ المزامنة...' : '⟳ Syncing...' : isAR ? '⟳ مزامنة المخرجات' : '⟳ Sync Outputs'}
           </button>
           <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => setShowExportOptions(s => !s)}>
             📦 Export Package
@@ -1519,7 +1521,7 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
       {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Loading artifacts...</div> : (
         data?.total === 0 ? (
           <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-dim)', fontSize: 12, border: '1px dashed var(--border)', borderRadius: 'var(--radius)' }}>
-            No artifacts yet. Click "Sync Outputs" to register existing outputs as artifacts.
+            {isAR ? 'لا توجد أدوات بعد. اضغط على "مزامنة المخرجات" لتسجيلها.' : 'No artifacts yet. Click "Sync Outputs" to register existing outputs as artifacts.'}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1572,7 +1574,7 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
 
 // ── Main ADM Page ─────────────────────────────────────────
 export default function AdmPage() {
-  const { t } = useLang()
+  const { t, isAR } = useLang()
   const [cycles, setCycles] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -1664,7 +1666,7 @@ export default function AdmPage() {
               <div>
                 {/* Cycle view tabs */}
                 <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
-                  {[['phases', '🗺 Phases'], ['repository', '📦 Cycle Repository']].map(([k, l]) => (
+                  {[['phases', isAR ? '🗺 المراحل' : '🗺 Phases'], ['repository', isAR ? '📦 مستودع الدورة' : '📦 Cycle Repository']].map(([k, l]) => (
                     <button key={k} onClick={() => setCycleView(k as any)}
                       style={{ fontSize: 11, padding: '5px 12px', borderRadius: 'var(--radius)', border: `1px solid ${cycleView === k ? 'var(--accent)' : 'var(--border)'}`, background: cycleView === k ? 'rgba(0,180,216,0.12)' : 'transparent', color: cycleView === k ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer' }}>
                       {l}

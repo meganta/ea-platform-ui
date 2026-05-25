@@ -6,7 +6,7 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660
 
 export default function Layout() {
   const { user, logout } = useAuth()
-  const { t, locale, setLocale } = useLang()
+  const { t, locale, isAR, setLocale } = useLang()
   const nav = useNavigate()
 
   const switchLanguage = async (newLocale: 'EN' | 'AR') => {
@@ -36,10 +36,10 @@ export default function Layout() {
           <div className="nav-label" style={{marginTop:8}}>{t('nav.repo_section')}</div>
           <NavLink to="/repository" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗄 {t('nav.repository')}</NavLink>
           <NavLink to="/knowledge" className={({isActive})=>`nav-item${isActive?' active':''}`}>📚 {t('nav.knowledge')}</NavLink>
-          <div className="nav-label" style={{marginTop:8}}>Admin</div>
-          <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Governance</NavLink>
-          <NavLink to="/setup" className={({isActive})=>`nav-item${isActive?' active':''}`}>🚀 Setup Assistant</NavLink>
-          <NavLink to="/settings" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ Settings</NavLink>
+          <div className="nav-label" style={{marginTop:8}}>{isAR ? 'الإدارة' : 'Admin'}</div>
+          <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 {isAR ? 'الحوكمة' : 'Governance'}</NavLink>
+          <NavLink to="/setup" className={({isActive})=>`nav-item${isActive?' active':''}`}>🚀 {isAR ? 'مساعد الإعداد' : 'Setup Assistant'}</NavLink>
+          <NavLink to="/settings" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ {isAR ? 'الإعدادات' : 'Settings'}</NavLink>
         </nav>
         <div className="sidebar-footer">
           <div className="flex items-center gap-2" style={{marginBottom:8}}>
