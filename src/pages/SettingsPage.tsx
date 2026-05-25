@@ -9,12 +9,6 @@ function useApi() {
   return { get, put }
 }
 
-const FRAMEWORKS = ['NORA', 'CUSTOM']
-const ALL_DOMAINS: Record<string, string[]> = {
-  TOGAF: ['BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY', 'CROSS_CUTTING'],
-  NORA: ['STRATEGIC', 'BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY', 'SECURITY', 'CROSS_CUTTING'],
-  CUSTOM: ['BUSINESS', 'DATA', 'APPLICATION', 'TECHNOLOGY', 'CROSS_CUTTING'],
-}
 
 function BrandingTab() {
   const [form, setForm] = useState({ organizationNameEn: '', organizationNameAr: '', primaryColor: '#00b4d8', accentColor: '#f39c12', logoUrl: '' })
@@ -922,17 +916,14 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const [tab, setTab] = useState('framework')
+  const [tab, setTab] = useState('ai')
 
   // Form states
-  const [framework, setFramework] = useState({ frameworkType: 'NORA', enabledDomains: [] as string[] })
   const [ai, setAi] = useState({ provider: 'openai', model: 'gpt-4o', language: 'EN' })
-  const [newDomain, setNewDomain] = useState('')
 
   useEffect(() => {
     api.get('/config').then(c => {
       setConfig(c)
-      setFramework({ frameworkType: c.framework?.type || 'NORA', enabledDomains: c.framework?.enabledDomains || [] })
       setAi(c.ai || { provider: 'openai', model: 'gpt-4o', language: 'EN' })
     }).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -953,15 +944,6 @@ export default function SettingsPage() {
     }
   }
 
-  const toggleDomain = (domain: string) => {
-    setFramework(f => ({
-      ...f,
-      enabledDomains: f.enabledDomains.includes(domain)
-        ? f.enabledDomains.filter(d => d !== domain)
-        : [...f.enabledDomains, domain],
-    }))
-  }
-
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>
 
   return (
@@ -971,7 +953,7 @@ export default function SettingsPage() {
         <div className="page-subtitle">TENANT CONFIGURATION — {config?.tenant?.slug?.toUpperCase()}</div>
         <div className="page-tabs">
           {[
-            ['framework', 'EA Framework'], ['ai', 'AI Configuration'],
+            ['ai', 'AI Configuration'],
             ['apikeys', '🔑 API Keys'], ['rag', '🧠 Knowledge Base'],
             ['branding', '🎨 Branding'], ['export', '📤 Export'], ['governance', '⚖ Governance'],
             ['diagrams', '📐 Diagrams'], ['notifications', '🔔 Notifications'],
@@ -987,54 +969,6 @@ export default function SettingsPage() {
           <div style={{ padding: '10px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13, background: msg.type === 'success' ? 'rgba(46,204,113,0.1)' : 'rgba(231,76,60,0.1)', border: `1px solid ${msg.type === 'success' ? 'rgba(46,204,113,0.3)' : 'rgba(231,76,60,0.3)'}`, color: msg.type === 'success' ? 'var(--success)' : 'var(--danger)', display: 'flex', justifyContent: 'space-between' }}>
             <span>{msg.text}</span>
             <button onClick={() => setMsg(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>×</button>
-          </div>
-        )}
-
-        {/* ── Framework ── */}
-        {tab === 'framework' && (
-          <div className="card">
-            <div className="section-title">🏗 EA Framework Configuration</div>
-            <div className="form-group">
-              <label className="form-label">EA Framework</label>
-              <div className="flex gap-2" style={{ marginBottom: 4 }}>
-                {FRAMEWORKS.map(f => (
-                  <button key={f} onClick={() => {
-                    const defaults = ALL_DOMAINS[f] || ALL_DOMAINS.NORA
-                    setFramework({ frameworkType: f, enabledDomains: defaults })
-                  }} className={`btn ${framework.frameworkType === f ? 'btn-primary' : 'btn-secondary'}`}>
-                    {f}
-                  </button>
-                ))}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                {framework.frameworkType === 'NORA' && 'National Organization Reference Architecture — Saudi government EA standard'}
-                {framework.frameworkType === 'CUSTOM' && 'Define your own architecture domains and asset types'}
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Enabled Architecture Domains</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                {(ALL_DOMAINS[framework.frameworkType] || []).map(domain => (
-                  <button key={domain} onClick={() => toggleDomain(domain)}
-                    style={{ padding: '6px 14px', borderRadius: 'var(--radius)', fontSize: 12, fontFamily: 'var(--font-mono)', cursor: 'pointer', border: `1px solid ${framework.enabledDomains.includes(domain) ? 'var(--accent)' : 'var(--border)'}`, background: framework.enabledDomains.includes(domain) ? 'rgba(0,180,216,0.15)' : 'var(--navy)', color: framework.enabledDomains.includes(domain) ? 'var(--accent)' : 'var(--text-dim)' }}>
-                    {framework.enabledDomains.includes(domain) ? '✓ ' : ''}{domain.replace(/_/g, ' ')}
-                  </button>
-                ))}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Click to toggle domains. Disabled domains won't appear in the EA Repository.</div>
-            </div>
-            {framework.frameworkType === 'CUSTOM' && (
-              <div className="form-group">
-                <label className="form-label">Add Custom Domain</label>
-                <div className="flex gap-2">
-                  <input className="form-input" value={newDomain} onChange={e => setNewDomain(e.target.value.toUpperCase().replace(/\s/g, '_'))} placeholder="MY_CUSTOM_DOMAIN" style={{ flex: 1 }} />
-                  <button className="btn btn-secondary" onClick={() => { if (newDomain) { setFramework(f => ({ ...f, enabledDomains: [...f.enabledDomains, newDomain] })); setNewDomain('') } }}>Add</button>
-                </div>
-              </div>
-            )}
-            <button className="btn btn-primary mt-4" disabled={saving === 'framework'} onClick={() => save('framework', framework)}>
-              {saving === 'framework' ? 'Saving...' : 'Save Framework Configuration'}
-            </button>
           </div>
         )}
 
