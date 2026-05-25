@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -12,15 +13,15 @@ function useApi() {
   return { get, post, patch, postFile, del }
 }
 
-const REVIEW_TYPES = [
-  { value: 'SOLUTION_DESIGN', label: 'Architecture Solution Review (HLD/LLD)' },
-  { value: 'NEW_PROJECT', label: 'New Project Review' },
+const getReviewTypes = (isAR: boolean) => [
+  { value: 'SOLUTION_DESIGN', label: isAR ? 'مراجعة حل معماري (تصميم عالي/تفصيلي)' : 'Architecture Solution Review (HLD/LLD)' },
+  { value: 'NEW_PROJECT', label: isAR ? 'مراجعة مشروع جديد' : 'New Project Review' },
   { value: 'RFP_SOW', label: 'RFP / Scope of Work Review' },
-  { value: 'CHANGE_REQUEST', label: 'Change Request Review' },
+  { value: 'CHANGE_REQUEST', label: isAR ? 'مراجعة طلب تغيير' : 'Change Request Review' },
   { value: 'CAB_REVIEW', label: 'CAB Review' },
-  { value: 'DIGITAL_INITIATIVE', label: 'Digital Initiative Review' },
-  { value: 'TECHNICAL_PROPOSAL', label: 'Technical Proposal Review' },
-  { value: 'BUSINESS_DEMAND', label: 'Business Demand Review' },
+  { value: 'DIGITAL_INITIATIVE', label: isAR ? 'مراجعة مبادرة رقمية' : 'Digital Initiative Review' },
+  { value: 'TECHNICAL_PROPOSAL', label: isAR ? 'مراجعة مقترح تقني' : 'Technical Proposal Review' },
+  { value: 'BUSINESS_DEMAND', label: isAR ? 'مراجعة طلب أعمال' : 'Business Demand Review' },
 ]
 
 const SEV_COLOR: Record<string, string> = {
@@ -36,8 +37,8 @@ const DECISION_COLOR: Record<string, string> = {
 }
 
 // ── Step indicator ────────────────────────────────────────
-function Steps({ current }: { current: number }) {
-  const steps = ['Review Type', 'Upload Inputs', 'Gap Check', 'AI Review', 'Report']
+function Steps({ current, isAR }: { current: number; isAR: boolean }) {
+  const steps = [isAR ? 'نوع المراجعة' : 'Review Type', isAR ? 'رفع المدخلات' : 'Upload Inputs', isAR ? 'فحص الفجوات' : 'Gap Check', 'AI Review', isAR ? 'التقرير' : 'Report']
   return (
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
       {steps.map((s, i) => (
@@ -95,6 +96,7 @@ function FindingCard({ f }: { f: any }) {
 // ── Main page ─────────────────────────────────────────────
 export default function GovernancePage() {
   const api = useApi()
+  const { isAR } = useLang()
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list')
   const [reviews, setReviews] = useState<any[]>([])
   const [review, setReview] = useState<any>(null)
@@ -117,7 +119,7 @@ export default function GovernancePage() {
   const loadReviews = async () => {
     setLoading(true)
     try { const data = await api.get('/governance/reviews'); setReviews(data) }
-    catch (e) { setError('Failed to load reviews') }
+    catch (e) { setError(isAR ? 'فشل تحميل المراجعات' : 'Failed to load reviews') }
     finally { setLoading(false) }
   }
 
@@ -133,13 +135,13 @@ export default function GovernancePage() {
 
   // ── Step 1: Create review ─────────────────────────────
   const createReview = async () => {
-    if (!form.title) { setError('Title is required'); return }
+    if (!form.title) { setError(isAR ? 'العنوان مطلوب' : 'Title is required'); return }
     setLoading(true); setError('')
     try {
       const r = await api.post('/governance/reviews', form)
       if (r.id) { setReview(r); setStep(1); setView('create') }
-      else setError(r.message || 'Failed to create review')
-    } catch (e) { setError('Failed to create review') }
+      else setError(r.message || isAR ? 'فشل إنشاء المراجعة' : 'Failed to create review')
+    } catch (e) { setError(isAR ? 'فشل إنشاء المراجعة' : 'Failed to create review') }
     finally { setLoading(false) }
   }
 
@@ -152,7 +154,7 @@ export default function GovernancePage() {
     try {
       const r = await api.postFile('/governance/reviews/' + review.id + '/inputs/file', fd)
       if (r.id) setInputs(i => [...i, r])
-    } catch (e) { setError('Upload failed') }
+    } catch (e) { setError(isAR ? 'فشل الرفع' : 'Upload failed') }
     finally { setUploading(false) }
   }
 
@@ -164,7 +166,7 @@ export default function GovernancePage() {
       setGaps(r.gaps || [])
       setReview((prev: any) => ({ ...prev, completenessScore: r.completenessScore }))
       setStep(3)
-    } catch (e) { setError('Gap detection failed') }
+    } catch (e) { setError(isAR ? 'فشل اكتشاف الفجوات' : 'Gap detection failed') }
     finally { setLoading(false) }
   }
 
@@ -175,7 +177,7 @@ export default function GovernancePage() {
       await api.post('/governance/reviews/' + review.id + '/run')
       setStep(4)
       pollStatus()
-    } catch (e: any) { setError(e.message || 'Failed to start review') }
+    } catch (e: any) { setError(e.message || isAR ? 'فشل بدء المراجعة' : 'Failed to start review') }
     finally { setLoading(false) }
   }
 
@@ -202,17 +204,17 @@ export default function GovernancePage() {
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Governance Reviews</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>EA Governance & Compliance Review Service</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{isAR ? 'مراجعات الحوكمة' : 'Governance Reviews'}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{isAR ? 'خدمة مراجعة حوكمة البنية المؤسسية' : 'EA Governance & Compliance Review Service'}</div>
         </div>
-        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA', aiMode: 'AUTOMATED', projectName: '', notes: '' }) }}>+ New Review</button>
+        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA', aiMode: 'AUTOMATED', projectName: '', notes: '' }) }}>{isAR ? '+ مراجعة جديدة' : '+ New Review'}</button>
       </div>
-      {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Loading...</div>}
+      {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>{isAR ? 'جارٍ التحميل...' : 'Loading...'}</div>}
       {reviews.length === 0 && !loading && (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🏛️</div>
-          <div style={{ fontSize: 16, marginBottom: 8 }}>No reviews yet</div>
-          <div style={{ fontSize: 13 }}>Start your first EA governance review</div>
+          <div style={{ fontSize: 16, marginBottom: 8 }}>{isAR ? 'لا توجد مراجعات بعد' : 'No reviews yet'}</div>
+          <div style={{ fontSize: 13 }}>{isAR ? 'ابدأ أول مراجعة حوكمة للبنية المؤسسية' : 'Start your first EA governance review'}</div>
         </div>
       )}
       <div style={{ display: 'grid', gap: 12 }}>
@@ -220,7 +222,7 @@ export default function GovernancePage() {
           <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{getReviewTypes(isAR).find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
             </div>
             {r.overallScore != null && <ScoreCircle score={Math.round(r.overallScore)} label='Score' />}
             <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[r.decision] + '22', color: DECISION_COLOR[r.decision] }}>{r.decision?.replace(/_/g, ' ')}</div>
@@ -238,7 +240,7 @@ export default function GovernancePage() {
         <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>New Governance Review</div>
       </div>
-      <Steps current={step} />
+      <Steps current={step} isAR={isAR} />
       {error && <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 8, padding: '10px 14px', color: '#e74c3c', marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
       {/* Step 0: Review type */}
@@ -247,13 +249,13 @@ export default function GovernancePage() {
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Review Configuration</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ gridColumn: '1/-1' }}>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{isAR ? 'عنوان المراجعة *' : 'Review Title *'}</label>
               <input className='form-input' value={form.title} onChange={set('title')} placeholder='e.g. Customer Portal HLD Review' />
             </div>
             <div style={{ gridColumn: '1/-1' }}>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Type</label>
               <select className='form-input' value={form.reviewType} onChange={set('reviewType')}>
-                {REVIEW_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {getReviewTypes(isAR).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div>
@@ -277,7 +279,7 @@ export default function GovernancePage() {
             </div>
           </div>
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? 'Creating...' : 'Create Review →'}</button>
+            <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? (isAR ? 'جارٍ الإنشاء...' : 'Creating...') : (isAR ? 'إنشاء المراجعة →' : 'Create Review →')}</button>
           </div>
         </div>
       )}
@@ -285,7 +287,7 @@ export default function GovernancePage() {
       {/* Step 1: Upload inputs */}
       {step === 1 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Upload Inputs</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{isAR ? 'رفع المدخلات' : 'Upload Inputs'}</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>Upload documents, diagrams, and architecture artifacts for review</div>
           <div
             style={{ border: '2px dashed var(--navy-light)', borderRadius: 10, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16 }}
