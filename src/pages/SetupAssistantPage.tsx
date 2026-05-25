@@ -240,13 +240,22 @@ function Step3Generation({ onNext }: any) {
 
 // Step 4: KB Setup
 function Step4KB({ config, onNext }: any) {
+  const [localConfig, setLocalConfig] = useState<any>(config)
+  useEffect(() => {
+    if (!config?.requiredKbDocs) {
+      authFetch('/setup/config').then(c => setLocalConfig(c))
+    } else {
+      setLocalConfig(config)
+    }
+  }, [config])
+
   return (
     <div>
       <div style={{ padding: 10, background: 'rgba(0,180,216,0.07)', border: '1px solid rgba(0,180,216,0.2)', borderRadius: 4, marginBottom: 12, fontSize: 12, color: '#ddd' }}>
         <strong style={{ color: '#00b4d8' }}>📚 قاعدة المعرفة:</strong> وثائق مرجعية مشتركة — منهجيات، معايير، لوائح. <strong>ليست</strong> خاصة بمنظمتك.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 14 }}>
-        {(config?.requiredKbDocs || []).map((doc: any) => (
+        {(localConfig?.requiredKbDocs || []).map((doc: any) => (
           <div key={doc.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid #333', borderRadius: 4 }}>
             <span style={{ fontSize: 15 }}>{doc.required ? '⭐' : '📄'}</span>
             <div style={{ flex: 1 }}>
@@ -256,6 +265,7 @@ function Step4KB({ config, onNext }: any) {
             <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: doc.required ? 'rgba(231,76,60,0.1)' : 'rgba(100,100,100,0.1)', color: doc.required ? '#e74c3c' : '#888' }}>{doc.required ? 'مطلوب' : 'اختياري'}</span>
           </div>
         ))}
+        {!localConfig?.requiredKbDocs && <div style={{ fontSize: 12, color: '#888' }}>⟳ جاري التحميل...</div>}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/knowledge', '_blank')}>🔗 قاعدة المعرفة</button>
@@ -267,13 +277,22 @@ function Step4KB({ config, onNext }: any) {
 
 // Step 5: Repo Setup
 function Step5Repo({ config, onNext }: any) {
+  const [localConfig, setLocalConfig] = useState<any>(config)
+  useEffect(() => {
+    if (!config?.requiredRepoAssets) {
+      authFetch('/setup/config').then(c => setLocalConfig(c))
+    } else {
+      setLocalConfig(config)
+    }
+  }, [config])
+
   return (
     <div>
       <div style={{ padding: 10, background: 'rgba(243,156,18,0.07)', border: '1px solid rgba(243,156,18,0.2)', borderRadius: 4, marginBottom: 12, fontSize: 12, color: '#ddd' }}>
         <strong style={{ color: '#f39c12' }}>🗄 مستودع البنية المؤسسية:</strong> أصول معمارية خاصة بمنظمتك — استراتيجية، خرائط، أنظمة.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 14 }}>
-        {(config?.requiredRepoAssets || []).map((asset: any) => (
+        {(localConfig?.requiredRepoAssets || []).map((asset: any) => (
           <div key={asset.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', background: 'rgba(255,255,255,0.03)', border: '1px solid #333', borderRadius: 4 }}>
             <span style={{ fontSize: 15 }}>{asset.required ? '⭐' : '📋'}</span>
             <div style={{ flex: 1 }}>
@@ -283,6 +302,7 @@ function Step5Repo({ config, onNext }: any) {
             <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: asset.required ? 'rgba(231,76,60,0.1)' : 'rgba(100,100,100,0.1)', color: asset.required ? '#e74c3c' : '#888' }}>{asset.required ? 'مطلوب' : 'اختياري'}</span>
           </div>
         ))}
+        {!localConfig?.requiredRepoAssets && <div style={{ fontSize: 12, color: '#888' }}>⟳ جاري التحميل...</div>}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/repository', '_blank')}>🔗 المستودع</button>
