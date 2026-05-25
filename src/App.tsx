@@ -25,7 +25,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
     fetch(`${API_URL}/setup/profile`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
       .then(r => r.json())
-      .then(p => { if (!p?.setupCompleted) setShowSetup(true) })
+      .then(p => {
+        // Only show modal if setup was never started (step=1 and no org name entered)
+        const isNewTenant = !p?.organizationName && !p?.organizationNameAr && !p?.setupCompleted && p?.setupStep <= 1
+        if (isNewTenant) setShowSetup(true)
+      })
       .catch(() => {})
   }, [user])
 
