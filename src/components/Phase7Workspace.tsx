@@ -407,7 +407,6 @@ function Step72({ admCycleId }: { admCycleId: string }) {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<any>(null)
   const [filterApproval, setFilterApproval] = useState('APPROVED')
-  const [filterStatus, setFilterStatus] = useState('ALL')
   const [filterType, setFilterType] = useState('ALL')
   const [filterDomain, setFilterDomain] = useState('ALL')
   const [filterPhase, setFilterPhase] = useState('ALL')
@@ -415,22 +414,21 @@ function Step72({ admCycleId }: { admCycleId: string }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      // Always fetch full list for filter options
+      const allRes = await authFetch(`/requirements?admCycleId=${admCycleId}&limit=200`)
+      setAllItems(allRes.data || [])
+      setStats(await authFetch(`/requirements/stats/${admCycleId}`))
+
+      // Filtered list
       const params = new URLSearchParams({ admCycleId, limit: '200' })
       if (filterApproval !== 'ALL') params.set('approvalStatus', filterApproval)
-      if (filterStatus !== 'ALL') params.set('status', filterStatus)
       if (filterType !== 'ALL') params.set('requirementType', filterType)
       if (filterDomain !== 'ALL') params.set('affectedDomain', filterDomain)
       if (filterPhase !== 'ALL') params.set('sourcePhase', filterPhase)
-      const [res, allRes, s] = await Promise.all([
-        authFetch(`/requirements?${params}`),
-        authFetch(`/requirements?admCycleId=${admCycleId}&limit=200`),
-        authFetch(`/requirements/stats/${admCycleId}`),
-      ])
+      const res = await authFetch(`/requirements?${params}`)
       setItems(res.data || [])
-      setAllItems(allRes.data || [])
-      setStats(s)
     } finally { setLoading(false) }
-  }, [admCycleId, filterApproval, filterStatus, filterType, filterDomain, filterPhase])
+  }, [admCycleId, filterApproval, filterType, filterDomain, filterPhase])
 
   useEffect(() => { load() }, [load])
 
@@ -481,7 +479,6 @@ function Step72({ admCycleId }: { admCycleId: string }) {
           <option value="ALL">{isAR ? 'الكل' : 'All'}</option>
         </select>
         {[
-          { val: filterStatus, set: setFilterStatus, opts: ['ALL', ...REQUIREMENT_STATUSES], label: isAR ? 'الحالة' : 'Status' },
           { val: filterType, set: setFilterType, opts: ['ALL', ...REQUIREMENT_TYPES], label: isAR ? 'النوع' : 'Type' },
           { val: filterDomain, set: setFilterDomain, opts: ['ALL', ...allDomains], label: isAR ? 'المجال' : 'Domain' },
           { val: filterPhase, set: setFilterPhase, opts: ['ALL', ...allPhases], label: isAR ? 'المرحلة' : 'Phase' },
