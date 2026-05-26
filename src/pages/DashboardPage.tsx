@@ -53,11 +53,11 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
-        {cycles[0]&&(
+        {cycles[0] && cycles[0].frameworkType === 'NORA' && (
           <div className="card">
             <div className="section-title">{t('dash.latest_cycle')} — {cycles[0].name}</div>
             <div className="phase-track">
-              {['PRELIM','A','B','C','D','E','F','G','H'].map(p=>{
+              {['1','2','3','4','5','6','7'].map(p=>{
                 const ph=cycles[0].phases?.find((x:any)=>x.phase===p); const s=ph?.status||'NOT_STARTED'
                 return <div key={p} className="phase-step"><div className={`phase-dot${s==='COMPLETE'?' done':s==='IN_PROGRESS'?' active':''}`}>{p}</div><div className="phase-label">{s==='COMPLETE'?'✓':s==='IN_PROGRESS'?'→':'·'}</div></div>
               })}

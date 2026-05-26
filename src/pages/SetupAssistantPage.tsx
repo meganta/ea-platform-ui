@@ -120,7 +120,7 @@ function Step1Profile({ profile, config, onSave }: any) {
       {msg && <div style={{ padding: '6px 10px', borderRadius: 4, background: msg.startsWith('✓') ? 'rgba(46,204,113,0.15)' : 'rgba(231,76,60,0.15)', color: msg.startsWith('✓') ? '#2ecc71' : '#e74c3c', fontSize: 11, marginBottom: 10 }}>{msg}</div>}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 11, marginBottom: 12 }}>
-        {([['organizationNameAr', 'اسم المنظمة (عربي)', true], ['organizationName', isAR ? 'اسم المنظمة (إنجليزي)' : 'Organization Name (EN)', false]] as [string,string,boolean][]).map(([k, l, rtl]) => (
+        {([['organizationNameAr', 'اسم المنظمة (عربي)', true], ['organizationName', isAR ? t('setup.org_name_en') : 'Organization Name (EN)', false]] as [string,string,boolean][]).map(([k, l, rtl]) => (
           <div key={k}>
             <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>{l}</div>
             <input className="form-input" value={(form as any)[k]} onChange={e => setForm((f: any) => ({ ...f, [k]: e.target.value }))} style={{ width: '100%', fontSize: 11, direction: rtl ? 'rtl' : 'ltr' }} />
@@ -129,13 +129,13 @@ function Step1Profile({ profile, config, onSave }: any) {
         <div>
           <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>القطاع</div>
           <select className="form-input" value={form.sector} onChange={e => setForm((f: any) => ({ ...f, sector: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
-            {[['GOVERNMENT','حكومي'],['HEALTH','صحة'],['EDUCATION','تعليم'],['FINANCE','مالية'],['UTILITIES','خدمات عامة'],['OTHER','أخرى']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+            {[['GOVERNMENT',isAR ? 'حكومي' : 'Government'],['HEALTH',isAR ? 'صحة' : 'Health'],['EDUCATION',isAR ? 'تعليم' : 'Education'],['FINANCE',isAR ? 'مالية' : 'Finance'],['UTILITIES',isAR ? 'خدمات عامة' : 'Utilities'],['OTHER',isAR ? 'أخرى' : 'Other']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
         <div>
           <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>نوع الجهة</div>
           <select className="form-input" value={form.entityType} onChange={e => setForm((f: any) => ({ ...f, entityType: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
-            {[['MINISTRY','وزارة'],['AUTHORITY','هيئة'],['ENTERPRISE','مؤسسة'],['SME','شركة']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+            {[['MINISTRY',isAR ? 'وزارة' : 'Ministry'],['AUTHORITY',isAR ? 'هيئة' : 'Authority'],['ENTERPRISE',isAR ? 'مؤسسة' : 'Enterprise'],['SME',isAR ? 'شركة' : 'Company']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
         <div>
@@ -152,7 +152,7 @@ function Step1Profile({ profile, config, onSave }: any) {
           <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>مستوى نضج البنية المؤسسية (1-5)</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="range" min={1} max={5} value={form.eaMaturityLevel} onChange={e => setForm((f: any) => ({ ...f, eaMaturityLevel: Number(e.target.value) }))} style={{ flex: 1 }} />
-            <span style={{ fontSize: 12, width: 50, color: '#ccc' }}>{['','بدائي','متطور','محدد','مُدار','مُحسَّن'][form.eaMaturityLevel]}</span>
+            <span style={{ fontSize: 12, width: 50, color: '#ccc' }}>{['',isAR ? 'بدائي' : 'Initial',isAR ? 'متطور' : 'Developing',isAR ? 'محدد' : 'Defined',isAR ? 'مُدار' : 'Managed',isAR ? 'مُحسَّن' : 'Optimized'][form.eaMaturityLevel]}</span>
           </div>
         </div>
         <div>
@@ -223,7 +223,7 @@ function Step2KB({ onNext }: any) {
                     <div style={{ fontSize: 10, color: '#888' }}>{doc.whyItMatters}</div>
                   </div>
                   <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, flexShrink: 0, background: available ? 'rgba(46,204,113,0.12)' : doc.required ? 'rgba(231,76,60,0.1)' : 'rgba(100,100,100,0.1)', color: available ? '#2ecc71' : doc.required ? '#e74c3c' : '#888' }}>
-                    {available ? 'متاح ✓' : doc.required ? 'مطلوب' : 'اختياري'}
+                    {available ? isAR ? 'متاح ✓' : 'Available ✓' : doc.required ? isAR ? 'مطلوب' : 'Required' : isAR ? 'اختياري' : 'Optional'}
                   </span>
                 </div>
               </div>
@@ -283,7 +283,7 @@ function Step3Repo({ onNext }: any) {
         setGeneratedContent((g: Record<string,any>) => ({ ...g, [docKey]: res.content }))
         setMsg({ type: 'success', text: `✓ تم توليد "${res.asset.nameAr}" وحفظه في المستودع` })
         load() // refresh asset list
-      } else setMsg({ type: 'error', text: res.message || 'فشل التوليد' })
+      } else setMsg({ type: 'error', text: res.message || isAR ? 'فشل التوليد' : 'Generation failed' })
     } finally { setGenerating(null) }
   }
 
@@ -315,9 +315,9 @@ function Step3Repo({ onNext }: any) {
                       <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: 'rgba(46,204,113,0.12)', color: '#2ecc71' }}>متاح ✓</span>
                     ) : (
                       <>
-                        <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, background: `${impColor(doc.importance)}18`, color: impColor(doc.importance) }}>{doc.importance === 'CRITICAL' ? 'حرجة' : 'عالية'}</span>
+                        <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, background: `${impColor(doc.importance)}18`, color: impColor(doc.importance) }}>{doc.importance === 'CRITICAL' ? isAR ? 'حرجة' : 'Critical' : isAR ? 'عالية' : 'High'}</span>
                         <button onClick={() => generate(doc.key)} disabled={generating === doc.key} style={{ fontSize: 9, padding: '2px 10px', background: 'rgba(0,180,216,0.12)', border: '1px solid #00b4d8', borderRadius: 2, cursor: 'pointer', color: '#00b4d8', whiteSpace: 'nowrap' }}>
-                          {generating === doc.key ? '⟳ جاري...' : '⚡ توليد'}
+                          {generating === doc.key ? isAR ? '⟳ جاري...' : '⟳ Generating...' : isAR ? '⚡ توليد' : '⚡ Generate'}
                         </button>
                       </>
                     )}

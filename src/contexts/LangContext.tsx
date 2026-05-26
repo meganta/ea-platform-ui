@@ -19,6 +19,19 @@ export type Locale = 'AR' | 'EN'
 // ── Static translation table ─────────────────────────────────────────────────
 // Keys map to both locales. NEVER use English as fallback for Arabic.
 const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
+  'nav.settings':       { EN: 'Settings', AR: 'الإعدادات' },
+  'setup.org_name_en':  { EN: 'Organization Name (EN)', AR: 'اسم المنظمة (إنجليزي)' },
+  'setup.sector':       { EN: 'Sector', AR: 'القطاع' },
+  'setup.entity_type':  { EN: 'Entity Type', AR: 'نوع الجهة' },
+  'setup.language':     { EN: 'Platform Language', AR: 'لغة المنصة' },
+  'setup.maturity':     { EN: 'EA Maturity Level (1-5)', AR: 'مستوى نضج البنية المؤسسية (1-5)' },
+  'setup.framework':    { EN: 'Reference Framework', AR: 'الإطار المرجعي' },
+  'setup.domains':      { EN: 'Architecture Domains in Scope', AR: 'المجالات المعمارية في النطاق' },
+  'adm.title':          { EN: 'ADM Cycles', AR: 'دورات تطوير البنية المؤسسية' },
+  'adm.new':            { EN: '+ New Cycle', AR: '+ دورة جديدة' },
+  'auth.tagline':       { EN: 'Enterprise Architecture Platform', AR: 'منصة البنية المؤسسية' },
+  'auth.organization':  { EN: 'Organization ID', AR: 'معرف المنظمة' },
+  'dash.status':        { EN: 'System Operational', AR: 'النظام يعمل' },
   // Navigation
   'nav.main':          { EN: 'Main', AR: 'الرئيسية' },
   'nav.dashboard':     { EN: 'Dashboard', AR: 'لوحة التحكم' },
@@ -29,7 +42,6 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'nav.knowledge':     { EN: 'Knowledge Base', AR: 'قاعدة المعرفة' },
   'nav.governance':    { EN: 'Governance', AR: 'الحوكمة' },
   'nav.setup':         { EN: 'Setup Assistant', AR: 'مساعد الإعداد' },
-  'nav.settings':      { EN: 'Settings', AR: 'الإعدادات' },
   'nav.admin':         { EN: 'Admin', AR: 'الإدارة' },
   // Auth
   'auth.email':        { EN: 'Email', AR: 'البريد الإلكتروني' },
@@ -149,7 +161,6 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'dash.latest_cycle':  { EN: 'Latest Cycle', AR: 'آخر دورة' },
   'dash.no_cycles':     { EN: 'No cycles yet', AR: 'لا توجد دورات بعد' },
   'dash.quick_actions': { EN: 'Quick Actions', AR: 'إجراءات سريعة' },
-  'dash.status':        { EN: 'Status', AR: 'الحالة' },
   'dash.subtitle':      { EN: 'Enterprise Architecture Platform', AR: 'منصة البنية المؤسسية' },
   'dash.adm':           { EN: 'ADM Cycles', AR: 'دورات ADM' },
   // Knowledge Base — missing keys

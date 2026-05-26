@@ -546,10 +546,10 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{mapping.purposeAr || mapping.purposeEn}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(46,204,113,0.4)' } : {}) }} disabled={loading} onClick={() => download('docx')}>
-          📄 {loading ? '...' : isFilled ? (isAR ? 'تحميل Word معبأ' : isAR ? 'تحميل Word معبأ' : 'Download Filled Word') : (isAR ? 'قالب Word' : isAR ? 'قالب Word' : 'Word Template')}
+          📄 {loading ? '...' : isFilled ? t('adm.download_word') : t('adm.word_template')}
         </button>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(46,204,113,0.4)' } : {}) }} disabled={loading} onClick={() => download('pptx')}>
-          📊 {loading ? '...' : isFilled ? (isAR ? 'تحميل PPT معبأ' : 'Download Filled PPT') : (isAR ? 'قالب PPT' : 'PPT Template')}
+          📊 {loading ? '...' : isFilled ? t('adm.download_ppt') : t('adm.ppt_template')}
         </button>
       </div>
     </div>
@@ -1096,8 +1096,8 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
             <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
               {currentStep && (
                 <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(0,180,216,0.06)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{currentStep.titleAr || currentStep.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{currentStep.title}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{isAR ? (currentStep.titleAr || currentStep.title) : (currentStep.title || currentStep.titleAr)}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? currentStep.title : (currentStep.titleAr || '')}</div>
                 </div>
               )}
 
@@ -1124,7 +1124,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                     return (
                       <div key={inp.id} style={{ marginBottom: 10, padding: '10px 12px', background: sourceColor, border: `1px solid ${sourceBorder}`, borderRadius: 'var(--radius)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <div style={{ fontSize: 12, fontWeight: 500 }}>{inp.title}</div>
+                          <div style={{ fontSize: 12, fontWeight: 500 }}>{isAR ? (inp.titleAr || inp.title) : (inp.title || inp.titleAr)}</div>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             {inp.providedBy?.startsWith('AUTO_ADM:') && (
                               <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(46,204,113,0.15)', color: '#2ecc71', border: '1px solid rgba(46,204,113,0.3)' }}>{t('adm.auto_adm')}</span>
@@ -1174,7 +1174,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                             <span style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0 }}>{isExpanded ? '▾' : '▸'}</span>
-                            <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{out.title}</div>
+                            <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isAR ? (out.titleAr || out.title) : (out.title || out.titleAr)}</div>
                           </div>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0, marginLeft: 8 }}>
                             {def?.behaviorType && (() => {
@@ -1551,7 +1551,7 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
                         <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px', borderTop: '1px solid rgba(255,255,255,0.03)', fontSize: 11 }}>
                           <span style={{ fontSize: 13, flexShrink: 0 }}>{typeInfo.icon}</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.titleAr || a.title}</div>
+                            <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isAR ? (a.titleAr || a.title) : (a.title || a.titleAr)}</div>
                             <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 1, display: 'flex', gap: 8 }}>
                               <span style={{ fontFamily: 'var(--font-mono)' }}>{a.outputKey || ''}</span>
                               {a.domain && <span>{a.domain.replace(/_/g, ' ')}</span>}

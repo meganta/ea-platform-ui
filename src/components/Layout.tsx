@@ -32,14 +32,14 @@ export default function Layout() {
           <div className="nav-label">{t('nav.main')}</div>
           <NavLink to="/" end className={({isActive})=>`nav-item${isActive?' active':''}`}>⬛ {t('nav.dashboard')}</NavLink>
           <NavLink to="/adm" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ {t('nav.adm')}</NavLink>
+          <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 {t('nav.governance')}</NavLink>
           <NavLink to="/copilot" className={({isActive})=>`nav-item${isActive?' active':''}`}>💬 {t('nav.copilot')}</NavLink>
           <div className="nav-label" style={{marginTop:8}}>{t('nav.repo_section')}</div>
           <NavLink to="/repository" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗄 {t('nav.repository')}</NavLink>
           <NavLink to="/knowledge" className={({isActive})=>`nav-item${isActive?' active':''}`}>📚 {t('nav.knowledge')}</NavLink>
           <div className="nav-label" style={{marginTop:8}}>{t('nav.admin')}</div>
-          <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 {t('nav.governance')}</NavLink>
           <NavLink to="/setup" className={({isActive})=>`nav-item${isActive?' active':''}`}>🚀 {t('nav.setup')}</NavLink>
-          <NavLink to="/settings" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ {isAR ? 'الإعدادات' : 'Settings'}</NavLink>
+          <NavLink to="/settings" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ {t('nav.settings')}</NavLink>
         </nav>
         <div className="sidebar-footer">
           <div className="flex items-center gap-2" style={{marginBottom:8}}>
