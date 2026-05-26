@@ -912,7 +912,7 @@ function TerminologyTab() {
 }
 
 export default function SettingsPage() {
-  const { setLocale, isAR } = useLang()
+  const { setLocale, isAR, t } = useLang()
   const api = useApi()
   const [config, setConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -936,7 +936,7 @@ export default function SettingsPage() {
     setMsg(null)
     try {
       await api.put(`/config/${section}`, data)
-      setMsg({ type: 'success', text: isAR ? 'تم الحفظ بنجاح' : 'Configuration saved successfully' })
+      setMsg({ type: 'success', text: t('settings.saved') })
       const updated = await api.get('/config')
       setConfig(updated)
     } catch (e: any) {
@@ -951,15 +951,15 @@ export default function SettingsPage() {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">{isAR ? '⚙ الإعدادات' : '⚙ Settings'}</div>
+        <div className="page-title">{t('settings.title')}</div>
         <div className="page-subtitle">{isAR ? 'إعدادات المنظمة — ' : 'TENANT CONFIGURATION — '}{config?.tenant?.slug?.toUpperCase()}</div>
         <div className="page-tabs">
           {[
-            ['ai', isAR ? 'إعداد الذكاء الاصطناعي' : 'AI Configuration'],
-            ['apikeys', isAR ? '🔑 مفاتيح API' : '🔑 API Keys'], ['rag', isAR ? '🧠 قاعدة المعرفة' : '🧠 Knowledge Base'],
-            ['branding', isAR ? '🎨 الهوية البصرية' : '🎨 Branding'], ['export', isAR ? '📤 التصدير' : '📤 Export'], ['governance', isAR ? '⚖ الحوكمة' : '⚖ Governance'],
-            ['diagrams', isAR ? '📐 المخططات' : '📐 Diagrams'], ['notifications', isAR ? '🔔 الإشعارات' : '🔔 Notifications'],
-            ['users', isAR ? '👥 المستخدمون' : '👥 Users'], ['terminology', isAR ? '🌐 المصطلحات' : '🌐 Terminology'], ['billing', isAR ? 'الاشتراك' : 'Subscription']
+            ['ai', t('settings.ai')],
+            ['apikeys', t('settings.apikeys')], ['rag', t('settings.kb')],
+            ['branding', t('settings.branding')], ['export', t('settings.export')], ['governance', t('settings.governance')],
+            ['diagrams', t('settings.diagrams')], ['notifications', t('settings.notifications')],
+            ['users', t('settings.users')], ['terminology', t('settings.terminology')], ['billing', t('settings.billing')]
           ].map(([k, l]) => (
             <button key={k} className={`tab-btn${tab === k ? ' active' : ''}`} onClick={() => setTab(k)}>{l}</button>
           ))}
