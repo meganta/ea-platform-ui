@@ -60,7 +60,7 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 
 // ── Step 1: Profile + Framework ───────────────────────────────────────────────
 function Step1Profile({ profile, config, onSave }: any) {
-  const { setLocale, isAR } = useLang()
+  const { setLocale, isAR, t } = useLang()
   const [form, setForm] = useState({
     organizationName: '', organizationNameAr: '', sector: 'GOVERNMENT',
     entityType: 'AUTHORITY', language: 'AR', eaMaturityLevel: 1,
@@ -108,7 +108,7 @@ function Step1Profile({ profile, config, onSave }: any) {
       {/* Tenant info cards */}
       {tenant && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          {[[(isAR ? 'معرف المنظمة' : 'ORGANIZATION ID'), tenant.slug, '#00b4d8'], [(isAR ? 'الاشتراك' : 'SUBSCRIPTION'), tenant.subscriptionTier, '#f39c12'], [(isAR ? 'الحالة' : 'STATUS'), tenant.status, '#2ecc71']].map(([l, v, c]) => (
+          {[[(t('settings.org_id')), tenant.slug, '#00b4d8'], [(t('settings.subscription')), tenant.subscriptionTier, '#f39c12'], [(t('common.status')), tenant.status, '#2ecc71']].map(([l, v, c]) => (
             <div key={l as string} style={{ flex: 1, padding: '8px 10px', background: 'rgba(255,255,255,0.04)', border: `1px solid ${c as string}22`, borderRadius: 6 }}>
               <div style={{ fontSize: 9, color: '#888', fontFamily: 'monospace', marginBottom: 2 }}>{l as string}</div>
               <div style={{ fontSize: 11, color: c as string, fontFamily: 'monospace', fontWeight: 600 }}>{(v as string) || '—'}</div>

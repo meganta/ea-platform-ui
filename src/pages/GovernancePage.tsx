@@ -37,8 +37,8 @@ const DECISION_COLOR: Record<string, string> = {
 }
 
 // ── Step indicator ────────────────────────────────────────
-function Steps({ current, isAR }: { current: number; isAR: boolean }) {
-  const steps = [isAR ? 'نوع المراجعة' : 'Review Type', isAR ? 'رفع المدخلات' : 'Upload Inputs', isAR ? 'فحص الفجوات' : 'Gap Check', 'AI Review', isAR ? 'التقرير' : 'Report']
+function Steps({ current, isAR, t }: { current: number; isAR: boolean; t: (k: string) => string }) {
+  const steps = [t('gov.review_type'), t('gov.upload_inputs'), t('gov.detect_gaps'), 'AI Review', t('gov.report')]
   return (
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
       {steps.map((s, i) => (
@@ -96,7 +96,7 @@ function FindingCard({ f }: { f: any }) {
 // ── Main page ─────────────────────────────────────────────
 export default function GovernancePage() {
   const api = useApi()
-  const { isAR } = useLang()
+  const { isAR, t } = useLang()
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list')
   const [reviews, setReviews] = useState<any[]>([])
   const [review, setReview] = useState<any>(null)
@@ -204,17 +204,17 @@ export default function GovernancePage() {
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{isAR ? 'مراجعات الحوكمة' : 'Governance Reviews'}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{isAR ? 'خدمة مراجعة حوكمة البنية المؤسسية' : 'EA Governance & Compliance Review Service'}</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{t('gov.title')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{t('gov.subtitle')}</div>
         </div>
-        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA', aiMode: 'AUTOMATED', projectName: '', notes: '' }) }}>{isAR ? '+ مراجعة جديدة' : '+ New Review'}</button>
+        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA', aiMode: 'AUTOMATED', projectName: '', notes: '' }) }}>{t('gov.new')}</button>
       </div>
-      {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>{isAR ? 'جارٍ التحميل...' : 'Loading...'}</div>}
+      {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>{t('common.loading')}</div>}
       {reviews.length === 0 && !loading && (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🏛️</div>
-          <div style={{ fontSize: 16, marginBottom: 8 }}>{isAR ? 'لا توجد مراجعات بعد' : 'No reviews yet'}</div>
-          <div style={{ fontSize: 13 }}>{isAR ? 'ابدأ أول مراجعة حوكمة للبنية المؤسسية' : 'Start your first EA governance review'}</div>
+          <div style={{ fontSize: 16, marginBottom: 8 }}>{t('gov.no_reviews')}</div>
+          <div style={{ fontSize: 13 }}>{t('gov.start_first')}</div>
         </div>
       )}
       <div style={{ display: 'grid', gap: 12 }}>
@@ -240,7 +240,7 @@ export default function GovernancePage() {
         <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>New Governance Review</div>
       </div>
-      <Steps current={step} isAR={isAR} />
+      <Steps current={step} isAR={isAR} t={t} />
       {error && <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 8, padding: '10px 14px', color: '#e74c3c', marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
       {/* Step 0: Review type */}
@@ -249,7 +249,7 @@ export default function GovernancePage() {
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Review Configuration</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ gridColumn: '1/-1' }}>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{isAR ? 'عنوان المراجعة *' : 'Review Title *'}</label>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{t('gov.review_title') + ' *'}</label>
               <input className='form-input' value={form.title} onChange={set('title')} placeholder='e.g. Customer Portal HLD Review' />
             </div>
             <div style={{ gridColumn: '1/-1' }}>
@@ -279,7 +279,7 @@ export default function GovernancePage() {
             </div>
           </div>
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? (isAR ? 'جارٍ الإنشاء...' : 'Creating...') : (isAR ? 'إنشاء المراجعة →' : 'Create Review →')}</button>
+            <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? (t('common.creating')) : (isAR ? 'إنشاء المراجعة →' : 'Create Review →')}</button>
           </div>
         </div>
       )}
@@ -287,7 +287,7 @@ export default function GovernancePage() {
       {/* Step 1: Upload inputs */}
       {step === 1 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{isAR ? 'رفع المدخلات' : 'Upload Inputs'}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{t('gov.upload_inputs')}</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>Upload documents, diagrams, and architecture artifacts for review</div>
           <div
             style={{ border: '2px dashed var(--navy-light)', borderRadius: 10, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16 }}
