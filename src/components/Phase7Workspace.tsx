@@ -410,34 +410,42 @@ function Step72({ admCycleId }: { admCycleId: string }) {
   const [filterType, setFilterType] = useState('ALL')
   const [filterDomain, setFilterDomain] = useState('ALL')
   const [filterPhase, setFilterPhase] = useState('ALL')
+  const [tick, setTick] = useState(0)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      // Always fetch full list for filter options
-      const allRes = await authFetch(`/requirements?admCycleId=${admCycleId}&limit=200`)
-      setAllItems(allRes.data || [])
-      setStats(await authFetch(`/requirements/stats/${admCycleId}`))
+  const reload = () => setTick(t => t + 1)
 
-      // Filtered list
-      const params = new URLSearchParams({ admCycleId, limit: '200' })
-      if (filterApproval !== 'ALL') params.set('approvalStatus', filterApproval)
-      if (filterType !== 'ALL') params.set('requirementType', filterType)
-      if (filterDomain !== 'ALL') params.set('affectedDomain', filterDomain)
-      if (filterPhase !== 'ALL') params.set('sourcePhase', filterPhase)
-      const res = await authFetch(`/requirements?${params}`)
-      setItems(res.data || [])
-    } finally { setLoading(false) }
-  }, [admCycleId, filterApproval, filterType, filterDomain, filterPhase])
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      setLoading(true)
+      try {
+        const [allRes, statsRes] = await Promise.all([
+          authFetch(`/requirements?admCycleId=${admCycleId}&limit=200`),
+          authFetch(`/requirements/stats/${admCycleId}`),
+        ])
+        if (cancelled) return
+        setAllItems(allRes.data || [])
+        setStats(statsRes)
 
-  useEffect(() => { load() }, [load])
+        const params = new URLSearchParams({ admCycleId, limit: '200' })
+        if (filterApproval !== 'ALL') params.set('approvalStatus', filterApproval)
+        if (filterType !== 'ALL') params.set('requirementType', filterType)
+        if (filterDomain !== 'ALL') params.set('affectedDomain', filterDomain)
+        if (filterPhase !== 'ALL') params.set('sourcePhase', filterPhase)
+        const res = await authFetch(`/requirements?${params}`)
+        if (!cancelled) setItems(res.data || [])
+      } finally { if (!cancelled) setLoading(false) }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [admCycleId, filterApproval, filterType, filterDomain, filterPhase, tick]) // eslint-disable-line
 
   const statusChange = async (id: string, status: string) => {
     await authFetch(`/requirements/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) })
-    await load()
+    reload()
   }
 
-  const onSave = async () => { setEditing(null); await load() }
+  const onSave = async () => { setEditing(null); reload() }
 
   // Use allItems for filter options so dropdowns don't empty when filtering
   const allDomains = Array.from(new Set(allItems.flatMap((r: any) => r.affectedDomains || []))).sort() as string[]
