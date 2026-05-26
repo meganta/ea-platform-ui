@@ -402,9 +402,11 @@ function Step71({ admCycleId }: { admCycleId: string }) {
 function Step72({ admCycleId }: { admCycleId: string }) {
   const { isAR } = useLang()
   const [items, setItems] = useState<any[]>([])
+  const [allItems, setAllItems] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<any>(null)
+  const [filterApproval, setFilterApproval] = useState('APPROVED')
   const [filterStatus, setFilterStatus] = useState('ALL')
   const [filterType, setFilterType] = useState('ALL')
   const [filterDomain, setFilterDomain] = useState('ALL')
@@ -413,19 +415,22 @@ function Step72({ admCycleId }: { admCycleId: string }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ admCycleId })
+      const params = new URLSearchParams({ admCycleId, limit: '200' })
+      if (filterApproval !== 'ALL') params.set('approvalStatus', filterApproval)
       if (filterStatus !== 'ALL') params.set('status', filterStatus)
       if (filterType !== 'ALL') params.set('requirementType', filterType)
       if (filterDomain !== 'ALL') params.set('affectedDomain', filterDomain)
       if (filterPhase !== 'ALL') params.set('sourcePhase', filterPhase)
-      const [res, s] = await Promise.all([
+      const [res, allRes, s] = await Promise.all([
         authFetch(`/requirements?${params}`),
+        authFetch(`/requirements?admCycleId=${admCycleId}&limit=200`),
         authFetch(`/requirements/stats/${admCycleId}`),
       ])
       setItems(res.data || [])
+      setAllItems(allRes.data || [])
       setStats(s)
     } finally { setLoading(false) }
-  }, [admCycleId, filterStatus, filterType, filterDomain, filterPhase])
+  }, [admCycleId, filterApproval, filterStatus, filterType, filterDomain, filterPhase])
 
   useEffect(() => { load() }, [load])
 
@@ -436,8 +441,9 @@ function Step72({ admCycleId }: { admCycleId: string }) {
 
   const onSave = async () => { setEditing(null); await load() }
 
-  const allDomains = Array.from(new Set(items.flatMap((r: any) => r.affectedDomains || []))).sort() as string[]
-  const allPhases = Array.from(new Set(items.map((r: any) => r.sourcePhase).filter(Boolean))).sort() as string[]
+  // Use allItems for filter options so dropdowns don't empty when filtering
+  const allDomains = Array.from(new Set(allItems.flatMap((r: any) => r.affectedDomains || []))).sort() as string[]
+  const allPhases = Array.from(new Set(allItems.map((r: any) => r.sourcePhase).filter(Boolean))).sort() as string[]
 
   return (
     <div>
@@ -467,6 +473,13 @@ function Step72({ admCycleId }: { admCycleId: string }) {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        <select value={filterApproval} onChange={e => setFilterApproval(e.target.value)}
+          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 'var(--radius)', border: `1px solid ${filterApproval === 'APPROVED' ? 'rgba(46,204,113,0.4)' : 'var(--border)'}`, background: 'var(--navy)', color: filterApproval === 'APPROVED' ? '#2ecc71' : 'var(--text)' }}>
+          <option value="APPROVED">{isAR ? 'معتمدة فقط' : 'Approved only'}</option>
+          <option value="PENDING">{isAR ? 'قيد الانتظار' : 'Pending'}</option>
+          <option value="REJECTED">{isAR ? 'مرفوضة' : 'Rejected'}</option>
+          <option value="ALL">{isAR ? 'الكل' : 'All'}</option>
+        </select>
         {[
           { val: filterStatus, set: setFilterStatus, opts: ['ALL', ...REQUIREMENT_STATUSES], label: isAR ? 'الحالة' : 'Status' },
           { val: filterType, set: setFilterType, opts: ['ALL', ...REQUIREMENT_TYPES], label: isAR ? 'النوع' : 'Type' },
@@ -489,7 +502,7 @@ function Step72({ admCycleId }: { admCycleId: string }) {
         <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: 16 }}>Loading...</div>
       ) : items.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--text-dim)' }}>
-          {isAR ? 'لا توجد متطلبات بعد. اعتمد المتطلبات المقترحة في الخطوة 7.1.' : 'No requirements yet. Approve proposed requirements in Step 7.1.'}
+          {filterApproval === 'APPROVED' ? (isAR ? 'لا توجد متطلبات معتمدة بعد. اعتمد المتطلبات المقترحة في الخطوة 7.1.' : 'No approved requirements yet. Approve proposed requirements in Step 7.1.') : (isAR ? 'لا توجد متطلبات.' : 'No requirements found.')}
         </div>
       ) : items.map(req => (
         <RequirementCard
