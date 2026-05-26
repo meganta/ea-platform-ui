@@ -1056,7 +1056,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
         <div style={{ padding: '20px 24px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700 }}>
-              Phase {phase} — {phaseDef?.nameAr || phaseDef?.name}
+              {t('adm.phase')} {phase} — {isAR ? (phaseDef?.nameAr || phaseDef?.name) : (phaseDef?.name || phaseDef?.nameAr)}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{phaseDef?.description}</div>
           </div>
@@ -1593,8 +1593,8 @@ export default function AdmPage() {
   }
 
   const PHASE_NAMES: Record<string, Record<string, string>> = {
-    TOGAF: { PRELIM: 'Preliminary', A: 'Vision', B: 'Business', C: 'Info Systems', D: 'Technology', E: 'Opportunities', F: 'Migration', G: 'Governance', H: 'Change Mgmt' },
-    NORA: { '1': 'تحديد النطاق', '2': 'تشخيص الراهن', '3': 'التوجهات', '4': 'تصميم المستقبل', '5': 'تحليل الفجوات', '6': 'خارطة الطريق', '7': 'إدارة المتطلبات' },
+    TOGAF: { PRELIM: t('phase.togaf.PRELIM'), A: t('phase.togaf.A'), B: t('phase.togaf.B'), C: t('phase.togaf.C'), D: t('phase.togaf.D'), E: t('phase.togaf.E'), F: t('phase.togaf.F'), G: t('phase.togaf.G'), H: t('phase.togaf.H') },
+    NORA: { '1': t('phase.nora.1'), '2': t('phase.nora.2'), '3': t('phase.nora.3'), '4': t('phase.nora.4'), '5': t('phase.nora.5'), '6': t('phase.nora.6'), '7': t('phase.nora.7') },
   }
 
   const load = async () => {
@@ -1701,7 +1701,7 @@ export default function AdmPage() {
                         onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
                         onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
                         <div style={{ fontSize: 16, fontWeight: 700, fontFamily: 'var(--font-display)', color: 'var(--accent)', marginBottom: 4 }}>{p}</div>
-                        <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', lineHeight: 1.3, direction: selected.frameworkType === 'NORA' ? 'rtl' : 'ltr' }}>{phaseNames[p]}</div>
+                        <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', lineHeight: 1.3, direction: isAR ? 'rtl' : 'ltr' }}>{phaseNames[p]}</div>
                       </button>
                     ))}
                   </div>
