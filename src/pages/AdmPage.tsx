@@ -98,10 +98,10 @@ function ScopeSelector({ cycle, onScopeSet }: any) {
     <div className="card mb-4" style={{ border: '1px solid rgba(201,168,76,0.4)', background: 'rgba(201,168,76,0.04)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div>
-          <div className="section-title" style={{ color: 'var(--gold)', marginBottom: 2 }}>🎯 Architecture Scope</div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Select domains in scope. Only relevant phases and deliverables will be shown.</div>
+          <div className="section-title" style={{ color: 'var(--gold)', marginBottom: 2 }}>{isAR ? '🎯 نطاق البنية المعمارية' : '🎯 Architecture Scope'}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'اختر المجالات المعمارية في النطاق.' : 'Select domains in scope. Only relevant phases and deliverables will be shown.'}</div>
         </div>
-        <button className="btn btn-primary btn-sm" disabled={saving} onClick={save}>{saving ? t('common.saving') : '✓ Save Scope'}</button>
+        <button className="btn btn-primary btn-sm" disabled={saving} onClick={save}>{saving ? t('common.saving') : isAR ? '✓ حفظ النطاق' : '✓ Save Scope'}</button>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {domains.map((d: string) => (
@@ -368,7 +368,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
         <div style={{ marginTop: 8, padding: 12, background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
           {/* KB Search */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>📚 Pull from Knowledge Base</div>
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>{isAR ? '📚 جلب من قاعدة المعرفة' : '📚 Pull from Knowledge Base'}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <input className="form-input" value={kbQuery} onChange={e => setKbQuery(e.target.value)} placeholder={`Search KB for "${inp.title}"`} style={{ flex: 1, fontSize: 11 }} onKeyDown={e => e.key === 'Enter' && pullFromKb()} />
               <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>{kbSearching ? '...' : t('common.search')}</button>
@@ -624,7 +624,7 @@ function OutputSourcePanel({ out, onUpdated }: any) {
         <div style={{ marginTop: 8, padding: 12, background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
           {/* KB */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>📚 Pull from Knowledge Base</div>
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>{isAR ? '📚 جلب من قاعدة المعرفة' : '📚 Pull from Knowledge Base'}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <input className="form-input" value={kbQuery} onChange={e => setKbQuery(e.target.value)} placeholder={`Search KB for "${out.title}"`} style={{ flex: 1, fontSize: 11 }} onKeyDown={e => e.key === 'Enter' && pullFromKb()} />
               <button className="btn btn-primary btn-sm" style={{ fontSize: 10 }} disabled={kbSearching || !kbQuery} onClick={pullFromKb}>{kbSearching ? '...' : t('common.search')}</button>
@@ -766,7 +766,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
         <div style={{ marginBottom: 8, padding: 12, background: 'rgba(0,0,0,0.15)', borderRadius: 6, border: '1px solid var(--border)' }}>
           {/* KB */}
           <div style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>📚 Pull from Knowledge Base</div>
+            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6, color: 'var(--accent)' }}>{isAR ? '📚 جلب من قاعدة المعرفة' : '📚 Pull from Knowledge Base'}</div>
             <div style={{ display: 'flex', gap: 6 }}>
               <input className="form-input" value={kbQuery} onChange={e => setKbQuery(e.target.value)}
                 placeholder={`Search KB for ${field.label.toLowerCase()}...`}
@@ -1080,10 +1080,10 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                     <button key={step.key} onClick={() => setActiveStep(step.key)}
                       style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === step.key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === step.key ? 'rgba(0,180,216,0.12)' : 'transparent', cursor: 'pointer' }}>
                       <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginBottom: 2 }}>{step.key}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>{step.titleAr || step.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>{isAR ? (step.titleAr || step.title) : (step.title || step.titleAr)}</div>
                       <div style={{ marginTop: 4 }}>
-                        {hasApproved && <span style={{ fontSize: 9, color: '#2ecc71' }}>● Approved</span>}
-                        {!hasApproved && hasAiDraft && <span style={{ fontSize: 9, color: '#9b59b6' }}>● AI Draft</span>}
+                        {hasApproved && <span style={{ fontSize: 9, color: '#2ecc71' }}>● {t('common.approved')}</span>}
+                        {!hasApproved && hasAiDraft && <span style={{ fontSize: 9, color: '#9b59b6' }}>● {t('common.draft')}</span>}
                       </div>
                     </button>
                   )
@@ -1514,8 +1514,8 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
         </select>
         <select className="form-input" value={filterStatus} onChange={e => setFilterStatus(e.target.value)} style={{ fontSize: 11 }}>
           <option value="ALL">{t('adm.all_statuses')}</option>
-          <option value="APPROVED">Approved</option>
-          <option value="DRAFT">Draft</option>
+          <option value="APPROVED">{t('common.approved')}</option>
+          <option value="DRAFT">{t('common.draft')}</option>
           <option value="DEPRECATED">{t('common.deprecated')}</option>
         </select>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', marginLeft: 'auto' }}>
@@ -1648,7 +1648,7 @@ export default function AdmPage() {
 
             {/* Cycles list */}
             <div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, letterSpacing: '0.08em' }}>CYCLES</div>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, letterSpacing: '0.08em' }}>{isAR ? 'الدورات' : 'CYCLES'}</div>
               {cycles.map(c => (
                 <div key={c.id} onClick={() => setSelected(c)}
                   style={{ padding: '12px 14px', marginBottom: 6, background: selected?.id === c.id ? 'var(--navy-mid)' : 'var(--navy-light)', border: `1px solid ${selected?.id === c.id ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)', cursor: 'pointer' }}>
@@ -1660,7 +1660,7 @@ export default function AdmPage() {
                   </div>
                   {c.scopeDomains?.length > 0 && (
                     <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
-                      Scope: {c.scopeDomains.slice(0,3).join(', ')}{c.scopeDomains.length > 3 ? `+${c.scopeDomains.length-3}` : ''}
+                      {isAR ? 'النطاق: ' : 'Scope: '}{c.scopeDomains.slice(0,3).join(', ')}{c.scopeDomains.length > 3 ? `+${c.scopeDomains.length-3}` : ''}
                     </div>
                   )}
                 </div>
