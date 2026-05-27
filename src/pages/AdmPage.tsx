@@ -956,14 +956,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const [outputContent, setOutputContent] = useState('')
   const [activeStep, setActiveStep] = useState<string | null>(null)
 
-  const refreshInputs = async () => {
-    try {
-      const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
-      if (Array.isArray(inp.inputs)) setPhaseInputs(inp.inputs)
-    } catch (e) {
-      // silently ignore — phaseInputs stays as-is
     }
-  }
 
   useEffect(() => {
     setLoading(true)
@@ -985,7 +978,6 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycle.id, phase])
 
-  // Note: refreshInputs() is called explicitly when user clicks a step tab (see step button onClick)
 
   const saveInput = async (inputId: string) => {
     await api.put(`/adm-intelligence/inputs/${inputId}`, { content: inputContent, source: 'PROVIDED' })
@@ -1019,6 +1011,13 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
               setGenerating(null)
               // Reload full phase data to get latest content
               setPhaseOutputs(prev => prev.map(o => o.id === outputId ? { ...o, ...updated } : o))
+              // Re-fetch inputs so next step gets auto-populated immediately
+              setTimeout(async () => {
+                try {
+                  const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
+                  if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
+                } catch (_) {}
+              }, 1500)
             }
           } catch(e) { clearInterval(pollInterval); setGenerating(null) }
         }, 2000)
@@ -1031,6 +1030,13 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const approveOutput = async (outputId: string) => {
     const result = await api.put(`/adm-intelligence/outputs/${outputId}`, { status: 'APPROVED' })
     setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
+    // Re-fetch inputs so next step gets auto-populated immediately
+    setTimeout(async () => {
+      try {
+        const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
+        if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
+      } catch (_) {}
+    }, 1500)
   }
 
   const saveOutputEdit = async (outputId: string) => {
@@ -1054,10 +1060,10 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
 
   // Get inputs/outputs for current step
   const stepInputs = currentStep
-    ? phaseInputs.filter(i => currentStep.inputs.some((def: any) => def.key === i.inputKey))
+    ? phaseInputs.filter(i => (currentStep.inputs || []).some((def: any) => def.key === i.inputKey))
     : phaseInputs
   const stepOutputs = currentStep
-    ? phaseOutputs.filter(o => currentStep.outputs.some((def: any) => def.key === o.outputKey))
+    ? phaseOutputs.filter(o => (currentStep.outputs || []).some((def: any) => def.key === o.outputKey))
     : phaseOutputs
 
   return (
@@ -1089,7 +1095,14 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                   const hasApproved = stepOuts.some(o => o.status === 'APPROVED')
                   const hasAiDraft = stepOuts.some(o => o.status === 'AI_DRAFT')
                   return (
-                    <button key={step.key} onClick={() => setActiveStep(step.key)}
+                    <button key={step.key} onClick={async () => {
+                        setActiveStep(step.key)
+                        // Re-fetch inputs to get any newly auto-populated values
+                        try {
+                          const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
+                          if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
+                        } catch (_) {}
+                      }}
                       style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === step.key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === step.key ? 'rgba(0,180,216,0.12)' : 'transparent', cursor: 'pointer' }}>
                       <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginBottom: 2 }}>{step.key}</div>
                       <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>{isAR ? (step.titleAr || step.title) : (step.title || step.titleAr)}</div>
