@@ -539,11 +539,11 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
     <div style={{ marginTop: 8, padding: '10px 12px', background: isFilled ? 'rgba(46,204,113,0.06)' : 'rgba(201,168,76,0.06)', border: `1px solid ${isFilled ? 'rgba(46,204,113,0.3)' : 'rgba(201,168,76,0.25)'}`, borderRadius: 'var(--radius)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: isFilled ? 'var(--success)' : 'var(--gold)' }}>
-          {isFilled ? '✅' : '📋'} {mapping.outputNameAr}
+          {isFilled ? '✅' : '📋'} {isAR ? mapping.outputNameAr : (mapping.outputNameEn || mapping.outputNameAr)}
         </span>
         {isFilled && <span style={{ fontSize: 9, padding: '1px 6px', background: 'rgba(46,204,113,0.15)', color: 'var(--success)', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>AI CONTENT READY</span>}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{mapping.purposeAr || mapping.purposeEn}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? (mapping.purposeAr || mapping.purposeEn) : (mapping.purposeEn || mapping.purposeAr)}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(46,204,113,0.4)' } : {}) }} disabled={loading} onClick={() => download('docx')}>
           📄 {loading ? '...' : isFilled ? t('adm.download_word') : t('adm.word_template')}
