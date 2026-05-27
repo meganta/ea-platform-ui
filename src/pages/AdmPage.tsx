@@ -956,6 +956,11 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const [outputContent, setOutputContent] = useState('')
   const [activeStep, setActiveStep] = useState<string | null>(null)
 
+  const refreshInputs = async () => {
+    const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
+    setPhaseInputs(inp.inputs || [])
+  }
+
   useEffect(() => {
     setLoading(true)
     Promise.all([
@@ -975,6 +980,14 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     }).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycle.id, phase])
+
+  // Re-fetch inputs whenever the active step changes so auto-populated
+  // inputs from previous step outputs are always up to date
+  useEffect(() => {
+    if (!activeStep) return
+    refreshInputs()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStep])
 
   const saveInput = async (inputId: string) => {
     await api.put(`/adm-intelligence/inputs/${inputId}`, { content: inputContent, source: 'PROVIDED' })
