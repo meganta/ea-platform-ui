@@ -127,19 +127,19 @@ function Step1Profile({ profile, config, onSave }: any) {
           </div>
         ))}
         <div>
-          <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>القطاع</div>
+          <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>{isAR ? 'القطاع' : 'Sector'}</div>
           <select className="form-input" value={form.sector} onChange={e => setForm((f: any) => ({ ...f, sector: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
             {[['GOVERNMENT',isAR ? 'حكومي' : 'Government'],['HEALTH',isAR ? 'صحة' : 'Health'],['EDUCATION',isAR ? 'تعليم' : 'Education'],['FINANCE',isAR ? 'مالية' : 'Finance'],['UTILITIES',isAR ? 'خدمات عامة' : 'Utilities'],['OTHER',isAR ? 'أخرى' : 'Other']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
         <div>
-          <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>نوع الجهة</div>
+          <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>{isAR ? 'نوع الجهة' : 'Entity Type'}</div>
           <select className="form-input" value={form.entityType} onChange={e => setForm((f: any) => ({ ...f, entityType: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
             {[['MINISTRY',isAR ? 'وزارة' : 'Ministry'],['AUTHORITY',isAR ? 'هيئة' : 'Authority'],['ENTERPRISE',isAR ? 'مؤسسة' : 'Enterprise'],['SME',isAR ? 'شركة' : 'Company']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
         <div>
-          <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>لغة المنصة</div>
+          <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>{isAR ? 'لغة المنصة' : 'Platform Language'}</div>
           <select className="form-input" value={form.language} onChange={e => {
             const lang = e.target.value as 'AR' | 'EN'
             setForm((f: any) => ({ ...f, language: lang }))
@@ -156,7 +156,7 @@ function Step1Profile({ profile, config, onSave }: any) {
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>الإطار المرجعي</div>
+          <div style={{ fontSize: 11, marginBottom: 3, color: '#ccc' }}>{isAR ? 'الإطار المرجعي' : 'Reference Framework'}</div>
           <div style={{ display: 'flex', gap: 6 }}>
             {['NORA', 'CUSTOM'].map(f => (
               <button key={f} onClick={() => setForm((fm: any) => ({ ...fm, preferredFramework: f, domainsInScope: ALL_DOMAINS[f] || [] }))}
@@ -170,7 +170,7 @@ function Step1Profile({ profile, config, onSave }: any) {
 
       {/* Domains */}
       <div style={{ marginBottom: 14 }}>
-        <div style={{ fontSize: 11, marginBottom: 6, color: '#ccc' }}>المجالات المعمارية في النطاق</div>
+        <div style={{ fontSize: 11, marginBottom: 6, color: '#ccc' }}>{isAR ? 'المجالات المعمارية في النطاق' : 'Architecture Domains in Scope'}</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {domains.map((d: string) => (
             <button key={d} onClick={() => toggle(d)} style={{ fontSize: 10, padding: '4px 10px', borderRadius: 4, border: `1px solid ${form.domainsInScope.includes(d) ? '#00b4d8' : '#333'}`, background: form.domainsInScope.includes(d) ? 'rgba(0,180,216,0.18)' : 'transparent', color: form.domainsInScope.includes(d) ? '#00b4d8' : '#888', cursor: 'pointer' }}>
