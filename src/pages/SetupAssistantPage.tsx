@@ -94,8 +94,8 @@ function Step1Profile({ profile, config, onSave }: any) {
       const r1 = await authFetch('/setup/profile', { method: 'PUT', body: JSON.stringify({ ...form, setupStep: 2 }) })
       // Save framework config to platform config
       const r2 = await authFetch('/config/framework', { method: 'PUT', body: JSON.stringify({ frameworkType: form.preferredFramework, enabledDomains: form.domainsInScope }) })
-      if ((r1.id || r1.tenantId) && r2) { setMsg('✓ تم الحفظ بنجاح'); setTimeout(() => onSave(), 700) }
-      else setMsg('خطأ في الحفظ')
+      if ((r1.id || r1.tenantId) && r2) { setMsg(isAR ? '✓ تم الحفظ بنجاح' : '✓ Saved successfully'); setTimeout(() => onSave(), 700) }
+      else setMsg(isAR ? 'خطأ في الحفظ' : 'Save failed')
     } catch (e: any) { setMsg('خطأ: ' + e.message) }
     finally { setSaving(false) }
   }
@@ -233,8 +233,8 @@ function Step2KB({ onNext }: any) {
       )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/knowledge', '_blank')}>🔗 رفع وثائق المرجعية</button>
-        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>المتابعة →</button>
+        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/knowledge', '_blank')}>{isAR ? '🔗 رفع وثائق المرجعية' : '🔗 Upload Reference Documents'}</button>
+        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>{isAR ? 'المتابعة →' : 'Continue →'}</button>
       </div>
     </div>
   )
@@ -338,7 +338,7 @@ function Step3Repo({ onNext }: any) {
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/repository', '_blank')}>{isAR ? '🔗 المستودع' : '🔗 Repository'}</button>
-        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>المتابعة →</button>
+        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>{isAR ? 'المتابعة →' : 'Continue →'}</button>
       </div>
 
       {preview && (
