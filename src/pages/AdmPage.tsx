@@ -1261,8 +1261,8 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                           )}
                         </div>
 
-                        {/* Promote */}
-                        {out.content && (
+                        {/* Promote — hidden from UI, restore by removing {false && ...} wrapper */}
+                        {false && out.content && (
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: 9, opacity: out.inRepository ? 0.5 : 1 }} disabled={out.inRepository} onClick={() => promoteToRepo(out.id)}>
                               {out.inRepository ? t('adm.in_repo') : t('adm.to_repo')}
