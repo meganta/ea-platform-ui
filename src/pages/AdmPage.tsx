@@ -1055,6 +1055,14 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, inKnowledgeBase: true } : o))
   }
 
+  const handleStepClick = async (stepKey: string) => {
+    setActiveStep(stepKey)
+    try {
+      const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
+      if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
+    } catch (_) {}
+  }
+
   const steps = phaseDef?.steps || []
   const currentStep = steps.find((s: any) => s.key === activeStep)
 
@@ -1095,14 +1103,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                   const hasApproved = stepOuts.some(o => o.status === 'APPROVED')
                   const hasAiDraft = stepOuts.some(o => o.status === 'AI_DRAFT')
                   return (
-                    <button key={step.key} onClick={async () => {
-                        setActiveStep(step.key)
-                        // Re-fetch inputs to get any newly auto-populated values
-                        try {
-                          const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
-                          if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
-                        } catch (_) {}
-                      }}
+                    <button key={step.key} onClick={() => handleStepClick(step.key)}
                       style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === step.key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === step.key ? 'rgba(0,180,216,0.12)' : 'transparent', cursor: 'pointer' }}>
                       <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginBottom: 2 }}>{step.key}</div>
                       <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>{isAR ? (step.titleAr || step.title) : (step.title || step.titleAr)}</div>
