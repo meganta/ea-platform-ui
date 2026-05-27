@@ -507,7 +507,7 @@ function Step72({ admCycleId }: { admCycleId: string }) {
             if (filterPhase !== 'ALL') params.set('sourcePhase', filterPhase)
             const res = await fetch(`${API_URL}/requirements/export/csv?${params}`, {
               cache: 'no-store',
-              headers: { Authorization: `Bearer ${token()}`, 'Cache-Control': 'no-cache' },
+              headers: { Authorization: `Bearer ${token()}` },
             })
             const blob = await res.blob()
             const url = URL.createObjectURL(blob)
