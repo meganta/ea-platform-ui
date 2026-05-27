@@ -6,9 +6,11 @@ const token = () => localStorage.getItem('ea_token')
 const authFetch = (path: string, opts: any = {}) =>
   fetch(`${API_URL}${path}`, {
     ...opts,
+    cache: 'no-store',
     headers: {
       Authorization: `Bearer ${token()}`,
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
       ...(opts.headers || {}),
     },
   }).then(r => r.json())
