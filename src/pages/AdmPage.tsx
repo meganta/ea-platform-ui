@@ -956,7 +956,6 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const [outputContent, setOutputContent] = useState('')
   const [activeStep, setActiveStep] = useState<string | null>(null)
 
-    }
 
   useEffect(() => {
     setLoading(true)
