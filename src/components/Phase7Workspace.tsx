@@ -10,7 +10,6 @@ const authFetch = (path: string, opts: any = {}) =>
     headers: {
       Authorization: `Bearer ${token()}`,
       'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
       ...(opts.headers || {}),
     },
   }).then(r => r.json())
@@ -501,12 +500,24 @@ function Step72({ admCycleId }: { admCycleId: string }) {
         ))}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
           <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{items.length} {isAR ? 'متطلب' : 'requirements'}</span>
-          <a
-            href={`${API_URL}/requirements/export/csv?admCycleId=${admCycleId}&approvalStatus=${filterApproval !== 'ALL' ? filterApproval : ''}&requirementType=${filterType !== 'ALL' ? filterType : ''}&sourcePhase=${filterPhase !== 'ALL' ? filterPhase : ''}`}
-            target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'none', color: 'var(--text-dim)', textDecoration: 'none', cursor: 'pointer' }}>
+          <button onClick={async () => {
+            const params = new URLSearchParams({ admCycleId })
+            if (filterApproval !== 'ALL') params.set('approvalStatus', filterApproval)
+            if (filterType !== 'ALL') params.set('requirementType', filterType)
+            if (filterPhase !== 'ALL') params.set('sourcePhase', filterPhase)
+            const res = await fetch(`${API_URL}/requirements/export/csv?${params}`, {
+              cache: 'no-store',
+              headers: { Authorization: `Bearer ${token()}`, 'Cache-Control': 'no-cache' },
+            })
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url; a.download = `requirements-${admCycleId}.csv`; a.click()
+            URL.revokeObjectURL(url)
+          }}
+            style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}>
             ⬇ {isAR ? 'تصدير CSV' : 'Export CSV'}
-          </a>
+          </button>
         </div>
       </div>
 
