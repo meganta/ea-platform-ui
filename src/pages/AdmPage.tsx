@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import ReactMarkdown from 'react-markdown'
 import { DiagramViewer } from '../components/DiagramViewer'
+import { Phase7Workspace } from '../components/Phase7Workspace'
 function DiagramBlock({ chart }: { chart: string }) {
   // Parse mermaid-style text into a readable styled block
   return (
@@ -1715,7 +1716,8 @@ export default function AdmPage() {
       </div>
 
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={create} t={t} />}
-      {activePhase && selected && <PhaseWorkspace cycle={selected} phase={activePhase} onClose={() => setActivePhase(null)} />}
+      {activePhase && selected && activePhase === '7' && <Phase7Workspace cycle={selected} steps={[]} onClose={() => setActivePhase(null)} />}
+      {activePhase && selected && activePhase !== '7' && <PhaseWorkspace cycle={selected} phase={activePhase} onClose={() => setActivePhase(null)} />}
     </div>
   )
 }
