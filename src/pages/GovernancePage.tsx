@@ -23,6 +23,24 @@ const REVIEW_TYPES = [
   { value: 'BUSINESS_DEMAND', label: 'Business Demand Review' },
 ]
 
+const AGGRESSIVENESS_CARDS = [
+  { value: 'ADVISORY', label: 'Advisory', icon: '💡', description: 'Lightweight guidance. Best for early-stage exploration.', border: '#3498db' },
+  { value: 'STANDARD', label: 'Standard', icon: '⚖️', description: 'Balanced review covering all NORA domains. Default.', border: '#2ecc71' },
+  { value: 'STRICT', label: 'Strict', icon: '🔒', description: 'Rigorous analysis with elevated thresholds. High-impact.', border: '#e67e22' },
+  { value: 'EXECUTIVE', label: 'Executive', icon: '🏛️', description: 'Board-level scrutiny with strategic alignment focus.', border: '#e74c3c' },
+]
+
+const REVIEW_PURPOSE_OPTIONS = [
+  { value: 'architecture_approval', label: 'Architecture Approval' },
+  { value: 'procurement_support', label: 'Procurement Support' },
+  { value: 'design_validation', label: 'Design Validation' },
+  { value: 'risk_assessment', label: 'Risk Assessment' },
+  { value: 'compliance_assessment', label: 'Compliance Assessment' },
+  { value: 'cab_support', label: 'CAB Support' },
+  { value: 'executive_review', label: 'Executive Review' },
+  { value: 'exception_evaluation', label: 'Exception Evaluation' },
+]
+
 const SEV_COLOR: Record<string, string> = {
   CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71',
 }
@@ -104,7 +122,7 @@ export default function GovernancePage() {
   const [gaps, setGaps] = useState<any[]>([])
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
-  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA', aiMode: 'AUTOMATED', projectName: '', notes: '' })
+  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD', reviewPurpose: '' })
   const [inputs, setInputs] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -205,7 +223,7 @@ export default function GovernancePage() {
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Governance Reviews</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>EA Governance & Compliance Review Service</div>
         </div>
-        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA', aiMode: 'AUTOMATED', projectName: '', notes: '' }) }}>+ New Review</button>
+        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD', reviewPurpose: '' }) }}>+ New Review</button>
       </div>
       {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Loading...</div>}
       {reviews.length === 0 && !loading && (
@@ -259,10 +277,8 @@ export default function GovernancePage() {
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
               <select className='form-input' value={form.framework} onChange={set('framework')}>
-                <option value='NORA'>NORA 2.0</option>
-                <option value='TOGAF'>TOGAF</option>
-                <option value='FEAF'>FEAF</option>
-                <option value='custom'>Custom</option>
+                <option value='NORA_2_0'>NORA 2.0</option>
+                  <option value='TOGAF_10'>TOGAF 10</option>
               </select>
             </div>
             <div>
@@ -277,6 +293,26 @@ export default function GovernancePage() {
               <input className='form-input' value={form.projectName} onChange={set('projectName')} placeholder='Optional' />
             </div>
           </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Aggressiveness</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  {AGGRESSIVENESS_CARDS.map(card => (
+                    <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
+                      style={{ border: `2px solid ${form.aggressiveness === card.value ? card.border : 'var(--navy-light)'}`, borderRadius: 10, padding: '12px 10px', cursor: 'pointer', background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-dark)', transition: 'all 0.15s' }}>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>{card.icon}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{card.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>{card.description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Purpose</label>
+                <select className='form-input' value={form.reviewPurpose} onChange={set('reviewPurpose')}>
+                  <option value=''>Select a purpose...</option>
+                  {REVIEW_PURPOSE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+              </div>
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
             <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? 'Creating...' : 'Create Review →'}</button>
           </div>
