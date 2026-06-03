@@ -30,17 +30,6 @@ const AGGRESSIVENESS_CARDS = [
   { value: 'EXECUTIVE', label: 'Executive', icon: '🏛️', description: 'Board-level scrutiny with strategic alignment focus.', border: '#e74c3c' },
 ]
 
-const REVIEW_PURPOSE_OPTIONS = [
-  { value: 'architecture_approval', label: 'Architecture Approval' },
-  { value: 'procurement_support', label: 'Procurement Support' },
-  { value: 'design_validation', label: 'Design Validation' },
-  { value: 'risk_assessment', label: 'Risk Assessment' },
-  { value: 'compliance_assessment', label: 'Compliance Assessment' },
-  { value: 'cab_support', label: 'CAB Support' },
-  { value: 'executive_review', label: 'Executive Review' },
-  { value: 'exception_evaluation', label: 'Exception Evaluation' },
-]
-
 const SEV_COLOR: Record<string, string> = {
   CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71',
 }
@@ -53,7 +42,6 @@ const DECISION_COLOR: Record<string, string> = {
   PENDING: '#8baac8',
 }
 
-// ── Step indicator ────────────────────────────────────────
 function Steps({ current }: { current: number }) {
   const steps = ['Review Type', 'Upload Inputs', 'Gap Check', 'AI Review', 'Report']
   return (
@@ -61,7 +49,7 @@ function Steps({ current }: { current: number }) {
       {steps.map((s, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 0 }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, background: i < current ? 'var(--accent)' : i === current ? 'var(--accent)' : 'var(--navy-mid)', color: i <= current ? '#fff' : 'var(--text-muted)', border: i === current ? '2px solid var(--accent)' : '2px solid transparent' }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, background: i <= current ? 'var(--accent)' : 'var(--navy-mid)', color: i <= current ? '#fff' : 'var(--text-muted)', border: i === current ? '2px solid var(--accent)' : '2px solid transparent' }}>
               {i < current ? '✓' : i + 1}
             </div>
             <div style={{ fontSize: 11, color: i === current ? 'var(--accent)' : 'var(--text-muted)', marginTop: 4, whiteSpace: 'nowrap' }}>{s}</div>
@@ -73,7 +61,6 @@ function Steps({ current }: { current: number }) {
   )
 }
 
-// ── Score circle ──────────────────────────────────────────
 function ScoreCircle({ score, label }: { score: number, label: string }) {
   const color = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
   return (
@@ -87,7 +74,6 @@ function ScoreCircle({ score, label }: { score: number, label: string }) {
   )
 }
 
-// ── Finding card ──────────────────────────────────────────
 function FindingCard({ f }: { f: any }) {
   const [open, setOpen] = useState(false)
   return (
@@ -110,7 +96,6 @@ function FindingCard({ f }: { f: any }) {
   )
 }
 
-// ── Main page ─────────────────────────────────────────────
 export default function GovernancePage() {
   const api = useApi()
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list')
@@ -122,10 +107,10 @@ export default function GovernancePage() {
   const [gaps, setGaps] = useState<any[]>([])
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
-  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD', reviewPurpose: '' })
+  const [repoWarnings, setRepoWarnings] = useState<string[]>([])
+  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
   const [inputs, setInputs] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
-  const [repoWarnings, setRepoWarnings] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<any>(null)
 
@@ -153,7 +138,6 @@ export default function GovernancePage() {
     setReport(rpt)
   }
 
-  // ── Step 1: Create review ─────────────────────────────
   const createReview = async () => {
     if (!form.title) { setError('Title is required'); return }
     setLoading(true); setError('')
@@ -165,7 +149,6 @@ export default function GovernancePage() {
     finally { setLoading(false) }
   }
 
-  // ── Step 2: Upload file ───────────────────────────────
   const uploadFile = async (file: File) => {
     setUploading(true)
     const fd = new FormData()
@@ -178,7 +161,6 @@ export default function GovernancePage() {
     finally { setUploading(false) }
   }
 
-  // ── Step 3: Detect gaps ───────────────────────────────
   const detectGaps = async () => {
     setLoading(true); setError('')
     try {
@@ -190,7 +172,6 @@ export default function GovernancePage() {
     finally { setLoading(false) }
   }
 
-  // ── Step 4: Run AI review ────────────────────────────
   const runReview = async () => {
     setLoading(true); setError('')
     try {
@@ -219,7 +200,6 @@ export default function GovernancePage() {
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
-  // ── Reviews list ──────────────────────────────────────
   if (view === 'list') return (
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -227,7 +207,7 @@ export default function GovernancePage() {
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Governance Reviews</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>EA Governance & Compliance Review Service</div>
         </div>
-        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD', reviewPurpose: '' }) }}>+ New Review</button>
+        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' }) }}>+ New Review</button>
       </div>
       {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Loading...</div>}
       {reviews.length === 0 && !loading && (
@@ -253,7 +233,6 @@ export default function GovernancePage() {
     </div>
   )
 
-  // ── Create / wizard ───────────────────────────────────
   if (view === 'create') return (
     <div style={{ padding: '24px 32px', maxWidth: 800 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
@@ -263,21 +242,20 @@ export default function GovernancePage() {
       <Steps current={step} />
       {error && <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 8, padding: '10px 14px', color: '#e74c3c', marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
-      {/* Step 0: Review type */}
       {step === 0 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Review Configuration</div>
-            {repoWarnings.length > 0 && (
-              <div style={{ background: '#f39c1218', border: '1px solid #f39c1266', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
-                <span style={{ fontSize: 16 }}>⚠️</span>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#f39c12', marginBottom: 4 }}>Repository Warnings</div>
-                  <ul style={{ margin: 0, paddingLeft: 16 }}>
-                    {repoWarnings.map((w, i) => <li key={i} style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{w}</li>)}
-                  </ul>
-                </div>
+          {repoWarnings.length > 0 && (
+            <div style={{ background: '#f39c1218', border: '1px solid #f39c1266', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
+              <span style={{ fontSize: 16 }}>⚠️</span>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#f39c12', marginBottom: 4 }}>Repository Warnings</div>
+                <ul style={{ margin: 0, paddingLeft: 16 }}>
+                  {repoWarnings.map((w, i) => <li key={i} style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{w}</li>)}
+                </ul>
               </div>
-            )}
+            </div>
+          )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ gridColumn: '1/-1' }}>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
@@ -289,11 +267,24 @@ export default function GovernancePage() {
                 {REVIEW_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
+            <div style={{ gridColumn: '1/-1' }}>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Aggressiveness</label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                {AGGRESSIVENESS_CARDS.map(card => (
+                  <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
+                    style={{ border: '2px solid ' + (form.aggressiveness === card.value ? card.border : 'var(--navy-light)'), borderRadius: 10, padding: '12px 10px', cursor: 'pointer', background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-dark)', transition: 'all 0.15s' }}>
+                    <div style={{ fontSize: 20, marginBottom: 4 }}>{card.icon}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{card.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>{card.description}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
               <select className='form-input' value={form.framework} onChange={set('framework')}>
                 <option value='NORA_2_0'>NORA 2.0</option>
-                  <option value='TOGAF_10'>TOGAF 10</option>
+                <option value='TOGAF_10'>TOGAF 10</option>
               </select>
             </div>
             <div>
@@ -308,43 +299,17 @@ export default function GovernancePage() {
               <input className='form-input' value={form.projectName} onChange={set('projectName')} placeholder='Optional' />
             </div>
           </div>
-              <div style={{ gridColumn: '1/-1' }}>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Aggressiveness</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                  {AGGRESSIVENESS_CARDS.map(card => (
-                    <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
-                      style={{ border: `2px solid ${form.aggressiveness === card.value ? card.border : 'var(--navy-light)'}`, borderRadius: 10, padding: '12px 10px', cursor: 'pointer', background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-dark)', transition: 'all 0.15s' }}>
-                      <div style={{ fontSize: 20, marginBottom: 4 }}>{card.icon}</div>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{card.label}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>{card.description}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div style={{ gridColumn: '1/-1' }}>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Purpose</label>
-                <select className='form-input' value={form.reviewPurpose} onChange={set('reviewPurpose')}>
-                  <option value=''>Select a purpose...</option>
-                  {REVIEW_PURPOSE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-              </div>
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
             <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? 'Creating...' : 'Create Review →'}</button>
           </div>
         </div>
       )}
 
-      {/* Step 1: Upload inputs */}
       {step === 1 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Upload Inputs</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>Upload documents, diagrams, and architecture artifacts for review</div>
-          <div
-            style={{ border: '2px dashed var(--navy-light)', borderRadius: 10, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16 }}
-            onClick={() => fileRef.current?.click()}
-            onDragOver={e => e.preventDefault()}
-            onDrop={e => { e.preventDefault(); Array.from(e.dataTransfer.files).forEach(uploadFile) }}
-          >
+          <div style={{ border: '2px dashed var(--navy-light)', borderRadius: 10, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16 }} onClick={() => fileRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); Array.from(e.dataTransfer.files).forEach(uploadFile) }}>
             <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
             <div style={{ fontSize: 14, color: 'var(--text)' }}>{uploading ? 'Uploading...' : 'Click or drag files here'}</div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>PDF, DOCX, PPTX, images, diagrams</div>
@@ -368,7 +333,6 @@ export default function GovernancePage() {
         </div>
       )}
 
-      {/* Step 2: Gap check */}
       {step === 2 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Input Gap Detection</div>
@@ -387,7 +351,7 @@ export default function GovernancePage() {
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', minWidth: 48 }}>{Math.round(review?.completenessScore || 0)}%</div>
               </div>
               {gaps.map((g, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 6, background: g.isMandatory ? '#e74c3c11' : '#f39c1211', borderLeft: `3px solid ${g.isMandatory ? '#e74c3c' : '#f39c12'}` }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 6, background: g.isMandatory ? '#e74c3c11' : '#f39c1211', borderLeft: '3px solid ' + (g.isMandatory ? '#e74c3c' : '#f39c12') }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{g.title}</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{g.description}</div>
@@ -409,7 +373,6 @@ export default function GovernancePage() {
         </div>
       )}
 
-      {/* Step 3: Run AI review */}
       {step === 3 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>AI Review Pipeline</div>
@@ -431,7 +394,6 @@ export default function GovernancePage() {
         </div>
       )}
 
-      {/* Step 4: Report */}
       {step === 4 && review?.status === 'PROCESSING' && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 40, textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>⚙️</div>
@@ -446,7 +408,6 @@ export default function GovernancePage() {
     </div>
   )
 
-  // ── Detail view ───────────────────────────────────────
   return (
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
@@ -460,14 +421,11 @@ export default function GovernancePage() {
   )
 }
 
-// ── Report view component ─────────────────────────────────
 function ReportView({ review, report, findings }: { review: any, report: any, findings: any[] }) {
   const [tab, setTab] = useState<'summary' | 'findings' | 'domains' | 'financial'>('summary')
   const tabs = ['summary', 'findings', 'domains', 'financial']
-
   return (
     <div>
-      {/* Score row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
         <ScoreCircle score={Math.round(report.overallScore || 0)} label='Overall' />
         <ScoreCircle score={Math.round(report.complianceScore || 0)} label='Compliance' />
@@ -475,21 +433,15 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
         <ScoreCircle score={Math.round(report.strategicScore || 0)} label='Strategic' />
         <ScoreCircle score={Math.round(report.completenessScore || 0)} label='Completeness' />
       </div>
-
-      {/* Decision box */}
-      <div style={{ background: (DECISION_COLOR[report.decision] || '#8baac8') + '22', border: `1px solid ${DECISION_COLOR[report.decision] || '#8baac8'}`, borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
+      <div style={{ background: (DECISION_COLOR[report.decision] || '#8baac8') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#8baac8'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#8baac8', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{report.decisionRationale}</div>
       </div>
-
-      {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--navy-light)' }}>
         {tabs.map(t => (
           <button key={t} onClick={() => setTab(t as any)} style={{ padding: '8px 16px', background: 'none', border: 'none', borderBottom: tab === t ? '2px solid var(--accent)' : '2px solid transparent', color: tab === t ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontWeight: tab === t ? 600 : 400, textTransform: 'capitalize' }}>{t}</button>
         ))}
       </div>
-
-      {/* Summary tab */}
       {tab === 'summary' && (
         <div>
           <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
@@ -509,15 +461,13 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           )}
         </div>
       )}
-
-      {/* Findings tab */}
       {tab === 'findings' && (
         <div>
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
             {['CRITICAL','HIGH','MEDIUM','LOW'].map(sev => {
               const count = findings.filter(f => f.severity === sev).length
               return count > 0 ? (
-                <div key={sev} style={{ padding: '8px 16px', borderRadius: 8, background: SEV_COLOR[sev] + '22', border: `1px solid ${SEV_COLOR[sev]}44`, fontSize: 13 }}>
+                <div key={sev} style={{ padding: '8px 16px', borderRadius: 8, background: SEV_COLOR[sev] + '22', border: '1px solid ' + SEV_COLOR[sev] + '44', fontSize: 13 }}>
                   <span style={{ color: SEV_COLOR[sev], fontWeight: 600 }}>{count}</span> <span style={{ color: 'var(--text-muted)' }}>{sev}</span>
                 </div>
               ) : null
@@ -527,8 +477,6 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           {findings.length === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No findings</div>}
         </div>
       )}
-
-      {/* Domains tab */}
       {tab === 'domains' && (
         <div>
           {Object.entries(report.domainSummaries || {}).map(([domain, ds]: [string, any]) => (
@@ -547,8 +495,6 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           ))}
         </div>
       )}
-
-      {/* Financial tab */}
       {tab === 'financial' && (
         <div>
           {report.financialOpportunities?.totalAnnualSaving > 0 && (
