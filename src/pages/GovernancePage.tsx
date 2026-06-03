@@ -125,12 +125,16 @@ export default function GovernancePage() {
   const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD', reviewPurpose: '' })
   const [inputs, setInputs] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
+  const [repoWarnings, setRepoWarnings] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<any>(null)
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  useEffect(() => { loadReviews() }, [])
+  useEffect(() => {
+    loadReviews()
+    api.get('/governance/repository/warnings').then((d: any) => setRepoWarnings(d?.warnings ?? [])).catch(() => {})
+  }, [])
 
   const loadReviews = async () => {
     setLoading(true)
@@ -263,6 +267,17 @@ export default function GovernancePage() {
       {step === 0 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Review Configuration</div>
+            {repoWarnings.length > 0 && (
+              <div style={{ background: '#f39c1218', border: '1px solid #f39c1266', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>⚠️</span>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#f39c12', marginBottom: 4 }}>Repository Warnings</div>
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    {repoWarnings.map((w, i) => <li key={i} style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{w}</li>)}
+                  </ul>
+                </div>
+              </div>
+            )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ gridColumn: '1/-1' }}>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
