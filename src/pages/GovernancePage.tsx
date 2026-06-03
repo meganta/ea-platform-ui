@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react'
-import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -13,15 +12,33 @@ function useApi() {
   return { get, post, patch, postFile, del }
 }
 
-const getReviewTypes = (isAR: boolean) => [
-  { value: 'SOLUTION_DESIGN', label: isAR ? 'مراجعة حل معماري (تصميم عالي/تفصيلي)' : 'Architecture Solution Review (HLD/LLD)' },
-  { value: 'NEW_PROJECT', label: isAR ? 'مراجعة مشروع جديد' : 'New Project Review' },
+const REVIEW_TYPES = [
+  { value: 'SOLUTION_DESIGN', label: 'Architecture Solution Review (HLD/LLD)' },
+  { value: 'NEW_PROJECT', label: 'New Project Review' },
   { value: 'RFP_SOW', label: 'RFP / Scope of Work Review' },
-  { value: 'CHANGE_REQUEST', label: isAR ? 'مراجعة طلب تغيير' : 'Change Request Review' },
+  { value: 'CHANGE_REQUEST', label: 'Change Request Review' },
   { value: 'CAB_REVIEW', label: 'CAB Review' },
-  { value: 'DIGITAL_INITIATIVE', label: isAR ? 'مراجعة مبادرة رقمية' : 'Digital Initiative Review' },
-  { value: 'TECHNICAL_PROPOSAL', label: isAR ? 'مراجعة مقترح تقني' : 'Technical Proposal Review' },
-  { value: 'BUSINESS_DEMAND', label: isAR ? 'مراجعة طلب أعمال' : 'Business Demand Review' },
+  { value: 'DIGITAL_INITIATIVE', label: 'Digital Initiative Review' },
+  { value: 'TECHNICAL_PROPOSAL', label: 'Technical Proposal Review' },
+  { value: 'BUSINESS_DEMAND', label: 'Business Demand Review' },
+]
+
+const AGGRESSIVENESS_CARDS = [
+  { value: 'ADVISORY', label: 'Advisory', icon: '💡', description: 'Lightweight guidance. Best for early-stage exploration.', border: '#3498db' },
+  { value: 'STANDARD', label: 'Standard', icon: '⚖️', description: 'Balanced review covering all NORA domains. Default.', border: '#2ecc71' },
+  { value: 'STRICT', label: 'Strict', icon: '🔒', description: 'Rigorous analysis with elevated thresholds. High-impact.', border: '#e67e22' },
+  { value: 'EXECUTIVE', label: 'Executive', icon: '🏛️', description: 'Board-level scrutiny with strategic alignment focus.', border: '#e74c3c' },
+]
+
+const REVIEW_PURPOSE_OPTIONS = [
+  { value: 'architecture_approval', label: 'Architecture Approval' },
+  { value: 'procurement_support', label: 'Procurement Support' },
+  { value: 'design_validation', label: 'Design Validation' },
+  { value: 'risk_assessment', label: 'Risk Assessment' },
+  { value: 'compliance_assessment', label: 'Compliance Assessment' },
+  { value: 'cab_support', label: 'CAB Support' },
+  { value: 'executive_review', label: 'Executive Review' },
+  { value: 'exception_evaluation', label: 'Exception Evaluation' },
 ]
 
 const SEV_COLOR: Record<string, string> = {
@@ -37,8 +54,8 @@ const DECISION_COLOR: Record<string, string> = {
 }
 
 // ── Step indicator ────────────────────────────────────────
-function Steps({ current, isAR, t }: { current: number; isAR: boolean; t: (k: string) => string }) {
-  const steps = [t('gov.review_type'), t('gov.upload_inputs'), t('gov.detect_gaps'), 'AI Review', t('gov.report')]
+function Steps({ current }: { current: number }) {
+  const steps = ['Review Type', 'Upload Inputs', 'Gap Check', 'AI Review', 'Report']
   return (
     <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
       {steps.map((s, i) => (
@@ -96,7 +113,6 @@ function FindingCard({ f }: { f: any }) {
 // ── Main page ─────────────────────────────────────────────
 export default function GovernancePage() {
   const api = useApi()
-  const { isAR, t } = useLang()
   const [view, setView] = useState<'list' | 'create' | 'detail'>('list')
   const [reviews, setReviews] = useState<any[]>([])
   const [review, setReview] = useState<any>(null)
@@ -106,20 +122,24 @@ export default function GovernancePage() {
   const [gaps, setGaps] = useState<any[]>([])
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
-  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA', aiMode: 'AUTOMATED', projectName: '', notes: '' })
+  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD', reviewPurpose: '' })
   const [inputs, setInputs] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
+  const [repoWarnings, setRepoWarnings] = useState<string[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<any>(null)
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  useEffect(() => { loadReviews() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadReviews()
+    api.get('/governance/repository/warnings').then((d: any) => setRepoWarnings(d?.warnings ?? [])).catch(() => {})
+  }, [])
 
   const loadReviews = async () => {
     setLoading(true)
     try { const data = await api.get('/governance/reviews'); setReviews(data) }
-    catch (e) { setError(isAR ? 'فشل تحميل المراجعات' : 'Failed to load reviews') }
+    catch (e) { setError('Failed to load reviews') }
     finally { setLoading(false) }
   }
 
@@ -135,13 +155,13 @@ export default function GovernancePage() {
 
   // ── Step 1: Create review ─────────────────────────────
   const createReview = async () => {
-    if (!form.title) { setError(isAR ? 'العنوان مطلوب' : 'Title is required'); return }
+    if (!form.title) { setError('Title is required'); return }
     setLoading(true); setError('')
     try {
       const r = await api.post('/governance/reviews', form)
       if (r.id) { setReview(r); setStep(1); setView('create') }
-      else setError(r.message || isAR ? 'فشل إنشاء المراجعة' : 'Failed to create review')
-    } catch (e) { setError(isAR ? 'فشل إنشاء المراجعة' : 'Failed to create review') }
+      else setError(r.message || 'Failed to create review')
+    } catch (e) { setError('Failed to create review') }
     finally { setLoading(false) }
   }
 
@@ -154,7 +174,7 @@ export default function GovernancePage() {
     try {
       const r = await api.postFile('/governance/reviews/' + review.id + '/inputs/file', fd)
       if (r.id) setInputs(i => [...i, r])
-    } catch (e) { setError(isAR ? 'فشل الرفع' : 'Upload failed') }
+    } catch (e) { setError('Upload failed') }
     finally { setUploading(false) }
   }
 
@@ -166,7 +186,7 @@ export default function GovernancePage() {
       setGaps(r.gaps || [])
       setReview((prev: any) => ({ ...prev, completenessScore: r.completenessScore }))
       setStep(3)
-    } catch (e) { setError(isAR ? 'فشل اكتشاف الفجوات' : 'Gap detection failed') }
+    } catch (e) { setError('Gap detection failed') }
     finally { setLoading(false) }
   }
 
@@ -177,7 +197,7 @@ export default function GovernancePage() {
       await api.post('/governance/reviews/' + review.id + '/run')
       setStep(4)
       pollStatus()
-    } catch (e: any) { setError(e.message || isAR ? 'فشل بدء المراجعة' : 'Failed to start review') }
+    } catch (e: any) { setError(e.message || 'Failed to start review') }
     finally { setLoading(false) }
   }
 
@@ -204,17 +224,17 @@ export default function GovernancePage() {
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{t('gov.title')}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{t('gov.subtitle')}</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Governance Reviews</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>EA Governance & Compliance Review Service</div>
         </div>
-        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA', aiMode: 'AUTOMATED', projectName: '', notes: '' }) }}>{t('gov.new')}</button>
+        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD', reviewPurpose: '' }) }}>+ New Review</button>
       </div>
-      {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>{t('common.loading')}</div>}
+      {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Loading...</div>}
       {reviews.length === 0 && !loading && (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🏛️</div>
-          <div style={{ fontSize: 16, marginBottom: 8 }}>{t('gov.no_reviews')}</div>
-          <div style={{ fontSize: 13 }}>{t('gov.start_first')}</div>
+          <div style={{ fontSize: 16, marginBottom: 8 }}>No reviews yet</div>
+          <div style={{ fontSize: 13 }}>Start your first EA governance review</div>
         </div>
       )}
       <div style={{ display: 'grid', gap: 12 }}>
@@ -222,7 +242,7 @@ export default function GovernancePage() {
           <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{getReviewTypes(isAR).find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
             </div>
             {r.overallScore != null && <ScoreCircle score={Math.round(r.overallScore)} label='Score' />}
             <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[r.decision] + '22', color: DECISION_COLOR[r.decision] }}>{r.decision?.replace(/_/g, ' ')}</div>
@@ -240,30 +260,40 @@ export default function GovernancePage() {
         <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>New Governance Review</div>
       </div>
-      <Steps current={step} isAR={isAR} t={t} />
+      <Steps current={step} />
       {error && <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 8, padding: '10px 14px', color: '#e74c3c', marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
       {/* Step 0: Review type */}
       {step === 0 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Review Configuration</div>
+            {repoWarnings.length > 0 && (
+              <div style={{ background: '#f39c1218', border: '1px solid #f39c1266', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
+                <span style={{ fontSize: 16 }}>⚠️</span>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#f39c12', marginBottom: 4 }}>Repository Warnings</div>
+                  <ul style={{ margin: 0, paddingLeft: 16 }}>
+                    {repoWarnings.map((w, i) => <li key={i} style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{w}</li>)}
+                  </ul>
+                </div>
+              </div>
+            )}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ gridColumn: '1/-1' }}>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{t('gov.review_title') + ' *'}</label>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
               <input className='form-input' value={form.title} onChange={set('title')} placeholder='e.g. Customer Portal HLD Review' />
             </div>
             <div style={{ gridColumn: '1/-1' }}>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Type</label>
               <select className='form-input' value={form.reviewType} onChange={set('reviewType')}>
-                {getReviewTypes(isAR).map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                {REVIEW_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div>
               <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
               <select className='form-input' value={form.framework} onChange={set('framework')}>
-                <option value='NORA'>NORA 2.0</option>
-                <option value='FEAF'>FEAF</option>
-                <option value='custom'>Custom</option>
+                <option value='NORA_2_0'>NORA 2.0</option>
+                  <option value='TOGAF_10'>TOGAF 10</option>
               </select>
             </div>
             <div>
@@ -278,8 +308,28 @@ export default function GovernancePage() {
               <input className='form-input' value={form.projectName} onChange={set('projectName')} placeholder='Optional' />
             </div>
           </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Aggressiveness</label>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                  {AGGRESSIVENESS_CARDS.map(card => (
+                    <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
+                      style={{ border: `2px solid ${form.aggressiveness === card.value ? card.border : 'var(--navy-light)'}`, borderRadius: 10, padding: '12px 10px', cursor: 'pointer', background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-dark)', transition: 'all 0.15s' }}>
+                      <div style={{ fontSize: 20, marginBottom: 4 }}>{card.icon}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{card.label}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>{card.description}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ gridColumn: '1/-1' }}>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Purpose</label>
+                <select className='form-input' value={form.reviewPurpose} onChange={set('reviewPurpose')}>
+                  <option value=''>Select a purpose...</option>
+                  {REVIEW_PURPOSE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                </select>
+              </div>
           <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? (t('common.creating')) : (isAR ? 'إنشاء المراجعة →' : 'Create Review →')}</button>
+            <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? 'Creating...' : 'Create Review →'}</button>
           </div>
         </div>
       )}
@@ -287,7 +337,7 @@ export default function GovernancePage() {
       {/* Step 1: Upload inputs */}
       {step === 1 && (
         <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>{t('gov.upload_inputs')}</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Upload Inputs</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>Upload documents, diagrams, and architecture artifacts for review</div>
           <div
             style={{ border: '2px dashed var(--navy-light)', borderRadius: 10, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16 }}
