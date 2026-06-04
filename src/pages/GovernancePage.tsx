@@ -418,13 +418,14 @@ export default function GovernancePage() {
 }
 
 function ReportView({ review, report, findings }: { review: any, report: any, findings: any[] }) {
-  const [tab, setTab] = useState<'summary' | 'findings' | 'domains' | 'strategic' | 'compliance' | 'future' | 'financial'>('summary')
+  const [tab, setTab] = useState<'summary' | 'findings' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
   const tabs = [
     { key: 'summary', label: 'Summary' },
     { key: 'findings', label: 'Findings' },
     { key: 'domains', label: 'Domains' },
     { key: 'strategic', label: 'Strategic' },
     { key: 'compliance', label: 'Compliance' },
+    { key: 'risk', label: 'Risk Register' },
     { key: 'future', label: 'Future State' },
     { key: 'financial', label: 'Financial' },
   ]
@@ -438,6 +439,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>AGGRESSIVENESS</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.aggressiveness || 'STANDARD'}</div></div>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>METHODOLOGY</div><div style={{ fontSize: 13, fontWeight: 600 }}>{report.reviewMethodology?.split('.')[0]}</div></div>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>DATE</div><div style={{ fontSize: 13, fontWeight: 600 }}>{new Date(review?.createdAt).toLocaleDateString()}</div></div>
+        {report.confidenceScore > 0 && <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>CONFIDENCE</div><div style={{ fontSize: 13, fontWeight: 600, color: report.confidenceScore >= 75 ? '#2ecc71' : report.confidenceScore >= 50 ? '#f39c12' : '#e74c3c' }}>{report.confidenceScore}%</div></div>}
       </div>
 
       {/* Score Row */}
@@ -622,6 +624,41 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
         </div>
       )}
 
+
+      {/* Risk Register Tab */}
+      {tab === 'risk' && (
+        <div>
+          {report.riskRegister?.totalRisks > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+              {[['Total Risks', report.riskRegister.totalRisks, '#8baac8'], ['Critical', report.riskRegister.criticalRisks, '#e74c3c'], ['High', report.riskRegister.highRisks, '#e67e22']].map(([l, v, c]: any) => (
+                <div key={l} style={{ background: c + '18', border: '1px solid ' + c + '44', borderRadius: 8, padding: '12px 16px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 24, fontWeight: 700, color: c }}>{v || 0}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          )}
+          {(report.riskRegister?.risks || []).map((risk: any, i: number) => (
+            <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[risk.severity] + '33', color: SEV_COLOR[risk.severity] }}>{risk.severity}</span>
+                <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{risk.riskTitle}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{risk.riskCategory?.replace(/_/g, ' ')}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Probability: </span>{risk.probability}</div>
+                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Owner: </span>{risk.owner}</div>
+              </div>
+              {risk.impact && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Impact: {risk.impact}</div>}
+              {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
+              {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
+            </div>
+          ))}
+          {(!report.riskRegister?.risks || report.riskRegister.risks.length === 0) && (
+            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No risk register available</div>
+          )}
+        </div>
+      )}
       {/* Future State Tab */}
       {tab === 'future' && (
         <div>
