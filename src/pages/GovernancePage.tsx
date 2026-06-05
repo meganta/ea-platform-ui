@@ -31,29 +31,21 @@ const AGGRESSIVENESS_CARDS = [
   { value: 'EXECUTIVE', label: 'Executive', icon: '🏛️', description: 'Board-level scrutiny with strategic alignment focus.', border: '#e74c3c' },
 ]
 
+const INTELLIGENCE_ITEMS = [
+  { key: 'strategies', label: 'Strategic Objectives & Initiatives', icon: '🎯', source: 'repository', enrichUrl: '/strategy' },
+  { key: 'ea_assets', label: 'EA Assets & Applications Inventory', icon: '🏗️', source: 'repository', enrichUrl: '/applications' },
+  { key: 'capabilities', label: 'Business Capabilities', icon: '⚡', source: 'repository', enrichUrl: '/capabilities' },
+  { key: 'arch_decisions', label: 'Previous Architecture Decisions', icon: '📋', source: 'kb', enrichUrl: '/decisions' },
+  { key: 'similar_reviews', label: 'Similar Previous Reviews', icon: '🔍', source: 'kb', enrichUrl: '/governance' },
+  { key: 'standards', label: 'EA Standards & Principles', icon: '📐', source: 'repository', enrichUrl: '/standards' },
+  { key: 'reference_architectures', label: 'Reference Architectures', icon: '🗂️', source: 'repository', enrichUrl: '/reference-architectures' },
+  { key: 'target_architectures', label: 'Target-State Architectures', icon: '🎯', source: 'repository', enrichUrl: '/target-architectures' },
+  { key: 'technology_catalog', label: 'Approved Technology Catalog', icon: '💻', source: 'repository', enrichUrl: '/technology' },
+  { key: 'security_standards', label: 'Security Standards & Controls', icon: '🔒', source: 'repository', enrichUrl: '/security' },
+]
+
 const SEV_COLOR: Record<string, string> = { CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71' }
 const DECISION_COLOR: Record<string, string> = { APPROVED: '#2ecc71', APPROVED_WITH_CONDITIONS: '#f39c12', REQUIRES_CHANGES: '#e67e22', REJECTED: '#e74c3c', PENDING: '#8baac8' }
-const COMPLIANCE_COLOR: Record<string, string> = { COMPLIANT: '#2ecc71', PARTIALLY_COMPLIANT: '#f39c12', NON_COMPLIANT: '#e74c3c', NOT_APPLICABLE: '#8baac8', REQUIRES_EXCEPTION: '#e67e22' }
-const ALIGNMENT_COLOR: Record<string, string> = { FULLY_ALIGNED: '#2ecc71', PARTIALLY_ALIGNED: '#f39c12', WEAKLY_ALIGNED: '#e67e22', NOT_ALIGNED: '#e74c3c', NOT_APPLICABLE: '#8baac8' }
-
-function Steps({ current }: { current: number }) {
-  const steps = ['Review Type', 'Upload Inputs', 'Gap Check', 'AI Review', 'Report']
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
-      {steps.map((s, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
-            <div style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, background: i <= current ? 'var(--accent)' : 'var(--navy-mid)', color: i <= current ? '#fff' : 'var(--text-muted)', border: i === current ? '2px solid var(--accent)' : '2px solid transparent' }}>
-              {i < current ? '✓' : i + 1}
-            </div>
-            <div style={{ fontSize: 11, color: i === current ? 'var(--accent)' : 'var(--text-muted)', marginTop: 4, whiteSpace: 'nowrap' }}>{s}</div>
-          </div>
-          {i < steps.length - 1 && <div style={{ flex: 1, height: 2, background: i < current ? 'var(--accent)' : 'var(--navy-mid)', margin: '0 4px', marginBottom: 20 }} />}
-        </div>
-      ))}
-    </div>
-  )
-}
 
 function ScoreCircle({ score, label, size = 72 }: { score: number, label: string, size?: number }) {
   const color = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
@@ -93,30 +85,170 @@ function FindingCard({ f }: { f: any }) {
   )
 }
 
+function IntelligenceAdvisor({ reviewType }: { reviewType: string }) {
+  return (
+    <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 20, marginTop: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🧠 Review Intelligence Advisor</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>The following repository and knowledge base items will be used to enrich your review. Items marked as missing should be uploaded to improve review quality.</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {INTELLIGENCE_ITEMS.map(item => {
+          const available = ['strategies', 'ea_assets', 'arch_decisions', 'similar_reviews'].includes(item.key)
+          return (
+            <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: available ? '#2ecc7111' : '#f39c1211', border: '1px solid ' + (available ? '#2ecc7133' : '#f39c1233') }}>
+              <span style={{ fontSize: 16 }}>{item.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{item.label}</div>
+                <div style={{ fontSize: 11, color: available ? '#2ecc71' : '#f39c12' }}>
+                  {available ? '✓ Available — will be used automatically' : '⚠ Not found — upload to ' + (item.source === 'kb' ? 'Knowledge Base' : 'Repository') + ' to enrich'}
+                </div>
+              </div>
+              {!available && (
+                <a href={item.enrichUrl} style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap', padding: '3px 8px', border: '1px solid var(--accent)', borderRadius: 6 }}>+ Add</a>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any, f: any[], rpt: any) => void }) {
+  const api = useApi()
+  const [stage, setStage] = useState<'gaps' | 'reviewing' | 'done'>('gaps')
+  const [progress, setProgress] = useState(0)
+  const [statusMsg, setStatusMsg] = useState('Analyzing input documents...')
+  const [engines, setEngines] = useState([
+    { label: 'Business Architecture', done: false },
+    { label: 'Beneficiary Experience', done: false },
+    { label: 'Application & Integration', done: false },
+    { label: 'Data Architecture', done: false },
+    { label: 'Infrastructure', done: false },
+    { label: 'Security Architecture', done: false },
+    { label: 'Compliance Matrix', done: false },
+    { label: 'Strategic Alignment', done: false },
+    { label: 'Risk Assessment', done: false },
+    { label: 'Financial Optimization', done: false },
+  ])
+  const pollRef = useRef<any>(null)
+  const engineTimerRef = useRef<any>(null)
+  const startedRef = useRef(false)
+
+  useEffect(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+    runFlow()
+    return () => {
+      clearInterval(pollRef.current)
+      clearInterval(engineTimerRef.current)
+    }
+  }, [])
+
+  const runFlow = async () => {
+    // Stage 1: Gap detection
+    setStage('gaps')
+    setStatusMsg('Running gap detection...')
+    setProgress(10)
+    try {
+      await api.post('/governance/reviews/' + review.id + '/gaps/detect')
+    } catch {}
+    setProgress(25)
+    setStatusMsg('Gap detection complete. Starting AI review engines...')
+    await sleep(1000)
+
+    // Stage 2: Run AI review
+    setStage('reviewing')
+    setProgress(30)
+    setStatusMsg('AI review pipeline running...')
+    try {
+      await api.post('/governance/reviews/' + review.id + '/run')
+    } catch {}
+
+    // Animate engines progressively
+    let engineIdx = 0
+    engineTimerRef.current = setInterval(() => {
+      if (engineIdx < engines.length) {
+        setEngines(prev => prev.map((e, i) => i === engineIdx ? { ...e, done: true } : e))
+        engineIdx++
+        setProgress(30 + Math.round((engineIdx / engines.length) * 50))
+      }
+    }, 8000)
+
+    // Poll for completion
+    pollRef.current = setInterval(async () => {
+      const r = await api.get('/governance/reviews/' + review.id).catch(() => null)
+      if (r?.status === 'COMPLETED') {
+        clearInterval(pollRef.current)
+        clearInterval(engineTimerRef.current)
+        setEngines(prev => prev.map(e => ({ ...e, done: true })))
+        setProgress(95)
+        setStatusMsg('Generating report...')
+        await sleep(1500)
+        setProgress(100)
+        const [f, rpt] = await Promise.all([
+          api.get('/governance/reviews/' + review.id + '/findings').catch(() => []),
+          api.get('/governance/reviews/' + review.id + '/report').catch(() => null),
+        ])
+        setStage('done')
+        onComplete(r, Array.isArray(f) ? f : [], rpt)
+      }
+    }, 4000)
+  }
+
+  const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
+
+  return (
+    <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 28 }}>
+      <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
+        {stage === 'gaps' ? '🔍 Analyzing Inputs' : stage === 'reviewing' ? '⚙️ Running AI Review Engines' : '✅ Review Complete'}
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>{statusMsg}</div>
+
+      {/* Progress bar */}
+      <div style={{ height: 8, background: 'var(--navy-dark)', borderRadius: 4, marginBottom: 24, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: progress + '%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.5s ease' }} />
+      </div>
+
+      {/* Engine status */}
+      {stage === 'reviewing' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          {engines.map((e, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: e.done ? '#2ecc7111' : 'var(--navy-dark)', border: '1px solid ' + (e.done ? '#2ecc7133' : 'var(--navy-light)') }}>
+              <span style={{ fontSize: 14 }}>{e.done ? '✅' : '⏳'}</span>
+              <span style={{ fontSize: 12, color: e.done ? '#2ecc71' : 'var(--text-muted)' }}>{e.label}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {stage === 'gaps' && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          {['Extracting document content', 'Identifying missing artifacts', 'Checking completeness', 'Pulling repository context'].map((s, i) => (
+            <div key={i} style={{ fontSize: 12, color: 'var(--text-muted)', padding: '4px 10px', borderRadius: 6, background: 'var(--navy-dark)', border: '1px solid var(--navy-light)' }}>⏳ {s}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function GovernancePage() {
   const api = useApi()
-  const [view, setView] = useState<'list' | 'create' | 'detail'>('list')
+  const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
   const [reviews, setReviews] = useState<any[]>([])
   const [review, setReview] = useState<any>(null)
-  const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [gaps, setGaps] = useState<any[]>([])
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
-  const [repoWarnings, setRepoWarnings] = useState<string[]>([])
   const [form, setForm] = useState({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
   const [inputs, setInputs] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
-  const pollRef = useRef<any>(null)
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  useEffect(() => {
-    loadReviews()
-    api.get('/governance/repository/warnings').then((d: any) => setRepoWarnings(d?.warnings ?? [])).catch(() => {})
-  }, [])
+  useEffect(() => { loadReviews() }, [])
 
   const loadReviews = async () => {
     setLoading(true)
@@ -126,75 +258,45 @@ export default function GovernancePage() {
   }
 
   const openReview = async (r: any) => {
-    setReview(r); setView('detail'); setStep(4)
+    setReview(r)
     const [f, rpt] = await Promise.all([
       api.get('/governance/reviews/' + r.id + '/findings').catch(() => []),
       api.get('/governance/reviews/' + r.id + '/report').catch(() => null),
     ])
     setFindings(Array.isArray(f) ? f : [])
     setReport(rpt)
+    setView('report')
   }
 
-  const createReview = async () => {
+  const createAndStart = async () => {
     if (!form.title) { setError('Title is required'); return }
+    if (inputs.length === 0) { setError('Please upload at least one document'); return }
     setLoading(true); setError('')
     try {
       const r = await api.post('/governance/reviews', form)
-      if (r.id) { setReview(r); setStep(1); setView('create') }
-      else setError(r.message || 'Failed to create review')
+      if (!r.id) { setError(r.message || 'Failed to create review'); return }
+      setReview(r)
+      // Upload all files to the new review
+      for (const inp of inputs) {
+        if (inp._file) {
+          const fd = new FormData()
+          fd.append('file', inp._file)
+          fd.append('label', inp._file.name)
+          await api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd).catch(() => {})
+        }
+      }
+      setView('progress')
     } catch (e) { setError('Failed to create review') }
     finally { setLoading(false) }
   }
 
-  const uploadFile = async (file: File) => {
-    setUploading(true)
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('label', file.name)
-    try {
-      const r = await api.postFile('/governance/reviews/' + review.id + '/inputs/file', fd)
-      if (r.id) setInputs(i => [...i, r])
-    } catch (e) { setError('Upload failed') }
-    finally { setUploading(false) }
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files) return
+    const newInputs = Array.from(files).map(f => ({ label: f.name, _file: f }))
+    setInputs(i => [...i, ...newInputs])
   }
 
-  const detectGaps = async () => {
-    setLoading(true); setError('')
-    try {
-      const r = await api.post('/governance/reviews/' + review.id + '/gaps/detect')
-      setGaps(r.gaps || [])
-      setReview((prev: any) => ({ ...prev, completenessScore: r.completenessScore }))
-      setStep(3)
-    } catch (e) { setError('Gap detection failed') }
-    finally { setLoading(false) }
-  }
-
-  const runReview = async () => {
-    setLoading(true); setError('')
-    try {
-      await api.post('/governance/reviews/' + review.id + '/run')
-      setStep(4); pollStatus()
-    } catch (e: any) { setError(e.message || 'Failed to start review') }
-    finally { setLoading(false) }
-  }
-
-  const pollStatus = () => {
-    pollRef.current = setInterval(async () => {
-      const r = await api.get('/governance/reviews/' + review.id).catch(() => null)
-      if (r?.status === 'COMPLETED') {
-        clearInterval(pollRef.current)
-        setReview(r)
-        const [f, rpt] = await Promise.all([
-          api.get('/governance/reviews/' + review.id + '/findings').catch(() => []),
-          api.get('/governance/reviews/' + review.id + '/report').catch(() => null),
-        ])
-        setFindings(Array.isArray(f) ? f : [])
-        setReport(rpt)
-      }
-    }, 3000)
-  }
-
-  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+  const removeInput = (idx: number) => setInputs(i => i.filter((_, j) => j !== idx))
 
   if (view === 'list') return (
     <div style={{ padding: '24px 32px' }}>
@@ -203,7 +305,7 @@ export default function GovernancePage() {
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Governance Reviews</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>EA Governance & Compliance Review Service</div>
         </div>
-        <button className='btn-primary' onClick={() => { setView('create'); setStep(0); setForm({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' }) }}>+ New Review</button>
+        <button className='btn-primary' onClick={() => { setView('create'); setForm({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' }); setInputs([]) }}>+ New Review</button>
       </div>
       {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Loading...</div>}
       {reviews.length === 0 && !loading && (
@@ -230,181 +332,102 @@ export default function GovernancePage() {
   )
 
   if (view === 'create') return (
-    <div style={{ padding: '24px 32px', maxWidth: 800 }}>
+    <div style={{ padding: '24px 32px', maxWidth: 860 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>New Governance Review</div>
       </div>
-      <Steps current={step} />
       {error && <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 8, padding: '10px 14px', color: '#e74c3c', marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
-      {step === 0 && (
-        <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 20 }}>Review Configuration</div>
-          {repoWarnings.length > 0 && (
-            <div style={{ background: '#f39c1218', border: '1px solid #f39c1266', borderRadius: 8, padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10 }}>
-              <span style={{ fontSize: 16 }}>⚠️</span>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#f39c12', marginBottom: 4 }}>Repository Warnings</div>
-                <ul style={{ margin: 0, paddingLeft: 16 }}>
-                  {repoWarnings.map((w, i) => <li key={i} style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>{w}</li>)}
-                </ul>
-              </div>
-            </div>
-          )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <div style={{ gridColumn: '1/-1' }}>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
-              <input className='form-input' value={form.title} onChange={set('title')} placeholder='e.g. Customer Portal HLD Review' />
-            </div>
-            <div style={{ gridColumn: '1/-1' }}>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Type</label>
-              <select className='form-input' value={form.reviewType} onChange={set('reviewType')}>
-                {REVIEW_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <div style={{ gridColumn: '1/-1' }}>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Aggressiveness</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-                {AGGRESSIVENESS_CARDS.map(card => (
-                  <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
-                    style={{ border: '2px solid ' + (form.aggressiveness === card.value ? card.border : 'var(--navy-light)'), borderRadius: 10, padding: '12px 10px', cursor: 'pointer', background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-dark)', transition: 'all 0.15s' }}>
-                    <div style={{ fontSize: 20, marginBottom: 4 }}>{card.icon}</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{card.label}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>{card.description}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
-              <select className='form-input' value={form.framework} onChange={set('framework')}>
-                <option value='NORA_2_0'>NORA 2.0</option>
-                <option value='TOGAF_10'>TOGAF 10</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>AI Mode</label>
-              <select className='form-input' value={form.aiMode} onChange={set('aiMode')}>
-                <option value='AUTOMATED'>Fully Automated</option>
-                <option value='ASSISTED'>Human Assisted</option>
-              </select>
-            </div>
-            <div style={{ gridColumn: '1/-1' }}>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Project Name</label>
-              <input className='form-input' value={form.projectName} onChange={set('projectName')} placeholder='Optional' />
-            </div>
+      <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24, marginBottom: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 20 }}>Review Configuration</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
+            <input className='form-input' value={form.title} onChange={set('title')} placeholder='e.g. Customer Portal HLD Review' />
           </div>
-          <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-            <button className='btn-primary' onClick={createReview} disabled={loading}>{loading ? 'Creating...' : 'Create Review →'}</button>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Type</label>
+            <select className='form-input' value={form.reviewType} onChange={set('reviewType')}>
+              {REVIEW_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
           </div>
-        </div>
-      )}
-
-      {step === 1 && (
-        <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Upload Inputs</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>Upload HLD documents, architecture diagrams, and artifacts for review</div>
-          <div style={{ border: '2px dashed var(--navy-light)', borderRadius: 10, padding: 32, textAlign: 'center', cursor: 'pointer', marginBottom: 16 }} onClick={() => fileRef.current?.click()} onDragOver={e => e.preventDefault()} onDrop={e => { e.preventDefault(); Array.from(e.dataTransfer.files).forEach(uploadFile) }}>
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📄</div>
-            <div style={{ fontSize: 14, color: 'var(--text)' }}>{uploading ? 'Uploading...' : 'Click or drag files here'}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>PDF, DOCX, PPTX, XLSX, PNG, JPG, JSON, YAML</div>
-            <input ref={fileRef} type='file' multiple style={{ display: 'none' }} onChange={e => Array.from(e.target.files || []).forEach(uploadFile)} />
-          </div>
-          {inputs.length > 0 && (
-            <div style={{ marginBottom: 16 }}>
-              {inputs.map((inp, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--navy-dark)', borderRadius: 8, marginBottom: 6 }}>
-                  <span style={{ fontSize: 16 }}>📄</span>
-                  <span style={{ fontSize: 13, flex: 1 }}>{inp.fileName || inp.label}</span>
-                  <span style={{ fontSize: 11, color: 'var(--accent)' }}>✓ Uploaded</span>
+          <div style={{ gridColumn: '1/-1' }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Aggressiveness</label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+              {AGGRESSIVENESS_CARDS.map(card => (
+                <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
+                  style={{ border: '2px solid ' + (form.aggressiveness === card.value ? card.border : 'var(--navy-light)'), borderRadius: 10, padding: '12px 10px', cursor: 'pointer', background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-dark)', transition: 'all 0.15s' }}>
+                  <div style={{ fontSize: 20, marginBottom: 4 }}>{card.icon}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{card.label}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>{card.description}</div>
                 </div>
               ))}
             </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-            <button onClick={() => setStep(0)} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '8px 16px', color: 'var(--text-muted)', cursor: 'pointer' }}>← Back</button>
-            <button className='btn-primary' onClick={() => setStep(2)}>Next: Check Gaps →</button>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
+            <select className='form-input' value={form.framework} onChange={set('framework')}>
+              <option value='NORA_2_0'>NORA 2.0</option>
+              <option value='TOGAF_10'>TOGAF 10</option>
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Project Name</label>
+            <input className='form-input' value={form.projectName} onChange={set('projectName')} placeholder='Optional' />
           </div>
         </div>
-      )}
+      </div>
 
-      {step === 2 && (
-        <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>Input Gap Detection</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>AI will analyze your inputs and detect missing artifacts</div>
-          {gaps.length === 0 && (
-            <div style={{ textAlign: 'center', padding: 32 }}>
-              <button className='btn-primary' onClick={detectGaps} disabled={loading}>{loading ? 'Detecting gaps...' : '🔍 Run Gap Detection'}</button>
-            </div>
-          )}
-          {gaps.length > 0 && (
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <div style={{ flex: 1, height: 8, background: 'var(--navy-dark)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: (review?.completenessScore || 0) + '%', background: 'var(--accent)', borderRadius: 4 }} />
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', minWidth: 48 }}>{Math.round(review?.completenessScore || 0)}%</div>
+      {/* Upload Section */}
+      <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24, marginBottom: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Upload Architecture Documents</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>PDF, DOCX, PPTX, XLSX, PNG, JPG, JSON, YAML — HLD documents, diagrams, NFRs, integration specs</div>
+        <div style={{ border: '2px dashed var(--navy-light)', borderRadius: 10, padding: 28, textAlign: 'center', cursor: 'pointer', marginBottom: 12 }}
+          onClick={() => fileRef.current?.click()}
+          onDragOver={e => e.preventDefault()}
+          onDrop={e => { e.preventDefault(); handleFileSelect(e.dataTransfer.files) }}>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
+          <div style={{ fontSize: 14, color: 'var(--text)' }}>{uploading ? 'Processing...' : 'Click or drag files here'}</div>
+          <input ref={fileRef} type='file' multiple style={{ display: 'none' }} onChange={e => handleFileSelect(e.target.files)} />
+        </div>
+        {inputs.length > 0 && (
+          <div>
+            {inputs.map((inp, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--navy-dark)', borderRadius: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 16 }}>📄</span>
+                <span style={{ fontSize: 13, flex: 1 }}>{inp.label}</span>
+                <button onClick={() => removeInput(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 16 }}>×</button>
               </div>
-              {gaps.map((g, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 8, marginBottom: 6, background: g.isMandatory ? '#e74c3c11' : '#f39c1211', borderLeft: '3px solid ' + (g.isMandatory ? '#e74c3c' : '#f39c12') }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{g.title}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{g.description}</div>
-                  </div>
-                  <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: g.isMandatory ? '#e74c3c33' : '#f39c1233', color: g.isMandatory ? '#e74c3c' : '#f39c12', whiteSpace: 'nowrap' }}>{g.isMandatory ? 'Blocks review' : g.priority}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 16 }}>
-            <button onClick={() => setStep(1)} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '8px 16px', color: 'var(--text-muted)', cursor: 'pointer' }}>← Back</button>
-            <div style={{ display: 'flex', gap: 10 }}>
-              {gaps.length > 0 && <button onClick={() => setStep(3)} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '8px 16px', color: 'var(--text-muted)', cursor: 'pointer' }}>Proceed anyway</button>}
-              {gaps.filter((g: any) => g.isMandatory).length === 0 && gaps.length > 0 && <button className='btn-primary' onClick={() => setStep(3)}>Next: Run AI Review →</button>}
-            </div>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-      {step === 3 && (
-        <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>AI Review Pipeline</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
-            {(review?.framework || '').includes('TOGAF') ? 'Runs 5 TOGAF ADM domain engines' : 'Runs 6 NORA domain engines'} in parallel plus compliance matrix, strategic objectives, future-state alignment, risk, and financial analysis
-          </div>
-          {review?.status === 'PROCESSING' ? (
-            <div style={{ textAlign: 'center', padding: 32 }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>⚙️</div>
-              <div style={{ fontSize: 15, color: 'var(--accent)', marginBottom: 8 }}>Review in progress...</div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>This may take 2-3 minutes. Results will appear automatically.</div>
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: 32 }}>
-              <button className='btn-primary' onClick={runReview} disabled={loading} style={{ fontSize: 15, padding: '12px 32px' }}>{loading ? 'Starting...' : '▶ Run AI Review'}</button>
-            </div>
-          )}
-          <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8 }}>
-            <button onClick={() => setStep(2)} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '8px 16px', color: 'var(--text-muted)', cursor: 'pointer' }}>← Back</button>
-          </div>
-        </div>
-      )}
+      {/* Intelligence Advisor */}
+      <IntelligenceAdvisor reviewType={form.reviewType} />
 
-      {step === 4 && review?.status === 'PROCESSING' && (
-        <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 40, textAlign: 'center' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>⚙️</div>
-          <div style={{ fontSize: 15, color: 'var(--accent)' }}>Generating governance report...</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>Results will appear automatically</div>
-        </div>
-      )}
-
-      {step === 4 && review?.status === 'COMPLETED' && report && (
-        <ReportView review={review} report={report} findings={findings} />
-      )}
+      <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
+        <button className='btn-primary' onClick={createAndStart} disabled={loading || inputs.length === 0} style={{ fontSize: 15, padding: '12px 32px' }}>
+          {loading ? 'Creating...' : '▶ Start Review'}
+        </button>
+      </div>
     </div>
   )
 
-  return (
+  if (view === 'progress') return (
+    <div style={{ padding: '24px 32px', maxWidth: 800 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{review?.title}</div>
+      </div>
+      <ProgressView
+        review={review}
+        onComplete={(r, f, rpt) => { setReview(r); setFindings(f); setReport(rpt); setView('report') }}
+      />
+    </div>
+  )
+
+  if (view === 'report') return (
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <button onClick={() => { setView('list'); loadReviews() }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back to reviews</button>
@@ -415,6 +438,8 @@ export default function GovernancePage() {
       {!report && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Report not available yet</div>}
     </div>
   )
+
+  return null
 }
 
 function ReportView({ review, report, findings }: { review: any, report: any, findings: any[] }) {
@@ -534,16 +559,12 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
                 <ScoreCircle score={Math.round(ds.score || 0)} label='' size={48} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
-                {[['Compliance', ds.complianceScore], ['Risk', ds.riskScore]].map(([l, v]: any) => (
+                {[['Compliance', ds.complianceScore], ['Risk', ds.riskScore], ['Findings', ds.findings?.length || 0]].map(([l, v]: any) => (
                   <div key={l} style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: v >= 75 ? '#2ecc71' : v >= 60 ? '#f39c12' : '#e74c3c' }}>{Math.round(v || 0)}</div>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: l === 'Findings' ? 'var(--text)' : v >= 75 ? '#2ecc71' : v >= 60 ? '#f39c12' : '#e74c3c' }}>{Math.round(v || 0)}</div>
                   </div>
                 ))}
-                <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Findings</div>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>{ds.findings?.length || 0}</div>
-                </div>
               </div>
               <div style={{ height: 6, background: 'var(--navy-dark)', borderRadius: 3, marginBottom: 10, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: (ds.score || 0) + '%', background: ds.score >= 75 ? '#2ecc71' : ds.score >= 60 ? '#f39c12' : '#e74c3c', borderRadius: 3 }} />
@@ -576,7 +597,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
             <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{obj.objectiveName}</div>
-                <div style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: (DECISION_COLOR[obj.alignmentStatus] || '#8baac8') + '22', color: (DECISION_COLOR[obj.alignmentStatus] || '#8baac8') }}>{obj.alignmentStatus?.replace(/_/g, ' ')}</div>
+                <div style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: '#8baac822', color: '#8baac8' }}>{obj.alignmentStatus?.replace(/_/g, ' ')}</div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', minWidth: 48, textAlign: 'right' }}>{obj.alignmentPercentage}%</div>
               </div>
               <div style={{ height: 4, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 10, overflow: 'hidden' }}>
@@ -610,7 +631,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
             <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{item.principleOrStandard}</div>
-                <div style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: (DECISION_COLOR[item.complianceStatus] || '#8baac8') + '22', color: (DECISION_COLOR[item.complianceStatus] || '#8baac8'), whiteSpace: 'nowrap' }}>{item.complianceStatus?.replace(/_/g, ' ')}</div>
+                <div style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8', whiteSpace: 'nowrap' }}>{item.complianceStatus?.replace(/_/g, ' ')}</div>
                 <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.category?.replace(/_/g, ' ')}</div>
               </div>
               {item.evidence && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Evidence: {item.evidence}</div>}
@@ -623,7 +644,6 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           )}
         </div>
       )}
-
 
       {/* Risk Register Tab */}
       {tab === 'risk' && (
@@ -659,6 +679,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           )}
         </div>
       )}
+
       {/* Future State Tab */}
       {tab === 'future' && (
         <div>
@@ -720,12 +741,18 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           )}
           {(report.financialOpportunities?.opportunities || []).map((o: any, i: number) => (
             <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 16, marginBottom: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>{o.type?.replace(/_/g, ' ')}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{o.title || o.type?.replace(/_/g, ' ')}</div>
+                {o.confidenceLevel && <div style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8' }}>Confidence: {o.confidenceLevel}</div>}
+              </div>
               <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>{o.description}</div>
-              {o.existingAlternative && <div style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 4 }}>Reuse: {o.existingAlternative}</div>}
-              {o.estimatedSaving > 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>One-time saving: SAR {o.estimatedSaving.toLocaleString()}</div>}
-              {o.annualSaving > 0 && <div style={{ fontSize: 13, color: '#2ecc71' }}>Annual saving: SAR {o.annualSaving.toLocaleString()}</div>}
-              {o.confidenceLevel && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>Confidence: {o.confidenceLevel}</div>}
+              {o.existingAlternative && <div style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 6 }}>♻️ Reuse: {o.existingAlternative}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                {o.estimatedSaving > 0 && <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>One-time Saving</div><div style={{ fontSize: 15, fontWeight: 700, color: '#2ecc71' }}>SAR {o.estimatedSaving.toLocaleString()}</div></div>}
+                {o.annualSaving > 0 && <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Annual Saving</div><div style={{ fontSize: 15, fontWeight: 700, color: '#2ecc71' }}>SAR {o.annualSaving.toLocaleString()}</div></div>}
+              </div>
+              {o.savingRationale && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 4 }}>📊 Basis: {o.savingRationale}</div>}
+              {o.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {o.recommendation}</div>}
             </div>
           ))}
           {!report.financialOpportunities?.opportunities?.length && (
