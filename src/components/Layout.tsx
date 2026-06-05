@@ -18,11 +18,11 @@ export default function Layout() {
           <NavLink to="/" end className={({isActive})=>`nav-item${isActive?' active':''}`}>⬛ {t('nav.dashboard')}</NavLink>
           <NavLink to="/adm" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ {t('nav.adm')}</NavLink>
           <NavLink to="/copilot" className={({isActive})=>`nav-item${isActive?' active':''}`}>💬 {t('nav.copilot')}</NavLink>
+          <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Governance</NavLink>
           <div className="nav-label" style={{marginTop:8}}>{t('nav.repo_section')}</div>
           <NavLink to="/repository" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗄 {t('nav.repository')}</NavLink>
           <NavLink to="/knowledge" className={({isActive})=>`nav-item${isActive?' active':''}`}>📚 {t('nav.knowledge')}</NavLink>
           <div className="nav-label" style={{marginTop:8}}>Admin</div>
-          <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Governance</NavLink>
           <NavLink to="/settings" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ Settings</NavLink>
         </nav>
         <div className="sidebar-footer">
