@@ -244,6 +244,8 @@ export default function GovernancePage() {
   const [form, setForm] = useState({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
   const [inputs, setInputs] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
+  const [extractedMeta, setExtractedMeta] = useState<any>(null)
+  const [showMeta, setShowMeta] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -286,14 +288,39 @@ export default function GovernancePage() {
         }
       }
       setView('progress')
+      // Fetch extracted metadata after a delay (extraction runs async in backend)
+      setTimeout(() => fetchExtractedMetadata(r.id).catch(() => {}), 5000)
     } catch (e) { setError('Failed to create review') }
     finally { setLoading(false) }
+  }
+
+  const exportWord = () => {
+    const token = localStorage.getItem('ea_token')
+    window.open(API_URL + '/governance/reviews/' + review?.id + '/export/word?token=' + token, '_blank')
+  }
+
+  const reRunReview = async () => {
+    if (!review?.id) return
+    try {
+      await api.post('/governance/reviews/' + review.id + '/run')
+      setView('progress')
+    } catch (e) { alert('Failed to re-run review') }
   }
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return
     const newInputs = Array.from(files).map(f => ({ label: f.name, _file: f }))
     setInputs(i => [...i, ...newInputs])
+  }
+
+  const fetchExtractedMetadata = async (reviewId: string) => {
+    try {
+      const meta = await api.get('/governance/reviews/' + reviewId + '/inputs/metadata')
+      if (meta && Object.keys(meta).length > 0) {
+        setExtractedMeta(meta)
+        setShowMeta(true)
+      }
+    } catch {}
   }
 
   const removeInput = (idx: number) => setInputs(i => i.filter((_, j) => j !== idx))
@@ -404,6 +431,30 @@ export default function GovernancePage() {
         )}
       </div>
 
+      {/* Extracted Metadata Panel */}
+      {extractedMeta && showMeta && (
+        <div style={{ background: 'var(--navy-mid)', border: '1px solid #3498db44', borderRadius: 12, padding: 20, marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>🤖 Auto-Extracted Information</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>AI extracted the following from your documents. Review and confirm before starting.</div>
+            </div>
+            <button onClick={() => setShowMeta(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18 }}>×</button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            {extractedMeta.solutionName && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>SOLUTION NAME</div><div style={{ fontSize: 13, fontWeight: 600 }}>{extractedMeta.solutionName}</div></div>}
+            {extractedMeta.scope && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>SCOPE</div><div style={{ fontSize: 13 }}>{extractedMeta.scope}</div></div>}
+            {extractedMeta.businessOwner && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>BUSINESS OWNER</div><div style={{ fontSize: 13 }}>{extractedMeta.businessOwner}</div></div>}
+            {extractedMeta.technicalOwner && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>TECHNICAL OWNER</div><div style={{ fontSize: 13 }}>{extractedMeta.technicalOwner}</div></div>}
+            {extractedMeta.availabilityTargets && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>AVAILABILITY</div><div style={{ fontSize: 13 }}>{extractedMeta.availabilityTargets}</div></div>}
+            {extractedMeta.drRequirements && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>DR REQUIREMENTS</div><div style={{ fontSize: 13 }}>{extractedMeta.drRequirements}</div></div>}
+          </div>
+          {extractedMeta.technologies?.length > 0 && <div style={{ marginTop: 10 }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>TECHNOLOGIES DETECTED</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{extractedMeta.technologies.map((t: string, i: number) => <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#3498db22', color: '#3498db' }}>{t}</span>)}</div></div>}
+          {extractedMeta.integrations?.length > 0 && <div style={{ marginTop: 10 }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>INTEGRATIONS</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{extractedMeta.integrations.map((t: string, i: number) => <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#2ecc7122', color: '#2ecc71' }}>{t}</span>)}</div></div>}
+          {extractedMeta.missingItems?.length > 0 && <div style={{ marginTop: 10, background: '#e67e2218', border: '1px solid #e67e2244', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 12, fontWeight: 600, color: '#e67e22', marginBottom: 6 }}>⚠ Potentially Missing</div>{extractedMeta.missingItems.map((m: string, i: number) => <div key={i} style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>• {m}</div>)}</div>}
+        </div>
+      )}
+
       {/* Intelligence Advisor */}
       <IntelligenceAdvisor reviewType={form.reviewType} />
 
@@ -433,6 +484,8 @@ export default function GovernancePage() {
         <button onClick={() => { setView('list'); loadReviews() }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back to reviews</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', flex: 1 }}>{review?.title}</div>
         <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[review?.decision] + '22', color: DECISION_COLOR[review?.decision] }}>{review?.decision?.replace(/_/g, ' ')}</div>
+        <button onClick={exportWord} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>📄 Export Word</button>
+        <button onClick={reRunReview} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
       </div>
       {report && <ReportView review={review} report={report} findings={findings} />}
       {!report && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Report not available yet</div>}
