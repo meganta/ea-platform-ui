@@ -11,6 +11,7 @@ import RepositoryPage from './pages/RepositoryPage'
 import KnowledgePage from './pages/KnowledgePage'
 import SettingsPage from './pages/SettingsPage'
 import GovernancePage from './pages/GovernancePage'
+import EAPlanningPage from './pages/EAPlanningPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -36,6 +37,7 @@ export default function App() {
               <Route path="knowledge" element={<KnowledgePage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="governance" element={<GovernancePage />} />
+              <Route path="ea-planning" element={<EAPlanningPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
