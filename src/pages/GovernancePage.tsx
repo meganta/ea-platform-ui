@@ -294,9 +294,21 @@ export default function GovernancePage() {
     finally { setLoading(false) }
   }
 
-  const exportWord = () => {
+  const exportWord = async () => {
     const token = localStorage.getItem('ea_token')
-    window.open(API_URL + '/governance/reviews/' + review?.id + '/export/word?token=' + token, '_blank')
+    try {
+      const res = await fetch(API_URL + '/governance/reviews/' + review?.id + '/export/word', {
+        headers: { Authorization: 'Bearer ' + token }
+      })
+      if (!res.ok) { alert('Export failed'); return }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = (review?.title || 'governance-review') + '.docx'
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch { alert('Export failed') }
   }
 
   const reRunReview = async () => {
