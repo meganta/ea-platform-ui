@@ -509,6 +509,13 @@ export default function GovernancePage() {
 
 function ReportView({ review, report, findings }: { review: any, report: any, findings: any[] }) {
   const [tab, setTab] = useState<'summary' | 'findings' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
+  const extScores = (report.domainSummaries?._extendedScores) || {}
+  const archQualityScore = extScores.architectureQualityScore || 0
+  const secScore = extScores.securityScore || 0
+  const futureScore = extScores.futureStateScore || 0
+  const finScore = extScores.financialScore || 0
+  const confScore = extScores.confidenceScore || report.confidenceScore || 0
+
   const tabs = [
     { key: 'summary', label: 'Summary' },
     { key: 'findings', label: 'Findings' },
@@ -529,7 +536,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>AGGRESSIVENESS</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.aggressiveness || 'STANDARD'}</div></div>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>METHODOLOGY</div><div style={{ fontSize: 13, fontWeight: 600 }}>{report.reviewMethodology?.split('.')[0]}</div></div>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>DATE</div><div style={{ fontSize: 13, fontWeight: 600 }}>{new Date(review?.createdAt).toLocaleDateString()}</div></div>
-        {report.confidenceScore > 0 && <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>CONFIDENCE</div><div style={{ fontSize: 13, fontWeight: 600, color: report.confidenceScore >= 75 ? '#2ecc71' : report.confidenceScore >= 50 ? '#f39c12' : '#e74c3c' }}>{report.confidenceScore}%</div></div>}
+        {confScore > 0 && <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>CONFIDENCE</div><div style={{ fontSize: 13, fontWeight: 600, color: confScore >= 75 ? '#2ecc71' : confScore >= 50 ? '#f39c12' : '#e74c3c' }}>{confScore}%</div></div>}
       </div>
 
       {/* Score Row */}
@@ -537,10 +544,10 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
         <ScoreCircle score={Math.round(report.overallScore || 0)} label='Overall' />
         <ScoreCircle score={Math.round(report.strategicScore || 0)} label='Strategic' />
         <ScoreCircle score={Math.round(report.complianceScore || 0)} label='Compliance' />
-        <ScoreCircle score={Math.round(report.architectureQualityScore || 0)} label='Arch Quality' />
-        <ScoreCircle score={Math.round(report.securityScore || 0)} label='Security' />
-        <ScoreCircle score={Math.round(report.futureStateScore || 0)} label='Future State' />
-        <ScoreCircle score={Math.round(report.financialScore || 0)} label='Financial' />
+        <ScoreCircle score={Math.round(archQualityScore)} label='Arch Quality' />
+        <ScoreCircle score={Math.round(secScore)} label='Security' />
+        <ScoreCircle score={Math.round(futureScore)} label='Future State' />
+        <ScoreCircle score={Math.round(finScore)} label='Financial' />
       </div>
 
       {/* Decision Box */}
