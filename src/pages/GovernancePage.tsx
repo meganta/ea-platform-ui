@@ -86,20 +86,64 @@ function FindingCard({ f }: { f: any }) {
 }
 
 function IntelligenceAdvisor({ reviewType }: { reviewType: string }) {
+  const api = useApi()
+  const [availability, setAvailability] = useState<Record<string, boolean>>({})
+  const [checked, setChecked] = useState(false)
+
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const [warnings] = await Promise.all([
+          api.get('/governance/repository/warnings').catch(() => ({ warnings: [] }))
+        ])
+        // Check repository content
+        const [strategies, assets, capabilities, standards, decisions, reviews] = await Promise.all([
+          api.get('/strategies').catch(() => []),
+          api.get('/ea-assets').catch(() => []),
+          api.get('/capabilities').catch(() => []),
+          api.get('/standards').catch(() => []),
+          api.get('/decisions').catch(() => []),
+          api.get('/governance/reviews').catch(() => []),
+        ])
+        setAvailability({
+          strategies: Array.isArray(strategies) && strategies.length > 0,
+          ea_assets: Array.isArray(assets) && assets.length > 0,
+          capabilities: Array.isArray(capabilities) && capabilities.length > 0,
+          standards: Array.isArray(standards) && standards.length > 0,
+          reference_architectures: false,
+          target_architectures: false,
+          technology_catalog: Array.isArray(assets) && assets.length > 0,
+          arch_decisions: Array.isArray(decisions) && decisions.length > 0,
+          security_standards: Array.isArray(standards) && standards.length > 0,
+          similar_reviews: Array.isArray(reviews) && reviews.length > 0,
+        })
+      } catch {}
+      setChecked(true)
+    }
+    check()
+  }, [])
+
+  if (!checked) return (
+    <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 20, marginTop: 20 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🧠 Review Intelligence Advisor</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Checking repository and knowledge base...</div>
+    </div>
+  )
+
   return (
     <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 20, marginTop: 20 }}>
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🧠 Review Intelligence Advisor</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>The following repository and knowledge base items will be used to enrich your review. Items marked as missing should be uploaded to improve review quality.</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>The following items will enrich your review. Items marked as missing should be added to improve review quality.</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {INTELLIGENCE_ITEMS.map(item => {
-          const available = ['strategies', 'ea_assets', 'arch_decisions', 'similar_reviews'].includes(item.key)
+          const available = item.source === 'auto' ? true : availability[item.key] === true
           return (
             <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: available ? '#2ecc7111' : '#f39c1211', border: '1px solid ' + (available ? '#2ecc7133' : '#f39c1233') }}>
               <span style={{ fontSize: 16 }}>{item.icon}</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{item.label}</div>
                 <div style={{ fontSize: 11, color: available ? '#2ecc71' : '#f39c12' }}>
-                  {available ? '✓ Available — will be used automatically' : '⚠ Not found — upload to ' + (item.source === 'kb' ? 'Knowledge Base' : 'Repository') + ' to enrich'}
+                  {available ? '✓ Available — will be used automatically' : '⚠ Not found — ' + (item.source === 'kb' ? 'upload to Knowledge Base' : 'add to Repository') + ' to enrich'}
                 </div>
               </div>
               {!available && item.enrichUrl && (
@@ -665,24 +709,40 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
               </div>
             </div>
           )}
-          {(report.strategicAlignment?.objectives || []).map((obj: any, i: number) => (
-            <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{obj.objectiveName}</div>
-                <div style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: '#8baac822', color: '#8baac8' }}>{obj.alignmentStatus?.replace(/_/g, ' ')}</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', minWidth: 48, textAlign: 'right' }}>{obj.alignmentPercentage}%</div>
+          {(() => {
+            const objectives = report.strategicAlignment?.objectives || []
+            if (objectives.length === 0) return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No strategic objectives assessed</div>
+            // Group by strategy type
+            const grouped: Record<string, any[]> = {}
+            for (const obj of objectives) {
+              const key = obj.strategyType || 'OTHER'
+              if (!grouped[key]) grouped[key] = []
+              grouped[key].push(obj)
+            }
+            return Object.entries(grouped).map(([stratType, objs]) => (
+              <div key={stratType} style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 10, padding: '6px 12px', background: 'var(--navy-mid)', borderRadius: 8 }}>
+                  {stratType.replace(/_/g, ' ')}
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>{objs.length} goal(s)</span>
+                </div>
+                {objs.map((obj: any, i: number) => (
+                  <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{obj.objectiveName}</div>
+                      <div style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, background: '#8baac822', color: '#8baac8' }}>{obj.alignmentStatus?.replace(/_/g, ' ')}</div>
+                      <div style={{ fontSize: 16, fontWeight: 700, color: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', minWidth: 42, textAlign: 'right' }}>{obj.alignmentPercentage}%</div>
+                    </div>
+                    <div style={{ height: 4, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: (obj.alignmentPercentage || 0) + '%', background: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
+                    </div>
+                    {obj.contributionDescription && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{obj.contributionDescription}</div>}
+                    {obj.expectedValue && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Value: {obj.expectedValue}</div>}
+                    {obj.relatedKPIs?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>KPIs: {obj.relatedKPIs.join(', ')}</div>}
+                  </div>
+                ))}
               </div>
-              <div style={{ height: 4, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 10, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: (obj.alignmentPercentage || 0) + '%', background: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
-              </div>
-              {obj.contributionDescription && <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>{obj.contributionDescription}</div>}
-              {obj.expectedValue && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Expected Value: {obj.expectedValue}</div>}
-              {obj.relatedKPIs?.length > 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>KPIs: {obj.relatedKPIs.join(', ')}</div>}
-            </div>
-          ))}
-          {(!report.strategicAlignment?.objectives || report.strategicAlignment.objectives.length === 0) && (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No strategic objectives assessed</div>
-          )}
+            ))
+          })()}
         </div>
       )}
 
@@ -703,8 +763,15 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
             <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{item.principleOrStandard}</div>
-                <div style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8', whiteSpace: 'nowrap' }}>{item.complianceStatus?.replace(/_/g, ' ')}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{item.category?.replace(/_/g, ' ')}</div>
+                <div style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap',
+                background: item.complianceStatus === 'COMPLIANT' ? '#2ecc7122' : item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c22' : item.complianceStatus === 'REQUIRES_EXCEPTION' ? '#e67e2222' : '#8baac822',
+                color: item.complianceStatus === 'COMPLIANT' ? '#2ecc71' : item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c' : item.complianceStatus === 'REQUIRES_EXCEPTION' ? '#e67e22' : '#8baac8'
+              }}>{item.complianceStatus?.replace(/_/g, ' ')}</div>
+              <div style={{ padding: '2px 6px', borderRadius: 6, fontSize: 10,
+                background: item.category === 'TENANT_PRINCIPLE' ? '#e74c3c22' : item.category === 'TENANT_STANDARD' ? '#e67e2222' : '#3498db22',
+                color: item.category === 'TENANT_PRINCIPLE' ? '#e74c3c' : item.category === 'TENANT_STANDARD' ? '#e67e22' : '#3498db',
+                whiteSpace: 'nowrap'
+              }}>{item.category?.replace(/_/g, ' ')}</div>
               </div>
               {item.evidence && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Evidence: {item.evidence}</div>}
               {item.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>Gap: {item.gap}</div>}
