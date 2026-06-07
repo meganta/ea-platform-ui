@@ -87,41 +87,18 @@ function FindingCard({ f }: { f: any }) {
 
 function IntelligenceAdvisor({ reviewType }: { reviewType: string }) {
   const api = useApi()
-  const [availability, setAvailability] = useState<Record<string, boolean>>({})
+  const [availability, setAvailability] = useState<Record<string, any>>({})
   const [checked, setChecked] = useState(false)
-
   useEffect(() => {
     const check = async () => {
       try {
-        const [warnings] = await Promise.all([
-          api.get('/governance/repository/warnings').catch(() => ({ warnings: [] }))
-        ])
-        // Check repository content
-        const [strategies, assets, capabilities, standards, decisions, reviews] = await Promise.all([
-          api.get('/strategies').catch(() => []),
-          api.get('/ea-assets').catch(() => []),
-          api.get('/capabilities').catch(() => []),
-          api.get('/standards').catch(() => []),
-          api.get('/decisions').catch(() => []),
-          api.get('/governance/reviews').catch(() => []),
-        ])
-        setAvailability({
-          strategies: Array.isArray(strategies) && strategies.length > 0,
-          ea_assets: Array.isArray(assets) && assets.length > 0,
-          capabilities: Array.isArray(capabilities) && capabilities.length > 0,
-          standards: Array.isArray(standards) && standards.length > 0,
-          reference_architectures: false,
-          target_architectures: false,
-          technology_catalog: Array.isArray(assets) && assets.length > 0,
-          arch_decisions: Array.isArray(decisions) && decisions.length > 0,
-          security_standards: Array.isArray(standards) && standards.length > 0,
-          similar_reviews: Array.isArray(reviews) && reviews.length > 0,
-        })
+        const contextCheck = await api.get('/governance/repository/context-check?reviewType=' + reviewType).catch(() => ({}))
+        setAvailability(contextCheck as any)
       } catch {}
       setChecked(true)
     }
     check()
-  }, [])
+  }, [reviewType])
 
   if (!checked) return (
     <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 20, marginTop: 20 }}>
@@ -136,7 +113,7 @@ function IntelligenceAdvisor({ reviewType }: { reviewType: string }) {
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>The following items will enrich your review. Items marked as missing should be added to improve review quality.</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {INTELLIGENCE_ITEMS.map(item => {
-          const available = item.source === 'auto' ? true : availability[item.key] === true
+          const itemData = availability[item.key]; const available = item.source === 'auto' ? true : (itemData?.available === true || itemData === true)
           return (
             <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: available ? '#2ecc7111' : '#f39c1211', border: '1px solid ' + (available ? '#2ecc7133' : '#f39c1233') }}>
               <span style={{ fontSize: 16 }}>{item.icon}</span>
