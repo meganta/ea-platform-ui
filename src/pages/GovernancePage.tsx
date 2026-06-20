@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 
@@ -867,7 +867,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
             ))}
           </div>
 
-          {Object.entries(report.domainSummaries || {}).filter(([k]) => k !== '_extendedScores').map(([domain, ds]: [string, any]) => {
+          {Object.entries(report.domainSummaries || {}).filter(([k, v]) => !k.startsWith('_') && typeof v === 'object' && v !== null && 'score' in v).map(([domain, ds]: [string, any]) => {
             const domainFindings = findings.filter(f => f.domain === domain)
             const crit = domainFindings.filter(f => f.severity === 'CRITICAL').length
             const high = domainFindings.filter(f => f.severity === 'HIGH').length
@@ -922,7 +922,16 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       {/* Strategic Tab */}
       {tab === 'strategic' && (() => {
         const objectives = report.strategicAlignment?.objectives || []
-        const overallPct = report.strategicAlignment?.overallAlignmentPercentage || 0
+        // Compute weighted strategic alignment: Business(40%) > DT(35%) > EA(25%)
+        const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
+        const rawPct = report.strategicAlignment?.overallAlignmentPercentage || 0
+        let weightedSum = 0, totalW = 0
+        for (const [sType, sobjs] of Object.entries(grouped) as [string, any[]][]) {
+          const w = STRAT_W[sType] || 0.10
+          const avg = sobjs.length ? sobjs.reduce((s,o)=>s+(o.alignmentPercentage||0),0)/sobjs.length : 0
+          weightedSum += avg * w; totalW += w
+        }
+        const overallPct = totalW > 0 ? Math.round(weightedSum / totalW) : rawPct
         const overallColor = overallPct >= 75 ? '#2ecc71' : overallPct >= 50 ? '#f39c12' : '#e74c3c'
 
         // Strategy type weights and colors
@@ -1401,4 +1410,5 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
     </div>
   )
 }
+
 
