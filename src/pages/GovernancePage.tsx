@@ -60,6 +60,151 @@ function ScoreCircle({ score, label, size = 72 }: { score: number, label: string
   )
 }
 
+
+const DOMAIN_LABEL: Record<string, string> = {
+  BUSINESS_ARCHITECTURE: 'Business Architecture',
+  BENEFICIARY_EXPERIENCE: 'Beneficiary Experience',
+  APPLICATION_INTEGRATION: 'Application & Integration',
+  DATA_ARCHITECTURE: 'Data Architecture',
+  INFRASTRUCTURE: 'Infrastructure',
+  SECURITY_ARCHITECTURE: 'Security Architecture',
+  TOGAF_BUSINESS: 'TOGAF Business',
+  TOGAF_APPLICATION: 'TOGAF Application',
+  TOGAF_DATA: 'TOGAF Data',
+  TOGAF_TECHNOLOGY: 'TOGAF Technology',
+  TOGAF_GOVERNANCE: 'TOGAF Governance',
+}
+
+function FindingsTab({ findings }: { findings: any[] }) {
+  const [groupBy, setGroupBy] = React.useState<'domain' | 'severity'>('domain')
+  const [filterSev, setFilterSev] = React.useState<string[]>([])
+  const [filterDomain, setFilterDomain] = React.useState<string[]>([])
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({})
+
+  const allDomains = Array.from(new Set(findings.map(f => f.domain || 'GENERAL'))).sort()
+
+  const toggleSev = (s: string) => setFilterSev(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])
+  const toggleDomain = (d: string) => setFilterDomain(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d])
+  const toggleGroup = (g: string) => setCollapsed(p => ({ ...p, [g]: !p[g] }))
+
+  const filtered = findings.filter(f => {
+    if (filterSev.length > 0 && !filterSev.includes(f.severity)) return false
+    if (filterDomain.length > 0 && !filterDomain.includes(f.domain || 'GENERAL')) return false
+    return true
+  })
+
+  const groups: Record<string, any[]> = {}
+  if (groupBy === 'domain') {
+    for (const f of filtered) { const k = f.domain || 'GENERAL'; if (!groups[k]) groups[k] = []; groups[k].push(f) }
+  } else {
+    for (const sev of ['CRITICAL','HIGH','MEDIUM','LOW']) {
+      const items = filtered.filter(f => f.severity === sev)
+      if (items.length) groups[sev] = items
+    }
+  }
+
+  const activeFilters = filterSev.length + filterDomain.length
+
+  return (
+    <div>
+      {/* Severity filter buttons */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        {['CRITICAL','HIGH','MEDIUM','LOW'].map(sev => {
+          const total = findings.filter(f => f.severity === sev).length
+          if (total === 0) return null
+          const active = filterSev.includes(sev)
+          return (
+            <button key={sev} onClick={() => toggleSev(sev)} style={{
+              padding: '5px 12px', borderRadius: 8, border: '1px solid ' + SEV_COLOR[sev] + (active ? '' : '55'),
+              background: active ? SEV_COLOR[sev] + '33' : 'transparent',
+              color: SEV_COLOR[sev], fontWeight: 600, fontSize: 12, cursor: 'pointer'
+            }}>{total} {sev}</button>
+          )
+        })}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          {activeFilters > 0 && (
+            <button onClick={() => { setFilterSev([]); setFilterDomain([]) }} style={{
+              fontSize: 11, color: 'var(--text-muted)', background: 'transparent',
+              border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer'
+            }}>✕ Clear filters</button>
+          )}
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length}/{findings.length} findings</span>
+        </div>
+      </div>
+
+      {/* Domain filter pills */}
+      {allDomains.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          {allDomains.map(d => {
+            const label = d === 'GENERAL' ? 'General' : (DOMAIN_LABEL[d] || d.replace(/_/g,' '))
+            const count = findings.filter(f => (f.domain || 'GENERAL') === d).length
+            const active = filterDomain.includes(d)
+            return (
+              <button key={d} onClick={() => toggleDomain(d)} style={{
+                padding: '3px 10px', borderRadius: 20, fontSize: 11, cursor: 'pointer',
+                border: '1px solid ' + (active ? 'var(--accent)' : 'var(--navy-light)'),
+                background: active ? 'var(--accent)22' : 'var(--navy-mid)',
+                color: active ? 'var(--accent)' : 'var(--text-muted)',
+              }}>{label} ({count})</button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Group by toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Group by:</span>
+        {(['domain','severity'] as const).map(g => (
+          <button key={g} onClick={() => setGroupBy(g)} style={{
+            padding: '3px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+            border: '1px solid ' + (groupBy === g ? 'var(--accent)' : 'var(--navy-light)'),
+            background: groupBy === g ? 'var(--accent)22' : 'transparent',
+            color: groupBy === g ? 'var(--accent)' : 'var(--text-muted)',
+          }}>{g === 'domain' ? 'Domain' : 'Severity'}</button>
+        ))}
+      </div>
+
+      {/* Groups */}
+      {Object.keys(groups).length === 0 && (
+        <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>
+          {findings.length === 0 ? 'No findings' : 'No findings match the selected filters'}
+        </div>
+      )}
+      {Object.entries(groups).map(([key, items]) => {
+        const isCollapsed = collapsed[key]
+        const sevCounts = ['CRITICAL','HIGH','MEDIUM','LOW']
+          .map(s => ({ s, n: items.filter(f => f.severity === s).length }))
+          .filter(x => x.n > 0)
+        const groupLabel = groupBy === 'domain'
+          ? (key === 'GENERAL' ? '⚙️ General / Common' : (DOMAIN_LABEL[key] || key.replace(/_/g,' ')))
+          : key
+        return (
+          <div key={key} style={{ marginBottom: 10, border: '1px solid var(--navy-light)', borderRadius: 10, overflow: 'hidden' }}>
+            <div onClick={() => toggleGroup(key)} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+              background: 'var(--navy-mid)', cursor: 'pointer', userSelect: 'none'
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: groupBy === 'severity' ? SEV_COLOR[key] : 'var(--text)' }}>{groupLabel}</span>
+              <div style={{ display: 'flex', gap: 5 }}>
+                {sevCounts.map(({ s, n }) => (
+                  <span key={s} style={{ padding: '1px 7px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[s] + '33', color: SEV_COLOR[s] }}>{n} {s}</span>
+                ))}
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 60, textAlign: 'right' }}>{items.length} finding{items.length !== 1 ? 's' : ''}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{isCollapsed ? '▶' : '▼'}</span>
+            </div>
+            {!isCollapsed && (
+              <div style={{ padding: '8px 8px 4px' }}>
+                {items.map((f, i) => <FindingCard key={i} f={f} />)}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function FindingCard({ f }: { f: any }) {
   const [open, setOpen] = useState(false)
   return (
@@ -686,23 +831,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       )}
 
       {/* Findings Tab */}
-      {tab === 'findings' && (
-        <div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-            {['CRITICAL','HIGH','MEDIUM','LOW'].map(sev => {
-              const count = findings.filter(f => f.severity === sev).length
-              return count > 0 ? (
-                <div key={sev} style={{ padding: '8px 16px', borderRadius: 8, background: SEV_COLOR[sev] + '22', border: '1px solid ' + SEV_COLOR[sev] + '44', fontSize: 13 }}>
-                  <span style={{ color: SEV_COLOR[sev], fontWeight: 600 }}>{count}</span> <span style={{ color: 'var(--text-muted)' }}>{sev}</span>
-                </div>
-              ) : null
-            })}
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center', marginLeft: 'auto' }}>{findings.length} total findings</div>
-          </div>
-          {findings.map((f, i) => <FindingCard key={i} f={f} />)}
-          {findings.length === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No findings</div>}
-        </div>
-      )}
+      {tab === 'findings' && <FindingsTab findings={findings} />}
 
       {/* Domains Tab */}
       {tab === 'domains' && (
