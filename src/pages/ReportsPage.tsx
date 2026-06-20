@@ -115,7 +115,32 @@ function SavingsReport() {
                   <td style={{ padding: '8px 12px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11 }}>{item.domain?.replace(/_/g,' ')}</td>
                   <td style={{ padding: '8px 12px' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: (SEV_COLOR[item.status]||'#8baac8')+'22', color: SEV_COLOR[item.status]||'#8baac8' }}>{item.status}</span>
+                    <select
+                      value={item.status}
+                      onChange={async e => {
+                        const newStatus = e.target.value
+                        const token = localStorage.getItem('ea_token') || ''
+                        await fetch(`${API_URL}/api/v1/governance/reviews/${item.reviewId}/findings/${item.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                          body: JSON.stringify({ status: newStatus }),
+                        })
+                        // Refresh data
+                        setData((prev: any) => ({
+                          ...prev,
+                          items: prev.items.map((i: any) => i.id === item.id ? { ...i, status: newStatus } : i)
+                        }))
+                      }}
+                      style={{ padding: '2px 6px', borderRadius: 8, border: '1px solid ' + (SEV_COLOR[item.status]||'#8baac8') + '66',
+                        background: (SEV_COLOR[item.status]||'#8baac8') + '18', color: SEV_COLOR[item.status]||'#8baac8',
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                    >
+                      <option value='OPEN'>OPEN</option>
+                      <option value='ACCEPTED'>ACCEPTED</option>
+                      <option value='APPROVED'>CONFIRMED</option>
+                      <option value='REJECTED'>REJECTED</option>
+                      <option value='EXCEPTION_REQUESTED'>EXCEPTION</option>
+                    </select>
                   </td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', color: '#3498db', fontWeight: 600 }}>{item.estimatedSaving ? item.estimatedSaving.toLocaleString() : '—'}</td>
                   <td style={{ padding: '8px 12px', textAlign: 'right', color: '#2ecc71', fontWeight: 600 }}>{item.annualSaving ? item.annualSaving.toLocaleString() : '—'}</td>
@@ -218,7 +243,7 @@ function ComplianceReport() {
             </thead>
             <tbody>
               {(data?.items || []).map((item: any, i: number) => (
-                <tr key={i} style={{ borderBottom: '1px solid var(--navy-light)', cursor: 'pointer' }} onClick={() => nav('/governance')}>
+                <tr key={i} style={{ borderBottom: '1px solid var(--navy-light)', cursor: 'pointer' }} onClick={() => nav('/governance', { state: { reviewId: item.reviewId, tab: 'compliance' } })}>
                   <td style={{ padding: '8px 12px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.review?.title}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)' }}>{item.review?.reviewType?.replace(/_/g,' ')}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{item.review?.createdAt ? new Date(item.review.createdAt).toLocaleDateString() : ''}</td>
@@ -230,7 +255,7 @@ function ComplianceReport() {
                     </span>
                   </td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: '#e74c3c', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.gap}</td>
-                  <td style={{ padding: '8px 12px' }}><span style={{ fontSize: 11, color: 'var(--accent)' }}>→ View</span></td>
+                  <td style={{ padding: '8px 12px' }}><span style={{ fontSize: 11, color: 'var(--accent)', whiteSpace: 'nowrap' }}>→ Open Review</span></td>
                 </tr>
               ))}
               {(!data?.items?.length) && (
@@ -415,3 +440,4 @@ export default function ReportsPage() {
     </div>
   )
 }
+
