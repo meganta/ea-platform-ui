@@ -1100,7 +1100,9 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
                       </div>
                     )
                   })}
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{total} items assessed</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                    {total} assessed · <span style={{ color: report.complianceMatrix?.complianceRate >= 70 ? '#2ecc71' : '#f39c12', fontWeight: 600 }}>{report.complianceMatrix?.complianceRate || 0}% compliance rate</span>
+                  </span>
                 </div>
 
                 {/* Category breakdown */}
