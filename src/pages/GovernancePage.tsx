@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -126,7 +127,7 @@ function FindingsTab({ findings }: { findings: any[] }) {
             <button onClick={() => { setFilterSev([]); setFilterDomain([]) }} style={{
               fontSize: 11, color: 'var(--text-muted)', background: 'transparent',
               border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer'
-            }}>✕ Clear filters</button>
+            }}>{t('gov.clear_filters')}</button>
           )}
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length}/{findings.length} findings</span>
         </div>
@@ -153,21 +154,21 @@ function FindingsTab({ findings }: { findings: any[] }) {
 
       {/* Group by toggle */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Group by:</span>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('gov.group_by')}</span>
         {(['domain','severity'] as const).map(g => (
           <button key={g} onClick={() => setGroupBy(g)} style={{
             padding: '3px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
             border: '1px solid ' + (groupBy === g ? 'var(--accent)' : 'var(--navy-light)'),
             background: groupBy === g ? 'var(--accent)22' : 'transparent',
             color: groupBy === g ? 'var(--accent)' : 'var(--text-muted)',
-          }}>{g === 'domain' ? 'Domain' : 'Severity'}</button>
+          }}>{g === 'domain' ? t('gov.domain') : t('gov.severity')}</button>
         ))}
       </div>
 
       {/* Groups */}
       {Object.keys(groups).length === 0 && (
         <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>
-          {findings.length === 0 ? 'No findings' : 'No findings match the selected filters'}
+          {findings.length === 0 ? 'No findings' : findings.length === 0 ? t('gov.no_findings') : 'No findings match the selected filters'}
         </div>
       )}
       {Object.entries(groups).map(([key, items]) => {
@@ -682,19 +683,20 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
 
+  const { t, isAR } = useLang()
   const tabs = [
-    { key: 'summary', label: 'Summary' },
-    { key: 'findings', label: 'Findings' },
-    { key: 'domains', label: 'Domains' },
-    { key: 'strategic', label: 'Strategic' },
-    { key: 'compliance', label: 'Compliance' },
-    { key: 'risk', label: 'Risk Register' },
-    { key: 'future', label: 'Future State' },
-    { key: 'financial', label: 'Financial' },
+    { key: 'summary', label: t('gov.summary') },
+    { key: 'findings', label: t('gov.findings') },
+    { key: 'domains', label: t('gov.domains') },
+    { key: 'strategic', label: t('gov.strategic') },
+    { key: 'compliance', label: t('gov.compliance') },
+    { key: 'risk', label: t('gov.risk_register') },
+    { key: 'future', label: t('gov.future_state') },
+    { key: 'financial', label: t('gov.financial') },
   ]
 
   return (
-    <div>
+    <div dir={isAR ? 'rtl' : 'ltr'}>
       {/* Review Header */}
       <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '12px 20px', marginBottom: 20, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>REVIEW TYPE</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.reviewType?.replace(/_/g, ' ')}</div></div>
@@ -792,7 +794,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
 
           {/* Executive Summary */}
           <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>EXECUTIVE SUMMARY</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.executive_summary')}</div>
             <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{report.executiveSummary}</div>
           </div>
 
@@ -807,7 +809,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           {/* Required Actions */}
           {report.requiredActions?.mandatory?.length > 0 && (
             <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c44', borderRadius: 10, padding: 20, marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 12 }}>MANDATORY ACTIONS ({report.requiredActions.mandatory.length})</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 12 }}>{t('gov.mandatory_actions')} ({report.requiredActions.mandatory.length})</div>
               {report.requiredActions.mandatory.map((a: any, i: number) => (
                 <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, fontSize: 13 }}>
                   <span style={{ color: '#e74c3c', fontWeight: 600, minWidth: 20 }}>{i + 1}.</span>
@@ -818,7 +820,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           )}
           {report.requiredActions?.recommended?.length > 0 && (
             <div style={{ background: '#f39c1211', border: '1px solid #f39c1244', borderRadius: 10, padding: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#f39c12', marginBottom: 12 }}>RECOMMENDED ACTIONS ({report.requiredActions.recommended.length})</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#f39c12', marginBottom: 12 }}>{t('gov.recommended_actions')} ({report.requiredActions.recommended.length})</div>
               {report.requiredActions.recommended.map((a: any, i: number) => (
                 <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, fontSize: 13 }}>
                   <span style={{ color: '#f39c12', fontWeight: 600, minWidth: 20 }}>{i + 1}.</span>
@@ -956,42 +958,101 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       )}
 
       {/* Compliance Tab */}
-      {tab === 'compliance' && (
-        <div>
-          {report.complianceMatrix?.count > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              {[['Compliant', report.complianceMatrix.compliantCount, '#2ecc71'], ['Non-Compliant', report.complianceMatrix.nonCompliantCount, '#e74c3c'], ['Requires Exception', report.complianceMatrix.requiresExceptionCount, '#e67e22']].map(([l, v, c]: any) => (
-                <div key={l} style={{ background: c + '18', border: '1px solid ' + c + '44', borderRadius: 8, padding: '12px 16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: c }}>{v || 0}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
+      {tab === 'compliance' && (() => {
+        const items = report.complianceMatrix?.items || []
+        const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','NOT_APPLICABLE']
+        const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#8baac8' }
+        const statusLabel: Record<string,string> = { COMPLIANT:'✓ Compliant', PARTIALLY_COMPLIANT:'⚠ Partial', NON_COMPLIANT:'✗ Non-Compliant', REQUIRES_EXCEPTION:'⚡ Exception', NOT_APPLICABLE:'— N/A' }
+        const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', TECHNOLOGY_CATALOG:'#9b59b6', NORA_STANDARD:'#3498db', NCA_STANDARD:'#1abc9c' }
+
+        // Group items by category
+        const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','TECHNOLOGY_CATALOG','NORA_STANDARD','NCA_STANDARD','GENERAL_BEST_PRACTICE']
+        const grouped: Record<string,any[]> = {}
+        for (const item of items) { const c = item.category || 'OTHER'; if (!grouped[c]) grouped[c]=[]; grouped[c].push(item) }
+
+        const countBy = (status: string) => items.filter((i:any) => i.complianceStatus === status).length
+        const total = items.length
+
+        return (
+          <div>
+            {/* Visual status breakdown */}
+            {total > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                {/* Status bar */}
+                <div style={{ height: 12, borderRadius: 6, overflow: 'hidden', display: 'flex', marginBottom: 10 }}>
+                  {statuses.map(s => {
+                    const pct = (countBy(s) / total) * 100
+                    return pct > 0 ? <div key={s} style={{ width: pct + '%', background: statusColor[s], title: s }} /> : null
+                  })}
                 </div>
-              ))}
-            </div>
-          )}
-          {(report.complianceMatrix?.items || []).map((item: any, i: number) => (
-            <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{item.principleOrStandard}</div>
-                <div style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap',
-                background: item.complianceStatus === 'COMPLIANT' ? '#2ecc7122' : item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c22' : item.complianceStatus === 'REQUIRES_EXCEPTION' ? '#e67e2222' : '#8baac822',
-                color: item.complianceStatus === 'COMPLIANT' ? '#2ecc71' : item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c' : item.complianceStatus === 'REQUIRES_EXCEPTION' ? '#e67e22' : '#8baac8'
-              }}>{item.complianceStatus?.replace(/_/g, ' ')}</div>
-              <div style={{ padding: '2px 6px', borderRadius: 6, fontSize: 10,
-                background: item.category === 'TENANT_PRINCIPLE' ? '#e74c3c22' : item.category === 'TENANT_STANDARD' ? '#e67e2222' : '#3498db22',
-                color: item.category === 'TENANT_PRINCIPLE' ? '#e74c3c' : item.category === 'TENANT_STANDARD' ? '#e67e22' : '#3498db',
-                whiteSpace: 'nowrap'
-              }}>{item.category?.replace(/_/g, ' ')}</div>
+                {/* Legend */}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  {statuses.map(s => {
+                    const n = countBy(s)
+                    if (n === 0) return null
+                    return (
+                      <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 2, background: statusColor[s] }} />
+                        <span style={{ fontSize: 12, color: statusColor[s], fontWeight: 600 }}>{n}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{statusLabel[s]}</span>
+                      </div>
+                    )
+                  })}
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{total} items assessed</span>
+                </div>
+
+                {/* Category breakdown */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginTop: 12 }}>
+                  {cats.filter(c => grouped[c]?.length > 0).map(c => {
+                    const citems = grouped[c] || []
+                    const nonComp = citems.filter((i:any) => i.complianceStatus === 'NON_COMPLIANT').length
+                    const comp = citems.filter((i:any) => i.complianceStatus === 'COMPLIANT').length
+                    return (
+                      <div key={c} style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '8px 12px' }}>
+                        <div style={{ fontSize: 10, color: catColor[c] || 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>{c.replace(/_/g,' ')}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {comp > 0 && <span style={{ color: '#2ecc71' }}>✓{comp} </span>}
+                          {nonComp > 0 && <span style={{ color: '#e74c3c' }}>✗{nonComp} </span>}
+                          {citems.length - comp - nonComp > 0 && <span>·{citems.length - comp - nonComp}</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-              {item.evidence && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Evidence: {item.evidence}</div>}
-              {item.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>Gap: {item.gap}</div>}
-              {item.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>Recommendation: {item.recommendation}</div>}
-            </div>
-          ))}
-          {(!report.complianceMatrix?.items || report.complianceMatrix.items.length === 0) && (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No compliance matrix available</div>
-          )}
-        </div>
-      )}
+            )}
+
+            {/* Items grouped by category */}
+            {cats.filter(c => grouped[c]?.length > 0).map(cat => (
+              <div key={cat} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: catColor[cat] || 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 3, height: 14, background: catColor[cat] || '#8baac8', borderRadius: 2 }} />
+                  {cat.replace(/_/g,' ')}
+                  <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({grouped[cat].length})</span>
+                </div>
+                {grouped[cat].map((item: any, i: number) => (
+                  <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + (item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c33' : 'var(--navy-light)'), borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ minWidth: 90, padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, textAlign: 'center', marginTop: 1,
+                        background: (statusColor[item.complianceStatus] || '#8baac8') + '22',
+                        color: statusColor[item.complianceStatus] || '#8baac8'
+                      }}>{statusLabel[item.complianceStatus] || item.complianceStatus}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{item.principleOrStandard}</div>
+                        {item.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>📋 {item.evidence}</div>}
+                        {item.gap && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4 }}>⚠ {item.gap}</div>}
+                        {item.recommendation && <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>→ {item.recommendation}</div>}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+
+            {total === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No compliance matrix available</div>}
+          </div>
+        )
+      })()}
 
       {/* Risk Register Tab */}
       {tab === 'risk' && (
