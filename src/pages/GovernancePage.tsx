@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
+import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -56,6 +58,151 @@ function ScoreCircle({ score, label, size = 72 }: { score: number, label: string
         <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}</div>
+    </div>
+  )
+}
+
+
+const DOMAIN_LABEL: Record<string, string> = {
+  BUSINESS_ARCHITECTURE: 'Business Architecture',
+  BENEFICIARY_EXPERIENCE: 'Beneficiary Experience',
+  APPLICATION_INTEGRATION: 'Application & Integration',
+  DATA_ARCHITECTURE: 'Data Architecture',
+  INFRASTRUCTURE: 'Infrastructure',
+  SECURITY_ARCHITECTURE: 'Security Architecture',
+  TOGAF_BUSINESS: 'TOGAF Business',
+  TOGAF_APPLICATION: 'TOGAF Application',
+  TOGAF_DATA: 'TOGAF Data',
+  TOGAF_TECHNOLOGY: 'TOGAF Technology',
+  TOGAF_GOVERNANCE: 'TOGAF Governance',
+}
+
+function FindingsTab({ findings }: { findings: any[] }) {
+  const [groupBy, setGroupBy] = React.useState<'domain' | 'severity'>('domain')
+  const [filterSev, setFilterSev] = React.useState<string[]>([])
+  const [filterDomain, setFilterDomain] = React.useState<string[]>([])
+  const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({})
+
+  const allDomains = Array.from(new Set(findings.map(f => f.domain || 'GENERAL'))).sort()
+
+  const toggleSev = (s: string) => setFilterSev(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])
+  const toggleDomain = (d: string) => setFilterDomain(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d])
+  const toggleGroup = (g: string) => setCollapsed(p => ({ ...p, [g]: !p[g] }))
+
+  const filtered = findings.filter(f => {
+    if (filterSev.length > 0 && !filterSev.includes(f.severity)) return false
+    if (filterDomain.length > 0 && !filterDomain.includes(f.domain || 'GENERAL')) return false
+    return true
+  })
+
+  const groups: Record<string, any[]> = {}
+  if (groupBy === 'domain') {
+    for (const f of filtered) { const k = f.domain || 'GENERAL'; if (!groups[k]) groups[k] = []; groups[k].push(f) }
+  } else {
+    for (const sev of ['CRITICAL','HIGH','MEDIUM','LOW']) {
+      const items = filtered.filter(f => f.severity === sev)
+      if (items.length) groups[sev] = items
+    }
+  }
+
+  const activeFilters = filterSev.length + filterDomain.length
+
+  return (
+    <div>
+      {/* Severity filter buttons */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        {['CRITICAL','HIGH','MEDIUM','LOW'].map(sev => {
+          const total = findings.filter(f => f.severity === sev).length
+          if (total === 0) return null
+          const active = filterSev.includes(sev)
+          return (
+            <button key={sev} onClick={() => toggleSev(sev)} style={{
+              padding: '5px 12px', borderRadius: 8, border: '1px solid ' + SEV_COLOR[sev] + (active ? '' : '55'),
+              background: active ? SEV_COLOR[sev] + '33' : 'transparent',
+              color: SEV_COLOR[sev], fontWeight: 600, fontSize: 12, cursor: 'pointer'
+            }}>{total} {sev}</button>
+          )
+        })}
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+          {activeFilters > 0 && (
+            <button onClick={() => { setFilterSev([]); setFilterDomain([]) }} style={{
+              fontSize: 11, color: 'var(--text-muted)', background: 'transparent',
+              border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer'
+            }}>{t('gov.clear_filters')}</button>
+          )}
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length}/{findings.length} findings</span>
+        </div>
+      </div>
+
+      {/* Domain filter pills */}
+      {allDomains.length > 1 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          {allDomains.map(d => {
+            const label = d === 'GENERAL' ? 'General' : (DOMAIN_LABEL[d] || d.replace(/_/g,' '))
+            const count = findings.filter(f => (f.domain || 'GENERAL') === d).length
+            const active = filterDomain.includes(d)
+            return (
+              <button key={d} onClick={() => toggleDomain(d)} style={{
+                padding: '3px 10px', borderRadius: 20, fontSize: 11, cursor: 'pointer',
+                border: '1px solid ' + (active ? 'var(--accent)' : 'var(--navy-light)'),
+                background: active ? 'var(--accent)22' : 'var(--navy-mid)',
+                color: active ? 'var(--accent)' : 'var(--text-muted)',
+              }}>{label} ({count})</button>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Group by toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('gov.group_by')}</span>
+        {(['domain','severity'] as const).map(g => (
+          <button key={g} onClick={() => setGroupBy(g)} style={{
+            padding: '3px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
+            border: '1px solid ' + (groupBy === g ? 'var(--accent)' : 'var(--navy-light)'),
+            background: groupBy === g ? 'var(--accent)22' : 'transparent',
+            color: groupBy === g ? 'var(--accent)' : 'var(--text-muted)',
+          }}>{g === 'domain' ? t('gov.domain') : t('gov.severity')}</button>
+        ))}
+      </div>
+
+      {/* Groups */}
+      {Object.keys(groups).length === 0 && (
+        <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>
+          {findings.length === 0 ? 'No findings' : findings.length === 0 ? t('gov.no_findings') : 'No findings match the selected filters'}
+        </div>
+      )}
+      {Object.entries(groups).map(([key, items]) => {
+        const isCollapsed = collapsed[key]
+        const sevCounts = ['CRITICAL','HIGH','MEDIUM','LOW']
+          .map(s => ({ s, n: items.filter(f => f.severity === s).length }))
+          .filter(x => x.n > 0)
+        const groupLabel = groupBy === 'domain'
+          ? (key === 'GENERAL' ? '⚙️ General / Common' : (DOMAIN_LABEL[key] || key.replace(/_/g,' ')))
+          : key
+        return (
+          <div key={key} style={{ marginBottom: 10, border: '1px solid var(--navy-light)', borderRadius: 10, overflow: 'hidden' }}>
+            <div onClick={() => toggleGroup(key)} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+              background: 'var(--navy-mid)', cursor: 'pointer', userSelect: 'none'
+            }}>
+              <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: groupBy === 'severity' ? SEV_COLOR[key] : 'var(--text)' }}>{groupLabel}</span>
+              <div style={{ display: 'flex', gap: 5 }}>
+                {sevCounts.map(({ s, n }) => (
+                  <span key={s} style={{ padding: '1px 7px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[s] + '33', color: SEV_COLOR[s] }}>{n} {s}</span>
+                ))}
+              </div>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 60, textAlign: 'right' }}>{items.length} finding{items.length !== 1 ? 's' : ''}</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{isCollapsed ? '▶' : '▼'}</span>
+            </div>
+            {!isCollapsed && (
+              <div style={{ padding: '8px 8px 4px' }}>
+                {items.map((f, i) => <FindingCard key={i} f={f} />)}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -257,6 +404,7 @@ export default function GovernancePage() {
   const api = useApi()
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
   const [reviews, setReviews] = useState<any[]>([])
+  const location = useLocation()
   const [review, setReview] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -279,6 +427,19 @@ export default function GovernancePage() {
     catch (e) { setError('Failed to load reviews') }
     finally { setLoading(false) }
   }
+
+  // Handle deep-link from Reports page — auto-open specific review at specific tab
+  useEffect(() => {
+    const state = location.state as { reviewId?: string; tab?: string } | null
+    if (!state?.reviewId || reviews.length === 0) return
+    const target = reviews.find((r: any) => r.id === state.reviewId)
+    if (target) {
+      setSelected(target)
+      loadReport(target.id)
+      if (state.tab) setTab(state.tab as any)
+      window.history.replaceState({}, '')
+    }
+  }, [location.state, reviews])
 
   const openReview = async (r: any) => {
     setReview(r)
@@ -537,19 +698,20 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
 
+  const { t, isAR, resolveText } = useLang()
   const tabs = [
-    { key: 'summary', label: 'Summary' },
-    { key: 'findings', label: 'Findings' },
-    { key: 'domains', label: 'Domains' },
-    { key: 'strategic', label: 'Strategic' },
-    { key: 'compliance', label: 'Compliance' },
-    { key: 'risk', label: 'Risk Register' },
-    { key: 'future', label: 'Future State' },
-    { key: 'financial', label: 'Financial' },
+    { key: 'summary', label: t('gov.summary') },
+    { key: 'findings', label: t('gov.findings') },
+    { key: 'domains', label: t('gov.domains') },
+    { key: 'strategic', label: t('gov.strategic') },
+    { key: 'compliance', label: t('gov.compliance') },
+    { key: 'risk', label: t('gov.risk_register') },
+    { key: 'future', label: t('gov.future_state') },
+    { key: 'financial', label: t('gov.financial') },
   ]
 
   return (
-    <div>
+    <div dir={isAR ? 'rtl' : 'ltr'}>
       {/* Review Header */}
       <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '12px 20px', marginBottom: 20, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>REVIEW TYPE</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.reviewType?.replace(/_/g, ' ')}</div></div>
@@ -574,7 +736,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       {/* Decision Box */}
       <div style={{ background: (DECISION_COLOR[report.decision] || '#8baac8') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#8baac8'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#8baac8', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{report.decisionRationale}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{isAR ? resolveText(report.decisionRationale) : report.decisionRationale}</div>
       </div>
 
       {/* Tabs */}
@@ -587,10 +749,70 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       {/* Summary Tab */}
       {tab === 'summary' && (
         <div>
+          {/* Finding severity snapshot */}
+          {(() => {
+            const crit = findings.filter(f => f.severity === 'CRITICAL')
+            const high = findings.filter(f => f.severity === 'HIGH')
+            const med  = findings.filter(f => f.severity === 'MEDIUM')
+            const low  = findings.filter(f => f.severity === 'LOW')
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
+                {[['CRITICAL', crit.length, '#e74c3c'], ['HIGH', high.length, '#e67e22'], ['MEDIUM', med.length, '#f39c12'], ['LOW', low.length, '#3498db']].map(([l, n, c]: any) => (
+                  <div key={l} style={{ background: c + '15', border: '1px solid ' + c + '44', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 28, fontWeight: 700, color: c }}>{n}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{l}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* Immediate blockers — CRITICAL findings */}
+          {findings.filter(f => f.severity === 'CRITICAL').length > 0 && (
+            <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c55', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c', marginBottom: 10 }}>
+                🚨 IMMEDIATE BLOCKERS — {findings.filter(f => f.severity === 'CRITICAL').length} CRITICAL FINDINGS
+              </div>
+              {findings.filter(f => f.severity === 'CRITICAL').map((f: any, i: number) => (
+                <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderTop: i > 0 ? '1px solid #e74c3c22' : 'none', fontSize: 13 }}>
+                  <span style={{ color: '#e74c3c', fontWeight: 700, minWidth: 22 }}>{i+1}.</span>
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--text)' }}>{isAR ? resolveText(f.title) : f.title}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>{f.domain?.replace(/_/g,' ')} · {f.category?.replace(/_/g,' ')}</div>
+                    {f.recommendation && <div style={{ color: '#e74c3c', fontSize: 12, marginTop: 4 }}>→ {f.recommendation}</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Score improvement tips */}
+          {(() => {
+            const tips: string[] = []
+            if (report.complianceScore < 60) tips.push('Compliance score is low — address EA principle violations to unlock significant score improvement')
+            if (report.strategicScore < 60) tips.push('Strategic alignment is weak — map solution capabilities to Business Strategy goals explicitly')
+            if ((extScores.securityScore || 0) < 50) tips.push('Security score is critical — resolve IAM and encryption findings before ARB approval')
+            if (findings.filter((f:any) => f.severity === 'CRITICAL').length >= 5) tips.push('5+ CRITICAL findings — resolve at least 3 before re-run to move decision to CONDITIONAL')
+            if (tips.length === 0 && report.overallScore >= 60) tips.push('Score is in acceptable range — address HIGH findings to move toward APPROVED status')
+            return tips.length > 0 ? (
+              <div style={{ background: '#3498db11', border: '1px solid #3498db33', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>💡 SCORE IMPROVEMENT TIPS</div>
+                {tips.map((t, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
+                    <span style={{ color: '#3498db' }}>→</span>
+                    <span style={{ color: 'var(--text)' }}>{t}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null
+          })()}
+
+          {/* Executive Summary */}
           <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>EXECUTIVE SUMMARY</div>
-            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{report.executiveSummary}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.executive_summary')}</div>
+            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{isAR ? resolveText(report.executiveSummary) : report.executiveSummary}</div>
           </div>
+
           {report.scopeDescription && (
             <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>REVIEW SCOPE & METHODOLOGY</div>
@@ -598,9 +820,11 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{report.reviewMethodology}</div>
             </div>
           )}
+
+          {/* Required Actions */}
           {report.requiredActions?.mandatory?.length > 0 && (
-            <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c44', borderRadius: 10, padding: 20, marginBottom: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 12 }}>MANDATORY ACTIONS ({report.requiredActions.mandatory.length})</div>
+            <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c44', borderRadius: 10, padding: 20, marginBottom: 12 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 12 }}>{t('gov.mandatory_actions')} ({report.requiredActions.mandatory.length})</div>
               {report.requiredActions.mandatory.map((a: any, i: number) => (
                 <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, fontSize: 13 }}>
                   <span style={{ color: '#e74c3c', fontWeight: 600, minWidth: 20 }}>{i + 1}.</span>
@@ -611,7 +835,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           )}
           {report.requiredActions?.recommended?.length > 0 && (
             <div style={{ background: '#f39c1211', border: '1px solid #f39c1244', borderRadius: 10, padding: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#f39c12', marginBottom: 12 }}>RECOMMENDED ACTIONS ({report.requiredActions.recommended.length})</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#f39c12', marginBottom: 12 }}>{t('gov.recommended_actions')} ({report.requiredActions.recommended.length})</div>
               {report.requiredActions.recommended.map((a: any, i: number) => (
                 <div key={i} style={{ display: 'flex', gap: 10, marginBottom: 8, fontSize: 13 }}>
                   <span style={{ color: '#f39c12', fontWeight: 600, minWidth: 20 }}>{i + 1}.</span>
@@ -624,142 +848,304 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       )}
 
       {/* Findings Tab */}
-      {tab === 'findings' && (
-        <div>
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
-            {['CRITICAL','HIGH','MEDIUM','LOW'].map(sev => {
-              const count = findings.filter(f => f.severity === sev).length
-              return count > 0 ? (
-                <div key={sev} style={{ padding: '8px 16px', borderRadius: 8, background: SEV_COLOR[sev] + '22', border: '1px solid ' + SEV_COLOR[sev] + '44', fontSize: 13 }}>
-                  <span style={{ color: SEV_COLOR[sev], fontWeight: 600 }}>{count}</span> <span style={{ color: 'var(--text-muted)' }}>{sev}</span>
-                </div>
-              ) : null
-            })}
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', alignSelf: 'center', marginLeft: 'auto' }}>{findings.length} total findings</div>
-          </div>
-          {findings.map((f, i) => <FindingCard key={i} f={f} />)}
-          {findings.length === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No findings</div>}
-        </div>
-      )}
+      {tab === 'findings' && <FindingsTab findings={findings} />}
 
       {/* Domains Tab */}
       {tab === 'domains' && (
         <div>
-          {Object.entries(report.domainSummaries || {}).map(([domain, ds]: [string, any]) => (
-            <div key={domain} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{domain.replace(/_/g, ' ')}</div>
-                <ScoreCircle score={Math.round(ds.score || 0)} label='' size={48} />
+          {/* Domain overview bar */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
+            {[
+              ['Total Findings', findings.length, 'var(--text)'],
+              ['Critical', findings.filter(f=>f.severity==='CRITICAL').length, '#e74c3c'],
+              ['High', findings.filter(f=>f.severity==='HIGH').length, '#e67e22'],
+            ].map(([l,v,c]:any) => (
+              <div key={l} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                <div style={{ fontSize: 22, fontWeight: 700, color: c }}>{v}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
-                {[['Compliance', ds.complianceScore], ['Risk', ds.riskScore], ['Findings', ds.findings?.length || 0]].map(([l, v]: any) => (
-                  <div key={l} style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '6px 10px', textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: l === 'Findings' ? 'var(--text)' : v >= 75 ? '#2ecc71' : v >= 60 ? '#f39c12' : '#e74c3c' }}>{Math.round(v || 0)}</div>
+            ))}
+          </div>
+
+          {Object.entries(report.domainSummaries || {}).filter(([k]) => k !== '_extendedScores').map(([domain, ds]: [string, any]) => {
+            const domainFindings = findings.filter(f => f.domain === domain)
+            const crit = domainFindings.filter(f => f.severity === 'CRITICAL').length
+            const high = domainFindings.filter(f => f.severity === 'HIGH').length
+            const med  = domainFindings.filter(f => f.severity === 'MEDIUM').length
+            const low  = domainFindings.filter(f => f.severity === 'LOW').length
+            const score = Math.round(ds.score || 0)
+            const scoreColor = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
+            return (
+              <div key={domain} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{domain.replace(/_/g, ' ')}</div>
+                    {ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 2 }}>✗ {isAR ? resolveText(ds.keyWeaknesses) : ds.keyWeaknesses}</div>}
+                    {ds.keyStrengths && !ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#2ecc71', marginTop: 2 }}>✓ {isAR ? resolveText(ds.keyStrengths) : ds.keyStrengths}</div>}
                   </div>
-                ))}
+                  <ScoreCircle score={score} label='' size={52} />
+                </div>
+
+                {/* Score bar */}
+                <div style={{ height: 6, background: 'var(--navy-dark)', borderRadius: 3, marginBottom: 12, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: score + '%', background: scoreColor, borderRadius: 3, transition: 'width 0.5s' }} />
+                </div>
+
+                {/* Sub-scores */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 12 }}>
+                  {[['Compliance', ds.complianceScore], ['Risk', ds.riskScore], ['Strategic', ds.strategicScore], ['Completeness', ds.completenessScore]].map(([l,v]:any) => (
+                    <div key={l} style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '5px 8px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{l}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: (v||0) >= 70 ? '#2ecc71' : (v||0) >= 55 ? '#f39c12' : '#e74c3c' }}>{Math.round(v||0)}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Finding severity badges */}
+                {domainFindings.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center' }}>Findings:</span>
+                    {crit > 0 && <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: '#e74c3c33', color: '#e74c3c' }}>{crit} CRITICAL</span>}
+                    {high > 0 && <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: '#e67e2233', color: '#e67e22' }}>{high} HIGH</span>}
+                    {med > 0  && <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: '#f39c1233', color: '#f39c12' }}>{med} MEDIUM</span>}
+                    {low > 0  && <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: '#3498db33', color: '#3498db' }}>{low} LOW</span>}
+                  </div>
+                )}
+                {domainFindings.length === 0 && <div style={{ fontSize: 12, color: '#2ecc71' }}>✓ No findings in this domain</div>}
               </div>
-              <div style={{ height: 6, background: 'var(--navy-dark)', borderRadius: 3, marginBottom: 10, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: (ds.score || 0) + '%', background: ds.score >= 75 ? '#2ecc71' : ds.score >= 60 ? '#f39c12' : '#e74c3c', borderRadius: 3 }} />
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>{ds.summary}</div>
-              {ds.keyStrengths && <div style={{ fontSize: 12, color: '#2ecc71' }}>✓ {ds.keyStrengths}</div>}
-              {ds.keyWeaknesses && <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 4 }}>✗ {ds.keyWeaknesses}</div>}
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
       {/* Strategic Tab */}
-      {tab === 'strategic' && (
-        <div>
-          {report.strategicAlignment?.overallAlignmentPercentage != null && (
-            <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 20 }}>
-              <div style={{ textAlign: 'center', minWidth: 80 }}>
-                <div style={{ fontSize: 32, fontWeight: 700, color: report.strategicAlignment.overallAlignmentPercentage >= 75 ? '#2ecc71' : report.strategicAlignment.overallAlignmentPercentage >= 50 ? '#f39c12' : '#e74c3c' }}>{report.strategicAlignment.overallAlignmentPercentage}%</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Overall Alignment</div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ height: 8, background: 'var(--navy-dark)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: report.strategicAlignment.overallAlignmentPercentage + '%', background: report.strategicAlignment.overallAlignmentPercentage >= 75 ? '#2ecc71' : report.strategicAlignment.overallAlignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 4 }} />
+      {tab === 'strategic' && (() => {
+        const objectives = report.strategicAlignment?.objectives || []
+        const overallPct = report.strategicAlignment?.overallAlignmentPercentage || 0
+        const overallColor = overallPct >= 75 ? '#2ecc71' : overallPct >= 50 ? '#f39c12' : '#e74c3c'
+
+        // Strategy type weights and colors
+        const STRAT_META: Record<string, { weight: number; label: string; color: string }> = {
+          BUSINESS_STRATEGY: { weight: 40, label: 'Business Strategy', color: '#e74c3c' },
+          DT_STRATEGY:       { weight: 35, label: 'Digital Transformation', color: '#9b59b6' },
+          EA_STRATEGY:       { weight: 25, label: 'EA Strategy', color: '#3498db' },
+          IT_STRATEGY:       { weight: 0,  label: 'IT Strategy', color: '#1abc9c' },
+          DATA_STRATEGY:     { weight: 0,  label: 'Data Strategy', color: '#e67e22' },
+          SECURITY_STRATEGY: { weight: 0,  label: 'Security Strategy', color: '#e74c3c' },
+          VISION_2030:       { weight: 0,  label: 'Vision 2030', color: '#f39c12' },
+        }
+        const STATUS_COLOR: Record<string, string> = {
+          FULLY_ALIGNED: '#2ecc71', PARTIALLY_ALIGNED: '#f39c12',
+          WEAKLY_ALIGNED: '#e67e22', NOT_ALIGNED: '#e74c3c', NOT_APPLICABLE: '#8baac8'
+        }
+        const STATUS_ICON: Record<string, string> = {
+          FULLY_ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', WEAKLY_ALIGNED: '🔶', NOT_ALIGNED: '❌', NOT_APPLICABLE: '—'
+        }
+
+        // Group by strategy type — sorted by weight desc
+        const grouped: Record<string, any[]> = {}
+        for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
+        const sortedTypes = Object.keys(grouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
+
+        return (
+          <div>
+            {/* Overall alignment header */}
+            <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 12 }}>
+                <div style={{ textAlign: 'center', minWidth: 72 }}>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: overallColor }}>{overallPct}%</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Overall Alignment</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ height: 10, background: 'var(--navy-dark)', borderRadius: 5, overflow: 'hidden', marginBottom: 8 }}>
+                    <div style={{ height: '100%', width: overallPct + '%', background: overallColor, borderRadius: 5, transition: 'width 0.5s' }} />
+                  </div>
+                  {/* Per-strategy weight summary */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {sortedTypes.filter(t => STRAT_META[t]?.weight > 0).map(t => {
+                      const meta = STRAT_META[t]
+                      const objs = grouped[t]
+                      const avg = objs.length ? Math.round(objs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/objs.length) : 0
+                      const c = avg >= 75 ? '#2ecc71' : avg >= 50 ? '#f39c12' : '#e74c3c'
+                      return (
+                        <div key={t} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, border: '1px solid ' + meta.color + '44', background: meta.color + '15' }}>
+                          <span style={{ color: meta.color, fontWeight: 600 }}>{meta.label}</span>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{meta.weight}% weight</span>
+                          <span style={{ color: c, fontWeight: 700, marginLeft: 6 }}>{avg}% aligned</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
-          )}
-          {(() => {
-            const objectives = report.strategicAlignment?.objectives || []
-            if (objectives.length === 0) return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No strategic objectives assessed</div>
-            // Group by strategy type
-            const grouped: Record<string, any[]> = {}
-            for (const obj of objectives) {
-              const key = obj.strategyType || 'OTHER'
-              if (!grouped[key]) grouped[key] = []
-              grouped[key].push(obj)
-            }
-            return Object.entries(grouped).map(([stratType, objs]) => (
-              <div key={stratType} style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 10, padding: '6px 12px', background: 'var(--navy-mid)', borderRadius: 8 }}>
-                  {stratType.replace(/_/g, ' ')}
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>{objs.length} goal(s)</span>
+
+            {objectives.length === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No strategic objectives assessed</div>}
+
+            {/* Per-strategy groups */}
+            {sortedTypes.map(stratType => {
+              const meta = STRAT_META[stratType]
+              const objs = grouped[stratType]
+              const avgAlign = Math.round(objs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/objs.length)
+              const avgColor = avgAlign >= 75 ? '#2ecc71' : avgAlign >= 50 ? '#f39c12' : '#e74c3c'
+              const fullyAligned = objs.filter((o:any) => o.alignmentStatus === 'FULLY_ALIGNED').length
+              const notAligned = objs.filter((o:any) => o.alignmentStatus === 'NOT_ALIGNED').length
+
+              return (
+                <div key={stratType} style={{ marginBottom: 20 }}>
+                  {/* Strategy header */}
+                  <div style={{ background: (meta?.color || '#8baac8') + '18', border: '1px solid ' + (meta?.color || '#8baac8') + '44', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: meta?.color || '#8baac8' }}>
+                          {meta?.label || stratType.replace(/_/g,' ')}
+                          {meta?.weight > 0 && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>[{meta.weight}% weight]</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                          {objs.length} goals · {fullyAligned} fully aligned · {notAligned} not aligned
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center', minWidth: 52 }}>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: avgColor }}>{avgAlign}%</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>avg</div>
+                      </div>
+                    </div>
+                    {/* Mini alignment bar */}
+                    <div style={{ height: 4, background: 'var(--navy-dark)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: avgAlign + '%', background: avgColor, borderRadius: 2 }} />
+                    </div>
+                  </div>
+
+                  {/* Objective cards */}
+                  {objs.map((obj: any, i: number) => {
+                    const statusColor = STATUS_COLOR[obj.alignmentStatus] || '#8baac8'
+                    const pct = obj.alignmentPercentage || 0
+                    return (
+                      <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + statusColor + '33', borderRadius: 10, padding: 14, marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                          <span style={{ fontSize: 16, marginTop: 1 }}>{STATUS_ICON[obj.alignmentStatus] || '•'}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{isAR ? resolveText(obj.objectiveName) : obj.objectiveName}</div>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', minWidth: 40, textAlign: 'right' }}>{pct}%</div>
+                            </div>
+                            {/* Progress bar */}
+                            <div style={{ height: 3, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: pct + '%', background: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
+                            </div>
+                            {obj.contributionDescription && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription}</div>}
+                            {obj.expectedValue && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>💡 {isAR ? resolveText(obj.expectedValue) : obj.expectedValue}</div>}
+                            {obj.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>📋 {obj.evidence}</div>}
+                            {obj.relatedKPIs?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📊 KPIs: {obj.relatedKPIs.join(', ')}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
-                {objs.map((obj: any, i: number) => (
-                  <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{obj.objectiveName}</div>
-                      <div style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, background: '#8baac822', color: '#8baac8' }}>{obj.alignmentStatus?.replace(/_/g, ' ')}</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', minWidth: 42, textAlign: 'right' }}>{obj.alignmentPercentage}%</div>
+              )
+            })}
+          </div>
+        )
+      })()}
+
+      {/* Compliance Tab */}
+      {tab === 'compliance' && (() => {
+        const items = report.complianceMatrix?.items || []
+        const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','NOT_APPLICABLE']
+        const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#8baac8' }
+        const statusLabel: Record<string,string> = { COMPLIANT:'✓ Compliant', PARTIALLY_COMPLIANT:'⚠ Partial', NON_COMPLIANT:'✗ Non-Compliant', REQUIRES_EXCEPTION:'⚡ Exception', NOT_APPLICABLE:'— N/A' }
+        const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', TECHNOLOGY_CATALOG:'#9b59b6', NORA_STANDARD:'#3498db', NCA_STANDARD:'#1abc9c' }
+
+        // Group items by category
+        const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','TECHNOLOGY_CATALOG','NORA_STANDARD','NCA_STANDARD','GENERAL_BEST_PRACTICE']
+        const grouped: Record<string,any[]> = {}
+        for (const item of items) { const c = item.category || 'OTHER'; if (!grouped[c]) grouped[c]=[]; grouped[c].push(item) }
+
+        const countBy = (status: string) => items.filter((i:any) => i.complianceStatus === status).length
+        const total = items.length
+
+        return (
+          <div>
+            {/* Visual status breakdown */}
+            {total > 0 && (
+              <div style={{ marginBottom: 20 }}>
+                {/* Status bar */}
+                <div style={{ height: 12, borderRadius: 6, overflow: 'hidden', display: 'flex', marginBottom: 10 }}>
+                  {statuses.map(s => {
+                    const pct = (countBy(s) / total) * 100
+                    return pct > 0 ? <div key={s} style={{ width: pct + '%', background: statusColor[s], title: s }} /> : null
+                  })}
+                </div>
+                {/* Legend */}
+                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                  {statuses.map(s => {
+                    const n = countBy(s)
+                    if (n === 0) return null
+                    return (
+                      <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <div style={{ width: 10, height: 10, borderRadius: 2, background: statusColor[s] }} />
+                        <span style={{ fontSize: 12, color: statusColor[s], fontWeight: 600 }}>{n}</span>
+                        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{statusLabel[s]}</span>
+                      </div>
+                    )
+                  })}
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{total} items assessed</span>
+                </div>
+
+                {/* Category breakdown */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginTop: 12 }}>
+                  {cats.filter(c => grouped[c]?.length > 0).map(c => {
+                    const citems = grouped[c] || []
+                    const nonComp = citems.filter((i:any) => i.complianceStatus === 'NON_COMPLIANT').length
+                    const comp = citems.filter((i:any) => i.complianceStatus === 'COMPLIANT').length
+                    return (
+                      <div key={c} style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '8px 12px' }}>
+                        <div style={{ fontSize: 10, color: catColor[c] || 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>{c.replace(/_/g,' ')}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                          {comp > 0 && <span style={{ color: '#2ecc71' }}>✓{comp} </span>}
+                          {nonComp > 0 && <span style={{ color: '#e74c3c' }}>✗{nonComp} </span>}
+                          {citems.length - comp - nonComp > 0 && <span>·{citems.length - comp - nonComp}</span>}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Items grouped by category */}
+            {cats.filter(c => grouped[c]?.length > 0).map(cat => (
+              <div key={cat} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: catColor[cat] || 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 3, height: 14, background: catColor[cat] || '#8baac8', borderRadius: 2 }} />
+                  {cat.replace(/_/g,' ')}
+                  <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({grouped[cat].length})</span>
+                </div>
+                {grouped[cat].map((item: any, i: number) => (
+                  <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + (item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c33' : 'var(--navy-light)'), borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ minWidth: 90, padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, textAlign: 'center', marginTop: 1,
+                        background: (statusColor[item.complianceStatus] || '#8baac8') + '22',
+                        color: statusColor[item.complianceStatus] || '#8baac8'
+                      }}>{statusLabel[item.complianceStatus] || item.complianceStatus}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600 }}>{item.principleOrStandard}</div>
+                        {item.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>📋 {item.evidence}</div>}
+                        {item.gap && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4 }}>⚠ {isAR ? resolveText(item.gap) : item.gap}</div>}
+                        {item.recommendation && <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>→ {isAR ? resolveText(item.recommendation) : item.recommendation}</div>}
+                      </div>
                     </div>
-                    <div style={{ height: 4, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: (obj.alignmentPercentage || 0) + '%', background: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
-                    </div>
-                    {obj.contributionDescription && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{obj.contributionDescription}</div>}
-                    {obj.expectedValue && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Value: {obj.expectedValue}</div>}
-                    {obj.relatedKPIs?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>KPIs: {obj.relatedKPIs.join(', ')}</div>}
                   </div>
                 ))}
               </div>
-            ))
-          })()}
-        </div>
-      )}
+            ))}
 
-      {/* Compliance Tab */}
-      {tab === 'compliance' && (
-        <div>
-          {report.complianceMatrix?.count > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              {[['Compliant', report.complianceMatrix.compliantCount, '#2ecc71'], ['Non-Compliant', report.complianceMatrix.nonCompliantCount, '#e74c3c'], ['Requires Exception', report.complianceMatrix.requiresExceptionCount, '#e67e22']].map(([l, v, c]: any) => (
-                <div key={l} style={{ background: c + '18', border: '1px solid ' + c + '44', borderRadius: 8, padding: '12px 16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: c }}>{v || 0}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
-                </div>
-              ))}
-            </div>
-          )}
-          {(report.complianceMatrix?.items || []).map((item: any, i: number) => (
-            <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{item.principleOrStandard}</div>
-                <div style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap',
-                background: item.complianceStatus === 'COMPLIANT' ? '#2ecc7122' : item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c22' : item.complianceStatus === 'REQUIRES_EXCEPTION' ? '#e67e2222' : '#8baac822',
-                color: item.complianceStatus === 'COMPLIANT' ? '#2ecc71' : item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c' : item.complianceStatus === 'REQUIRES_EXCEPTION' ? '#e67e22' : '#8baac8'
-              }}>{item.complianceStatus?.replace(/_/g, ' ')}</div>
-              <div style={{ padding: '2px 6px', borderRadius: 6, fontSize: 10,
-                background: item.category === 'TENANT_PRINCIPLE' ? '#e74c3c22' : item.category === 'TENANT_STANDARD' ? '#e67e2222' : '#3498db22',
-                color: item.category === 'TENANT_PRINCIPLE' ? '#e74c3c' : item.category === 'TENANT_STANDARD' ? '#e67e22' : '#3498db',
-                whiteSpace: 'nowrap'
-              }}>{item.category?.replace(/_/g, ' ')}</div>
-              </div>
-              {item.evidence && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>Evidence: {item.evidence}</div>}
-              {item.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>Gap: {item.gap}</div>}
-              {item.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>Recommendation: {item.recommendation}</div>}
-            </div>
-          ))}
-          {(!report.complianceMatrix?.items || report.complianceMatrix.items.length === 0) && (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No compliance matrix available</div>
-          )}
-        </div>
-      )}
+            {total === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No compliance matrix available</div>}
+          </div>
+        )
+      })()}
 
       {/* Risk Register Tab */}
       {tab === 'risk' && (
@@ -797,85 +1183,222 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       )}
 
       {/* Future State Tab */}
-      {tab === 'future' && (
-        <div>
-          {report.futureStateAlignment ? (
-            <div>
-              <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 20 }}>
-                <div style={{ textAlign: 'center', minWidth: 80 }}>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: (report.futureStateAlignment.alignmentPercentage || 0) >= 75 ? '#2ecc71' : (report.futureStateAlignment.alignmentPercentage || 0) >= 50 ? '#f39c12' : '#e74c3c' }}>{report.futureStateAlignment.alignmentPercentage || 0}%</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{report.futureStateAlignment.overallAlignment?.replace(/_/g, ' ')}</div>
+      {tab === 'future' && (() => {
+        const fs = report.futureStateAlignment
+        if (!fs) return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>Future-state alignment not available</div>
+        const pct = fs.alignmentPercentage || 0
+        const pctColor = pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c'
+        const AREA_STATUS_COLOR: Record<string,string> = {
+          ALIGNED: '#2ecc71', PARTIALLY_ALIGNED: '#f39c12', GAP_IDENTIFIED: '#e67e22',
+          NOT_ALIGNED: '#e74c3c', FUTURE_REQUIREMENT: '#3498db', NOT_APPLICABLE: '#8baac8'
+        }
+        const AREA_ICON: Record<string,string> = {
+          ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', GAP_IDENTIFIED: '🔶',
+          NOT_ALIGNED: '❌', FUTURE_REQUIREMENT: '🔵', NOT_APPLICABLE: '—'
+        }
+        const areas = fs.alignmentAreas || []
+        const alignedCount = areas.filter((a:any) => a.status === 'ALIGNED').length
+        const gapCount = areas.filter((a:any) => ['GAP_IDENTIFIED','NOT_ALIGNED'].includes(a.status)).length
+        const futureReqs = areas.filter((a:any) => a.status === 'FUTURE_REQUIREMENT').length
+
+        return (
+          <div>
+            {/* Header */}
+            <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 10 }}>
+                <div style={{ textAlign: 'center', minWidth: 72 }}>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: pctColor }}>{pct}%</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fs.overallAlignment?.replace(/_/g,' ') || 'Alignment'}</div>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>{report.futureStateAlignment.summary}</div>
-                  <div style={{ height: 6, background: 'var(--navy-dark)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: (report.futureStateAlignment.alignmentPercentage || 0) + '%', background: (report.futureStateAlignment.alignmentPercentage || 0) >= 75 ? '#2ecc71' : (report.futureStateAlignment.alignmentPercentage || 0) >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 3 }} />
+                  <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8, lineHeight: 1.5 }}>{isAR ? resolveText(fs.summary) : fs.summary}</div>
+                  <div style={{ height: 8, background: 'var(--navy-dark)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: pct + '%', background: pctColor, borderRadius: 4, transition: 'width 0.5s' }} />
                   </div>
                 </div>
               </div>
-              {(report.futureStateAlignment.alignmentAreas || []).map((area: any, i: number) => (
-                <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{area.area}</div>
-                    <div style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8' }}>{area.status?.replace(/_/g, ' ')}</div>
-                  </div>
-                  {area.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>Gap: {area.gap}</div>}
-                  {area.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>Recommendation: {area.recommendation}</div>}
-                </div>
-              ))}
-              {report.futureStateAlignment.keyGaps?.length > 0 && (
-                <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c44', borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 10 }}>KEY GAPS</div>
-                  {report.futureStateAlignment.keyGaps.map((g: string, i: number) => (
-                    <div key={i} style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 8 }}>• {g}</div>
-                  ))}
-                </div>
-              )}
-              {report.futureStateAlignment.recommendations?.length > 0 && (
-                <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 10 }}>RECOMMENDATIONS</div>
-                  {report.futureStateAlignment.recommendations.map((r: string, i: number) => (
-                    <div key={i} style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 8 }}>• {r}</div>
-                  ))}
+              {/* Area status summary */}
+              {areas.length > 0 && (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+                  {alignedCount > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#2ecc7122', color: '#2ecc71' }}>✅ {alignedCount} Aligned</span>}
+                  {gapCount > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#e74c3c22', color: '#e74c3c' }}>❌ {gapCount} Gaps</span>}
+                  {futureReqs > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#3498db22', color: '#3498db' }}>🔵 {futureReqs} Future Requirements</span>}
                 </div>
               )}
             </div>
-          ) : (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>Future-state alignment not available</div>
-          )}
-        </div>
-      )}
+
+            {/* Alignment areas — grouped by status */}
+            {['NOT_ALIGNED','GAP_IDENTIFIED','PARTIALLY_ALIGNED','FUTURE_REQUIREMENT','ALIGNED','NOT_APPLICABLE']
+              .filter(s => areas.some((a:any) => a.status === s))
+              .map(status => {
+                const statusAreas = areas.filter((a:any) => a.status === status)
+                const c = AREA_STATUS_COLOR[status] || '#8baac8'
+                return (
+                  <div key={status} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: c, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{AREA_ICON[status]}</span>
+                      <span>{status.replace(/_/g,' ')}</span>
+                      <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({statusAreas.length})</span>
+                    </div>
+                    {statusAreas.map((area: any, i: number) => (
+                      <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + c + '33', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>{isAR ? resolveText(area.area) : area.area}</div>
+                        {area.currentState && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>📍 Current: {isAR ? resolveText(area.currentState) : area.currentState}</div>}
+                        {area.targetState && <div style={{ fontSize: 12, color: '#3498db', marginBottom: 4 }}>🎯 Target: {isAR ? resolveText(area.targetState) : area.targetState}</div>}
+                        {area.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>⚠ Gap: {isAR ? resolveText(area.gap) : area.gap}</div>}
+                        {area.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {isAR ? resolveText(area.recommendation) : area.recommendation}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })
+            }
+
+            {/* Key gaps */}
+            {fs.keyGaps?.length > 0 && (
+              <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c33', borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c', marginBottom: 10 }}>🚨 KEY GAPS TO ADDRESS</div>
+                {fs.keyGaps.map((g: string, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
+                    <span style={{ color: '#e74c3c', minWidth: 20, fontWeight: 700 }}>{i+1}.</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{isAR ? resolveText(g) : g}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Recommendations roadmap */}
+            {fs.recommendations?.length > 0 && (
+              <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>🗺 ROADMAP TO TARGET STATE</div>
+                {fs.recommendations.map((r: string, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 10, alignItems: 'flex-start' }}>
+                    <div style={{ minWidth: 24, height: 24, borderRadius: '50%', background: 'var(--accent)22', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>{i+1}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', paddingTop: 3, lineHeight: 1.5 }}>{isAR ? resolveText(r) : r}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Financial Tab */}
-      {tab === 'financial' && (
-        <div>
-          {report.financialOpportunities?.totalAnnualSaving > 0 && (
-            <div style={{ background: '#2ecc7122', border: '1px solid #2ecc7144', borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>ESTIMATED ANNUAL SAVINGS</div>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#2ecc71' }}>SAR {report.financialOpportunities.totalAnnualSaving.toLocaleString()}</div>
-            </div>
-          )}
-          {(report.financialOpportunities?.opportunities || []).map((o: any, i: number) => (
-            <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 16, marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{o.title || o.type?.replace(/_/g, ' ')}</div>
-                {o.confidenceLevel && <div style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8' }}>Confidence: {o.confidenceLevel}</div>}
+      {tab === 'financial' && (() => {
+        const fin = report.financialOpportunities || {}
+        const opps = fin.opportunities || []
+        const totalAnnual = fin.totalAnnualSaving || opps.reduce((s:number,o:any)=>s+(o.annualSaving||0),0)
+        const totalOneTime = fin.totalEstimatedSaving || opps.reduce((s:number,o:any)=>s+(o.estimatedSaving||0),0)
+        const totalSaving = totalAnnual + totalOneTime
+
+        const TYPE_COLOR: Record<string,string> = {
+          REUSE_OPPORTUNITY: '#2ecc71', LICENSE_OPTIMIZATION: '#3498db',
+          CLOUD_OPTIMIZATION: '#9b59b6', VENDOR_CONSOLIDATION: '#e67e22',
+          TECHNICAL_DEBT_REDUCTION: '#f39c12', PROCESS_AUTOMATION: '#1abc9c',
+        }
+        const TYPE_ICON: Record<string,string> = {
+          REUSE_OPPORTUNITY: '♻️', LICENSE_OPTIMIZATION: '📋',
+          CLOUD_OPTIMIZATION: '☁️', VENDOR_CONSOLIDATION: '🤝',
+          TECHNICAL_DEBT_REDUCTION: '🔧', PROCESS_AUTOMATION: '⚙️',
+        }
+        const CONF_COLOR: Record<string,string> = { HIGH:'#2ecc71', MEDIUM:'#f39c12', LOW:'#e74c3c' }
+
+        return (
+          <div>
+            {/* Total savings header */}
+            {totalSaving > 0 ? (
+              <div style={{ background: '#2ecc7118', border: '1px solid #2ecc7144', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+                <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 4 }}>TOTAL FINANCIAL OPPORTUNITY</div>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: '#2ecc71' }}>
+                    SAR {totalSaving.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{opps.length} opportunities identified</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {totalAnnual > 0 && (
+                    <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>💰 Annual Savings</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#2ecc71' }}>SAR {totalAnnual.toLocaleString()}</div>
+                    </div>
+                  )}
+                  {totalOneTime > 0 && (
+                    <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>🏦 One-time Saving</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#3498db' }}>SAR {totalOneTime.toLocaleString()}</div>
+                    </div>
+                  )}
+                </div>
+                {/* Type breakdown */}
+                {opps.length > 1 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                    {Object.entries(
+                      opps.reduce((acc:any,o:any)=>{ const t=o.type||'OTHER'; acc[t]=(acc[t]||0)+(o.annualSaving||o.estimatedSaving||0); return acc },{})
+                    ).sort((a:any,b:any)=>b[1]-a[1]).map(([type,val]:any) => (
+                      <div key={type} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: (TYPE_COLOR[type]||'#8baac8')+'22', color: TYPE_COLOR[type]||'#8baac8' }}>
+                        {TYPE_ICON[type]||'•'} {type.replace(/_/g,' ')}: SAR {val.toLocaleString()}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>{o.description}</div>
-              {o.existingAlternative && <div style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 6 }}>♻️ Reuse: {o.existingAlternative}</div>}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                {o.estimatedSaving > 0 && <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>One-time Saving</div><div style={{ fontSize: 15, fontWeight: 700, color: '#2ecc71' }}>SAR {o.estimatedSaving.toLocaleString()}</div></div>}
-                {o.annualSaving > 0 && <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Annual Saving</div><div style={{ fontSize: 15, fontWeight: 700, color: '#2ecc71' }}>SAR {o.annualSaving.toLocaleString()}</div></div>}
-              </div>
-              {o.savingRationale && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 4 }}>📊 Basis: {o.savingRationale}</div>}
-              {o.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {o.recommendation}</div>}
-            </div>
-          ))}
-          {!report.financialOpportunities?.opportunities?.length && (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No financial opportunities detected</div>
-          )}
-        </div>
-      )}
+            ) : (
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No financial opportunities detected</div>
+            )}
+
+            {/* Opportunity cards — sorted by saving desc */}
+            {[...opps].sort((a:any,b:any)=>((b.annualSaving||0)+(b.estimatedSaving||0))-((a.annualSaving||0)+(a.estimatedSaving||0))).map((o: any, i: number) => {
+              const oColor = TYPE_COLOR[o.type] || '#8baac8'
+              const oIcon = TYPE_ICON[o.type] || '💡'
+              const oTotal = (o.annualSaving||0) + (o.estimatedSaving||0)
+              return (
+                <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + oColor + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20, minWidth: 28 }}>{oIcon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{isAR ? resolveText(o.title||o.type?.replace(/_/g,' ')) : (o.title||o.type?.replace(/_/g,' '))}</div>
+                        {o.confidenceLevel && (
+                          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: (CONF_COLOR[o.confidenceLevel]||'#8baac8')+'22', color: CONF_COLOR[o.confidenceLevel]||'#8baac8', fontWeight: 600 }}>
+                            {o.confidenceLevel} confidence
+                          </span>
+                        )}
+                        {oTotal > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: '#2ecc71', marginLeft: 'auto' }}>SAR {oTotal.toLocaleString()}</span>}
+                      </div>
+                      {o.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>{isAR ? resolveText(o.description) : o.description}</div>}
+                    </div>
+                  </div>
+
+                  {o.existingAlternative && (
+                    <div style={{ background: '#2ecc7115', border: '1px solid #2ecc7133', borderRadius: 6, padding: '6px 10px', marginBottom: 8, fontSize: 12, color: '#2ecc71' }}>
+                      ♻️ Reuse existing: {isAR ? resolveText(o.existingAlternative) : o.existingAlternative}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: o.estimatedSaving > 0 && o.annualSaving > 0 ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 8 }}>
+                    {o.estimatedSaving > 0 && (
+                      <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>One-time Saving</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: '#3498db' }}>SAR {o.estimatedSaving.toLocaleString()}</div>
+                      </div>
+                    )}
+                    {o.annualSaving > 0 && (
+                      <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Annual Saving</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: '#2ecc71' }}>SAR {o.annualSaving.toLocaleString()}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {o.savingRationale && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 6 }}>📊 {isAR ? resolveText(o.savingRationale) : o.savingRationale}</div>}
+                  {o.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {isAR ? resolveText(o.recommendation) : o.recommendation}</div>}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
     </div>
   )
 }
+
