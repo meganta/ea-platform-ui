@@ -905,57 +905,135 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       )}
 
       {/* Strategic Tab */}
-      {tab === 'strategic' && (
-        <div>
-          {report.strategicAlignment?.overallAlignmentPercentage != null && (
-            <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 20 }}>
-              <div style={{ textAlign: 'center', minWidth: 80 }}>
-                <div style={{ fontSize: 32, fontWeight: 700, color: report.strategicAlignment.overallAlignmentPercentage >= 75 ? '#2ecc71' : report.strategicAlignment.overallAlignmentPercentage >= 50 ? '#f39c12' : '#e74c3c' }}>{report.strategicAlignment.overallAlignmentPercentage}%</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Overall Alignment</div>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ height: 8, background: 'var(--navy-dark)', borderRadius: 4, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: report.strategicAlignment.overallAlignmentPercentage + '%', background: report.strategicAlignment.overallAlignmentPercentage >= 75 ? '#2ecc71' : report.strategicAlignment.overallAlignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 4 }} />
+      {tab === 'strategic' && (() => {
+        const objectives = report.strategicAlignment?.objectives || []
+        const overallPct = report.strategicAlignment?.overallAlignmentPercentage || 0
+        const overallColor = overallPct >= 75 ? '#2ecc71' : overallPct >= 50 ? '#f39c12' : '#e74c3c'
+
+        // Strategy type weights and colors
+        const STRAT_META: Record<string, { weight: number; label: string; color: string }> = {
+          BUSINESS_STRATEGY: { weight: 40, label: 'Business Strategy', color: '#e74c3c' },
+          DT_STRATEGY:       { weight: 35, label: 'Digital Transformation', color: '#9b59b6' },
+          EA_STRATEGY:       { weight: 25, label: 'EA Strategy', color: '#3498db' },
+          IT_STRATEGY:       { weight: 0,  label: 'IT Strategy', color: '#1abc9c' },
+          DATA_STRATEGY:     { weight: 0,  label: 'Data Strategy', color: '#e67e22' },
+          SECURITY_STRATEGY: { weight: 0,  label: 'Security Strategy', color: '#e74c3c' },
+          VISION_2030:       { weight: 0,  label: 'Vision 2030', color: '#f39c12' },
+        }
+        const STATUS_COLOR: Record<string, string> = {
+          FULLY_ALIGNED: '#2ecc71', PARTIALLY_ALIGNED: '#f39c12',
+          WEAKLY_ALIGNED: '#e67e22', NOT_ALIGNED: '#e74c3c', NOT_APPLICABLE: '#8baac8'
+        }
+        const STATUS_ICON: Record<string, string> = {
+          FULLY_ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', WEAKLY_ALIGNED: '🔶', NOT_ALIGNED: '❌', NOT_APPLICABLE: '—'
+        }
+
+        // Group by strategy type — sorted by weight desc
+        const grouped: Record<string, any[]> = {}
+        for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
+        const sortedTypes = Object.keys(grouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
+
+        return (
+          <div>
+            {/* Overall alignment header */}
+            <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 12 }}>
+                <div style={{ textAlign: 'center', minWidth: 72 }}>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: overallColor }}>{overallPct}%</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Overall Alignment</div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ height: 10, background: 'var(--navy-dark)', borderRadius: 5, overflow: 'hidden', marginBottom: 8 }}>
+                    <div style={{ height: '100%', width: overallPct + '%', background: overallColor, borderRadius: 5, transition: 'width 0.5s' }} />
+                  </div>
+                  {/* Per-strategy weight summary */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {sortedTypes.filter(t => STRAT_META[t]?.weight > 0).map(t => {
+                      const meta = STRAT_META[t]
+                      const objs = grouped[t]
+                      const avg = objs.length ? Math.round(objs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/objs.length) : 0
+                      const c = avg >= 75 ? '#2ecc71' : avg >= 50 ? '#f39c12' : '#e74c3c'
+                      return (
+                        <div key={t} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, border: '1px solid ' + meta.color + '44', background: meta.color + '15' }}>
+                          <span style={{ color: meta.color, fontWeight: 600 }}>{meta.label}</span>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{meta.weight}% weight</span>
+                          <span style={{ color: c, fontWeight: 700, marginLeft: 6 }}>{avg}% aligned</span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
-          )}
-          {(() => {
-            const objectives = report.strategicAlignment?.objectives || []
-            if (objectives.length === 0) return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No strategic objectives assessed</div>
-            // Group by strategy type
-            const grouped: Record<string, any[]> = {}
-            for (const obj of objectives) {
-              const key = obj.strategyType || 'OTHER'
-              if (!grouped[key]) grouped[key] = []
-              grouped[key].push(obj)
-            }
-            return Object.entries(grouped).map(([stratType, objs]) => (
-              <div key={stratType} style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 10, padding: '6px 12px', background: 'var(--navy-mid)', borderRadius: 8 }}>
-                  {stratType.replace(/_/g, ' ')}
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400, marginLeft: 8 }}>{objs.length} goal(s)</span>
-                </div>
-                {objs.map((obj: any, i: number) => (
-                  <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{obj.objectiveName}</div>
-                      <div style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, background: '#8baac822', color: '#8baac8' }}>{obj.alignmentStatus?.replace(/_/g, ' ')}</div>
-                      <div style={{ fontSize: 16, fontWeight: 700, color: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', minWidth: 42, textAlign: 'right' }}>{obj.alignmentPercentage}%</div>
+
+            {objectives.length === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No strategic objectives assessed</div>}
+
+            {/* Per-strategy groups */}
+            {sortedTypes.map(stratType => {
+              const meta = STRAT_META[stratType]
+              const objs = grouped[stratType]
+              const avgAlign = Math.round(objs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/objs.length)
+              const avgColor = avgAlign >= 75 ? '#2ecc71' : avgAlign >= 50 ? '#f39c12' : '#e74c3c'
+              const fullyAligned = objs.filter((o:any) => o.alignmentStatus === 'FULLY_ALIGNED').length
+              const notAligned = objs.filter((o:any) => o.alignmentStatus === 'NOT_ALIGNED').length
+
+              return (
+                <div key={stratType} style={{ marginBottom: 20 }}>
+                  {/* Strategy header */}
+                  <div style={{ background: (meta?.color || '#8baac8') + '18', border: '1px solid ' + (meta?.color || '#8baac8') + '44', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: meta?.color || '#8baac8' }}>
+                          {meta?.label || stratType.replace(/_/g,' ')}
+                          {meta?.weight > 0 && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>[{meta.weight}% weight]</span>}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                          {objs.length} goals · {fullyAligned} fully aligned · {notAligned} not aligned
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'center', minWidth: 52 }}>
+                        <div style={{ fontSize: 22, fontWeight: 700, color: avgColor }}>{avgAlign}%</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>avg</div>
+                      </div>
                     </div>
-                    <div style={{ height: 4, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: (obj.alignmentPercentage || 0) + '%', background: obj.alignmentPercentage >= 75 ? '#2ecc71' : obj.alignmentPercentage >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
+                    {/* Mini alignment bar */}
+                    <div style={{ height: 4, background: 'var(--navy-dark)', borderRadius: 2, marginTop: 8, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: avgAlign + '%', background: avgColor, borderRadius: 2 }} />
                     </div>
-                    {obj.contributionDescription && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{obj.contributionDescription}</div>}
-                    {obj.expectedValue && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Value: {obj.expectedValue}</div>}
-                    {obj.relatedKPIs?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>KPIs: {obj.relatedKPIs.join(', ')}</div>}
                   </div>
-                ))}
-              </div>
-            ))
-          })()}
-        </div>
-      )}
+
+                  {/* Objective cards */}
+                  {objs.map((obj: any, i: number) => {
+                    const statusColor = STATUS_COLOR[obj.alignmentStatus] || '#8baac8'
+                    const pct = obj.alignmentPercentage || 0
+                    return (
+                      <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + statusColor + '33', borderRadius: 10, padding: 14, marginBottom: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                          <span style={{ fontSize: 16, marginTop: 1 }}>{STATUS_ICON[obj.alignmentStatus] || '•'}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{isAR ? resolveText(obj.objectiveName) : obj.objectiveName}</div>
+                              <div style={{ fontSize: 18, fontWeight: 700, color: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', minWidth: 40, textAlign: 'right' }}>{pct}%</div>
+                            </div>
+                            {/* Progress bar */}
+                            <div style={{ height: 3, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: pct + '%', background: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
+                            </div>
+                            {obj.contributionDescription && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription}</div>}
+                            {obj.expectedValue && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>💡 {isAR ? resolveText(obj.expectedValue) : obj.expectedValue}</div>}
+                            {obj.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>📋 {obj.evidence}</div>}
+                            {obj.relatedKPIs?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📊 KPIs: {obj.relatedKPIs.join(', ')}</div>}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
 
       {/* Compliance Tab */}
       {tab === 'compliance' && (() => {
@@ -1090,85 +1168,221 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       )}
 
       {/* Future State Tab */}
-      {tab === 'future' && (
-        <div>
-          {report.futureStateAlignment ? (
-            <div>
-              <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 20 }}>
-                <div style={{ textAlign: 'center', minWidth: 80 }}>
-                  <div style={{ fontSize: 32, fontWeight: 700, color: (report.futureStateAlignment.alignmentPercentage || 0) >= 75 ? '#2ecc71' : (report.futureStateAlignment.alignmentPercentage || 0) >= 50 ? '#f39c12' : '#e74c3c' }}>{report.futureStateAlignment.alignmentPercentage || 0}%</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{report.futureStateAlignment.overallAlignment?.replace(/_/g, ' ')}</div>
+      {tab === 'future' && (() => {
+        const fs = report.futureStateAlignment
+        if (!fs) return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>Future-state alignment not available</div>
+        const pct = fs.alignmentPercentage || 0
+        const pctColor = pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c'
+        const AREA_STATUS_COLOR: Record<string,string> = {
+          ALIGNED: '#2ecc71', PARTIALLY_ALIGNED: '#f39c12', GAP_IDENTIFIED: '#e67e22',
+          NOT_ALIGNED: '#e74c3c', FUTURE_REQUIREMENT: '#3498db', NOT_APPLICABLE: '#8baac8'
+        }
+        const AREA_ICON: Record<string,string> = {
+          ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', GAP_IDENTIFIED: '🔶',
+          NOT_ALIGNED: '❌', FUTURE_REQUIREMENT: '🔵', NOT_APPLICABLE: '—'
+        }
+        const areas = fs.alignmentAreas || []
+        const alignedCount = areas.filter((a:any) => a.status === 'ALIGNED').length
+        const gapCount = areas.filter((a:any) => ['GAP_IDENTIFIED','NOT_ALIGNED'].includes(a.status)).length
+        const futureReqs = areas.filter((a:any) => a.status === 'FUTURE_REQUIREMENT').length
+
+        return (
+          <div>
+            {/* Header */}
+            <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 10 }}>
+                <div style={{ textAlign: 'center', minWidth: 72 }}>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: pctColor }}>{pct}%</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fs.overallAlignment?.replace(/_/g,' ') || 'Alignment'}</div>
                 </div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8 }}>{report.futureStateAlignment.summary}</div>
-                  <div style={{ height: 6, background: 'var(--navy-dark)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: (report.futureStateAlignment.alignmentPercentage || 0) + '%', background: (report.futureStateAlignment.alignmentPercentage || 0) >= 75 ? '#2ecc71' : (report.futureStateAlignment.alignmentPercentage || 0) >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 3 }} />
+                  <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8, lineHeight: 1.5 }}>{isAR ? resolveText(fs.summary) : fs.summary}</div>
+                  <div style={{ height: 8, background: 'var(--navy-dark)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: pct + '%', background: pctColor, borderRadius: 4, transition: 'width 0.5s' }} />
                   </div>
                 </div>
               </div>
-              {(report.futureStateAlignment.alignmentAreas || []).map((area: any, i: number) => (
-                <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{area.area}</div>
-                    <div style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8' }}>{area.status?.replace(/_/g, ' ')}</div>
-                  </div>
-                  {area.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>Gap: {area.gap}</div>}
-                  {area.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>Recommendation: {area.recommendation}</div>}
-                </div>
-              ))}
-              {report.futureStateAlignment.keyGaps?.length > 0 && (
-                <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c44', borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 10 }}>KEY GAPS</div>
-                  {report.futureStateAlignment.keyGaps.map((g: string, i: number) => (
-                    <div key={i} style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 8 }}>• {g}</div>
-                  ))}
-                </div>
-              )}
-              {report.futureStateAlignment.recommendations?.length > 0 && (
-                <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)', marginBottom: 10 }}>RECOMMENDATIONS</div>
-                  {report.futureStateAlignment.recommendations.map((r: string, i: number) => (
-                    <div key={i} style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4, paddingLeft: 8 }}>• {r}</div>
-                  ))}
+              {/* Area status summary */}
+              {areas.length > 0 && (
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
+                  {alignedCount > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#2ecc7122', color: '#2ecc71' }}>✅ {alignedCount} Aligned</span>}
+                  {gapCount > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#e74c3c22', color: '#e74c3c' }}>❌ {gapCount} Gaps</span>}
+                  {futureReqs > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#3498db22', color: '#3498db' }}>🔵 {futureReqs} Future Requirements</span>}
                 </div>
               )}
             </div>
-          ) : (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>Future-state alignment not available</div>
-          )}
-        </div>
-      )}
+
+            {/* Alignment areas — grouped by status */}
+            {['NOT_ALIGNED','GAP_IDENTIFIED','PARTIALLY_ALIGNED','FUTURE_REQUIREMENT','ALIGNED','NOT_APPLICABLE']
+              .filter(s => areas.some((a:any) => a.status === s))
+              .map(status => {
+                const statusAreas = areas.filter((a:any) => a.status === status)
+                const c = AREA_STATUS_COLOR[status] || '#8baac8'
+                return (
+                  <div key={status} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: c, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{AREA_ICON[status]}</span>
+                      <span>{status.replace(/_/g,' ')}</span>
+                      <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({statusAreas.length})</span>
+                    </div>
+                    {statusAreas.map((area: any, i: number) => (
+                      <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + c + '33', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>{isAR ? resolveText(area.area) : area.area}</div>
+                        {area.currentState && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>📍 Current: {isAR ? resolveText(area.currentState) : area.currentState}</div>}
+                        {area.targetState && <div style={{ fontSize: 12, color: '#3498db', marginBottom: 4 }}>🎯 Target: {isAR ? resolveText(area.targetState) : area.targetState}</div>}
+                        {area.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>⚠ Gap: {isAR ? resolveText(area.gap) : area.gap}</div>}
+                        {area.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {isAR ? resolveText(area.recommendation) : area.recommendation}</div>}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })
+            }
+
+            {/* Key gaps */}
+            {fs.keyGaps?.length > 0 && (
+              <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c33', borderRadius: 10, padding: 16, marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c', marginBottom: 10 }}>🚨 KEY GAPS TO ADDRESS</div>
+                {fs.keyGaps.map((g: string, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
+                    <span style={{ color: '#e74c3c', minWidth: 20, fontWeight: 700 }}>{i+1}.</span>
+                    <span style={{ color: 'var(--text-muted)' }}>{isAR ? resolveText(g) : g}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Recommendations roadmap */}
+            {fs.recommendations?.length > 0 && (
+              <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>🗺 ROADMAP TO TARGET STATE</div>
+                {fs.recommendations.map((r: string, i: number) => (
+                  <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 10, alignItems: 'flex-start' }}>
+                    <div style={{ minWidth: 24, height: 24, borderRadius: '50%', background: 'var(--accent)22', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>{i+1}</div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', paddingTop: 3, lineHeight: 1.5 }}>{isAR ? resolveText(r) : r}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Financial Tab */}
-      {tab === 'financial' && (
-        <div>
-          {report.financialOpportunities?.totalAnnualSaving > 0 && (
-            <div style={{ background: '#2ecc7122', border: '1px solid #2ecc7144', borderRadius: 10, padding: 16, marginBottom: 16, textAlign: 'center' }}>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 4 }}>ESTIMATED ANNUAL SAVINGS</div>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#2ecc71' }}>SAR {report.financialOpportunities.totalAnnualSaving.toLocaleString()}</div>
-            </div>
-          )}
-          {(report.financialOpportunities?.opportunities || []).map((o: any, i: number) => (
-            <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 16, marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{o.title || o.type?.replace(/_/g, ' ')}</div>
-                {o.confidenceLevel && <div style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8' }}>Confidence: {o.confidenceLevel}</div>}
+      {tab === 'financial' && (() => {
+        const fin = report.financialOpportunities || {}
+        const opps = fin.opportunities || []
+        const totalAnnual = fin.totalAnnualSaving || opps.reduce((s:number,o:any)=>s+(o.annualSaving||0),0)
+        const totalOneTime = fin.totalEstimatedSaving || opps.reduce((s:number,o:any)=>s+(o.estimatedSaving||0),0)
+        const totalSaving = totalAnnual + totalOneTime
+
+        const TYPE_COLOR: Record<string,string> = {
+          REUSE_OPPORTUNITY: '#2ecc71', LICENSE_OPTIMIZATION: '#3498db',
+          CLOUD_OPTIMIZATION: '#9b59b6', VENDOR_CONSOLIDATION: '#e67e22',
+          TECHNICAL_DEBT_REDUCTION: '#f39c12', PROCESS_AUTOMATION: '#1abc9c',
+        }
+        const TYPE_ICON: Record<string,string> = {
+          REUSE_OPPORTUNITY: '♻️', LICENSE_OPTIMIZATION: '📋',
+          CLOUD_OPTIMIZATION: '☁️', VENDOR_CONSOLIDATION: '🤝',
+          TECHNICAL_DEBT_REDUCTION: '🔧', PROCESS_AUTOMATION: '⚙️',
+        }
+        const CONF_COLOR: Record<string,string> = { HIGH:'#2ecc71', MEDIUM:'#f39c12', LOW:'#e74c3c' }
+
+        return (
+          <div>
+            {/* Total savings header */}
+            {totalSaving > 0 ? (
+              <div style={{ background: '#2ecc7118', border: '1px solid #2ecc7144', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+                <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 4 }}>TOTAL FINANCIAL OPPORTUNITY</div>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: '#2ecc71' }}>
+                    SAR {totalSaving.toLocaleString()}
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{opps.length} opportunities identified</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  {totalAnnual > 0 && (
+                    <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>💰 Annual Savings</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#2ecc71' }}>SAR {totalAnnual.toLocaleString()}</div>
+                    </div>
+                  )}
+                  {totalOneTime > 0 && (
+                    <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>🏦 One-time Saving</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#3498db' }}>SAR {totalOneTime.toLocaleString()}</div>
+                    </div>
+                  )}
+                </div>
+                {/* Type breakdown */}
+                {opps.length > 1 && (
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                    {Object.entries(
+                      opps.reduce((acc:any,o:any)=>{ const t=o.type||'OTHER'; acc[t]=(acc[t]||0)+(o.annualSaving||o.estimatedSaving||0); return acc },{})
+                    ).sort((a:any,b:any)=>b[1]-a[1]).map(([type,val]:any) => (
+                      <div key={type} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: (TYPE_COLOR[type]||'#8baac8')+'22', color: TYPE_COLOR[type]||'#8baac8' }}>
+                        {TYPE_ICON[type]||'•'} {type.replace(/_/g,' ')}: SAR {val.toLocaleString()}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>{o.description}</div>
-              {o.existingAlternative && <div style={{ fontSize: 13, color: 'var(--accent)', marginBottom: 6 }}>♻️ Reuse: {o.existingAlternative}</div>}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                {o.estimatedSaving > 0 && <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>One-time Saving</div><div style={{ fontSize: 15, fontWeight: 700, color: '#2ecc71' }}>SAR {o.estimatedSaving.toLocaleString()}</div></div>}
-                {o.annualSaving > 0 && <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Annual Saving</div><div style={{ fontSize: 15, fontWeight: 700, color: '#2ecc71' }}>SAR {o.annualSaving.toLocaleString()}</div></div>}
-              </div>
-              {o.savingRationale && <div style={{ fontSize: 12, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 4 }}>📊 Basis: {o.savingRationale}</div>}
-              {o.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {o.recommendation}</div>}
-            </div>
-          ))}
-          {!report.financialOpportunities?.opportunities?.length && (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No financial opportunities detected</div>
-          )}
-        </div>
-      )}
+            ) : (
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No financial opportunities detected</div>
+            )}
+
+            {/* Opportunity cards — sorted by saving desc */}
+            {[...opps].sort((a:any,b:any)=>((b.annualSaving||0)+(b.estimatedSaving||0))-((a.annualSaving||0)+(a.estimatedSaving||0))).map((o: any, i: number) => {
+              const oColor = TYPE_COLOR[o.type] || '#8baac8'
+              const oIcon = TYPE_ICON[o.type] || '💡'
+              const oTotal = (o.annualSaving||0) + (o.estimatedSaving||0)
+              return (
+                <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + oColor + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 20, minWidth: 28 }}>{oIcon}</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{isAR ? resolveText(o.title||o.type?.replace(/_/g,' ')) : (o.title||o.type?.replace(/_/g,' '))}</div>
+                        {o.confidenceLevel && (
+                          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: (CONF_COLOR[o.confidenceLevel]||'#8baac8')+'22', color: CONF_COLOR[o.confidenceLevel]||'#8baac8', fontWeight: 600 }}>
+                            {o.confidenceLevel} confidence
+                          </span>
+                        )}
+                        {oTotal > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: '#2ecc71', marginLeft: 'auto' }}>SAR {oTotal.toLocaleString()}</span>}
+                      </div>
+                      {o.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>{isAR ? resolveText(o.description) : o.description}</div>}
+                    </div>
+                  </div>
+
+                  {o.existingAlternative && (
+                    <div style={{ background: '#2ecc7115', border: '1px solid #2ecc7133', borderRadius: 6, padding: '6px 10px', marginBottom: 8, fontSize: 12, color: '#2ecc71' }}>
+                      ♻️ Reuse existing: {isAR ? resolveText(o.existingAlternative) : o.existingAlternative}
+                    </div>
+                  )}
+
+                  <div style={{ display: 'grid', gridTemplateColumns: o.estimatedSaving > 0 && o.annualSaving > 0 ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 8 }}>
+                    {o.estimatedSaving > 0 && (
+                      <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>One-time Saving</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: '#3498db' }}>SAR {o.estimatedSaving.toLocaleString()}</div>
+                      </div>
+                    )}
+                    {o.annualSaving > 0 && (
+                      <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Annual Saving</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color: '#2ecc71' }}>SAR {o.annualSaving.toLocaleString()}</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {o.savingRationale && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 6 }}>📊 {isAR ? resolveText(o.savingRationale) : o.savingRationale}</div>}
+                  {o.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {isAR ? resolveText(o.recommendation) : o.recommendation}</div>}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })()}
     </div>
   )
 }
