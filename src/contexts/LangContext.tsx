@@ -74,6 +74,63 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'common.export':     { EN: 'Export', AR: 'تصدير' },
   'common.loading':    { EN: 'Loading...', AR: 'جارٍ التحميل...' },
   'common.error':      { EN: 'Error', AR: 'خطأ' },
+
+  // ── Governance ────────────────────────────────────────────────────────────
+  'gov.dashboard':            { EN: 'Governance Reviews', AR: 'مراجعات الحوكمة' },
+  'gov.reviews':              { EN: 'Reviews', AR: 'المراجعات' },
+  'gov.new_review':           { EN: '+ New Review', AR: '+ مراجعة جديدة' },
+  'gov.start_review':         { EN: 'Start an architecture governance review', AR: 'ابدأ مراجعة حوكمة البنية المؤسسية' },
+  'gov.review_now':           { EN: 'Review Now', AR: 'راجع الآن' },
+  'gov.view_all':             { EN: 'View All', AR: 'عرض الكل' },
+  'gov.pending':              { EN: 'Pending', AR: 'معلّقة' },
+  'gov.completed':            { EN: 'Completed', AR: 'مكتملة' },
+  'gov.total_reviews':        { EN: 'Total Reviews', AR: 'إجمالي المراجعات' },
+  'gov.avg_score':            { EN: 'Avg Score', AR: 'متوسط النتيجة' },
+  'gov.decision_breakdown':   { EN: 'Decision Breakdown', AR: 'توزيع القرارات' },
+  'gov.score_trend':          { EN: 'Score Trend', AR: 'اتجاه النتائج' },
+  'gov.last_n':               { EN: 'Last {n}', AR: 'آخر {n}' },
+  'gov.recent_reviews':       { EN: 'Recent Reviews', AR: 'المراجعات الأخيرة' },
+  'gov.reviews_pending_action': { EN: 'reviews pending action', AR: 'مراجعات تنتظر الإجراء' },
+  // Report sections
+  'gov.summary':              { EN: 'Summary', AR: 'الملخص' },
+  'gov.findings':             { EN: 'Findings', AR: 'الملاحظات' },
+  'gov.domains':              { EN: 'Domains', AR: 'المجالات' },
+  'gov.strategic':            { EN: 'Strategic', AR: 'الاستراتيجي' },
+  'gov.compliance':           { EN: 'Compliance', AR: 'الامتثال' },
+  'gov.risk_register':        { EN: 'Risk Register', AR: 'سجل المخاطر' },
+  'gov.future_state':         { EN: 'Future State', AR: 'الحالة المستقبلية' },
+  'gov.financial':            { EN: 'Financial', AR: 'المالي' },
+  'gov.executive_summary':    { EN: 'Executive Summary', AR: 'الملخص التنفيذي' },
+  'gov.mandatory_actions':    { EN: 'Mandatory Actions', AR: 'الإجراءات الإلزامية' },
+  'gov.recommended_actions':  { EN: 'Recommended Actions', AR: 'الإجراءات الموصى بها' },
+  'gov.immediate_blockers':   { EN: 'Immediate Blockers', AR: 'العوائق الفورية' },
+  'gov.score_tips':           { EN: 'Score Improvement Tips', AR: 'نصائح تحسين النتيجة' },
+  'gov.group_by':             { EN: 'Group by:', AR: 'تجميع حسب:' },
+  'gov.domain':               { EN: 'Domain', AR: 'المجال' },
+  'gov.severity':             { EN: 'Severity', AR: 'الخطورة' },
+  'gov.clear_filters':        { EN: '✕ Clear filters', AR: '✕ مسح التصفية' },
+  'gov.no_findings':          { EN: 'No findings', AR: 'لا توجد ملاحظات' },
+  'gov.total_findings':       { EN: 'total findings', AR: 'إجمالي الملاحظات' },
+  // Decisions
+  'gov.approved':             { EN: 'Approved', AR: 'معتمد' },
+  'gov.rejected':             { EN: 'Rejected', AR: 'مرفوض' },
+  'gov.conditional':          { EN: 'Approved with Conditions', AR: 'معتمد بشروط' },
+  'gov.requires_changes':     { EN: 'Requires Changes', AR: 'يتطلب تعديلات' },
+  'gov.requires_exception':   { EN: 'Requires Exception', AR: 'يتطلب استثناء' },
+  // Review types
+  'gov.hld_review':           { EN: 'HLD Review', AR: 'مراجعة التصميم رفيع المستوى' },
+  'gov.lld_review':           { EN: 'LLD Review', AR: 'مراجعة التصميم تفصيلي المستوى' },
+  // Compliance
+  'gov.compliant':            { EN: '✓ Compliant', AR: '✓ ممتثل' },
+  'gov.non_compliant':        { EN: '✗ Non-Compliant', AR: '✗ غير ممتثل' },
+  'gov.partial':              { EN: '⚠ Partial', AR: '⚠ جزئي' },
+  'gov.exception':            { EN: '⚡ Exception', AR: '⚡ استثناء' },
+  'gov.na':                   { EN: '— N/A', AR: '— غير منطبق' },
+  'gov.evidence':             { EN: 'Evidence', AR: 'الدليل' },
+  'gov.gap':                  { EN: 'Gap', AR: 'الفجوة' },
+  'gov.recommendation':       { EN: 'Recommendation', AR: 'التوصية' },
+  'gov.items_assessed':       { EN: 'items assessed', AR: 'عنصر تم تقييمه' },
+
   'common.success':    { EN: 'Success', AR: 'نجاح' },
   'common.status':     { EN: 'Status', AR: 'الحالة' },
   'common.name':       { EN: 'Name', AR: 'الاسم' },
@@ -432,3 +489,4 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
     </Ctx.Provider>
   )
 }
+
