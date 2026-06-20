@@ -683,7 +683,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
 
-  const { t, isAR } = useLang()
+  const { t, isAR, resolveText } = useLang()
   const tabs = [
     { key: 'summary', label: t('gov.summary') },
     { key: 'findings', label: t('gov.findings') },
@@ -721,7 +721,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
       {/* Decision Box */}
       <div style={{ background: (DECISION_COLOR[report.decision] || '#8baac8') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#8baac8'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
         <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#8baac8', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{report.decisionRationale}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{isAR ? resolveText(report.decisionRationale) : report.decisionRationale}</div>
       </div>
 
       {/* Tabs */}
@@ -762,7 +762,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
                 <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderTop: i > 0 ? '1px solid #e74c3c22' : 'none', fontSize: 13 }}>
                   <span style={{ color: '#e74c3c', fontWeight: 700, minWidth: 22 }}>{i+1}.</span>
                   <div>
-                    <div style={{ fontWeight: 600, color: 'var(--text)' }}>{f.title}</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text)' }}>{isAR ? resolveText(f.title) : f.title}</div>
                     <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>{f.domain?.replace(/_/g,' ')} · {f.category?.replace(/_/g,' ')}</div>
                     {f.recommendation && <div style={{ color: '#e74c3c', fontSize: 12, marginTop: 4 }}>→ {f.recommendation}</div>}
                   </div>
@@ -795,7 +795,7 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
           {/* Executive Summary */}
           <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.executive_summary')}</div>
-            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{report.executiveSummary}</div>
+            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{isAR ? resolveText(report.executiveSummary) : report.executiveSummary}</div>
           </div>
 
           {report.scopeDescription && (
@@ -866,8 +866,8 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{domain.replace(/_/g, ' ')}</div>
-                    {ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 2 }}>✗ {ds.keyWeaknesses}</div>}
-                    {ds.keyStrengths && !ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#2ecc71', marginTop: 2 }}>✓ {ds.keyStrengths}</div>}
+                    {ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 2 }}>✗ {isAR ? resolveText(ds.keyWeaknesses) : ds.keyWeaknesses}</div>}
+                    {ds.keyStrengths && !ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#2ecc71', marginTop: 2 }}>✓ {isAR ? resolveText(ds.keyStrengths) : ds.keyStrengths}</div>}
                   </div>
                   <ScoreCircle score={score} label='' size={52} />
                 </div>
@@ -1040,8 +1040,8 @@ function ReportView({ review, report, findings }: { review: any, report: any, fi
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 600 }}>{item.principleOrStandard}</div>
                         {item.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>📋 {item.evidence}</div>}
-                        {item.gap && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4 }}>⚠ {item.gap}</div>}
-                        {item.recommendation && <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>→ {item.recommendation}</div>}
+                        {item.gap && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4 }}>⚠ {isAR ? resolveText(item.gap) : item.gap}</div>}
+                        {item.recommendation && <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>→ {isAR ? resolveText(item.recommendation) : item.recommendation}</div>}
                       </div>
                     </div>
                   </div>
