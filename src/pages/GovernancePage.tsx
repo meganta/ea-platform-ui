@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
@@ -403,6 +404,7 @@ export default function GovernancePage() {
   const api = useApi()
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
   const [reviews, setReviews] = useState<any[]>([])
+  const location = useLocation()
   const [review, setReview] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -425,6 +427,19 @@ export default function GovernancePage() {
     catch (e) { setError('Failed to load reviews') }
     finally { setLoading(false) }
   }
+
+  // Handle deep-link from Reports page — auto-open specific review at specific tab
+  useEffect(() => {
+    const state = location.state as { reviewId?: string; tab?: string } | null
+    if (!state?.reviewId || reviews.length === 0) return
+    const target = reviews.find((r: any) => r.id === state.reviewId)
+    if (target) {
+      setSelected(target)
+      loadReport(target.id)
+      if (state.tab) setTab(state.tab as any)
+      window.history.replaceState({}, '')
+    }
+  }, [location.state, reviews])
 
   const openReview = async (r: any) => {
     setReview(r)
