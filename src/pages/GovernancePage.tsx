@@ -1162,7 +1162,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 <div style={{ height: 12, borderRadius: 6, overflow: 'hidden', display: 'flex', marginBottom: 10 }}>
                   {statuses.map(s => {
                     const pct = (countBy(s) / total) * 100
-                    return pct > 0 ? <div key={s} style={{ width: pct + '%', background: statusColor[s], title: s }} /> : null
+                    return pct > 0 ? <div key={s} title={s} style={{ width: pct + '%', background: statusColor[s] }} /> : null
                   })}
                 </div>
                 {/* Legend */}
