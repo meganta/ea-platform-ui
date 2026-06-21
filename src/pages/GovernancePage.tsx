@@ -1380,9 +1380,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Compliance Tab */}
       {tab === 'compliance' && (() => {
         const items = report.complianceMatrix?.items || []
-        const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','NOT_APPLICABLE']
-        const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#8baac8' }
-        const statusLabel: Record<string,string> = { COMPLIANT:'✓ Compliant', PARTIALLY_COMPLIANT:'⚠ Partial', NON_COMPLIANT:'✗ Non-Compliant', REQUIRES_EXCEPTION:'⚡ Exception', NOT_APPLICABLE:'— N/A' }
+        const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE']
+        const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#8baac8', RECOMMENDED:'#3498db' }
+        const statusLabel: Record<string,string> = { COMPLIANT:'✓ Compliant', PARTIALLY_COMPLIANT:'⚠ Partial', NON_COMPLIANT:'✗ Non-Compliant', REQUIRES_EXCEPTION:'⚡ Exception', NOT_APPLICABLE:'— N/A', RECOMMENDED:'💡 Recommended' }
         const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', NCA_STANDARD:'#1abc9c', NDMO_STANDARD:'#9b59b6' }
         const catLabel: Record<string,string> = { TENANT_PRINCIPLE:'Tenant EA Principles', TENANT_STANDARD:'Tenant EA Standards', NCA_STANDARD:'NCA ECC Controls', NDMO_STANDARD:'NDMO Data Standards' }
 
@@ -1453,7 +1453,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                   {catLabel[cat] || cat.replace(/_/g,' ')}
                   <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({grouped[cat].length})</span>
                   {(() => {
-                    const scorable = grouped[cat].filter((i:any) => i.complianceStatus !== 'NOT_APPLICABLE')
+                    const scorable = grouped[cat].filter((i:any) => i.complianceStatus !== 'NOT_APPLICABLE' && i.complianceStatus !== 'RECOMMENDED')
                     if (scorable.length === 0) return null
                     const avg = Math.round(scorable.reduce((s:number,i:any) => s + (i.complianceStatus === 'COMPLIANT' ? 100 : i.complianceStatus === 'PARTIALLY_COMPLIANT' ? 50 : i.complianceStatus === 'REQUIRES_EXCEPTION' ? 25 : 0), 0) / scorable.length)
                     const c = avg >= 75 ? '#2ecc71' : avg >= 40 ? '#f39c12' : '#e74c3c'
@@ -1466,11 +1466,12 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     : item.complianceStatus === 'PARTIALLY_COMPLIANT' ? 50
                     : item.complianceStatus === 'NON_COMPLIANT' ? 0
                     : item.complianceStatus === 'REQUIRES_EXCEPTION' ? 25
-                    : null // NOT_APPLICABLE — excluded from scoring
+                    : null // NOT_APPLICABLE and RECOMMENDED — excluded from scoring
                   const scoreColor = itemScore === null ? '#8baac8' : itemScore >= 75 ? '#2ecc71' : itemScore >= 40 ? '#f39c12' : '#e74c3c'
                   const borderColor = item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c33'
                     : item.complianceStatus === 'COMPLIANT' ? '#2ecc7133'
                     : item.complianceStatus === 'PARTIALLY_COMPLIANT' ? '#f39c1233'
+                    : item.complianceStatus === 'RECOMMENDED' ? '#3498db22'
                     : 'var(--navy-light)'
                   return (
                     <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + borderColor, borderRadius: 10, padding: 12, marginBottom: 8 }}>
@@ -1483,34 +1484,45 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                         {/* Content */}
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: item.evidence || item.gap ? 4 : 0 }}>{item.principleOrStandard}</div>
-                          {item.evidence && (
-                            <div style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 6 }}>
-                              <span style={{ color: item.complianceStatus === 'COMPLIANT' ? '#2ecc71' : item.complianceStatus === 'PARTIALLY_COMPLIANT' ? '#f39c12' : 'var(--text-muted)', flexShrink: 0 }}>✓</span>
-                              <span style={{ color: 'var(--text-muted)' }}>{item.evidence}</span>
+                          {item.complianceStatus === 'RECOMMENDED' ? (
+                            <div style={{ fontSize: 11, color: '#3498db', marginTop: 4, display: 'flex', gap: 6 }}>
+                              <span style={{ flexShrink: 0 }}>💡</span>
+                              <span>{isAR ? resolveText(item.recommendation || 'Consider addressing this principle in the solution design.') : (item.recommendation || 'Consider addressing this principle in the solution design.')}</span>
                             </div>
-                          )}
-                          {item.complianceStatus === 'PARTIALLY_COMPLIANT' && item.gap && (
-                            <div style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 6 }}>
-                              <span style={{ color: '#e74c3c', flexShrink: 0 }}>✗</span>
-                              <span style={{ color: '#e74c3c' }}>{isAR ? resolveText(item.gap) : item.gap}</span>
-                            </div>
-                          )}
-                          {item.complianceStatus === 'NON_COMPLIANT' && item.gap && (
-                            <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4, display: 'flex', gap: 6 }}>
-                              <span style={{ flexShrink: 0 }}>⚠</span>
-                              <span>{isAR ? resolveText(item.gap) : item.gap}</span>
-                            </div>
-                          )}
-                          {item.recommendation && item.complianceStatus !== 'COMPLIANT' && item.complianceStatus !== 'NOT_APPLICABLE' && (
-                            <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, display: 'flex', gap: 6 }}>
-                              <span style={{ flexShrink: 0 }}>→</span>
-                              <span>{isAR ? resolveText(item.recommendation) : item.recommendation}</span>
-                            </div>
+                          ) : (
+                            <>
+                              {item.evidence && (
+                                <div style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 6 }}>
+                                  <span style={{ color: item.complianceStatus === 'COMPLIANT' ? '#2ecc71' : item.complianceStatus === 'PARTIALLY_COMPLIANT' ? '#f39c12' : 'var(--text-muted)', flexShrink: 0 }}>✓</span>
+                                  <span style={{ color: 'var(--text-muted)' }}>{item.evidence}</span>
+                                </div>
+                              )}
+                              {item.complianceStatus === 'PARTIALLY_COMPLIANT' && item.gap && (
+                                <div style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 6 }}>
+                                  <span style={{ color: '#e74c3c', flexShrink: 0 }}>✗</span>
+                                  <span style={{ color: '#e74c3c' }}>{isAR ? resolveText(item.gap) : item.gap}</span>
+                                </div>
+                              )}
+                              {item.complianceStatus === 'NON_COMPLIANT' && item.gap && (
+                                <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4, display: 'flex', gap: 6 }}>
+                                  <span style={{ flexShrink: 0 }}>⚠</span>
+                                  <span>{isAR ? resolveText(item.gap) : item.gap}</span>
+                                </div>
+                              )}
+                              {item.recommendation && item.complianceStatus !== 'COMPLIANT' && item.complianceStatus !== 'NOT_APPLICABLE' && item.complianceStatus !== 'RECOMMENDED' && (
+                                <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, display: 'flex', gap: 6 }}>
+                                  <span style={{ flexShrink: 0 }}>→</span>
+                                  <span>{isAR ? resolveText(item.recommendation) : item.recommendation}</span>
+                                </div>
+                              )}
+                            </>
                           )}
                         </div>
                         {/* Score chip */}
                         <div style={{ textAlign: 'center', minWidth: 44, flexShrink: 0 }}>
-                          {itemScore !== null ? (
+                          {item.complianceStatus === 'RECOMMENDED' ? (
+                            <div style={{ fontSize: 9, color: '#3498db', fontWeight: 600, lineHeight: 1.3 }}>Advisory<br/>No penalty</div>
+                          ) : itemScore !== null ? (
                             <>
                               <div style={{ fontSize: 16, fontWeight: 700, color: scoreColor }}>{itemScore}</div>
                               <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
