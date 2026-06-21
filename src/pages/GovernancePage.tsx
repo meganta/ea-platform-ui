@@ -77,136 +77,145 @@ const DOMAIN_LABEL: Record<string, string> = {
   TOGAF_GOVERNANCE: 'TOGAF Governance',
 }
 
-function FindingsTab({ findings }: { findings: any[] }) {
+function DomainsFindingsTab({ findings, report, isAR, resolveText }: { findings: any[], report: any, isAR: boolean, resolveText: (s: string) => string }) {
   const { t } = useLang()
-  const [groupBy, setGroupBy] = React.useState<'domain' | 'severity'>('domain')
   const [filterSev, setFilterSev] = React.useState<string[]>([])
-  const [filterDomain, setFilterDomain] = React.useState<string[]>([])
+  // collapsed state: null = all expanded by default
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({})
 
-  const allDomains = Array.from(new Set(findings.map(f => f.domain || 'GENERAL'))).sort()
-
   const toggleSev = (s: string) => setFilterSev(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])
-  const toggleDomain = (d: string) => setFilterDomain(p => p.includes(d) ? p.filter(x => x !== d) : [...p, d])
   const toggleGroup = (g: string) => setCollapsed(p => ({ ...p, [g]: !p[g] }))
 
-  const filtered = findings.filter(f => {
+  // Filter findings — never collapse groups, just filter their contents
+  const filteredFindings = findings.filter(f => {
     if (filterSev.length > 0 && !filterSev.includes(f.severity)) return false
-    if (filterDomain.length > 0 && !filterDomain.includes(f.domain || 'GENERAL')) return false
     return true
   })
 
-  const groups: Record<string, any[]> = {}
-  if (groupBy === 'domain') {
-    for (const f of filtered) { const k = f.domain || 'GENERAL'; if (!groups[k]) groups[k] = []; groups[k].push(f) }
-  } else {
-    for (const sev of ['CRITICAL','HIGH','MEDIUM','LOW']) {
-      const items = filtered.filter(f => f.severity === sev)
-      if (items.length) groups[sev] = items
-    }
-  }
+  // Build domain groups from domainSummaries (to preserve score data) + findings
+  const domainEntries = Object.entries(report.domainSummaries || {})
+    .filter(([k, v]) => !k.startsWith('_') && typeof v === 'object' && v !== null && 'score' in (v as any))
 
-  const activeFilters = filterSev.length + filterDomain.length
+  const sevCount = (sev: string) => findings.filter(f => f.severity === sev).length
 
   return (
     <div>
-      {/* Severity filter buttons */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        {['CRITICAL','HIGH','MEDIUM','LOW'].map(sev => {
-          const total = findings.filter(f => f.severity === sev).length
-          if (total === 0) return null
-          const active = filterSev.includes(sev)
-          return (
-            <button key={sev} onClick={() => toggleSev(sev)} style={{
-              padding: '5px 12px', borderRadius: 8, border: '1px solid ' + SEV_COLOR[sev] + (active ? '' : '55'),
-              background: active ? SEV_COLOR[sev] + '33' : 'transparent',
-              color: SEV_COLOR[sev], fontWeight: 600, fontSize: 12, cursor: 'pointer'
-            }}>{total} {sev}</button>
-          )
-        })}
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          {activeFilters > 0 && (
-            <button onClick={() => { setFilterSev([]); setFilterDomain([]) }} style={{
-              fontSize: 11, color: 'var(--text-muted)', background: 'transparent',
-              border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer'
-            }}>{t('gov.clear_filters')}</button>
-          )}
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{filtered.length}/{findings.length} findings</span>
-        </div>
-      </div>
-
-      {/* Domain filter pills */}
-      {allDomains.length > 1 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-          {allDomains.map(d => {
-            const label = d === 'GENERAL' ? 'General' : (DOMAIN_LABEL[d] || d.replace(/_/g,' '))
-            const count = findings.filter(f => (f.domain || 'GENERAL') === d).length
-            const active = filterDomain.includes(d)
-            return (
-              <button key={d} onClick={() => toggleDomain(d)} style={{
-                padding: '3px 10px', borderRadius: 20, fontSize: 11, cursor: 'pointer',
-                border: '1px solid ' + (active ? 'var(--accent)' : 'var(--navy-light)'),
-                background: active ? 'var(--accent)22' : 'var(--navy-mid)',
-                color: active ? 'var(--accent)' : 'var(--text-muted)',
-              }}>{label} ({count})</button>
-            )
-          })}
-        </div>
-      )}
-
-      {/* Group by toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('gov.group_by')}</span>
-        {(['domain','severity'] as const).map(g => (
-          <button key={g} onClick={() => setGroupBy(g)} style={{
-            padding: '3px 12px', borderRadius: 6, fontSize: 12, cursor: 'pointer',
-            border: '1px solid ' + (groupBy === g ? 'var(--accent)' : 'var(--navy-light)'),
-            background: groupBy === g ? 'var(--accent)22' : 'transparent',
-            color: groupBy === g ? 'var(--accent)' : 'var(--text-muted)',
-          }}>{g === 'domain' ? t('gov.domain') : t('gov.severity')}</button>
+      {/* Overview stats */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, marginBottom: 14 }}>
+        {[['Total', findings.length, 'var(--text)'], ['Critical', sevCount('CRITICAL'), '#e74c3c'], ['High', sevCount('HIGH'), '#e67e22'], ['Medium', sevCount('MEDIUM'), '#f39c12'], ['Low', sevCount('LOW'), '#3498db']].map(([l,v,c]:any) => (
+          <div key={l} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: c }}>{v}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{l}</div>
+          </div>
         ))}
       </div>
 
-      {/* Groups */}
-      {Object.keys(groups).length === 0 && (
-        <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>
-          {findings.length === 0 ? t('gov.no_findings') : 'No findings match the selected filters'}
-        </div>
-      )}
-      {Object.entries(groups).map(([key, items]) => {
-        const isCollapsed = collapsed[key]
-        const sevCounts = ['CRITICAL','HIGH','MEDIUM','LOW']
-          .map(s => ({ s, n: items.filter(f => f.severity === s).length }))
-          .filter(x => x.n > 0)
-        const groupLabel = groupBy === 'domain'
-          ? (key === 'GENERAL' ? '⚙️ General / Common' : (DOMAIN_LABEL[key] || key.replace(/_/g,' ')))
-          : key
+      {/* Severity filter — filters findings within groups, groups stay expanded */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
+        {(['CRITICAL','HIGH','MEDIUM','LOW'] as const).map(sev => {
+          const n = sevCount(sev)
+          if (n === 0) return null
+          const active = filterSev.includes(sev)
+          return (
+            <button key={sev} onClick={() => toggleSev(sev)} style={{
+              padding: '4px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              border: '1px solid ' + SEV_COLOR[sev] + (active ? '' : '55'),
+              background: active ? SEV_COLOR[sev] + '33' : 'transparent',
+              color: SEV_COLOR[sev]
+            }}>{n} {sev}</button>
+          )
+        })}
+        {filterSev.length > 0 && (
+          <button onClick={() => setFilterSev([])} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>✕ Clear</button>
+        )}
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{filteredFindings.length}/{findings.length} findings</span>
+      </div>
+
+      {/* Domain groups */}
+      {domainEntries.map(([domain, ds]: [string, any]) => {
+        const domainFindings = filteredFindings.filter(f => f.domain === domain)
+        const allDomainFindings = findings.filter(f => f.domain === domain)
+        const score = Math.round(ds.score || 0)
+        const scoreColor = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
+        const isCollapsed = collapsed[domain]
+        const crit = allDomainFindings.filter(f => f.severity === 'CRITICAL').length
+        const high = allDomainFindings.filter(f => f.severity === 'HIGH').length
+        const med  = allDomainFindings.filter(f => f.severity === 'MEDIUM').length
+        const low  = allDomainFindings.filter(f => f.severity === 'LOW').length
+
         return (
-          <div key={key} style={{ marginBottom: 10, border: '1px solid var(--navy-light)', borderRadius: 10, overflow: 'hidden' }}>
-            <div onClick={() => toggleGroup(key)} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
-              background: 'var(--navy-mid)', cursor: 'pointer', userSelect: 'none'
-            }}>
-              <span style={{ fontSize: 13, fontWeight: 600, flex: 1, color: groupBy === 'severity' ? SEV_COLOR[key] : 'var(--text)' }}>{groupLabel}</span>
-              <div style={{ display: 'flex', gap: 5 }}>
-                {sevCounts.map(({ s, n }) => (
-                  <span key={s} style={{ padding: '1px 7px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[s] + '33', color: SEV_COLOR[s] }}>{n} {s}</span>
+          <div key={domain} style={{ marginBottom: 10, border: '1px solid var(--navy-light)', borderRadius: 10, overflow: 'hidden' }}>
+            {/* Domain header — clickable to collapse */}
+            <div onClick={() => toggleGroup(domain)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--navy-mid)', cursor: 'pointer', userSelect: 'none' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{DOMAIN_LABEL[domain] || domain.replace(/_/g,' ')}</div>
+                {ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#e74c3c' }}>✗ {isAR ? resolveText(ds.keyWeaknesses) : ds.keyWeaknesses}</div>}
+                {ds.keyStrengths && !ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#2ecc71' }}>✓ {isAR ? resolveText(ds.keyStrengths) : ds.keyStrengths}</div>}
+              </div>
+              {/* Sub-scores */}
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[['C', ds.complianceScore], ['R', ds.riskScore], ['S', ds.strategicScore]].map(([l,v]:any) => (
+                  <div key={l} style={{ textAlign: 'center', minWidth: 28 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: (v||0) >= 70 ? '#2ecc71' : (v||0) >= 55 ? '#f39c12' : '#e74c3c' }}>{Math.round(v||0)}</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{l}</div>
+                  </div>
                 ))}
               </div>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 60, textAlign: 'right' }}>{items.length} finding{items.length !== 1 ? 's' : ''}</span>
+              {/* Score circle */}
+              <div style={{ textAlign: 'center', minWidth: 44 }}>
+                <div style={{ width: 40, height: 40, borderRadius: '50%', border: '2px solid ' + scoreColor, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: scoreColor }}>{score}</span>
+                </div>
+              </div>
+              {/* Severity badges */}
+              <div style={{ display: 'flex', gap: 4 }}>
+                {crit > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#e74c3c33', color: '#e74c3c' }}>{crit}C</span>}
+                {high > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#e67e2233', color: '#e67e22' }}>{high}H</span>}
+                {med  > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#f39c1233', color: '#f39c12' }}>{med}M</span>}
+                {low  > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#3498db33', color: '#3498db' }}>{low}L</span>}
+              </div>
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{isCollapsed ? '▶' : '▼'}</span>
             </div>
+
             {!isCollapsed && (
-              <div style={{ padding: '8px 8px 4px' }}>
-                {items.map((f, i) => <FindingCard key={i} f={f} />)}
+              <div style={{ padding: '10px 12px 6px' }}>
+                {/* Score bar */}
+                <div style={{ height: 4, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 10, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: score + '%', background: scoreColor, borderRadius: 2, transition: 'width 0.5s' }} />
+                </div>
+
+                {/* Filtered findings for this domain */}
+                {domainFindings.length === 0 && allDomainFindings.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#2ecc71', padding: '6px 0 4px' }}>✓ No findings in this domain</div>
+                )}
+                {domainFindings.length === 0 && allDomainFindings.length > 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0 4px', fontStyle: 'italic' }}>No findings match the active severity filter</div>
+                )}
+                {domainFindings.map((f, i) => <FindingCard key={i} f={f} />)}
               </div>
             )}
           </div>
         )
       })}
+
+      {/* Findings with no domain match */}
+      {(() => {
+        const domainKeys = domainEntries.map(([k]) => k)
+        const orphans = filteredFindings.filter(f => !domainKeys.includes(f.domain))
+        if (orphans.length === 0) return null
+        return (
+          <div style={{ marginBottom: 10, border: '1px solid var(--navy-light)', borderRadius: 10, overflow: 'hidden' }}>
+            <div style={{ padding: '10px 16px', background: 'var(--navy-mid)', fontSize: 13, fontWeight: 600 }}>⚙️ General / Other</div>
+            <div style={{ padding: '8px 12px 4px' }}>
+              {orphans.map((f, i) => <FindingCard key={i} f={f} />)}
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
+
 
 function FindingCard({ f }: { f: any }) {
   const [open, setOpen] = useState(false)
@@ -418,7 +427,7 @@ export default function GovernancePage() {
   const [review, setReview] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [tab, setTab] = useState<'summary' | 'findings' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
+  const [tab, setTab] = useState<'summary' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
   const [form, setForm] = useState({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
@@ -475,9 +484,9 @@ export default function GovernancePage() {
     setLoading(true); setError('')
     try {
       const r = await api.post('/governance/reviews', form)
-      if (!r.id) { setError(r.message || 'Failed to create review'); return }
+      if (!r.id) { setError(r.message || 'Failed to create review'); setLoading(false); return }
       setReview(r)
-      // Upload all files to the new review
+      setLoading(false) // unblock button — show upload progress in status message instead
       // Upload files one by one — each triggers Docling extraction
       for (let i = 0; i < inputs.length; i++) {
         const inp = inputs[i]
@@ -485,8 +494,7 @@ export default function GovernancePage() {
           const fd = new FormData()
           fd.append('file', inp._file)
           fd.append('label', inp._file.name)
-          // Show which file is being processed
-          setError('Extracting: ' + inp._file.name + ' (' + (i+1) + '/' + inputs.length + ')')
+          setError('📄 Uploading & extracting: ' + inp._file.name + ' (' + (i+1) + '/' + inputs.length + ')')
           await api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd).catch(() => {})
         }
       }
@@ -731,7 +739,7 @@ export default function GovernancePage() {
 
       <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
         <button className='btn-primary' onClick={createAndStart} disabled={loading || inputs.length === 0} style={{ fontSize: 15, padding: '12px 32px' }}>
-          {loading ? 'Creating...' : '▶ Start Review'}
+          {loading ? 'Creating review...' : '▶ Start Review'}
         </button>
       </div>
     </div>
@@ -777,8 +785,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   const { t, isAR, resolveText } = useLang()
   const tabs = [
     { key: 'summary', label: t('gov.summary') },
-    { key: 'findings', label: t('gov.findings') },
-    { key: 'domains', label: t('gov.domains') },
+    { key: 'domains', label: 'Domains & Findings' },
     { key: 'strategic', label: t('gov.strategic') },
     { key: 'compliance', label: t('gov.compliance') },
     { key: 'risk', label: t('gov.risk_register') },
@@ -825,7 +832,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Summary Tab */}
       {tab === 'summary' && (
         <div>
-          {/* Finding severity snapshot */}
+          {/* 1. Executive Summary FIRST */}
+          <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.executive_summary')}</div>
+            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{isAR ? resolveText(report.executiveSummary) : report.executiveSummary}</div>
+          </div>
+
+          {/* 2. Finding severity snapshot */}
           {(() => {
             const crit = findings.filter(f => f.severity === 'CRITICAL')
             const high = findings.filter(f => f.severity === 'HIGH')
@@ -843,7 +856,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             )
           })()}
 
-          {/* Immediate blockers — CRITICAL findings */}
+          {/* 3. Immediate blockers — CRITICAL findings */}
           {findings.filter(f => f.severity === 'CRITICAL').length > 0 && (
             <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c55', borderRadius: 10, padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c', marginBottom: 10 }}>
@@ -862,7 +875,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             </div>
           )}
 
-          {/* Score improvement tips */}
+          {/* 4. Score improvement tips */}
           {(() => {
             const tips: string[] = []
             if (report.complianceScore < 60) tips.push('Compliance score is low — address EA principle violations to unlock significant score improvement')
@@ -883,12 +896,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             ) : null
           })()}
 
-          {/* Executive Summary */}
-          <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.executive_summary')}</div>
-            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{isAR ? resolveText(report.executiveSummary) : report.executiveSummary}</div>
-          </div>
-
+          {/* 5. Scope & Methodology */}
           {report.scopeDescription && (
             <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>REVIEW SCOPE & METHODOLOGY</div>
@@ -923,11 +931,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         </div>
       )}
 
-      {/* Findings Tab */}
-      {tab === 'findings' && <FindingsTab findings={findings} />}
+      {/* Domains & Findings Tab (merged) */}
+      {tab === 'domains' && <DomainsFindingsTab findings={findings} report={report} isAR={isAR} resolveText={resolveText} />}
 
-      {/* Domains Tab */}
-      {tab === 'domains' && (
+      {/* UNUSED_DOMAINS_PLACEHOLDER */}
+      {false && (
         <div>
           {/* Domain overview bar */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 16 }}>
@@ -998,7 +1006,19 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Strategic Tab */}
       {tab === 'strategic' && (() => {
         const objectives = report.strategicAlignment?.objectives || []
-        // Group by strategy type — must be declared before weighted calc
+
+        // Strategy type weights and colors — declared FIRST (used in sort below)
+        const STRAT_META: Record<string, { weight: number; label: string; color: string }> = {
+          BUSINESS_STRATEGY: { weight: 40, label: 'Business Strategy', color: '#e74c3c' },
+          DT_STRATEGY:       { weight: 35, label: 'Digital Transformation', color: '#9b59b6' },
+          EA_STRATEGY:       { weight: 25, label: 'EA Strategy', color: '#3498db' },
+          IT_STRATEGY:       { weight: 0,  label: 'IT Strategy', color: '#1abc9c' },
+          DATA_STRATEGY:     { weight: 0,  label: 'Data Strategy', color: '#e67e22' },
+          SECURITY_STRATEGY: { weight: 0,  label: 'Security Strategy', color: '#e74c3c' },
+          VISION_2030:       { weight: 0,  label: 'Vision 2030', color: '#f39c12' },
+        }
+
+        // Group by strategy type
         const grouped: Record<string, any[]> = {}
         for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
         const sortedTypes = Object.keys(grouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
@@ -1015,16 +1035,15 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const overallPct = totalW > 0 ? Math.round(weightedSum / totalW) : rawPct
         const overallColor = overallPct >= 75 ? '#2ecc71' : overallPct >= 50 ? '#f39c12' : '#e74c3c'
 
-        // Strategy type weights and colors
-        const STRAT_META: Record<string, { weight: number; label: string; color: string }> = {
-          BUSINESS_STRATEGY: { weight: 40, label: 'Business Strategy', color: '#e74c3c' },
-          DT_STRATEGY:       { weight: 35, label: 'Digital Transformation', color: '#9b59b6' },
-          EA_STRATEGY:       { weight: 25, label: 'EA Strategy', color: '#3498db' },
-          IT_STRATEGY:       { weight: 0,  label: 'IT Strategy', color: '#1abc9c' },
-          DATA_STRATEGY:     { weight: 0,  label: 'Data Strategy', color: '#e67e22' },
-          SECURITY_STRATEGY: { weight: 0,  label: 'Security Strategy', color: '#e74c3c' },
-          VISION_2030:       { weight: 0,  label: 'Vision 2030', color: '#f39c12' },
-        }
+        // Guard: if no objectives, show empty state early
+        if (objectives.length === 0) return (
+          <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>🎯</div>
+            <div style={{ fontSize: 15, marginBottom: 6 }}>No strategic objectives assessed</div>
+            <div style={{ fontSize: 12 }}>Add strategy documents to the repository to enable strategic alignment analysis</div>
+          </div>
+        )
+
         const STATUS_COLOR: Record<string, string> = {
           FULLY_ALIGNED: '#2ecc71', PARTIALLY_ALIGNED: '#f39c12',
           WEAKLY_ALIGNED: '#e67e22', NOT_ALIGNED: '#e74c3c', NOT_APPLICABLE: '#8baac8'
@@ -1032,8 +1051,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const STATUS_ICON: Record<string, string> = {
           FULLY_ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', WEAKLY_ALIGNED: '🔶', NOT_ALIGNED: '❌', NOT_APPLICABLE: '—'
         }
-
-        // grouped + sortedTypes already declared above
 
         return (
           <div>
@@ -1067,8 +1084,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 </div>
               </div>
             </div>
-
-            {objectives.length === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No strategic objectives assessed</div>}
 
             {/* Per-strategy groups */}
             {sortedTypes.map(stratType => {
