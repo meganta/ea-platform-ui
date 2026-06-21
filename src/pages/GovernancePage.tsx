@@ -1078,19 +1078,18 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       </div>
 
       {/* Score formula explainer */}
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16, display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
-        <span>Overall = </span>
-        <span style={{ color: '#9b59b6' }}>Strategic 20%</span>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16, display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ color: 'var(--text-muted)' }}>Overall =</span>
+        <span style={{ color: '#9b59b6', fontWeight: 600 }}>Strategic 25%</span>
         <span>+</span>
-        <span style={{ color: '#1abc9c' }}>Compliance 20%</span>
+        <span style={{ color: '#1abc9c', fontWeight: 600 }}>Compliance 25%</span>
         <span>+</span>
-        <span style={{ color: '#e67e22' }}>Risk 15%</span>
+        <span style={{ color: '#e67e22', fontWeight: 600 }}>Risk 20%</span>
         <span>+</span>
-        <span style={{ color: '#3498db' }}>Future State 15%</span>
+        <span style={{ color: '#3498db', fontWeight: 600 }}>Future State 15%</span>
         <span>+</span>
-        <span style={{ color: '#2ecc71' }}>Financial 10%</span>
-        <span>+</span>
-        <span style={{ color: '#e74c3c' }}>Domain Quality 20%</span>
+        <span style={{ color: '#2ecc71', fontWeight: 600 }}>Financial 15%</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>− CRITICAL penalty</span>
       </div>
 
       {/* Decision Box */}
