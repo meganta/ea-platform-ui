@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
-import { api } from '../lib/api'
+import { api, getToken } from '../lib/api'
+
+const GOV_API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
 const DECISION_COLOR: Record<string, string> = {
   APPROVED: '#2ecc71',
@@ -24,7 +26,8 @@ export default function DashboardPage() {
     api.getCycles().then(setCycles).catch(() => {})
     api.getCapabilities().then(setCapabilities).catch(() => {})
     api.getDocuments().then(setDocs).catch(() => {})
-    api.get('/governance/reviews').then((r: any) => setReviews(Array.isArray(r) ? r : [])).catch(() => {})
+    fetch(GOV_API + '/governance/reviews', { headers: { Authorization: 'Bearer ' + (getToken() || '') } })
+      .then(r => r.json()).then((r: any) => setReviews(Array.isArray(r) ? r : [])).catch(() => {})
   }, [])
 
   const activeCycles = cycles.filter(c => c.status === 'ACTIVE').length
@@ -216,3 +219,4 @@ export default function DashboardPage() {
     </div>
   )
 }
+
