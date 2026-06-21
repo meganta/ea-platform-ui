@@ -390,9 +390,14 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
       )}
 
       {stage === 'gaps' && (
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
+            📄 Extracting document content via Docling — this may take 10-30 seconds for large files...
+          </div>
           {['Extracting document content', 'Identifying missing artifacts', 'Checking completeness', 'Pulling repository context'].map((s, i) => (
-            <div key={i} style={{ fontSize: 12, color: 'var(--text-muted)', padding: '4px 10px', borderRadius: 6, background: 'var(--navy-dark)', border: '1px solid var(--navy-light)' }}>⏳ {s}</div>
+            <div key={i} style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 12px', borderRadius: 6, background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span> {s}
+            </div>
           ))}
         </div>
       )}
@@ -405,6 +410,10 @@ export default function GovernancePage() {
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
   const [reviews, setReviews] = useState<any[]>([])
   const location = useLocation()
+  const [filterStatus, setFilterStatus] = useState('')
+  const [filterDecision, setFilterDecision] = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [filterSearch, setFilterSearch] = useState('')
   const [review, setReview] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -420,6 +429,14 @@ export default function GovernancePage() {
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
 
   useEffect(() => { loadReviews() }, [])
+
+  const filteredReviews = reviews.filter(r => {
+    if (filterStatus && r.status !== filterStatus) return false
+    if (filterDecision && r.decision !== filterDecision) return false
+    if (filterType && r.reviewType !== filterType) return false
+    if (filterSearch && !r.title?.toLowerCase().includes(filterSearch.toLowerCase())) return false
+    return true
+  })
 
   const loadReviews = async () => {
     setLoading(true)
@@ -461,17 +478,36 @@ export default function GovernancePage() {
       if (!r.id) { setError(r.message || 'Failed to create review'); return }
       setReview(r)
       // Upload all files to the new review
-      for (const inp of inputs) {
+      // Upload files one by one — each triggers Docling extraction
+      for (let i = 0; i < inputs.length; i++) {
+        const inp = inputs[i]
         if (inp._file) {
           const fd = new FormData()
           fd.append('file', inp._file)
           fd.append('label', inp._file.name)
+          // Show which file is being processed
+          setError('Extracting: ' + inp._file.name + ' (' + (i+1) + '/' + inputs.length + ')')
           await api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd).catch(() => {})
         }
       }
+      setError('')
       setView('progress')
-      // Fetch extracted metadata after a delay (extraction runs async in backend)
-      setTimeout(() => fetchExtractedMetadata(r.id).catch(() => {}), 5000)
+      // Poll for extracted metadata — Docling can take 10-30s for large files
+      // Poll every 3 seconds for up to 60 seconds
+      let attempts = 0
+      const maxAttempts = 20
+      const pollMeta = setInterval(async () => {
+        attempts++
+        try {
+          const meta = await api.get('/governance/reviews/' + r.id + '/inputs/metadata')
+          if (meta && Object.keys(meta).length > 0) {
+            setExtractedMeta(meta)
+            setShowMeta(true)
+            clearInterval(pollMeta)
+          }
+        } catch { /* keep polling */ }
+        if (attempts >= maxAttempts) clearInterval(pollMeta)
+      }, 3000)
     } catch (e) { setError('Failed to create review') }
     finally { setLoading(false) }
   }
@@ -513,6 +549,7 @@ export default function GovernancePage() {
       if (meta && Object.keys(meta).length > 0) {
         setExtractedMeta(meta)
         setShowMeta(true)
+        setShowMeta(true)
       }
     } catch {}
   }
@@ -536,8 +573,49 @@ export default function GovernancePage() {
           <div style={{ fontSize: 13 }}>Start your first EA governance review</div>
         </div>
       )}
+      {/* Filter bar */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
+        <input
+          value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
+          placeholder='Search reviews...'
+          style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12, minWidth: 160 }}
+        />
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
+          <option value=''>All Statuses</option>
+          <option value='COMPLETED'>Completed</option>
+          <option value='IN_PROGRESS'>In Progress</option>
+          <option value='DRAFT'>Draft</option>
+          <option value='CANCELLED'>Cancelled</option>
+        </select>
+        <select value={filterDecision} onChange={e => setFilterDecision(e.target.value)}
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
+          <option value=''>All Decisions</option>
+          <option value='APPROVED'>Approved</option>
+          <option value='APPROVED_WITH_CONDITIONS'>Approved with Conditions</option>
+          <option value='REQUIRES_CHANGES'>Requires Changes</option>
+          <option value='REJECTED'>Rejected</option>
+          <option value='PENDING'>Pending</option>
+        </select>
+        <select value={filterType} onChange={e => setFilterType(e.target.value)}
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
+          <option value=''>All Types</option>
+          <option value='HLD_REVIEW'>HLD Review</option>
+          <option value='LLD_REVIEW'>LLD Review</option>
+        </select>
+        {(filterStatus || filterDecision || filterType || filterSearch) && (
+          <button onClick={() => { setFilterStatus(''); setFilterDecision(''); setFilterType(''); setFilterSearch('') }}
+            style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer' }}>
+            ✕ Clear
+          </button>
+        )}
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+          {filteredReviews.length}/{reviews.length} reviews
+        </span>
+      </div>
+
       <div style={{ display: 'grid', gap: 12 }}>
-        {reviews.map(r => (
+        {filteredReviews.map(r => (
           <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>
