@@ -1030,15 +1030,30 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         {confScore > 0 && <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>CONFIDENCE</div><div style={{ fontSize: 13, fontWeight: 600, color: confScore >= 75 ? '#2ecc71' : confScore >= 50 ? '#f39c12' : '#e74c3c' }}>{confScore}%</div></div>}
       </div>
 
-      {/* Score Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 12, marginBottom: 24 }}>
+      {/* Score Row — one circle per tab so user knows what drives each score */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
         <ScoreCircle score={Math.round(report.overallScore || 0)} label='Overall' />
         <ScoreCircle score={Math.round(report.strategicScore || 0)} label='Strategic' />
         <ScoreCircle score={Math.round(report.complianceScore || 0)} label='Compliance' />
-        <ScoreCircle score={Math.round(archQualityScore)} label='Arch Quality' />
-        <ScoreCircle score={Math.round(secScore)} label='Security' />
+        <ScoreCircle score={Math.round(report.riskScore || 0)} label='Risk' />
         <ScoreCircle score={Math.round(futureScore)} label='Future State' />
         <ScoreCircle score={Math.round(finScore)} label='Financial' />
+      </div>
+
+      {/* Score formula explainer */}
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16, display: 'flex', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+        <span>Overall = </span>
+        <span style={{ color: '#9b59b6' }}>Strategic 20%</span>
+        <span>+</span>
+        <span style={{ color: '#1abc9c' }}>Compliance 20%</span>
+        <span>+</span>
+        <span style={{ color: '#e67e22' }}>Risk 15%</span>
+        <span>+</span>
+        <span style={{ color: '#3498db' }}>Future State 15%</span>
+        <span>+</span>
+        <span style={{ color: '#2ecc71' }}>Financial 10%</span>
+        <span>+</span>
+        <span style={{ color: '#e74c3c' }}>Domain Quality 20%</span>
       </div>
 
       {/* Decision Box */}
