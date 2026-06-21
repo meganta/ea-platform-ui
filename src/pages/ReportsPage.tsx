@@ -1,7 +1,15 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
-import { api } from '../lib/api'
+import { getToken } from '../lib/api'
+
+const GOV_API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+
+async function govGet(path: string) {
+  const res = await fetch(GOV_API + path, { headers: { Authorization: 'Bearer ' + (getToken() || '') } })
+  if (!res.ok) throw new Error('HTTP ' + res.status)
+  return res.json()
+}
 
 const API_URL = process.env.REACT_APP_API_URL || ''
 
@@ -47,7 +55,7 @@ function SavingsReport() {
       if (reviewType) params.set('reviewType', reviewType)
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
-      const res = await api.get(`/governance/reports/savings?${params}`)
+      const res = await govGet(`/governance/reports/savings?${params}`)
       setData(res)
     } catch { setData(null) } finally { setLoading(false) }
   }, [status, reviewType, dateFrom, dateTo])
@@ -178,7 +186,7 @@ function ComplianceReport() {
       if (category) params.set('category', category)
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
-      const res = await api.get(`/governance/reports/compliance?${params}`)
+      const res = await govGet(`/governance/reports/compliance?${params}`)
       setData(res)
     } catch { setData(null) } finally { setLoading(false) }
   }, [complianceStatus, reviewType, category, dateFrom, dateTo])
@@ -290,7 +298,7 @@ function RequirementsTracker() {
       if (reviewType) params.set('reviewType', reviewType)
       if (dateFrom) params.set('dateFrom', dateFrom)
       if (dateTo) params.set('dateTo', dateTo)
-      const res = await api.get(`/governance/reports/requirements?${params}`)
+      const res = await govGet(`/governance/reports/requirements?${params}`)
       setData(res)
     } catch { setData(null) } finally { setLoading(false) }
   }, [source, status, domain, reviewType, dateFrom, dateTo])
@@ -440,4 +448,5 @@ export default function ReportsPage() {
     </div>
   )
 }
+
 
