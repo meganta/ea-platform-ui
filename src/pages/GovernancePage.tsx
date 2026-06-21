@@ -170,7 +170,7 @@ function FindingsTab({ findings }: { findings: any[] }) {
       {/* Groups */}
       {Object.keys(groups).length === 0 && (
         <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>
-          {findings.length === 0 ? 'No findings' : findings.length === 0 ? t('gov.no_findings') : 'No findings match the selected filters'}
+          {findings.length === 0 ? t('gov.no_findings') : 'No findings match the selected filters'}
         </div>
       )}
       {Object.entries(groups).map(([key, items]) => {
@@ -548,7 +548,6 @@ export default function GovernancePage() {
       const meta = await api.get('/governance/reviews/' + reviewId + '/inputs/metadata')
       if (meta && Object.keys(meta).length > 0) {
         setExtractedMeta(meta)
-        setShowMeta(true)
         setShowMeta(true)
       }
     } catch {}
@@ -999,6 +998,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Strategic Tab */}
       {tab === 'strategic' && (() => {
         const objectives = report.strategicAlignment?.objectives || []
+        // Group by strategy type — must be declared before weighted calc
+        const grouped: Record<string, any[]> = {}
+        for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
+        const sortedTypes = Object.keys(grouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
+
         // Compute weighted strategic alignment: Business(40%) > DT(35%) > EA(25%)
         const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
         const rawPct = report.strategicAlignment?.overallAlignmentPercentage || 0
@@ -1029,10 +1033,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           FULLY_ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', WEAKLY_ALIGNED: '🔶', NOT_ALIGNED: '❌', NOT_APPLICABLE: '—'
         }
 
-        // Group by strategy type — sorted by weight desc
-        const grouped: Record<string, any[]> = {}
-        for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
-        const sortedTypes = Object.keys(grouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
+        // grouped + sortedTypes already declared above
 
         return (
           <div>
