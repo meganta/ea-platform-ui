@@ -472,6 +472,7 @@ export default function GovernancePage() {
   const [extractedMeta, setExtractedMeta] = useState<any>(null)
   const [showMeta, setShowMeta] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
+  const [uploadStatus, setUploadStatus] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -518,12 +519,12 @@ export default function GovernancePage() {
   const createAndStart = async () => {
     if (!form.title) { setError('Title is required'); return }
     if (inputs.length === 0) { setError('Please upload at least one document'); return }
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setUploadStatus('')
     try {
       const r = await api.post('/governance/reviews', form)
       if (!r.id) { setError(r.message || 'Failed to create review'); setLoading(false); return }
       setReview(r)
-      setLoading(false) // unblock button — show upload progress in status message instead
+      setLoading(false)
       // Upload files one by one — each triggers Docling extraction
       for (let i = 0; i < inputs.length; i++) {
         const inp = inputs[i]
@@ -531,14 +532,16 @@ export default function GovernancePage() {
           const fd = new FormData()
           fd.append('file', inp._file)
           fd.append('label', inp._file.name)
-          setError('📄 Uploading & extracting: ' + inp._file.name + ' (' + (i+1) + '/' + inputs.length + ')')
-          await api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd).catch(() => {})
+          setUploadStatus('📄 Uploading & extracting: ' + inp._file.name + ' (' + (i+1) + '/' + inputs.length + ')...')
+          // 90s timeout per file — large DOCX files via Docling can take a while
+          const uploadPromise = api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd)
+          const timeoutPromise = new Promise(res => setTimeout(res, 90000))
+          await Promise.race([uploadPromise, timeoutPromise]).catch(() => {})
         }
       }
-      setError('')
+      setUploadStatus('')
       setView('progress')
-      // Poll for extracted metadata — Docling can take 10-30s for large files
-      // Poll every 3 seconds for up to 60 seconds
+      // Poll for extracted metadata in background
       let attempts = 0
       const maxAttempts = 20
       const pollMeta = setInterval(async () => {
@@ -553,7 +556,7 @@ export default function GovernancePage() {
         } catch { /* keep polling */ }
         if (attempts >= maxAttempts) clearInterval(pollMeta)
       }, 3000)
-    } catch (e) { setError('Failed to create review') }
+    } catch (e) { setError('Failed to create review. Please try again.') }
     finally { setLoading(false) }
   }
 
@@ -947,11 +950,17 @@ export default function GovernancePage() {
             </div>
           )}
 
+          {uploadStatus && (
+            <div style={{ background: '#3498db15', border: '1px solid #3498db44', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#3498db', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+              {uploadStatus}
+            </div>
+          )}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
-            <button className='btn-primary' onClick={createAndStart} disabled={loading}
-              style={{ fontSize: 15, padding: '12px 36px' }}>
-              {loading ? 'Creating review...' : '▶ Launch Review'}
+            <button onClick={wizardBack} disabled={!!uploadStatus || loading} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: uploadStatus ? 'not-allowed' : 'pointer', fontSize: 13, opacity: uploadStatus ? 0.4 : 1 }}>← Back</button>
+            <button className='btn-primary' onClick={createAndStart} disabled={loading || !!uploadStatus}
+              style={{ fontSize: 15, padding: '12px 36px', opacity: loading || uploadStatus ? 0.7 : 1 }}>
+              {loading ? 'Creating review...' : uploadStatus ? 'Uploading...' : '▶ Launch Review'}
             </button>
           </div>
         </div>
