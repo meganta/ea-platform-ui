@@ -418,6 +418,7 @@ export default function GovernancePage() {
   const [review, setReview] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [tab, setTab] = useState<'summary' | 'findings' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
   const [form, setForm] = useState({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
@@ -758,7 +759,7 @@ export default function GovernancePage() {
         <button onClick={exportWord} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>📄 Export Word</button>
         <button onClick={reRunReview} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
       </div>
-      {report && <ReportView review={review} report={report} findings={findings} />}
+      {report && <ReportView review={review} report={report} findings={findings} tab={tab} setTab={setTab} />}
       {!report && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Report not available yet</div>}
     </div>
   )
@@ -766,8 +767,7 @@ export default function GovernancePage() {
   return null
 }
 
-function ReportView({ review, report, findings }: { review: any, report: any, findings: any[] }) {
-  const [tab, setTab] = useState<'summary' | 'findings' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
+function ReportView({ review, report, findings, tab, setTab }: { review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
   const extScores = (report.domainSummaries?._extendedScores) || {}
   const archQualityScore = extScores.architectureQualityScore || 0
   const secScore = extScores.securityScore || 0
