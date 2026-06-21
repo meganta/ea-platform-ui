@@ -1269,7 +1269,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         let weightedSum = 0, totalW = 0
         for (const [sType, sobjs] of Object.entries(grouped) as [string, any[]][]) {
           const w = STRAT_W[sType] || 0.10
-          const avg = sobjs.length ? sobjs.reduce((s,o)=>s+(o.alignmentPercentage||0),0)/sobjs.length : 0
+          // Exclude NOT_APPLICABLE from alignment percentage calculation
+          const scorableObjs = sobjs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
+          const avg = scorableObjs.length ? scorableObjs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/scorableObjs.length : 0
           weightedSum += avg * w; totalW += w
         }
         const overallPct = totalW > 0 ? Math.round(weightedSum / totalW) : rawPct
@@ -1290,6 +1292,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         }
         const STATUS_ICON: Record<string, string> = {
           FULLY_ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', WEAKLY_ALIGNED: '🔶', NOT_ALIGNED: '❌', NOT_APPLICABLE: '—'
+        }
+        // Sort objectives: aligned first, then partial, then weak, then not aligned, then N/A
+        const STATUS_ORDER: Record<string, number> = {
+          FULLY_ALIGNED: 0, PARTIALLY_ALIGNED: 1, WEAKLY_ALIGNED: 2, NOT_ALIGNED: 3, NOT_APPLICABLE: 4
         }
 
         return (
@@ -1332,7 +1338,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               const avgAlign = Math.round(objs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/objs.length)
               const avgColor = avgAlign >= 75 ? '#2ecc71' : avgAlign >= 50 ? '#f39c12' : '#e74c3c'
               const fullyAligned = objs.filter((o:any) => o.alignmentStatus === 'FULLY_ALIGNED').length
+              const partialAligned = objs.filter((o:any) => o.alignmentStatus === 'PARTIALLY_ALIGNED').length
               const notAligned = objs.filter((o:any) => o.alignmentStatus === 'NOT_ALIGNED').length
+              const notApplicable = objs.filter((o:any) => o.alignmentStatus === 'NOT_APPLICABLE').length
 
               return (
                 <div key={stratType} style={{ marginBottom: 20 }}>
@@ -1345,7 +1353,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                           {meta?.weight > 0 && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>[{meta.weight}% weight]</span>}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                          {objs.length} goals · {fullyAligned} fully aligned · {notAligned} not aligned
+                          {objs.length} goals · {fullyAligned > 0 && <span style={{color:'#2ecc71'}}>{fullyAligned} aligned</span>}{fullyAligned > 0 && ' · '}{partialAligned > 0 && <span style={{color:'#f39c12'}}>{partialAligned} partial</span>}{partialAligned > 0 && ' · '}{notAligned > 0 && <span style={{color:'#e74c3c'}}>{notAligned} not aligned</span>}{notApplicable > 0 && ' · '}{notApplicable > 0 && <span style={{color:'#8baac8'}}>{notApplicable} N/A</span>}
                         </div>
                       </div>
                       <div style={{ textAlign: 'center', minWidth: 52 }}>
@@ -1360,11 +1368,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                   </div>
 
                   {/* Objective cards */}
-                  {objs.map((obj: any, i: number) => {
+                  {[...objs].sort((a:any,b:any) => (STATUS_ORDER[a.alignmentStatus]??5)-(STATUS_ORDER[b.alignmentStatus]??5)).map((obj: any, i: number) => {
                     const statusColor = STATUS_COLOR[obj.alignmentStatus] || '#8baac8'
                     const pct = obj.alignmentPercentage || 0
                     return (
-                      <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + statusColor + '33', borderRadius: 10, padding: 14, marginBottom: 8 }}>
+                      <div key={i} style={{ background: obj.alignmentStatus === 'NOT_APPLICABLE' ? 'var(--navy-dark)' : 'var(--navy-mid)', border: '1px solid ' + statusColor + '33', borderRadius: 10, padding: 14, marginBottom: 8, opacity: obj.alignmentStatus === 'NOT_APPLICABLE' ? 0.6 : 1 }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                           <span style={{ fontSize: 16, marginTop: 1 }}>{STATUS_ICON[obj.alignmentStatus] || '•'}</span>
                           <div style={{ flex: 1 }}>
@@ -1398,16 +1406,23 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE']
         const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#8baac8', RECOMMENDED:'#3498db' }
         const statusLabel: Record<string,string> = { COMPLIANT:'✓ Compliant', PARTIALLY_COMPLIANT:'⚠ Partial', NON_COMPLIANT:'✗ Non-Compliant', REQUIRES_EXCEPTION:'⚡ Exception', NOT_APPLICABLE:'— N/A', RECOMMENDED:'💡 Recommended' }
-        const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', NCA_STANDARD:'#1abc9c', NDMO_STANDARD:'#9b59b6' }
-        const catLabel: Record<string,string> = { TENANT_PRINCIPLE:'Tenant EA Principles', TENANT_STANDARD:'Tenant EA Standards', NCA_STANDARD:'NCA ECC Controls', NDMO_STANDARD:'NDMO Data Standards' }
+        const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', NCA_STANDARD:'#1abc9c', NDMO_STANDARD:'#9b59b6', SDAIA_STANDARD:'#3498db', DGA_STANDARD:'#f39c12' }
+        const catLabel: Record<string,string> = { TENANT_PRINCIPLE:'Tenant EA Principles', TENANT_STANDARD:'Tenant EA Standards', NCA_STANDARD:'NCA ECC Controls', NDMO_STANDARD:'NDMO Data Standards', SDAIA_STANDARD:'SDAIA Standards', DGA_STANDARD:'DGA Standards' }
 
-        // Group items by category — only 4 allowed categories
-        const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','NCA_STANDARD','NDMO_STANDARD']
+        // For national standards: filter out NOT_APPLICABLE rows (only show actionable statuses)
+        const nationalCats = ['NCA_STANDARD','NDMO_STANDARD','SDAIA_STANDARD','DGA_STANDARD']
+        const displayItems = items.filter((i:any) => {
+          if (nationalCats.includes(i.category)) return i.complianceStatus !== 'NOT_APPLICABLE'
+          return true // tenant principles/standards: show all including NOT_APPLICABLE
+        })
+
+        // Rebuild grouped from displayItems
+        const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','NCA_STANDARD','NDMO_STANDARD','SDAIA_STANDARD','DGA_STANDARD']
         const grouped: Record<string,any[]> = {}
-        for (const item of items) { const c = item.category || 'OTHER'; if (!grouped[c]) grouped[c]=[]; grouped[c].push(item) }
+        for (const item of displayItems) { const c = item.category || 'OTHER'; if (!grouped[c]) grouped[c]=[]; grouped[c].push(item) }
 
-        const countBy = (status: string) => items.filter((i:any) => i.complianceStatus === status).length
-        const total = items.length
+        const countBy = (status: string) => displayItems.filter((i:any) => i.complianceStatus === status).length
+        const total = displayItems.length
 
         return (
           <div>
@@ -1435,7 +1450,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     )
                   })}
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                    {total} assessed · <span style={{ color: report.complianceMatrix?.complianceRate >= 70 ? '#2ecc71' : '#f39c12', fontWeight: 600 }}>{report.complianceMatrix?.complianceRate || 0}% compliance rate</span>
+                    {displayItems.length} assessed · <span style={{ color: report.complianceMatrix?.complianceRate >= 70 ? '#2ecc71' : '#f39c12', fontWeight: 600 }}>{report.complianceMatrix?.complianceRate || 0}% compliance rate</span>
                   </span>
                 </div>
 
