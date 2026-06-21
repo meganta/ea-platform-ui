@@ -321,7 +321,6 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'gov.project_name':       { EN: 'Project Name', AR: 'اسم المشروع' },
   'gov.completeness':       { EN: 'Completeness Score', AR: 'درجة الاكتمال' },
   'gov.gaps_found':         { EN: 'Gaps Found', AR: 'الفجوات المكتشفة' },
-  'gov.findings':           { EN: 'Findings', AR: 'النتائج' },
   // Repository
   'repo.title':             { EN: 'EA Repository', AR: 'مستودع البنية المؤسسية' },
   'repo.new_asset':         { EN: '+ New Asset', AR: '+ أصل جديد' },
@@ -489,4 +488,5 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
     </Ctx.Provider>
   )
 }
+
 
