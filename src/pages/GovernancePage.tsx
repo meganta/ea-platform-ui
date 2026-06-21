@@ -435,6 +435,7 @@ export default function GovernancePage() {
   const [uploading, setUploading] = useState(false)
   const [extractedMeta, setExtractedMeta] = useState<any>(null)
   const [showMeta, setShowMeta] = useState(false)
+  const [wizardStep, setWizardStep] = useState(1)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -570,7 +571,7 @@ export default function GovernancePage() {
           <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Governance Reviews</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>EA Governance & Compliance Review Service</div>
         </div>
-        <button className='btn-primary' onClick={() => { setView('create'); setForm({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' }); setInputs([]) }}>+ New Review</button>
+        <button className='btn-primary' onClick={() => { setView('create'); setForm({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' }); setInputs([]); setWizardStep(1); setExtractedMeta(null); setShowMeta(false) }}>+ New Review</button>
       </div>
       {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Loading...</div>}
       {reviews.length === 0 && !loading && (
@@ -637,111 +638,270 @@ export default function GovernancePage() {
     </div>
   )
 
+  // ── Wizard helpers ──────────────────────────────────────────────────────────
+  const WIZARD_STEPS = [
+    { n: 1, label: 'Identity',       icon: '📋' },
+    { n: 2, label: 'Documents',      icon: '📄' },
+    { n: 3, label: 'Intelligence',   icon: '🧠' },
+    { n: 4, label: 'Aggressiveness', icon: '⚖️' },
+    { n: 5, label: 'Confirm',        icon: '🚀' },
+  ]
+  const canNext1 = !!form.title
+  const canNext2 = inputs.length > 0
+  const wizardNext = () => setWizardStep(s => Math.min(5, s + 1))
+  const wizardBack = () => setWizardStep(s => Math.max(1, s - 1))
+
   if (view === 'create') return (
-    <div style={{ padding: '24px 32px', maxWidth: 860 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => setView('list')} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
+    <div style={{ padding: '24px 32px', maxWidth: 780 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
+        <button onClick={() => { setView('list'); setWizardStep(1) }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>New Governance Review</div>
       </div>
+
+      {/* Step indicator */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 32, gap: 0 }}>
+        {WIZARD_STEPS.map((step, idx) => {
+          const done = wizardStep > step.n
+          const active = wizardStep === step.n
+          return (
+            <React.Fragment key={step.n}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 80 }}>
+                <div onClick={() => done && setWizardStep(step.n)} style={{
+                  width: 36, height: 36, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: done ? 16 : 13, fontWeight: 700, cursor: done ? 'pointer' : 'default',
+                  background: done ? 'var(--accent)' : active ? 'var(--accent)22' : 'var(--navy-mid)',
+                  border: '2px solid ' + (done || active ? 'var(--accent)' : 'var(--navy-light)'),
+                  color: done ? '#fff' : active ? 'var(--accent)' : 'var(--text-muted)',
+                  transition: 'all 0.2s'
+                }}>{done ? '✓' : step.icon}</div>
+                <div style={{ fontSize: 10, color: active ? 'var(--accent)' : done ? 'var(--text-muted)' : 'var(--text-muted)', fontWeight: active ? 700 : 400, whiteSpace: 'nowrap' }}>{step.label}</div>
+              </div>
+              {idx < WIZARD_STEPS.length - 1 && (
+                <div style={{ flex: 1, height: 2, background: wizardStep > step.n ? 'var(--accent)' : 'var(--navy-light)', marginBottom: 22, transition: 'background 0.3s' }} />
+              )}
+            </React.Fragment>
+          )
+        })}
+      </div>
+
       {error && <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 8, padding: '10px 14px', color: '#e74c3c', marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
-      <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24, marginBottom: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 20 }}>Review Configuration</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div style={{ gridColumn: '1/-1' }}>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
-            <input className='form-input' value={form.title} onChange={set('title')} placeholder='e.g. Customer Portal HLD Review' />
-          </div>
-          <div style={{ gridColumn: '1/-1' }}>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Type</label>
-            <select className='form-input' value={form.reviewType} onChange={set('reviewType')}>
-              {REVIEW_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-          </div>
-          <div style={{ gridColumn: '1/-1' }}>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Aggressiveness</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-              {AGGRESSIVENESS_CARDS.map(card => (
-                <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
-                  style={{ border: '2px solid ' + (form.aggressiveness === card.value ? card.border : 'var(--navy-light)'), borderRadius: 10, padding: '12px 10px', cursor: 'pointer', background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-dark)', transition: 'all 0.15s' }}>
-                  <div style={{ fontSize: 20, marginBottom: 4 }}>{card.icon}</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{card.label}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3, lineHeight: 1.4 }}>{card.description}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
-            <select className='form-input' value={form.framework} onChange={set('framework')}>
-              <option value='NORA_2_0'>NORA 2.0</option>
-              <option value='TOGAF_10'>TOGAF 10</option>
-            </select>
-          </div>
-          <div>
-            <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Project Name</label>
-            <input className='form-input' value={form.projectName} onChange={set('projectName')} placeholder='Optional' />
-          </div>
-        </div>
-      </div>
+      {/* ── STEP 1: Identity ── */}
+      {wizardStep === 1 && (
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>📋 Review Identity</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Give your review a clear name and set the review type and framework.</div>
 
-      {/* Upload Section */}
-      <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 24, marginBottom: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>Upload Architecture Documents</div>
-        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>PDF, DOCX, PPTX, XLSX, PNG, JPG, JSON, YAML — HLD documents, diagrams, NFRs, integration specs</div>
-        <div style={{ border: '2px dashed var(--navy-light)', borderRadius: 10, padding: 28, textAlign: 'center', cursor: 'pointer', marginBottom: 12 }}
-          onClick={() => fileRef.current?.click()}
-          onDragOver={e => e.preventDefault()}
-          onDrop={e => { e.preventDefault(); handleFileSelect(e.dataTransfer.files) }}>
-          <div style={{ fontSize: 28, marginBottom: 8 }}>📄</div>
-          <div style={{ fontSize: 14, color: 'var(--text)' }}>{uploading ? 'Processing...' : 'Click or drag files here'}</div>
-          <input ref={fileRef} type='file' multiple style={{ display: 'none' }} onChange={e => handleFileSelect(e.target.files)} />
-        </div>
-        {inputs.length > 0 && (
-          <div>
-            {inputs.map((inp, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--navy-dark)', borderRadius: 8, marginBottom: 6 }}>
-                <span style={{ fontSize: 16 }}>📄</span>
-                <span style={{ fontSize: 13, flex: 1 }}>{inp.label}</span>
-                <button onClick={() => removeInput(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 16 }}>×</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Extracted Metadata Panel */}
-      {extractedMeta && showMeta && (
-        <div style={{ background: 'var(--navy-mid)', border: '1px solid #3498db44', borderRadius: 12, padding: 20, marginBottom: 20 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>🤖 Auto-Extracted Information</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>AI extracted the following from your documents. Review and confirm before starting.</div>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
+              <input className='form-input' value={form.title} onChange={set('title')}
+                placeholder='e.g. Customer Portal HLD Review'
+                style={{ fontSize: 15 }} />
             </div>
-            <button onClick={() => setShowMeta(false)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 18 }}>×</button>
+
+            <div>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>Review Type</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {REVIEW_TYPES.map(rt => (
+                  <div key={rt.value} onClick={() => setForm(f => ({ ...f, reviewType: rt.value }))}
+                    style={{ padding: '10px 14px', borderRadius: 10, cursor: 'pointer', transition: 'all 0.15s',
+                      border: '2px solid ' + (form.reviewType === rt.value ? 'var(--accent)' : 'var(--navy-light)'),
+                      background: form.reviewType === rt.value ? 'var(--accent)11' : 'var(--navy-mid)',
+                      color: form.reviewType === rt.value ? 'var(--accent)' : 'var(--text)',
+                      fontSize: 13, fontWeight: form.reviewType === rt.value ? 600 : 400
+                    }}>{rt.label}</div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
+                <select className='form-input' value={form.framework} onChange={set('framework')}>
+                  <option value='NORA_2_0'>NORA 2.0</option>
+                  <option value='TOGAF_10'>TOGAF 10</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Project Name (optional)</label>
+                <input className='form-input' value={form.projectName} onChange={set('projectName')} placeholder='e.g. Customer Portal' />
+              </div>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {extractedMeta.solutionName && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>SOLUTION NAME</div><div style={{ fontSize: 13, fontWeight: 600 }}>{extractedMeta.solutionName}</div></div>}
-            {extractedMeta.scope && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>SCOPE</div><div style={{ fontSize: 13 }}>{extractedMeta.scope}</div></div>}
-            {extractedMeta.businessOwner && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>BUSINESS OWNER</div><div style={{ fontSize: 13 }}>{extractedMeta.businessOwner}</div></div>}
-            {extractedMeta.technicalOwner && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>TECHNICAL OWNER</div><div style={{ fontSize: 13 }}>{extractedMeta.technicalOwner}</div></div>}
-            {extractedMeta.availabilityTargets && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>AVAILABILITY</div><div style={{ fontSize: 13 }}>{extractedMeta.availabilityTargets}</div></div>}
-            {extractedMeta.drRequirements && <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>DR REQUIREMENTS</div><div style={{ fontSize: 13 }}>{extractedMeta.drRequirements}</div></div>}
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 32 }}>
+            <button className='btn-primary' onClick={wizardNext} disabled={!canNext1}
+              style={{ padding: '10px 28px', opacity: canNext1 ? 1 : 0.4 }}>
+              Next: Upload Documents →
+            </button>
           </div>
-          {extractedMeta.technologies?.length > 0 && <div style={{ marginTop: 10 }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>TECHNOLOGIES DETECTED</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{extractedMeta.technologies.map((t: string, i: number) => <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#3498db22', color: '#3498db' }}>{t}</span>)}</div></div>}
-          {extractedMeta.integrations?.length > 0 && <div style={{ marginTop: 10 }}><div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>INTEGRATIONS</div><div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{extractedMeta.integrations.map((t: string, i: number) => <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#2ecc7122', color: '#2ecc71' }}>{t}</span>)}</div></div>}
-          {extractedMeta.missingItems?.length > 0 && <div style={{ marginTop: 10, background: '#e67e2218', border: '1px solid #e67e2244', borderRadius: 8, padding: '10px 14px' }}><div style={{ fontSize: 12, fontWeight: 600, color: '#e67e22', marginBottom: 6 }}>⚠ Potentially Missing</div>{extractedMeta.missingItems.map((m: string, i: number) => <div key={i} style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 2 }}>• {m}</div>)}</div>}
         </div>
       )}
 
-      {/* Intelligence Advisor */}
-      <IntelligenceAdvisor reviewType={form.reviewType} />
+      {/* ── STEP 2: Documents ── */}
+      {wizardStep === 2 && (
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>📄 Upload Architecture Documents</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+            Upload your HLD, NFRs, diagrams, and integration specs. Docling will extract content automatically while you complete the setup.
+          </div>
 
-      <div style={{ marginTop: 24, display: 'flex', justifyContent: 'flex-end' }}>
-        <button className='btn-primary' onClick={createAndStart} disabled={loading || inputs.length === 0} style={{ fontSize: 15, padding: '12px 32px' }}>
-          {loading ? 'Creating review...' : '▶ Start Review'}
-        </button>
-      </div>
+          <div style={{ border: '2px dashed var(--navy-light)', borderRadius: 12, padding: 36, textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+            background: inputs.length > 0 ? 'var(--accent)05' : 'transparent',
+            borderColor: inputs.length > 0 ? 'var(--accent)55' : 'var(--navy-light)'
+          }}
+            onClick={() => fileRef.current?.click()}
+            onDragOver={e => e.preventDefault()}
+            onDrop={e => { e.preventDefault(); handleFileSelect(e.dataTransfer.files) }}>
+            <div style={{ fontSize: 36, marginBottom: 10 }}>{inputs.length > 0 ? '✅' : '📂'}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
+              {inputs.length > 0 ? inputs.length + ' file' + (inputs.length > 1 ? 's' : '') + ' selected' : 'Click or drag files here'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>PDF, DOCX, PPTX, XLSX, PNG, JPG, JSON, YAML</div>
+            <input ref={fileRef} type='file' multiple style={{ display: 'none' }} onChange={e => handleFileSelect(e.target.files)} />
+          </div>
+
+          {inputs.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              {inputs.map((inp, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 18 }}>📄</span>
+                  <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{inp.label}</span>
+                  <span style={{ fontSize: 11, color: '#2ecc71' }}>Ready</span>
+                  <button onClick={() => removeInput(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+                </div>
+              ))}
+              <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: '1px dashed var(--accent)55', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', marginTop: 4 }}>+ Add more files</button>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32 }}>
+            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
+            <button className='btn-primary' onClick={wizardNext} disabled={!canNext2}
+              style={{ padding: '10px 28px', opacity: canNext2 ? 1 : 0.4 }}>
+              Next: Review Intelligence →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 3: Intelligence Advisor ── */}
+      {wizardStep === 3 && (
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>🧠 Review Intelligence</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+            These repository items will be used to enrich your review. Missing items reduce review quality — add them before starting if possible.
+          </div>
+          <IntelligenceAdvisor reviewType={form.reviewType} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28 }}>
+            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
+            <button className='btn-primary' onClick={wizardNext} style={{ padding: '10px 28px' }}>Next: Set Aggressiveness →</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 4: Aggressiveness ── */}
+      {wizardStep === 4 && (
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>⚖️ Review Aggressiveness</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+            Choose how rigorous the AI review should be. This affects finding thresholds, scoring penalties, and compliance strictness.
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            {AGGRESSIVENESS_CARDS.map(card => (
+              <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
+                style={{ border: '2px solid ' + (form.aggressiveness === card.value ? card.border : 'var(--navy-light)'),
+                  borderRadius: 12, padding: '18px 16px', cursor: 'pointer',
+                  background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-mid)',
+                  transition: 'all 0.15s' }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>{card.icon}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{card.label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>{card.description}</div>
+                {form.aggressiveness === card.value && (
+                  <div style={{ marginTop: 10, fontSize: 11, color: card.border, fontWeight: 600 }}>✓ Selected</div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32 }}>
+            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
+            <button className='btn-primary' onClick={wizardNext} style={{ padding: '10px 28px' }}>Next: Confirm & Launch →</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 5: Confirm & Launch ── */}
+      {wizardStep === 5 && (
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>🚀 Confirm & Launch</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Review your configuration before starting the AI analysis.</div>
+
+          {/* Summary card */}
+          <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>REVIEW TITLE</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{form.title}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>REVIEW TYPE</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{REVIEW_TYPES.find(t => t.value === form.reviewType)?.label || form.reviewType}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>FRAMEWORK</div>
+                <div style={{ fontSize: 13 }}>{form.framework?.replace(/_/g, ' ')}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>AGGRESSIVENESS</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  {AGGRESSIVENESS_CARDS.find(c => c.value === form.aggressiveness)?.icon} {form.aggressiveness}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Files */}
+          <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>DOCUMENTS ({inputs.length})</div>
+            {inputs.map((inp, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 4 }}>
+                <span>📄</span><span style={{ color: 'var(--text)' }}>{inp.label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Extracted metadata if available */}
+          {extractedMeta && (
+            <div style={{ background: '#3498db0a', border: '1px solid #3498db33', borderRadius: 12, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>🤖 AUTO-DETECTED FROM DOCUMENTS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                {extractedMeta.solutionName && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SOLUTION</div><div style={{ fontSize: 13, fontWeight: 600 }}>{extractedMeta.solutionName}</div></div>}
+                {extractedMeta.scope && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SCOPE</div><div style={{ fontSize: 13 }}>{extractedMeta.scope}</div></div>}
+                {extractedMeta.businessOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>BUSINESS OWNER</div><div style={{ fontSize: 13 }}>{extractedMeta.businessOwner}</div></div>}
+                {extractedMeta.technicalOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>TECH OWNER</div><div style={{ fontSize: 13 }}>{extractedMeta.technicalOwner}</div></div>}
+              </div>
+              {extractedMeta.technologies?.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>TECHNOLOGIES DETECTED</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {extractedMeta.technologies.map((t: string, i: number) => <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#3498db22', color: '#3498db' }}>{t}</span>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
+            <button className='btn-primary' onClick={createAndStart} disabled={loading}
+              style={{ fontSize: 15, padding: '12px 36px' }}>
+              {loading ? 'Creating review...' : '▶ Launch Review'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 
