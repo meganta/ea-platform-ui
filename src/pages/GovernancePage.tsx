@@ -1572,6 +1572,19 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     </div>
                   </div>
 
+                  {/* Source citation — where in the document this was found */}
+                  {o.sourceReference && (
+                    <div style={{ background: '#3498db11', border: '1px solid #3498db33', borderRadius: 8, padding: '8px 12px', marginBottom: 8 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#3498db', marginBottom: 4, letterSpacing: 0.5 }}>📍 FOUND IN DOCUMENT</div>
+                      <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{o.sourceReference}</div>
+                      {o.sourceQuote && (
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, paddingLeft: 8, borderLeft: '2px solid #3498db44', fontStyle: 'italic', lineHeight: 1.5 }}>
+                          "{o.sourceQuote}"
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {o.existingAlternative && (
                     <div style={{ background: '#2ecc7115', border: '1px solid #2ecc7133', borderRadius: 6, padding: '6px 10px', marginBottom: 8, fontSize: 12, color: '#2ecc71' }}>
                       ♻️ Reuse existing: {isAR ? resolveText(o.existingAlternative) : o.existingAlternative}
@@ -1593,7 +1606,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     )}
                   </div>
 
-                  {o.savingRationale && <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic', marginBottom: 6 }}>📊 {isAR ? resolveText(o.savingRationale) : o.savingRationale}</div>}
+                  {/* Saving rationale — step-by-step derivation */}
+                  {o.savingRationale && (
+                    <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px', marginBottom: 8 }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4, letterSpacing: 0.5 }}>📊 SAVING RATIONALE</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>{isAR ? resolveText(o.savingRationale) : o.savingRationale}</div>
+                    </div>
+                  )}
                   {o.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {isAR ? resolveText(o.recommendation) : o.recommendation}</div>}
                 </div>
               )
