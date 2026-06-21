@@ -451,6 +451,35 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
   )
 }
 
+function MetadataPreview({ meta }: { meta: any }) {
+  if (!meta || Object.keys(meta).length === 0) return null
+  return (
+    <div style={{ background: '#3498db0a', border: '1px solid #3498db33', borderRadius: 10, padding: 16, marginTop: 16 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>🤖 Auto-Detected from Documents</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {meta.solutionName && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SOLUTION</div><div style={{ fontSize: 13, fontWeight: 600 }}>{meta.solutionName}</div></div>}
+        {meta.scope && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SCOPE</div><div style={{ fontSize: 12 }}>{meta.scope}</div></div>}
+        {meta.businessOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>BUSINESS OWNER</div><div style={{ fontSize: 12 }}>{meta.businessOwner}</div></div>}
+        {meta.technicalOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>TECH OWNER</div><div style={{ fontSize: 12 }}>{meta.technicalOwner}</div></div>}
+      </div>
+      {meta.technologies?.length > 0 && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>TECHNOLOGIES DETECTED</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {meta.technologies.map((t: string, i: number) => <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#3498db22', color: '#3498db' }}>{t}</span>)}
+          </div>
+        </div>
+      )}
+      {meta.missingItems?.length > 0 && (
+        <div style={{ marginTop: 10, background: '#e67e2218', border: '1px solid #e67e2244', borderRadius: 8, padding: '8px 12px' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#e67e22', marginBottom: 4 }}>⚠ Potentially Missing</div>
+          {meta.missingItems.map((m: string, i: number) => <div key={i} style={{ fontSize: 11, color: 'var(--text-muted)' }}>• {m}</div>)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function GovernancePage() {
   const api = useApi()
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
@@ -537,6 +566,13 @@ export default function GovernancePage() {
           const uploadPromise = api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd)
           const timeoutPromise = new Promise(res => setTimeout(res, 90000))
           await Promise.race([uploadPromise, timeoutPromise]).catch(() => {})
+          // Try fetching metadata immediately after each file — Docling may have completed
+          try {
+            const earlyMeta = await api.get('/governance/reviews/' + r.id + '/inputs/metadata').catch(() => null)
+            if (earlyMeta && Object.keys(earlyMeta).length > 0) {
+              setExtractedMeta(earlyMeta)
+            }
+          } catch { /* ignore — will retry in poll */ }
         }
       }
       setUploadStatus('')
@@ -977,6 +1013,7 @@ export default function GovernancePage() {
         review={review}
         onComplete={(r, f, rpt) => { setReview(r); setFindings(f); setReport(rpt); setView('report') }}
       />
+      <MetadataPreview meta={extractedMeta} />
     </div>
   )
 
