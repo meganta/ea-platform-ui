@@ -1420,10 +1420,23 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                             <div style={{ height: 3, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
                               <div style={{ height: '100%', width: pct + '%', background: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
                             </div>
-                            {obj.contributionDescription && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription}</div>}
-                            {obj.expectedValue && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>💡 {isAR ? resolveText(obj.expectedValue) : obj.expectedValue}</div>}
-                            {obj.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>📋 {obj.evidence}</div>}
-                            {obj.relatedKPIs?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📊 KPIs: {obj.relatedKPIs.join(', ')}</div>}
+                            {obj.contributionDescription && obj.contributionDescription !== 'N/A' && obj.contributionDescription !== 'n/a' && (
+                              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription}</div>
+                            )}
+                            {obj.expectedValue && obj.expectedValue !== 'N/A' && obj.expectedValue !== 'n/a' && (
+                              <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>💡 {isAR ? resolveText(obj.expectedValue) : obj.expectedValue}</div>
+                            )}
+                            {obj.evidence && obj.evidence !== 'N/A' && obj.evidence !== 'n/a' && (
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>📋 {obj.evidence}</div>
+                            )}
+                            {obj.relatedKPIs?.length > 0 && obj.relatedKPIs.some((k:string) => k !== 'N/A') && (
+                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📊 KPIs: {obj.relatedKPIs.filter((k:string) => k !== 'N/A').join(', ')}</div>
+                            )}
+                            {(obj.alignmentStatus === 'NOT_ALIGNED' || obj.alignmentStatus === 'NOT_APPLICABLE') && !obj.contributionDescription && (
+                              <div style={{ fontSize: 11, color: '#8baac8', fontStyle: 'italic' }}>
+                                {obj.alignmentStatus === 'NOT_ALIGNED' ? 'This goal is not addressed by the submitted solution.' : 'This goal is not relevant to this solution type.'}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
