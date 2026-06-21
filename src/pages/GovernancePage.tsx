@@ -1160,10 +1160,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','NOT_APPLICABLE']
         const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#8baac8' }
         const statusLabel: Record<string,string> = { COMPLIANT:'✓ Compliant', PARTIALLY_COMPLIANT:'⚠ Partial', NON_COMPLIANT:'✗ Non-Compliant', REQUIRES_EXCEPTION:'⚡ Exception', NOT_APPLICABLE:'— N/A' }
-        const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', TECHNOLOGY_CATALOG:'#9b59b6', NORA_STANDARD:'#3498db', NCA_STANDARD:'#1abc9c' }
+        const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', NCA_STANDARD:'#1abc9c', NDMO_STANDARD:'#9b59b6' }
+        const catLabel: Record<string,string> = { TENANT_PRINCIPLE:'Tenant EA Principles', TENANT_STANDARD:'Tenant EA Standards', NCA_STANDARD:'NCA ECC Controls', NDMO_STANDARD:'NDMO Data Standards' }
 
-        // Group items by category
-        const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','TECHNOLOGY_CATALOG','NORA_STANDARD','NCA_STANDARD','GENERAL_BEST_PRACTICE']
+        // Group items by category — only 4 allowed categories
+        const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','NCA_STANDARD','NDMO_STANDARD']
         const grouped: Record<string,any[]> = {}
         for (const item of items) { const c = item.category || 'OTHER'; if (!grouped[c]) grouped[c]=[]; grouped[c].push(item) }
 
@@ -1208,7 +1209,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     const comp = citems.filter((i:any) => i.complianceStatus === 'COMPLIANT').length
                     return (
                       <div key={c} style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '8px 12px' }}>
-                        <div style={{ fontSize: 10, color: catColor[c] || 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>{c.replace(/_/g,' ')}</div>
+                        <div style={{ fontSize: 10, color: catColor[c] || 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>{catLabel[c] || c.replace(/_/g,' ')}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                           {comp > 0 && <span style={{ color: '#2ecc71' }}>✓{comp} </span>}
                           {nonComp > 0 && <span style={{ color: '#e74c3c' }}>✗{nonComp} </span>}
@@ -1226,7 +1227,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               <div key={cat} style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: catColor[cat] || 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 3, height: 14, background: catColor[cat] || '#8baac8', borderRadius: 2 }} />
-                  {cat.replace(/_/g,' ')}
+                  {catLabel[cat] || cat.replace(/_/g,' ')}
                   <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({grouped[cat].length})</span>
                 </div>
                 {grouped[cat].map((item: any, i: number) => (
