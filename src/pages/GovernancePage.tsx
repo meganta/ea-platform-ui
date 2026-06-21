@@ -1229,23 +1229,56 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                   <div style={{ width: 3, height: 14, background: catColor[cat] || '#8baac8', borderRadius: 2 }} />
                   {catLabel[cat] || cat.replace(/_/g,' ')}
                   <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({grouped[cat].length})</span>
+                  {(() => {
+                    const scorable = grouped[cat].filter((i:any) => i.complianceStatus !== 'NOT_APPLICABLE')
+                    if (scorable.length === 0) return null
+                    const avg = Math.round(scorable.reduce((s:number,i:any) => s + (i.complianceStatus === 'COMPLIANT' ? 100 : i.complianceStatus === 'PARTIALLY_COMPLIANT' ? 50 : i.complianceStatus === 'REQUIRES_EXCEPTION' ? 25 : 0), 0) / scorable.length)
+                    const c = avg >= 75 ? '#2ecc71' : avg >= 40 ? '#f39c12' : '#e74c3c'
+                    return <span style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: c }}>{avg}/100</span>
+                  })()}
                 </div>
-                {grouped[cat].map((item: any, i: number) => (
-                  <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + (item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c33' : 'var(--navy-light)'), borderRadius: 10, padding: 12, marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                      <div style={{ minWidth: 90, padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, textAlign: 'center', marginTop: 1,
-                        background: (statusColor[item.complianceStatus] || '#8baac8') + '22',
-                        color: statusColor[item.complianceStatus] || '#8baac8'
-                      }}>{statusLabel[item.complianceStatus] || item.complianceStatus}</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{item.principleOrStandard}</div>
-                        {item.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>📋 {item.evidence}</div>}
-                        {item.gap && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4 }}>⚠ {isAR ? resolveText(item.gap) : item.gap}</div>}
-                        {item.recommendation && <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>→ {isAR ? resolveText(item.recommendation) : item.recommendation}</div>}
+                {grouped[cat].map((item: any, i: number) => {
+                  // Per-item score contribution: COMPLIANT=100, PARTIALLY=50, NON_COMPLIANT=0, N/A=null
+                  const itemScore = item.complianceStatus === 'COMPLIANT' ? 100
+                    : item.complianceStatus === 'PARTIALLY_COMPLIANT' ? 50
+                    : item.complianceStatus === 'NON_COMPLIANT' ? 0
+                    : item.complianceStatus === 'REQUIRES_EXCEPTION' ? 25
+                    : null // NOT_APPLICABLE — excluded from scoring
+                  const scoreColor = itemScore === null ? '#8baac8' : itemScore >= 75 ? '#2ecc71' : itemScore >= 40 ? '#f39c12' : '#e74c3c'
+                  const borderColor = item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c33'
+                    : item.complianceStatus === 'COMPLIANT' ? '#2ecc7133'
+                    : item.complianceStatus === 'PARTIALLY_COMPLIANT' ? '#f39c1233'
+                    : 'var(--navy-light)'
+                  return (
+                    <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + borderColor, borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        {/* Status badge */}
+                        <div style={{ minWidth: 100, padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, textAlign: 'center', marginTop: 1, flexShrink: 0,
+                          background: (statusColor[item.complianceStatus] || '#8baac8') + '22',
+                          color: statusColor[item.complianceStatus] || '#8baac8'
+                        }}>{statusLabel[item.complianceStatus] || item.complianceStatus}</div>
+                        {/* Content */}
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: item.evidence || item.gap ? 4 : 0 }}>{item.principleOrStandard}</div>
+                          {item.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>📋 {item.evidence}</div>}
+                          {item.gap && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4 }}>⚠ {isAR ? resolveText(item.gap) : item.gap}</div>}
+                          {item.recommendation && <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>→ {isAR ? resolveText(item.recommendation) : item.recommendation}</div>}
+                        </div>
+                        {/* Score chip */}
+                        <div style={{ textAlign: 'center', minWidth: 44, flexShrink: 0 }}>
+                          {itemScore !== null ? (
+                            <>
+                              <div style={{ fontSize: 16, fontWeight: 700, color: scoreColor }}>{itemScore}</div>
+                              <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
+                            </>
+                          ) : (
+                            <div style={{ fontSize: 10, color: '#8baac8' }}>N/A</div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ))}
 
