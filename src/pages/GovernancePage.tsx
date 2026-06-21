@@ -78,6 +78,7 @@ const DOMAIN_LABEL: Record<string, string> = {
 }
 
 function FindingsTab({ findings }: { findings: any[] }) {
+  const { t } = useLang()
   const [groupBy, setGroupBy] = React.useState<'domain' | 'severity'>('domain')
   const [filterSev, setFilterSev] = React.useState<string[]>([])
   const [filterDomain, setFilterDomain] = React.useState<string[]>([])
