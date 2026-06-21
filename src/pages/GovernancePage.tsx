@@ -1237,39 +1237,83 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       })()}
 
       {/* Risk Register Tab */}
-      {tab === 'risk' && (
-        <div>
-          {report.riskRegister?.totalRisks > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              {[['Total Risks', report.riskRegister.totalRisks, '#8baac8'], ['Critical', report.riskRegister.criticalRisks, '#e74c3c'], ['High', report.riskRegister.highRisks, '#e67e22']].map(([l, v, c]: any) => (
-                <div key={l} style={{ background: c + '18', border: '1px solid ' + c + '44', borderRadius: 8, padding: '12px 16px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: c }}>{v || 0}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{l}</div>
+      {tab === 'risk' && (() => {
+        const allRisks = report.riskRegister?.risks || []
+        const [riskFilterSev, setRiskFilterSev] = React.useState<string[]>([])
+        const [riskFilterCat, setRiskFilterCat] = React.useState<string>('')
+        const filteredRisks = allRisks.filter((r: any) => {
+          if (riskFilterSev.length > 0 && !riskFilterSev.includes(r.severity)) return false
+          if (riskFilterCat && r.riskCategory !== riskFilterCat) return false
+          return true
+        })
+        const sevCount = (s: string) => allRisks.filter((r: any) => r.severity === s).length
+        const allCats = Array.from(new Set(allRisks.map((r: any) => r.riskCategory).filter(Boolean))) as string[]
+        const toggleSev = (s: string) => setRiskFilterSev((p: string[]) => p.includes(s) ? p.filter((x: string) => x !== s) : [...p, s])
+
+        return (
+          <div>
+            {/* Severity summary cards */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+              {[['Total', allRisks.length, '#8baac8'], ['Critical', sevCount('CRITICAL'), '#e74c3c'], ['High', sevCount('HIGH'), '#e67e22'], ['Medium', sevCount('MEDIUM'), '#f39c12'], ['Low', sevCount('LOW'), '#3498db']].map(([l, v, c]: any) => (
+                <div key={l} style={{ background: c + '18', border: '1px solid ' + c + '44', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: c }}>{v}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
                 </div>
               ))}
             </div>
-          )}
-          {(report.riskRegister?.risks || []).map((risk: any, i: number) => (
-            <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[risk.severity] + '33', color: SEV_COLOR[risk.severity] }}>{risk.severity}</span>
-                <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{risk.riskTitle}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{risk.riskCategory?.replace(/_/g, ' ')}</div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Probability: </span>{risk.probability}</div>
-                <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Owner: </span>{risk.owner}</div>
-              </div>
-              {risk.impact && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Impact: {risk.impact}</div>}
-              {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
-              {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
+
+            {/* Severity filter */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+              {(['CRITICAL','HIGH','MEDIUM','LOW'] as const).map(sev => {
+                const n = sevCount(sev)
+                if (n === 0) return null
+                const active = riskFilterSev.includes(sev)
+                return (
+                  <button key={sev} onClick={() => toggleSev(sev)} style={{
+                    padding: '4px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    border: '1px solid ' + SEV_COLOR[sev] + (active ? '' : '55'),
+                    background: active ? SEV_COLOR[sev] + '33' : 'transparent',
+                    color: SEV_COLOR[sev]
+                  }}>{n} {sev}</button>
+                )
+              })}
+              <select value={riskFilterCat} onChange={e => setRiskFilterCat(e.target.value)}
+                style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12, marginLeft: 4 }}>
+                <option value=''>All Categories</option>
+                {allCats.map((c: string) => <option key={c} value={c}>{c.replace(/_/g,' ')}</option>)}
+              </select>
+              {(riskFilterSev.length > 0 || riskFilterCat) && (
+                <button onClick={() => { setRiskFilterSev([]); setRiskFilterCat('') }} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>✕ Clear</button>
+              )}
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{filteredRisks.length}/{allRisks.length} risks</span>
             </div>
-          ))}
-          {(!report.riskRegister?.risks || report.riskRegister.risks.length === 0) && (
-            <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No risk register available</div>
-          )}
-        </div>
-      )}
+
+            {/* Risk cards */}
+            {filteredRisks.map((risk: any, i: number) => (
+              <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                  <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[risk.severity] + '33', color: SEV_COLOR[risk.severity] }}>{risk.severity}</span>
+                  <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{risk.riskTitle}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{risk.riskCategory?.replace(/_/g, ' ')}</div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Probability: </span>{risk.probability}</div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Owner: </span>{risk.owner}</div>
+                </div>
+                {risk.impact && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Impact: {risk.impact}</div>}
+                {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
+                {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
+              </div>
+            ))}
+            {allRisks.length === 0 && (
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No risk register available</div>
+            )}
+            {allRisks.length > 0 && filteredRisks.length === 0 && (
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No risks match the selected filters</div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Future State Tab */}
       {tab === 'future' && (() => {
