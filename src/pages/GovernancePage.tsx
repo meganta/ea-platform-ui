@@ -775,6 +775,8 @@ export default function GovernancePage() {
 }
 
 function ReportView({ review, report, findings, tab, setTab }: { review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
+  const [riskFilterSev, setRiskFilterSev] = React.useState<string[]>([])
+  const [riskFilterCat, setRiskFilterCat] = React.useState<string>('')
   const extScores = (report.domainSummaries?._extendedScores) || {}
   const archQualityScore = extScores.architectureQualityScore || 0
   const secScore = extScores.securityScore || 0
@@ -1254,8 +1256,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Risk Register Tab */}
       {tab === 'risk' && (() => {
         const allRisks = report.riskRegister?.risks || []
-        const [riskFilterSev, setRiskFilterSev] = React.useState<string[]>([])
-        const [riskFilterCat, setRiskFilterCat] = React.useState<string>('')
         const filteredRisks = allRisks.filter((r: any) => {
           if (riskFilterSev.length > 0 && !riskFilterSev.includes(r.severity)) return false
           if (riskFilterCat && r.riskCategory !== riskFilterCat) return false
