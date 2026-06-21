@@ -27,10 +27,46 @@ const REVIEW_TYPES = [
 ]
 
 const AGGRESSIVENESS_CARDS = [
-  { value: 'ADVISORY', label: 'Advisory', icon: '💡', description: 'Lightweight guidance. Best for early-stage exploration.', border: '#3498db' },
-  { value: 'STANDARD', label: 'Standard', icon: '⚖️', description: 'Balanced review covering all domains. Default.', border: '#2ecc71' },
-  { value: 'STRICT', label: 'Strict', icon: '🔒', description: 'Rigorous analysis with elevated thresholds. High-impact.', border: '#e67e22' },
-  { value: 'EXECUTIVE', label: 'Executive', icon: '🏛️', description: 'Board-level scrutiny with strategic alignment focus.', border: '#e74c3c' },
+  {
+    value: 'ADVISORY', label: 'Advisory', icon: '💡', border: '#3498db',
+    description: 'Lightweight guidance for early-stage exploration.',
+    details: [
+      'Constructive tone — findings are suggestions, not blockers',
+      'Lower scoring penalties — focus on direction not compliance',
+      'Ideal for: concept proposals, feasibility studies, early HLDs',
+      'Decision outcome: Guidance only — no formal approval required',
+    ],
+  },
+  {
+    value: 'STANDARD', label: 'Standard', icon: '⚖️', border: '#2ecc71',
+    description: 'Balanced review covering all domains. Default for most HLD reviews.',
+    details: [
+      'Full domain coverage across all 6 NORA architecture domains',
+      'Normal compliance thresholds and scoring penalties',
+      'Ideal for: standard HLD/LLD reviews, project approvals',
+      'Decision outcome: APPROVED / APPROVED WITH CONDITIONS / REQUIRES CHANGES',
+    ],
+  },
+  {
+    value: 'STRICT', label: 'Strict', icon: '🔒', border: '#e67e22',
+    description: 'Rigorous analysis with elevated thresholds. For high-impact solutions.',
+    details: [
+      'Higher scoring penalties — MEDIUM findings also penalize score',
+      'Full EA principle enforcement — every deviation flagged',
+      'Ideal for: critical systems, cross-domain integrations, large budgets',
+      'Decision outcome: Formal ARB approval required before proceeding',
+    ],
+  },
+  {
+    value: 'EXECUTIVE', label: 'Executive', icon: '🏛️', border: '#e74c3c',
+    description: 'Board-level scrutiny with maximum strategic and financial focus.',
+    details: [
+      'Deepest assessment — strategic, financial, and risk dimensions weighted highest',
+      'Every finding includes business impact and SAR financial implications',
+      'Ideal for: strategic platforms, Vision 2030 initiatives, enterprise-wide systems',
+      'Decision outcome: Executive committee sign-off required',
+    ],
+  },
 ]
 
 const INTELLIGENCE_ITEMS = [
@@ -810,20 +846,38 @@ export default function GovernancePage() {
             Choose how rigorous the AI review should be. This affects finding thresholds, scoring penalties, and compliance strictness.
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            {AGGRESSIVENESS_CARDS.map(card => (
-              <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
-                style={{ border: '2px solid ' + (form.aggressiveness === card.value ? card.border : 'var(--navy-light)'),
-                  borderRadius: 12, padding: '18px 16px', cursor: 'pointer',
-                  background: form.aggressiveness === card.value ? card.border + '18' : 'var(--navy-mid)',
-                  transition: 'all 0.15s' }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>{card.icon}</div>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{card.label}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>{card.description}</div>
-                {form.aggressiveness === card.value && (
-                  <div style={{ marginTop: 10, fontSize: 11, color: card.border, fontWeight: 600 }}>✓ Selected</div>
-                )}
-              </div>
-            ))}
+            {AGGRESSIVENESS_CARDS.map(card => {
+              const active = form.aggressiveness === card.value
+              return (
+                <div key={card.value} onClick={() => setForm(f => ({ ...f, aggressiveness: card.value }))}
+                  style={{ border: '2px solid ' + (active ? card.border : 'var(--navy-light)'),
+                    borderRadius: 12, padding: '18px 16px', cursor: 'pointer',
+                    background: active ? card.border + '18' : 'var(--navy-mid)',
+                    transition: 'all 0.15s', display: 'flex', flexDirection: 'column', gap: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                    <span style={{ fontSize: 26 }}>{card.icon}</span>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: active ? card.border : 'var(--text)' }}>{card.label}</div>
+                      {active && <div style={{ fontSize: 10, color: card.border, fontWeight: 600 }}>✓ Selected</div>}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 12 }}>{card.description}</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    {(card as any).details.map((d: string, i: number) => {
+                      const isIdeal = d.startsWith('Ideal for:')
+                      const isOutcome = d.startsWith('Decision outcome:')
+                      return (
+                        <div key={i} style={{ display: 'flex', gap: 7, fontSize: 11, lineHeight: 1.4,
+                          color: isOutcome ? card.border : isIdeal ? 'var(--accent)' : 'var(--text-muted)' }}>
+                          <span style={{ flexShrink: 0, marginTop: 1 }}>{isOutcome ? '⚖' : isIdeal ? '🎯' : '•'}</span>
+                          <span>{d}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32 }}>
             <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
