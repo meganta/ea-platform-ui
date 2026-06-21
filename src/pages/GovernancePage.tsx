@@ -1260,9 +1260,30 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                         {/* Content */}
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: item.evidence || item.gap ? 4 : 0 }}>{item.principleOrStandard}</div>
-                          {item.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>📋 {item.evidence}</div>}
-                          {item.gap && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4 }}>⚠ {isAR ? resolveText(item.gap) : item.gap}</div>}
-                          {item.recommendation && <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4 }}>→ {isAR ? resolveText(item.recommendation) : item.recommendation}</div>}
+                          {item.evidence && (
+                            <div style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 6 }}>
+                              <span style={{ color: item.complianceStatus === 'COMPLIANT' ? '#2ecc71' : item.complianceStatus === 'PARTIALLY_COMPLIANT' ? '#f39c12' : 'var(--text-muted)', flexShrink: 0 }}>✓</span>
+                              <span style={{ color: 'var(--text-muted)' }}>{item.evidence}</span>
+                            </div>
+                          )}
+                          {item.complianceStatus === 'PARTIALLY_COMPLIANT' && item.gap && (
+                            <div style={{ fontSize: 11, marginTop: 4, display: 'flex', gap: 6 }}>
+                              <span style={{ color: '#e74c3c', flexShrink: 0 }}>✗</span>
+                              <span style={{ color: '#e74c3c' }}>{isAR ? resolveText(item.gap) : item.gap}</span>
+                            </div>
+                          )}
+                          {item.complianceStatus === 'NON_COMPLIANT' && item.gap && (
+                            <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4, display: 'flex', gap: 6 }}>
+                              <span style={{ flexShrink: 0 }}>⚠</span>
+                              <span>{isAR ? resolveText(item.gap) : item.gap}</span>
+                            </div>
+                          )}
+                          {item.recommendation && item.complianceStatus !== 'COMPLIANT' && item.complianceStatus !== 'NOT_APPLICABLE' && (
+                            <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 4, display: 'flex', gap: 6 }}>
+                              <span style={{ flexShrink: 0 }}>→</span>
+                              <span>{isAR ? resolveText(item.recommendation) : item.recommendation}</span>
+                            </div>
+                          )}
                         </div>
                         {/* Score chip */}
                         <div style={{ textAlign: 'center', minWidth: 44, flexShrink: 0 }}>
