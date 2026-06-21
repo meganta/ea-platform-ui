@@ -452,7 +452,7 @@ export default function GovernancePage() {
     if (!state?.reviewId || reviews.length === 0) return
     const target = reviews.find((r: any) => r.id === state.reviewId)
     if (target) {
-      setSelected(target)
+      setReview(target)
       loadReport(target.id)
       if (state.tab) setTab(state.tab as any)
       window.history.replaceState({}, '')
