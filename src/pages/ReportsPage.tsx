@@ -207,11 +207,19 @@ function ComplianceReport() {
         </select>
         <select value={category} onChange={e => setCategory(e.target.value)} style={selStyle}>
           <option value=''>All Categories</option>
-          <option value='TENANT_PRINCIPLE'>Tenant Principle</option>
-          <option value='TENANT_STANDARD'>Tenant Standard</option>
-          <option value='NORA_STANDARD'>NORA Standard</option>
-          <option value='NCA_STANDARD'>NCA Standard</option>
-          <option value='TECHNOLOGY_CATALOG'>Technology Catalog</option>
+          <option value='TENANT_PRINCIPLE'>Tenant Principles</option>
+          <option value='TENANT_STANDARD'>Tenant Standards</option>
+          <option value='NCA_STANDARD'>NCA ECC</option>
+          <option value='NDMO_STANDARD'>NDMO</option>
+          <option value='SDAIA_STANDARD'>SDAIA</option>
+          <option value='DGA_STANDARD'>DGA</option>
+        </select>
+        <select value={severity} onChange={e => setSeverity(e.target.value)} style={selStyle}>
+          <option value=''>All Severities</option>
+          <option value='CRITICAL'>Critical</option>
+          <option value='HIGH'>High</option>
+          <option value='MEDIUM'>Medium</option>
+          <option value='LOW'>Low</option>
         </select>
         <select value={reviewType} onChange={e => setReviewType(e.target.value)} style={selStyle}>
           <option value=''>All Review Types</option>
