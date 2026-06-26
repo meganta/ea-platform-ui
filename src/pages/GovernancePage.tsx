@@ -1605,7 +1605,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     {sortedTypes.filter(t => STRAT_META[t]?.weight > 0).map(t => {
                       const meta = STRAT_META[t]
                       const objs = grouped[t]
-                      const avg = objs.length ? Math.round(objs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/objs.length) : 0
+                      const scorableObjs2 = objs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
+                      const avg = scorableObjs2.length ? Math.round(scorableObjs2.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/scorableObjs2.length) : 0
                       const c = avg >= 75 ? '#2ecc71' : avg >= 50 ? '#f39c12' : '#e74c3c'
                       return (
                         <div key={t} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, border: '1px solid ' + meta.color + '44', background: meta.color + '15' }}>
@@ -1624,7 +1625,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             {sortedTypes.map(stratType => {
               const meta = STRAT_META[stratType]
               const objs = grouped[stratType]
-              const avgAlign = Math.round(objs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/objs.length)
+              const scorableGroup = objs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
+              const avgAlign = scorableGroup.length ? Math.round(scorableGroup.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/scorableGroup.length) : 0
               const avgColor = avgAlign >= 75 ? '#2ecc71' : avgAlign >= 50 ? '#f39c12' : '#e74c3c'
               const fullyAligned = objs.filter((o:any) => o.alignmentStatus === 'FULLY_ALIGNED').length
               const partialAligned = objs.filter((o:any) => o.alignmentStatus === 'PARTIALLY_ALIGNED').length
