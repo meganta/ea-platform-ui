@@ -767,16 +767,23 @@ export default function GovernancePage() {
     const langParam = lang || exportLang || ''
     try {
       const url = API_URL + '/governance/reviews/' + review?.id + '/export/word' + (langParam ? '?lang=' + langParam : '')
-      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } })
-      if (!res.ok) { alert('Export failed'); return }
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+      if (!res.ok) {
+        const errText = await res.text().catch(() => res.status.toString())
+        alert('Export failed: ' + errText.slice(0, 200))
+        return
+      }
       const blob = await res.blob()
+      if (blob.size === 0) { alert('Export failed: empty file received'); return }
       const objUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objUrl
       a.download = (review?.title || 'governance-review') + (langParam === 'ar' ? '_AR' : langParam === 'en' ? '_EN' : '') + '.docx'
+      document.body.appendChild(a)
       a.click()
-      URL.revokeObjectURL(objUrl)
-    } catch { alert('Export failed') }
+      // Delay revoke to ensure download starts
+      setTimeout(() => { URL.revokeObjectURL(objUrl); document.body.removeChild(a) }, 2000)
+    } catch (e: any) { alert('Export failed: ' + (e?.message || 'Unknown error')) }
   }
 
   const handleFileSelect = (files: FileList | null) => {
