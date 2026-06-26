@@ -113,7 +113,7 @@ const DOMAIN_LABEL: Record<string, string> = {
   TOGAF_GOVERNANCE: 'TOGAF Governance',
 }
 
-function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onFindingUpdate, onFindingDelete }: { findings: any[], report: any, isAR: boolean, resolveText: (s: string) => string, reviewId?: string, onFindingUpdate?: (id: string, data: any) => void, onFindingDelete?: (id: string) => void }) {
+function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onFindingUpdate, onFindingDelete, onRescore }: { findings: any[], report: any, isAR: boolean, resolveText: (s: string) => string, reviewId?: string, onFindingUpdate?: (id: string, data: any) => void, onFindingDelete?: (id: string) => void, onRescore?: () => void }) {
   const { t } = useLang()
   const [filterSev, setFilterSev] = React.useState<string[]>([])
   // collapsed state: null = all expanded by default
@@ -227,7 +227,7 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
                 {domainFindings.length === 0 && allDomainFindings.length > 0 && (
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0 4px', fontStyle: 'italic' }}>No findings match the active severity filter</div>
                 )}
-                {domainFindings.map((f, i) => <FindingCard key={i} f={f} reviewId={reviewId} onUpdate={onFindingUpdate} onDelete={onFindingDelete} />)}
+                {domainFindings.map((f, i) => <FindingCard key={i} f={f} reviewId={reviewId} onUpdate={onFindingUpdate} onDelete={onFindingDelete} onRescore={onRescore} />)}
               </div>
             )}
           </div>
@@ -243,7 +243,7 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
           <div style={{ marginBottom: 10, border: '1px solid var(--navy-light)', borderRadius: 10, overflow: 'hidden' }}>
             <div style={{ padding: '10px 16px', background: 'var(--navy-mid)', fontSize: 13, fontWeight: 600 }}>⚙️ General / Other</div>
             <div style={{ padding: '8px 12px 4px' }}>
-              {orphans.map((f, i) => <FindingCard key={i} f={f} reviewId={reviewId} onUpdate={onFindingUpdate} onDelete={onFindingDelete} />)}
+              {orphans.map((f, i) => <FindingCard key={i} f={f} reviewId={reviewId} onUpdate={onFindingUpdate} onDelete={onFindingDelete} onRescore={onRescore} />)}
             </div>
           </div>
         )
@@ -273,12 +273,13 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
       })
       onUpdate(f.id, draft)
       setEditing(false)
+      if (onRescore) onRescore()
     } finally { setSaving(false) }
   }
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!window.confirm('Remove this finding from the review?')) return
+    // No confirmation popup — delete directly (severity change is reversible via edit)
     if (!reviewId || !onDelete) return
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -1696,7 +1697,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       )}
 
       {/* Domains & Findings Tab (merged) */}
-      {tab === 'domains' && <DomainsFindingsTab findings={localFindings} report={report} isAR={isAR} resolveText={resolveText} reviewId={review.id} onFindingUpdate={handleFindingUpdate} onFindingDelete={handleFindingDelete} />}
+      {tab === 'domains' && <DomainsFindingsTab findings={localFindings} report={report} isAR={isAR} resolveText={resolveText} reviewId={review.id} onFindingUpdate={handleFindingUpdate} onFindingDelete={handleFindingDelete} onRescore={triggerRescore} />}
 
       {/* UNUSED_DOMAINS_PLACEHOLDER */}
       {false && (
