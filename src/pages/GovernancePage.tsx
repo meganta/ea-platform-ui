@@ -427,7 +427,32 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
     }
   }, [])
 
+  const [pipelineError, setPipelineError] = React.useState<string | null>(null)
+  const [retrying, setRetrying] = React.useState(false)
+
+  const attemptRun = async (attempt: number = 1): Promise<boolean> => {
+    try {
+      const res = await api.post('/governance/reviews/' + review.id + '/run')
+      return true
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Unknown error'
+      // Mandatory gaps blocking run — no point retrying
+      if (msg.toLowerCase().includes('mandatory gap') || msg.toLowerCase().includes('cannot run')) {
+        setPipelineError('⚠️ Mandatory gaps are unresolved: ' + msg + '. Please go back and resolve them before running.')
+        return false
+      }
+      if (attempt < 3) {
+        setStatusMsg('Pipeline start failed, retrying (' + attempt + '/3)...')
+        await sleep(attempt * 3000)
+        return attemptRun(attempt + 1)
+      }
+      setPipelineError(msg)
+      return false
+    }
+  }
+
   const runFlow = async () => {
+    setPipelineError(null)
     // Stage 1: Gap detection
     setStage('gaps')
     setStatusMsg('Running gap detection...')
@@ -439,25 +464,29 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
     setStatusMsg('Gap detection complete. Starting AI review engines...')
     await sleep(1000)
 
-    // Stage 2: Run AI review
+    // Stage 2: Run AI review — auto-retry up to 3 times
     setStage('reviewing')
     setProgress(30)
-    setStatusMsg('AI review pipeline running...')
-    try {
-      await api.post('/governance/reviews/' + review.id + '/run')
-    } catch {}
+    setStatusMsg('Starting AI review pipeline...')
+    const started = await attemptRun(1)
+    if (!started) return  // error state already set
 
-    // Animate engines progressively
+    setStatusMsg('AI review pipeline running...')
+
+    // Animate engines progressively — first one ticks immediately
     let engineIdx = 0
-    engineTimerRef.current = setInterval(() => {
+    const tickEngine = () => {
       if (engineIdx < engines.length) {
         setEngines(prev => prev.map((e, i) => i === engineIdx ? { ...e, done: true } : e))
         engineIdx++
         setProgress(30 + Math.round((engineIdx / engines.length) * 50))
       }
-    }, 8000)
+    }
+    tickEngine()
+    engineTimerRef.current = setInterval(tickEngine, 8000)
 
-    // Poll for completion
+    // Poll for completion — also detect DRAFT (pipeline crashed after start)
+    let staleDraftCount = 0
     pollRef.current = setInterval(async () => {
       const r = await api.get('/governance/reviews/' + review.id).catch(() => null)
       if (r?.status === 'COMPLETED') {
@@ -474,8 +503,26 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
         ])
         setStage('done')
         onComplete(r, Array.isArray(f) ? f : [], rpt)
+      } else if (r?.status === 'DRAFT') {
+        // Pipeline started but crashed back to DRAFT
+        staleDraftCount++
+        if (staleDraftCount >= 3) {
+          clearInterval(pollRef.current)
+          clearInterval(engineTimerRef.current)
+          setPipelineError('Pipeline crashed during execution. Check Cloud Run logs for details. You can retry below.')
+        }
       }
     }, 4000)
+  }
+
+  const handleManualRetry = async () => {
+    setRetrying(true)
+    setPipelineError(null)
+    setEngines(prev => prev.map(e => ({ ...e, done: false })))
+    setProgress(30)
+    startedRef.current = false
+    await runFlow()
+    setRetrying(false)
   }
 
   const sleep = (ms: number) => new Promise(res => setTimeout(res, ms))
@@ -501,6 +548,23 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
               <span style={{ fontSize: 12, color: e.done ? '#2ecc71' : 'var(--text-muted)' }}>{e.label}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pipeline error state */}
+      {pipelineError && (
+        <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: '#e74c3c18', border: '1px solid #e74c3c44' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 6 }}>❌ Pipeline Error</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>{pipelineError}</div>
+          {!pipelineError.includes('mandatory gap') && (
+            <button
+              onClick={handleManualRetry}
+              disabled={retrying}
+              style={{ padding: '6px 16px', borderRadius: 8, background: '#e74c3c', color: '#fff', border: 'none', cursor: retrying ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, opacity: retrying ? 0.6 : 1 }}
+            >
+              {retrying ? '⏳ Retrying...' : '🔄 Retry Pipeline'}
+            </button>
+          )}
         </div>
       )}
 
