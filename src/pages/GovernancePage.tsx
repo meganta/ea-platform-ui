@@ -1383,6 +1383,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
     }).catch(() => {})
+    setTimeout(() => triggerRescore(), 300)
   }
   const removeComplianceItem = (idx: number) => {
     const newItems = localCompliance.filter((_: any, i: number) => i !== idx)
@@ -1393,6 +1394,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
     }).catch(() => {})
+    setTimeout(() => triggerRescore(), 300)
   }
 
   // Risk local state
@@ -1434,6 +1436,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
     }).catch(() => {})
+    setTimeout(() => triggerRescore(), 300)
   }
   const removeRisk = (idx: number) => {
     const newRisks = localRisks.filter((_: any, i: number) => i !== idx)
@@ -1444,6 +1447,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
     }).catch(() => {})
+    setTimeout(() => triggerRescore(), 300)
   }
   const tabs = [
     { key: 'summary', label: t('gov.summary') },
@@ -2121,6 +2125,22 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                             <div style={{ fontSize: 10, color: '#8baac8' }}>N/A</div>
                           )}
                         </div>
+                      </div>
+                      {/* Edit controls */}
+                      <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <select
+                          value={item.complianceStatus}
+                          onChange={e => updateComplianceItem(localCompliance.indexOf(item), { complianceStatus: e.target.value })}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (statusColor[item.complianceStatus] || '#8baac8') + '44', background: (statusColor[item.complianceStatus] || '#8baac8') + '18', color: statusColor[item.complianceStatus] || '#8baac8', cursor: 'pointer' }}>
+                          {['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE'].map(s => (
+                            <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => removeComplianceItem(localCompliance.indexOf(item))}
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>
+                          ✕ Remove
+                        </button>
                       </div>
                     </div>
                   )
