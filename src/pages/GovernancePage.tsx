@@ -502,6 +502,7 @@ export default function GovernancePage() {
   const [showMeta, setShowMeta] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
   const [uploadStatus, setUploadStatus] = useState('')
+  const [exportLang, setExportLang] = useState<'auto'|'ar'|'en'>('auto')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
@@ -596,20 +597,20 @@ export default function GovernancePage() {
     finally { setLoading(false) }
   }
 
-  const exportWord = async () => {
+  const exportWord = async (lang?: string) => {
     const token = localStorage.getItem('ea_token')
+    const langParam = lang || (exportLang !== 'auto' ? exportLang : '')
     try {
-      const res = await fetch(API_URL + '/governance/reviews/' + review?.id + '/export/word', {
-        headers: { Authorization: 'Bearer ' + token }
-      })
+      const url = API_URL + '/governance/reviews/' + review?.id + '/export/word' + (langParam ? '?lang=' + langParam : '')
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } })
       if (!res.ok) { alert('Export failed'); return }
       const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
+      const objUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url
-      a.download = (review?.title || 'governance-review') + '.docx'
+      a.href = objUrl
+      a.download = (review?.title || 'governance-review') + (langParam === 'ar' ? '_AR' : langParam === 'en' ? '_EN' : '') + '.docx'
       a.click()
-      URL.revokeObjectURL(url)
+      URL.revokeObjectURL(objUrl)
     } catch { alert('Export failed') }
   }
 
@@ -1023,7 +1024,15 @@ export default function GovernancePage() {
         <button onClick={() => { setView('list'); loadReviews() }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back to reviews</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', flex: 1 }}>{review?.title}</div>
         <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[review?.decision] + '22', color: DECISION_COLOR[review?.decision] }}>{review?.decision?.replace(/_/g, ' ')}</div>
-        <button onClick={exportWord} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>📄 Export Word</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <select value={exportLang} onChange={e => setExportLang(e.target.value as any)}
+            style={{ padding: '5px 8px', borderRadius: '8px 0 0 8px', border: '1px solid var(--navy-light)', borderRight: 'none', background: 'var(--navy-mid)', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer' }}>
+            <option value='auto'>🌐 Auto</option>
+            <option value='en'>🇬🇧 EN</option>
+            <option value='ar'>🇸🇦 AR</option>
+          </select>
+          <button onClick={() => exportWord()} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: '0 8px 8px 0', padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>📄 Export Word</button>
+        </div>
         <button onClick={reRunReview} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
       </div>
       {report && <ReportView review={review} report={report} findings={findings} tab={tab} setTab={setTab} />}

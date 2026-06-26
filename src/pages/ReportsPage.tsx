@@ -44,6 +44,7 @@ function SavingsReport() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
   const [reviewType, setReviewType] = useState('')
+  const [domain, setDomain] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
@@ -62,6 +63,8 @@ function SavingsReport() {
 
   useEffect(() => { load() }, [load])
 
+  // Domain filter is client-side — API doesn't support it
+  const filteredItems = (data?.items || []).filter((i: any) => !domain || i.domain === domain)
   const exportUrl = `governance/reports/savings/export?${new URLSearchParams({ status, reviewType, dateFrom, dateTo }).toString()}`
 
   return (
@@ -79,6 +82,15 @@ function SavingsReport() {
           <option value=''>All Review Types</option>
           <option value='HLD_REVIEW'>HLD Review</option>
           <option value='LLD_REVIEW'>LLD Review</option>
+        </select>
+        <select value={domain} onChange={e => setDomain(e.target.value)} style={selStyle}>
+          <option value=''>All Domains</option>
+          <option value='APPLICATION_INTEGRATION'>Application Integration</option>
+          <option value='DATA_ARCHITECTURE'>Data Architecture</option>
+          <option value='INFRASTRUCTURE'>Infrastructure</option>
+          <option value='SECURITY_ARCHITECTURE'>Security Architecture</option>
+          <option value='BUSINESS_ARCHITECTURE'>Business Architecture</option>
+          <option value='BENEFICIARY_EXPERIENCE'>Beneficiary Experience</option>
         </select>
         <input type='date' value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={selStyle} placeholder='From' />
         <input type='date' value={dateTo} onChange={e => setDateTo(e.target.value)} style={selStyle} placeholder='To' />
@@ -115,7 +127,7 @@ function SavingsReport() {
               </tr>
             </thead>
             <tbody>
-              {(data?.items || []).map((item: any) => (
+              {filteredItems.map((item: any) => (
                 <tr key={item.id} style={{ borderBottom: '1px solid var(--navy-light)' }}>
                   <td style={{ padding: '8px 12px', maxWidth: 150, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.review?.title}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)' }}>{item.review?.reviewType?.replace(/_/g,' ')}</td>
@@ -155,8 +167,8 @@ function SavingsReport() {
                   <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 700, color: '#2ecc71' }}>{item.totalSaving ? item.totalSaving.toLocaleString() : '—'}</td>
                 </tr>
               ))}
-              {(!data?.items?.length) && (
-                <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>No savings found</td></tr>
+              {filteredItems.length === 0 && (
+                <tr><td colSpan={9} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>{domain ? 'No savings in selected domain' : 'No savings found'}</td></tr>
               )}
             </tbody>
           </table>
@@ -174,6 +186,7 @@ function ComplianceReport() {
   const [complianceStatus, setComplianceStatus] = useState('')
   const [reviewType, setReviewType] = useState('')
   const [category, setCategory] = useState('')
+  const [severity, setSeverity] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
@@ -193,6 +206,8 @@ function ComplianceReport() {
 
   useEffect(() => { load() }, [load])
 
+  // Severity filter is client-side
+  const filteredCompItems = (data?.items || []).filter((i: any) => !severity || i.severity === severity)
   const exportUrl = `governance/reports/compliance/export?${new URLSearchParams({ complianceStatus, reviewType, category, dateFrom, dateTo }).toString()}`
 
   return (
@@ -258,7 +273,7 @@ function ComplianceReport() {
               </tr>
             </thead>
             <tbody>
-              {(data?.items || []).map((item: any, i: number) => (
+              {filteredCompItems.map((item: any, i: number) => (
                 <tr key={i} style={{ borderBottom: '1px solid var(--navy-light)', cursor: 'pointer' }} onClick={() => nav('/governance', { state: { reviewId: item.reviewId, tab: 'compliance' } })}>
                   <td style={{ padding: '8px 12px', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.review?.title}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)' }}>{item.review?.reviewType?.replace(/_/g,' ')}</td>
@@ -274,8 +289,8 @@ function ComplianceReport() {
                   <td style={{ padding: '8px 12px' }}><span style={{ fontSize: 11, color: 'var(--accent)', whiteSpace: 'nowrap' }}>→ Open Review</span></td>
                 </tr>
               ))}
-              {(!data?.items?.length) && (
-                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>No compliance items found</td></tr>
+              {filteredCompItems.length === 0 && (
+                <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>{severity ? 'No items with selected severity' : 'No compliance items found'}</td></tr>
               )}
             </tbody>
           </table>

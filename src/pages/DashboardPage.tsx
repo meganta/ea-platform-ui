@@ -21,28 +21,38 @@ export default function DashboardPage() {
   const [capabilities, setCapabilities] = useState<any[]>([])
   const [docs, setDocs] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
+  const [govStats, setGovStats] = useState<any>(null)
 
   useEffect(() => {
     api.getCycles().then(setCycles).catch(() => {})
     api.getCapabilities().then(setCapabilities).catch(() => {})
     api.getDocuments().then(setDocs).catch(() => {})
-    fetch(GOV_API + '/governance/reviews', { headers: { Authorization: 'Bearer ' + (getToken() || '') } })
+    const token = getToken() || ''
+    // Load reviews list for recent reviews section
+    fetch(GOV_API + '/governance/reviews', { headers: { Authorization: 'Bearer ' + token } })
       .then(r => r.json()).then((r: any) => setReviews(Array.isArray(r) ? r : [])).catch(() => {})
+    // Load aggregated stats from dedicated endpoint
+    fetch(GOV_API + '/governance/stats', { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json()).then(setGovStats).catch(() => {})
   }, [])
 
   const activeCycles = cycles.filter(c => c.status === 'ACTIVE').length
   const readyDocs = docs.filter(d => d.status === 'READY').length
 
-  // Governance stats
-  const completedReviews = reviews.filter(r => r.status === 'COMPLETED')
+  // Use stats endpoint data when available, fall back to manual calculation
+  const statsTotal    = govStats?.summary?.totalReviews     ?? reviews.length
+  const statsComplete = govStats?.summary?.completedReviews ?? reviews.filter(r => r.status === 'COMPLETED').length
+  const statsPending  = govStats?.summary?.inProgressReviews ?? reviews.filter(r => ['DRAFT','IN_PROGRESS','PROCESSING'].includes(r.status)).length
+  const statsAvgScore = govStats?.summary?.avgOverallScore  ?? 0
+  const statsCriticalOpen = govStats?.summary?.criticalOpenFindings ?? 0
+  const statsOpenFindings = govStats?.summary?.openFindings ?? 0
+  const decisionCounts = govStats?.decisions ?? {}
+  const monthlyTrend  = govStats?.monthlyTrend ?? []
+  const findingsBySev = govStats?.findingsBySeverity ?? {}
+  const scoreAvgs     = govStats?.scoreAverages ?? null
+
+  // Keep for pending alert
   const pendingReviews = reviews.filter(r => ['DRAFT', 'IN_PROGRESS'].includes(r.status))
-  const avgScore = completedReviews.length
-    ? Math.round(completedReviews.reduce((s, r) => s + (r.overallScore || 0), 0) / completedReviews.length)
-    : 0
-  const decisionCounts = completedReviews.reduce((acc: any, r) => {
-    acc[r.decision] = (acc[r.decision] || 0) + 1
-    return acc
-  }, {})
 
   return (
     <div>
@@ -63,16 +73,16 @@ export default function DashboardPage() {
           <div className="stat-card"><div className="stat-value">{capabilities.length}</div><div className="stat-label">{t('dash.capabilities')}</div></div>
           <div className="stat-card"><div className="stat-value">{docs.length}</div><div className="stat-label">{t('dash.documents')}</div><div className="stat-delta">{readyDocs} {t('dash.indexed')}</div></div>
           <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => nav('/governance')}>
-            <div className="stat-value">{reviews.length}</div>
+            <div className="stat-value">{statsTotal}</div>
             <div className="stat-label">{t('gov.reviews')}</div>
-            <div className="stat-delta" style={{ color: pendingReviews.length > 0 ? '#f39c12' : 'var(--success)' }}>
-              {pendingReviews.length} {t('gov.pending')}
+            <div className="stat-delta" style={{ color: statsPending > 0 ? '#f39c12' : 'var(--success)' }}>
+              {statsPending} {t('gov.pending')}
             </div>
           </div>
         </div>
 
         {/* Governance Dashboard */}
-        {reviews.length > 0 && (
+        {statsTotal > 0 && (
           <div className="card mb-6">
             <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
               <div className="section-title">🏛 {t('gov.dashboard')}</div>
@@ -82,22 +92,55 @@ export default function DashboardPage() {
             </div>
 
             {/* Governance KPIs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
               {[
-                { label: t('gov.total_reviews'), value: reviews.length, color: '#8baac8' },
-                { label: t('gov.completed'), value: completedReviews.length, color: '#2ecc71' },
-                { label: t('gov.pending'), value: pendingReviews.length, color: '#f39c12' },
-                { label: t('gov.avg_score'), value: avgScore || '—', color: avgScore >= 70 ? '#2ecc71' : avgScore >= 50 ? '#f39c12' : '#e74c3c' },
+                { label: t('gov.total_reviews'), value: statsTotal, sub: statsComplete + ' completed', color: '#8baac8' },
+                { label: t('gov.avg_score'), value: statsAvgScore || '—', sub: scoreAvgs ? `C:${scoreAvgs.compliance} S:${scoreAvgs.strategic} R:${scoreAvgs.risk}` : '', color: statsAvgScore >= 70 ? '#2ecc71' : statsAvgScore >= 50 ? '#f39c12' : '#e74c3c' },
+                { label: 'Open Findings', value: statsOpenFindings, sub: statsCriticalOpen > 0 ? statsCriticalOpen + ' critical' : 'none critical', color: statsCriticalOpen > 0 ? '#e74c3c' : '#2ecc71' },
               ].map((s: any) => (
                 <div key={s.label} style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
                   <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{s.label}</div>
+                  {s.sub && <div style={{ fontSize: 10, color: s.color + 'aa', marginTop: 2 }}>{s.sub}</div>}
                 </div>
               ))}
             </div>
 
+            {/* Findings by severity */}
+            {(findingsBySev.CRITICAL > 0 || findingsBySev.HIGH > 0) && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                {[['CRITICAL','#e74c3c'],['HIGH','#e67e22'],['MEDIUM','#f39c12'],['LOW','#3498db']].map(([sev,col]) =>
+                  findingsBySev[sev] ? (
+                    <div key={sev} style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: col + '22', color: col, border: '1px solid ' + col + '44' }}>
+                      {findingsBySev[sev]} {sev}
+                    </div>
+                  ) : null
+                )}
+              </div>
+            )}
+
+            {/* Monthly trend */}
+            {monthlyTrend.length > 0 && monthlyTrend.some((m: any) => m.count > 0) && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>Monthly Reviews & Avg Score</div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 64 }}>
+                  {monthlyTrend.map((m: any, i: number) => {
+                    const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any)=>x.count), 1)) * 48))
+                    const scoreColor = m.avgScore >= 70 ? '#2ecc71' : m.avgScore >= 50 ? '#f39c12' : m.avgScore ? '#e74c3c' : '#8baac8'
+                    return (
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                        {m.avgScore && <div style={{ fontSize: 9, color: scoreColor, fontWeight: 600 }}>{m.avgScore}</div>}
+                        <div style={{ width: '100%', height: h, background: m.count > 0 ? scoreColor + '88' : 'var(--navy-light)', borderRadius: 3, border: '1px solid ' + (m.count > 0 ? scoreColor : 'var(--navy-light)') }} title={m.count + ' reviews'} />
+                        <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{m.label}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Decision breakdown */}
-            {completedReviews.length > 0 && (
+            {statsComplete > 0 && (
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.decision_breakdown')}</div>
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -114,7 +157,7 @@ export default function DashboardPage() {
             )}
 
             {/* Compliance trend — avg score per last 5 reviews */}
-            {completedReviews.length >= 2 && (
+            {statsComplete >= 2 && (
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.score_trend')} ({t('gov.last_n').replace('{n}', String(Math.min(5, completedReviews.length)))})</div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 60 }}>
