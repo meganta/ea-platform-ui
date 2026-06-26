@@ -1711,14 +1711,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
         // For national standards: filter out NOT_APPLICABLE rows (only show actionable statuses)
         const nationalCats = ['NCA_STANDARD','NDMO_STANDARD','SDAIA_STANDARD','DGA_STANDARD']
-        const displayItems = items.filter((i:any) => {
-          if (nationalCats.includes(i.category)) return i.complianceStatus !== 'NOT_APPLICABLE'
-          return true // tenant principles/standards: show all including NOT_APPLICABLE
-        })
-
-        // Rebuild grouped from displayItems
         const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','NCA_STANDARD','NDMO_STANDARD','SDAIA_STANDARD','DGA_STANDARD']
-        // Use localCompliance for optimistic updates
+        // Use localCompliance for optimistic updates — fall back to report items
         const allItemsSource = localCompliance.length > 0 ? localCompliance : items
         const displayItems = allItemsSource.filter((i:any) => {
           if (nationalCats.includes(i.category)) return i.complianceStatus !== 'NOT_APPLICABLE'
