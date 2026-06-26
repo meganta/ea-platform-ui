@@ -504,8 +504,17 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
           api.get('/governance/reviews/' + review.id + '/findings').catch(() => []),
           api.get('/governance/reviews/' + review.id + '/report').catch(() => null),
         ])
-        setStage('done')
-        onComplete(r, Array.isArray(f) ? f : [], rpt)
+        // If report not ready yet, retry once after 3s
+        if (!rpt || rpt.statusCode === 404) {
+          setStatusMsg('Finalizing report...')
+          await sleep(3000)
+          const rpt2 = await api.get('/governance/reviews/' + review.id + '/report').catch(() => null)
+          setStage('done')
+          onComplete(r, Array.isArray(f) ? f : [], rpt2)
+        } else {
+          setStage('done')
+          onComplete(r, Array.isArray(f) ? f : [], rpt)
+        }
       } else if (r?.status === 'DRAFT') {
         // Pipeline started but crashed back to DRAFT
         staleDraftCount++
