@@ -1316,8 +1316,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   // Local state for optimistic updates
   const [localFindings, setLocalFindings] = React.useState(findings)
   React.useEffect(() => { setLocalFindings(findings) }, [findings])
-  const handleFindingUpdate = (id: string, data: any) => setLocalFindings((prev: any[]) => prev.map(f => f.id === id ? { ...f, ...data } : f))
-  const handleFindingDelete = (id: string) => setLocalFindings((prev: any[]) => prev.filter(f => f.id !== id))
+  const handleFindingUpdate = (id: string, data: any) => {
+    setLocalFindings((prev: any[]) => prev.map(f => f.id === id ? { ...f, ...data } : f))
+    setTimeout(() => triggerRescore(), 300) // rescore after state settles
+  }
+  const handleFindingDelete = (id: string) => {
+    setLocalFindings((prev: any[]) => prev.filter(f => f.id !== id))
+    setTimeout(() => triggerRescore(), 300) // rescore after state settles
+  }
 
   // Local report state for optimistic updates
   const [localReport, setLocalReport] = React.useState(report)
