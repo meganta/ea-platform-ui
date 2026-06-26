@@ -253,7 +253,7 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
 }
 
 
-function FindingCard({ f, reviewId, onUpdate, onDelete }: { f: any; reviewId?: string; onUpdate?: (id: string, data: any) => void; onDelete?: (id: string) => void }) {
+function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; reviewId?: string; onUpdate?: (id: string, data: any) => void; onDelete?: (id: string) => void; onRescore?: () => void }) {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<any>({})
@@ -685,6 +685,17 @@ export default function GovernancePage() {
 
   const reRunReview = async () => {
     if (!review?.id) return
+    const confirmed = window.confirm(
+      '⚠️ Re-run Review — WARNING\n\n' +
+      'This will permanently overwrite ALL current results:\n\n' +
+      '  ✕ All findings (including edited/deleted ones)\n' +
+      '  ✕ Compliance matrix and all status changes\n' +
+      '  ✕ Risk register and severity adjustments\n' +
+      '  ✕ Financial savings and your edits\n' +
+      '  ✕ Scores, decision, and executive summary\n\n' +
+      'This cannot be undone. Continue?'
+    )
+    if (!confirmed) return
     try {
       await api.post('/governance/reviews/' + review.id + '/run')
       setView('progress')
@@ -1168,6 +1179,35 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   )
 
   const { t, isAR, resolveText } = useLang()
+
+  // ── Rescore state ──────────────────────────────────────────────────────────
+  const [rescoring, setRescoring] = React.useState(false)
+  const [rescoreResult, setRescoreResult] = React.useState<any>(null)
+  const [showRerunConfirm, setShowRerunConfirm] = React.useState(false)
+
+  const triggerRescore = React.useCallback(async () => {
+    setRescoring(true)
+    try {
+      const res = await fetch(`${apiUrl}/governance/reviews/${review.id}/rescore`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+      })
+      if (res.ok) setRescoreResult(await res.json())
+    } catch { /* non-blocking */ }
+    finally { setRescoring(false) }
+  }, [review.id, apiUrl])
+
+  const confirmReRun = async () => {
+    setShowRerunConfirm(false)
+    try {
+      const res = await fetch(`${apiUrl}/governance/reviews/${review.id}/run`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` },
+      })
+      if (res.ok) setTab('summary')
+    } catch { alert('Failed to re-run review') }
+  }
+
   // Local state for optimistic updates
   const [localFindings, setLocalFindings] = React.useState(findings)
   React.useEffect(() => { setLocalFindings(findings) }, [findings])
@@ -1242,44 +1282,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
   return (
     <div dir={isAR ? 'rtl' : 'ltr'}>
-      {/* Re-run confirmation modal */}
-      {showRerunConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ background: 'var(--navy-mid)', border: '2px solid #e74c3c', borderRadius: 16, padding: 32, maxWidth: 480, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
-            <div style={{ fontSize: 28, marginBottom: 12 }}>⚠️</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: '#e74c3c', marginBottom: 12 }}>Re-run Review — Confirm</div>
-            <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, marginBottom: 16 }}>
-              Running a new AI review will <strong>permanently overwrite all current results</strong>, including:
-            </div>
-            <div style={{ background: '#e74c3c15', border: '1px solid #e74c3c33', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-              {[
-                'All findings — including any you edited or deleted',
-                'Compliance matrix — all status changes you made',
-                'Risk register — severity adjustments',
-                'Financial savings — your edits and amounts',
-                'Scores and decision outcome',
-                'Executive summary — your edits',
-              ].map((item, i) => (
-                <div key={i} style={{ fontSize: 13, color: '#e74c3c', marginBottom: 4, display: 'flex', gap: 8 }}>
-                  <span style={{ flexShrink: 0 }}>✕</span><span>{item}</span>
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
-              This action cannot be undone. The new AI analysis will start immediately and takes 1–2 minutes.
-            </div>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowRerunConfirm(false)} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer' }}>
-                ← Keep current results
-              </button>
-              <button onClick={confirmReRun} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#e74c3c', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-                Yes, overwrite and re-run →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Review Header */}
       <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '12px 20px', marginBottom: 20, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>REVIEW TYPE</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.reviewType?.replace(/_/g, ' ')}</div></div>
