@@ -1435,20 +1435,23 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         <ScoreCircle score={Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0)} label='Risk' />
         <ScoreCircle score={Math.round(futureScore)} label='Future State' />
         <ScoreCircle score={Math.round(finScore)} label='Financial' />
+        <ScoreCircle score={Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => { const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []; const vals = (ds as any[]).map((d:any) => d?.domainScore || 0).filter((v:number) => v > 0); return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0; })())} label='Domains' />
       </div>
 
       {/* Score formula explainer */}
       <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16, display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         <span style={{ color: 'var(--text-muted)' }}>Overall =</span>
-        <span style={{ color: '#9b59b6', fontWeight: 600 }}>Strategic 25%</span>
+        <span style={{ color: '#9b59b6', fontWeight: 600 }}>Strategic 20%</span>
         <span>+</span>
-        <span style={{ color: '#1abc9c', fontWeight: 600 }}>Compliance 25%</span>
+        <span style={{ color: '#1abc9c', fontWeight: 600 }}>Compliance 20%</span>
         <span>+</span>
-        <span style={{ color: '#e67e22', fontWeight: 600 }}>Risk 20%</span>
+        <span style={{ color: '#e67e22', fontWeight: 600 }}>Risk 15%</span>
         <span>+</span>
-        <span style={{ color: '#3498db', fontWeight: 600 }}>Future State 15%</span>
+        <span style={{ color: '#3498db', fontWeight: 600 }}>Future State 10%</span>
         <span>+</span>
-        <span style={{ color: '#2ecc71', fontWeight: 600 }}>Financial 15%</span>
+        <span style={{ color: '#2ecc71', fontWeight: 600 }}>Financial 10%</span>
+        <span>+</span>
+        <span style={{ color: '#e74c3c', fontWeight: 600 }}>Domains 25%</span>
         <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>− CRITICAL penalty</span>
       </div>
 
