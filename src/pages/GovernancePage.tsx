@@ -1329,6 +1329,33 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     (report.complianceMatrix as any)?.items || []
   )
   React.useEffect(() => { setLocalCompliance((report.complianceMatrix as any)?.items || []) }, [report])
+  const [localOpps, setLocalOpps] = React.useState<any[]>(report.financialOpportunities?.opportunities || [])
+  const [editingOppIdx, setEditingOppIdx] = React.useState<number | null>(null)
+  const [oppDraft, setOppDraft] = React.useState<any>({})
+  React.useEffect(() => { setLocalOpps(report.financialOpportunities?.opportunities || []) }, [report])
+  const saveOppEdit = async () => {
+    if (editingOppIdx === null) return
+    const newOpps = localOpps.map((o, i) => i === editingOppIdx ? { ...o, ...oppDraft } : o)
+    setLocalOpps(newOpps)
+    setEditingOppIdx(null)
+    setOppDraft({})
+    const token = localStorage.getItem('ea_token') || ''
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ financialOpportunities: { ...report.financialOpportunities, opportunities: newOpps } }),
+    }).catch(() => {})
+  }
+  const removeOpp = async (idx: number) => {
+    const newOpps = localOpps.filter((_: any, i: number) => i !== idx)
+    setLocalOpps(newOpps)
+    const token = localStorage.getItem('ea_token') || ''
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ financialOpportunities: { ...report.financialOpportunities, opportunities: newOpps } }),
+    }).catch(() => {})
+  }
   const updateComplianceItem = async (idx: number, data: any) => {
     const newItems = localCompliance.map((item, i) => i === idx ? { ...item, ...data } : item)
     setLocalCompliance(newItems)
@@ -2219,9 +2246,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {tab === 'financial' && (() => {
         const fin = report.financialOpportunities || {}
         const opps = fin.opportunities || []
-        // Use live totals from rescore if available (reflects deleted/edited savings)
-        const totalAnnual = rescoreResult?.totalAnnualSaving ?? (fin.totalAnnualSaving || opps.reduce((s:number,o:any)=>s+(o.annualSaving||0),0))
-        const totalOneTime = rescoreResult?.totalOneTimeSaving ?? (fin.totalEstimatedSaving || opps.reduce((s:number,o:any)=>s+(o.estimatedSaving||0),0))
+        // Use localOpps for live totals (reflects user edits/deletes)
+        const totalAnnual = localOpps.reduce((s:number,o:any)=>s+(o.annualSaving||0),0) || rescoreResult?.totalAnnualSaving || fin.totalAnnualSaving || 0
+        const totalOneTime = localOpps.reduce((s:number,o:any)=>s+(o.estimatedSaving||0),0) || rescoreResult?.totalOneTimeSaving || fin.totalEstimatedSaving || 0
         const totalSaving = totalAnnual + totalOneTime
 
         const TYPE_COLOR: Record<string,string> = {
@@ -2280,12 +2307,31 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             )}
 
             {/* Opportunity cards — sorted by saving desc */}
-            {[...opps].sort((a:any,b:any)=>((b.annualSaving||0)+(b.estimatedSaving||0))-((a.annualSaving||0)+(a.estimatedSaving||0))).map((o: any, i: number) => {
+            {[...localOpps].sort((a:any,b:any)=>((b.annualSaving||0)+(b.estimatedSaving||0))-((a.annualSaving||0)+(a.estimatedSaving||0))).map((o: any, i: number) => {
               const oColor = TYPE_COLOR[o.type] || '#8baac8'
               const oIcon = TYPE_ICON[o.type] || '💡'
               const oTotal = (o.annualSaving||0) + (o.estimatedSaving||0)
+              const isEditing = editingOppIdx === i
               return (
                 <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + oColor + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
+                  {isEditing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>✏ Edit Saving Opportunity</div>
+                      <input value={oppDraft.title ?? o.title ?? ''} onChange={e => setOppDraft((d:any) => ({...d, title: e.target.value}))} placeholder='Title' style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                      <textarea value={oppDraft.description ?? o.description ?? ''} onChange={e => setOppDraft((d:any) => ({...d, description: e.target.value}))} placeholder='Description' rows={2} style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 12, resize: 'vertical' }} />
+                      <input value={oppDraft.existingAlternative ?? o.existingAlternative ?? ''} onChange={e => setOppDraft((d:any) => ({...d, existingAlternative: e.target.value}))} placeholder='Existing alternative (tool/platform name)' style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                      <textarea value={oppDraft.savingRationale ?? o.savingRationale ?? ''} onChange={e => setOppDraft((d:any) => ({...d, savingRationale: e.target.value}))} placeholder='Saving rationale (step-by-step derivation)' rows={2} style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 12, resize: 'vertical' }} />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>One-time Saving (SAR)</div><input type='number' value={oppDraft.estimatedSaving ?? o.estimatedSaving ?? 0} onChange={e => setOppDraft((d:any) => ({...d, estimatedSaving: Number(e.target.value)}))} style={{ width: '100%', background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: '#3498db', fontSize: 14, fontWeight: 700 }} /></div>
+                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>Annual Saving (SAR)</div><input type='number' value={oppDraft.annualSaving ?? o.annualSaving ?? 0} onChange={e => setOppDraft((d:any) => ({...d, annualSaving: Number(e.target.value)}))} style={{ width: '100%', background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: '#2ecc71', fontSize: 14, fontWeight: 700 }} /></div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                        <button onClick={saveOppEdit} style={{ flex: 1, padding: '7px 0', borderRadius: 8, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>💾 Save</button>
+                        <button onClick={() => { setEditingOppIdx(null); setOppDraft({}) }} style={{ padding: '7px 16px', borderRadius: 8, background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                  <>
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
                     <span style={{ fontSize: 20, minWidth: 28 }}>{oIcon}</span>
                     <div style={{ flex: 1 }}>
@@ -2297,6 +2343,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                           </span>
                         )}
                         {oTotal > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: '#2ecc71', marginLeft: 'auto' }}>SAR {oTotal.toLocaleString()}</span>}
+                        <button onClick={() => { setEditingOppIdx(i); setOppDraft({}) }} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'none', border: '1px solid var(--accent)55', color: 'var(--accent)', cursor: 'pointer' }}>✏ Edit</button>
+                        <button onClick={() => removeOpp(i)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'none', border: '1px solid #e74c3c55', color: '#e74c3c', cursor: 'pointer' }}>🗑</button>
                       </div>
                       {o.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>{isAR ? resolveText(o.description) : o.description}</div>}
                     </div>
@@ -2344,6 +2392,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     </div>
                   )}
                   {o.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {isAR ? resolveText(o.recommendation) : o.recommendation}</div>}
+                  </>
+                  )}
                 </div>
               )
             })}
