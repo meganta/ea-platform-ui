@@ -1458,7 +1458,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             weightedSum += avg * w; totalW += w
           }
           const alignPct = totalW > 0 ? Math.round(weightedSum / totalW) : 0
-          return alignPct || Math.round(rescoreResult?.strategicScore ?? report.strategicScore ?? 0)
+          // Show alignment % directly — no fallback to domain score (different metric)
+          return alignPct
         })()} label='Strategic' />
         <ScoreCircle score={Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0)} label='Compliance' />
         <ScoreCircle score={Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0)} label='Risk' />
@@ -1725,7 +1726,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const overallPct = totalW > 0 ? Math.round(weightedSum / totalW) : rawPct
         const overallColor = overallPct >= 75 ? '#2ecc71' : overallPct >= 50 ? '#f39c12' : '#e74c3c'
 
-        // Guard: if no objectives, show empty state early
+        // Guard: if no scorable tenant objectives, show N/A state
+        if (objectives.length === 0 || (tenantObjectives.length > 0 && tenantObjectives.every((o:any) => o.alignmentStatus === 'NOT_APPLICABLE'))) return (
+          <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>
+            <div style={{ fontSize: 32, marginBottom: 12 }}>—</div>
+            <div style={{ fontSize: 15, marginBottom: 6 }}>All tenant strategy goals are Not Applicable</div>
+            <div style={{ fontSize: 12 }}>The solution type does not intersect with any of the tenant\'s strategic goals. This is not a penalty.</div>
+          </div>
+        )
         if (objectives.length === 0) return (
           <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🎯</div>
