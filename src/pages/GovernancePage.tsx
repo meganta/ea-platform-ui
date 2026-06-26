@@ -1388,6 +1388,31 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     (report.riskRegister as any)?.risks || []
   )
   React.useEffect(() => { setLocalRisks((report.riskRegister as any)?.risks || []) }, [report])
+  const [localFutureAreas, setLocalFutureAreas] = React.useState<any[]>(report.futureStateAlignment?.alignmentAreas || [])
+  React.useEffect(() => { setLocalFutureAreas(report.futureStateAlignment?.alignmentAreas || []) }, [report])
+  const updateFutureArea = async (idx: number, data: any) => {
+    const newAreas = localFutureAreas.map((a, i) => i === idx ? { ...a, ...data } : a)
+    setLocalFutureAreas(newAreas)
+    const t2 = localStorage.getItem('ea_token') || ''
+    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
+      body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
+    }).catch(() => {})
+    setTimeout(() => triggerRescore(), 300)
+  }
+  const removeFutureArea = async (idx: number) => {
+    const newAreas = localFutureAreas.filter((_: any, i: number) => i !== idx)
+    setLocalFutureAreas(newAreas)
+    const t2 = localStorage.getItem('ea_token') || ''
+    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
+      body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
+    }).catch(() => {})
+    setTimeout(() => triggerRescore(), 300)
+  }
+
   const updateRisk = async (idx: number, data: any) => {
     const newRisks = localRisks.map((r, i) => i === idx ? { ...r, ...data } : r)
     setLocalRisks(newRisks)
@@ -2085,7 +2110,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
       {/* Risk Register Tab */}
       {tab === 'risk' && (() => {
-        const allRisks = report.riskRegister?.risks || []
+        const allRisks = localRisks  // use localRisks for live edit/delete
         const filteredRisks = allRisks.filter((r: any) => {
           if (riskFilterSev.length > 0 && !riskFilterSev.includes(r.severity)) return false
           if (riskFilterCat && r.riskCategory !== riskFilterCat) return false
@@ -2134,8 +2159,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             </div>
 
             {/* Risk cards */}
-            {filteredRisks.map((risk: any, i: number) => (
-              <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
+            {filteredRisks.map((risk: any) => {
+              const riskIdx = localRisks.indexOf(risk)
+              return (
+              <div key={riskIdx} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                   <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[risk.severity] + '33', color: SEV_COLOR[risk.severity] }}>{risk.severity}</span>
                   <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{risk.riskTitle}</div>
@@ -2149,14 +2176,15 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
                 {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
                 <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
-                  <select value={risk.severity} onChange={e => updateRisk(allRisks.indexOf(risk), { severity: e.target.value })}
+                  <select value={risk.severity} onChange={e => { updateRisk(riskIdx, { severity: e.target.value }); setTimeout(() => triggerRescore(), 300) }}
                     style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (SEV_COLOR[risk.severity] || '#8baac8') + '44', background: (SEV_COLOR[risk.severity] || '#8baac8') + '18', color: SEV_COLOR[risk.severity] || '#8baac8', cursor: 'pointer' }}>
                     {['CRITICAL','HIGH','MEDIUM','LOW'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                  <button onClick={() => removeRisk(allRisks.indexOf(risk))} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                  <button onClick={() => { removeRisk(riskIdx); setTimeout(() => triggerRescore(), 300) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
                 </div>
               </div>
-            ))}
+              )
+            })}
             {allRisks.length === 0 && (
               <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No risk register available</div>
             )}
@@ -2181,7 +2209,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', GAP_IDENTIFIED: '🔶',
           NOT_ALIGNED: '❌', FUTURE_REQUIREMENT: '🔵', NOT_APPLICABLE: '—'
         }
-        const areas = fs.alignmentAreas || []
+        const areas = localFutureAreas  // use local state for live edits
         const alignedCount = areas.filter((a:any) => a.status === 'ALIGNED').length
         const gapCount = areas.filter((a:any) => ['GAP_IDENTIFIED','NOT_ALIGNED'].includes(a.status)).length
         const futureReqs = areas.filter((a:any) => a.status === 'FUTURE_REQUIREMENT').length
@@ -2225,15 +2253,25 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                       <span>{status.replace(/_/g,' ')}</span>
                       <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({statusAreas.length})</span>
                     </div>
-                    {statusAreas.map((area: any, i: number) => (
-                      <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + c + '33', borderRadius: 10, padding: 12, marginBottom: 8 }}>
+                    {statusAreas.map((area: any) => {
+                      const areaIdx = localFutureAreas.indexOf(area)
+                      return (
+                      <div key={areaIdx} style={{ background: 'var(--navy-mid)', border: '1px solid ' + c + '33', borderRadius: 10, padding: 12, marginBottom: 8 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>{isAR ? resolveText(area.area) : area.area}</div>
                         {area.currentState && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>📍 Current: {isAR ? resolveText(area.currentState) : area.currentState}</div>}
                         {area.targetState && <div style={{ fontSize: 12, color: '#3498db', marginBottom: 4 }}>🎯 Target: {isAR ? resolveText(area.targetState) : area.targetState}</div>}
                         {area.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>⚠ Gap: {isAR ? resolveText(area.gap) : area.gap}</div>}
-                        {area.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)' }}>→ {isAR ? resolveText(area.recommendation) : area.recommendation}</div>}
+                        {area.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>→ {isAR ? resolveText(area.recommendation) : area.recommendation}</div>}
+                        <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
+                          <select value={area.status} onChange={e => updateFutureArea(areaIdx, { status: e.target.value })}
+                            style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + c + '44', background: c + '18', color: c, cursor: 'pointer' }}>
+                            {['ALIGNED','PARTIALLY_ALIGNED','GAP_IDENTIFIED','NOT_ALIGNED','FUTURE_REQUIREMENT','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                          </select>
+                          <button onClick={() => removeFutureArea(areaIdx)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                        </div>
                       </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 )
               })
