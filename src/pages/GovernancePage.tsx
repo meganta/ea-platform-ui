@@ -635,6 +635,7 @@ export default function GovernancePage() {
   const [showMeta, setShowMeta] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
   const [uploadStatus, setUploadStatus] = useState('')
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; fileName: string; pct: number } | null>(null)
   const [exportLang, setExportLang] = useState<'auto'|'ar'|'en'>('auto')
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -689,17 +690,20 @@ export default function GovernancePage() {
       setReview(r)
       setLoading(false)
       // Upload files one by one — each triggers Docling extraction
-      for (let i = 0; i < inputs.length; i++) {
-        const inp = inputs[i]
+      const filesToUpload = inputs.filter(inp => inp._file)
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const inp = filesToUpload[i]
         if (inp._file) {
           const fd = new FormData()
           fd.append('file', inp._file)
           fd.append('label', inp._file.name)
-          setUploadStatus('📄 Uploading & extracting: ' + inp._file.name + ' (' + (i+1) + '/' + inputs.length + ')...')
+          setUploadStatus('📄 Uploading & extracting: ' + inp._file.name + ' (' + (i+1) + '/' + filesToUpload.length + ')...')
+          setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: Math.round(((i) / filesToUpload.length) * 100) })
           // 90s timeout per file — large DOCX files via Docling can take a while
           const uploadPromise = api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd)
           const timeoutPromise = new Promise(res => setTimeout(res, 90000))
           await Promise.race([uploadPromise, timeoutPromise]).catch(() => {})
+          setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: Math.round(((i + 1) / filesToUpload.length) * 100) })
           // Try fetching metadata immediately after each file — Docling may have completed
           try {
             const earlyMeta = await api.get('/governance/reviews/' + r.id + '/inputs/metadata').catch(() => null)
@@ -710,6 +714,7 @@ export default function GovernancePage() {
         }
       }
       setUploadStatus('')
+      setUploadProgress(null)
       setView('progress')
       // Poll for extracted metadata in background
       let attempts = 0
@@ -1131,7 +1136,28 @@ export default function GovernancePage() {
             </div>
           )}
 
-          {uploadStatus && (
+          {uploadProgress && (
+            <div style={{ marginBottom: 12, padding: '12px 14px', background: 'var(--navy-dark)', borderRadius: 10, border: '1px solid #3498db44' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ fontSize: 12, color: '#3498db', fontWeight: 600 }}>
+                  📄 File {uploadProgress.current}/{uploadProgress.total}: {uploadProgress.fileName.length > 35 ? uploadProgress.fileName.slice(0,32)+'...' : uploadProgress.fileName}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{uploadProgress.pct}%</div>
+              </div>
+              <div style={{ height: 6, background: 'var(--navy-mid)', borderRadius: 3, overflow: 'hidden', marginBottom: 6 }}>
+                <div style={{ height: '100%', width: uploadProgress.pct + '%', background: '#3498db', borderRadius: 3, transition: 'width 0.4s ease' }} />
+              </div>
+              {uploadProgress.total > 1 && (
+                <div style={{ display: 'flex', gap: 4, marginBottom: 6 }}>
+                  {Array.from({ length: uploadProgress.total }).map((_, idx) => (
+                    <div key={idx} style={{ flex: 1, height: 3, borderRadius: 2, background: idx < uploadProgress.current - 1 ? '#3498db' : idx === uploadProgress.current - 1 ? '#3498db88' : 'var(--navy-light)' }} />
+                  ))}
+                </div>
+              )}
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>⏳ Docling extracting content — large files may take 30–60s</div>
+            </div>
+          )}
+          {uploadStatus && !uploadProgress && (
             <div style={{ background: '#3498db15', border: '1px solid #3498db44', borderRadius: 8, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#3498db', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
               {uploadStatus}
