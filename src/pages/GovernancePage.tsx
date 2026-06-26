@@ -1457,8 +1457,12 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             const avg = scorable.length ? scorable.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/scorable.length : 0
             weightedSum += avg * w; totalW += w
           }
+          // If all tenant objectives are NOT_APPLICABLE — no violations, score = 100
+          const allNA = tenantObjs.length > 0 && tenantObjs.every((o:any) => o.alignmentStatus === 'NOT_APPLICABLE')
+          if (allNA) return 100
+          // No tenant objectives at all — not assessed yet, show 0
+          if (tenantObjs.length === 0) return 0
           const alignPct = totalW > 0 ? Math.round(weightedSum / totalW) : 0
-          // Show alignment % directly — no fallback to domain score (different metric)
           return alignPct
         })()} label='Strategic' />
         <ScoreCircle score={Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0)} label='Compliance' />
