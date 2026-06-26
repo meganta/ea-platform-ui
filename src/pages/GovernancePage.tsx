@@ -767,16 +767,6 @@ export default function GovernancePage() {
     } catch { alert('Export failed') }
   }
 
-  const [showRerunModal, setShowRerunModal] = React.useState(false)
-  const reRunReview = () => setShowRerunModal(true)
-  const confirmReRunModal = async () => {
-    setShowRerunModal(false)
-    try {
-      await api.post('/governance/reviews/' + review.id + '/run')
-      setView('progress')
-    } catch (e) { alert('Failed to re-run review') }
-  }
-
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return
     const newInputs = Array.from(files).map(f => ({ label: f.name, _file: f }))
@@ -1209,7 +1199,7 @@ export default function GovernancePage() {
           </select>
           <button onClick={() => exportWord()} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: '0 8px 8px 0', padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>📄 Export Word</button>
         </div>
-        <button onClick={reRunReview} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
+        <button onClick={() => setShowRerunModal(true)} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
       </div>
       {report && <ReportView review={review} report={report} findings={findings} tab={tab} setTab={setTab} />}
       {!report && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Report not available yet</div>}
@@ -1279,7 +1269,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   // ── Rescore state ──────────────────────────────────────────────────────────
   const [rescoring, setRescoring] = React.useState(false)
   const [rescoreResult, setRescoreResult] = React.useState<any>(null)
-  const [showRerunConfirm, setShowRerunConfirm] = React.useState(false)
+  const [showRerunModal, setShowRerunModal] = React.useState(false)
 
   const triggerRescore = React.useCallback(async () => {
     setRescoring(true)
@@ -1294,7 +1284,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   }, [review.id, apiUrl])
 
   const confirmReRun = async () => {
-    setShowRerunConfirm(false)
+    setShowRerunModal(false)
     try {
       const res = await fetch(`${apiUrl}/governance/reviews/${review.id}/run`, {
         method: 'POST',
@@ -1497,7 +1487,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               <button onClick={() => setShowRerunModal(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
                 Cancel
               </button>
-              <button onClick={confirmReRunModal} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: '#e74c3c', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+              <button onClick={confirmReRun} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: '#e74c3c', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
                 Yes, Re-run Review
               </button>
             </div>
