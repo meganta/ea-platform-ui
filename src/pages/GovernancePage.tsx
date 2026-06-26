@@ -698,12 +698,25 @@ export default function GovernancePage() {
           fd.append('file', inp._file)
           fd.append('label', inp._file.name)
           setUploadStatus('📄 Uploading & extracting: ' + inp._file.name + ' (' + (i+1) + '/' + filesToUpload.length + ')...')
-          setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: Math.round(((i) / filesToUpload.length) * 100) })
+          setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: 0 })
+
+          // Simulate progress: tick up to 85% while waiting, jump to 100% when done
+          let simPct = 0
+          const simTimer = setInterval(() => {
+            // Slow down as we approach 85% — feels realistic for Docling extraction
+            const increment = simPct < 30 ? 8 : simPct < 60 ? 4 : simPct < 80 ? 2 : 0.5
+            simPct = Math.min(85, simPct + increment)
+            setUploadProgress(prev => prev ? { ...prev, pct: Math.round(simPct) } : prev)
+          }, 500)
+
           // 90s timeout per file — large DOCX files via Docling can take a while
           const uploadPromise = api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd)
           const timeoutPromise = new Promise(res => setTimeout(res, 90000))
           await Promise.race([uploadPromise, timeoutPromise]).catch(() => {})
-          setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: Math.round(((i + 1) / filesToUpload.length) * 100) })
+
+          clearInterval(simTimer)
+          setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: 100 })
+          await new Promise(res => setTimeout(res, 400)) // brief pause so user sees 100%
           // Try fetching metadata immediately after each file — Docling may have completed
           try {
             const earlyMeta = await api.get('/governance/reviews/' + r.id + '/inputs/metadata').catch(() => null)
