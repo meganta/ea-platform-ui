@@ -1415,7 +1415,22 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Score Row — use rescoreResult when available for live updates */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
         <ScoreCircle score={Math.round(rescoreResult?.overallScore    ?? report.overallScore    ?? 0)} label='Overall' />
-        <ScoreCircle score={Math.round(rescoreResult?.strategicScore  ?? report.strategicScore  ?? 0)} label='Strategic' />
+        <ScoreCircle score={(() => {
+          // Use weighted goal alignment % as Strategic score (Option A)
+          const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
+          const objectives = report.strategicAlignment?.objectives || []
+          const grouped: Record<string,any[]> = {}
+          for (const o of objectives) { const k = o.strategyType || 'EA_STRATEGY'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(o) }
+          let weightedSum = 0, totalW = 0
+          for (const [sType, sobjs] of Object.entries(grouped) as [string,any[]][]) {
+            const w = STRAT_W[sType] || 0.10
+            const scorable = sobjs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
+            const avg = scorable.length ? scorable.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/scorable.length : 0
+            weightedSum += avg * w; totalW += w
+          }
+          const alignPct = totalW > 0 ? Math.round(weightedSum / totalW) : 0
+          return alignPct || Math.round(rescoreResult?.strategicScore ?? report.strategicScore ?? 0)
+        })()} label='Strategic' />
         <ScoreCircle score={Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0)} label='Compliance' />
         <ScoreCircle score={Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0)} label='Risk' />
         <ScoreCircle score={Math.round(futureScore)} label='Future State' />
