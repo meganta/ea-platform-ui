@@ -1435,7 +1435,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         <ScoreCircle score={Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0)} label='Risk' />
         <ScoreCircle score={Math.round(futureScore)} label='Future State' />
         <ScoreCircle score={Math.round(finScore)} label='Financial' />
-        <ScoreCircle score={Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => { const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []; const vals = (ds as any[]).map((d:any) => d?.domainScore || 0).filter((v:number) => v > 0); return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0; })())} label='Domains' />
+        <ScoreCircle score={Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => { const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []; const vals = (ds as any[]).map((d:any) => d?.score || d?.domainScore || 0).filter((v:number) => v > 0); return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0; })())} label='Domains' />
       </div>
 
       {/* Score formula explainer */}
