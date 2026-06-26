@@ -1699,15 +1699,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           VISION_2030:       { weight: 0,  label: 'Vision 2030', color: '#f39c12' },
         }
 
-        // Group by strategy type
-        const grouped: Record<string, any[]> = {}
-        for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
-        const sortedTypes = Object.keys(tenantGrouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
-
         // Split tenant strategies (scored) from national/common (recommendations only)
         const NATIONAL_TYPES = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
         const tenantObjectives = objectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_TYPES.includes((o.strategyType||'').toUpperCase()))
         const nationalObjectives = objectives.filter((o:any) => o.isTenantStrategy === false || NATIONAL_TYPES.includes((o.strategyType||'').toUpperCase()))
+
+        // Group ALL objectives by type (for pills), tenant-only for scoring/rendering
+        const grouped: Record<string, any[]> = {}
+        for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
 
         // Compute weighted alignment using ONLY tenant strategies
         const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
