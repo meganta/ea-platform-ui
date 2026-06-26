@@ -1419,10 +1419,12 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           // Use weighted goal alignment % as Strategic score (Option A)
           const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
           const objectives = report.strategicAlignment?.objectives || []
-          const grouped: Record<string,any[]> = {}
-          for (const o of objectives) { const k = o.strategyType || 'EA_STRATEGY'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(o) }
+          const NATIONAL_T = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
+          const tenantObjs = objectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_T.includes((o.strategyType||'').toUpperCase()))
+          const tGrouped: Record<string,any[]> = {}
+          for (const o of tenantObjs) { const k = o.strategyType || 'EA_STRATEGY'; if (!tGrouped[k]) tGrouped[k]=[]; tGrouped[k].push(o) }
           let weightedSum = 0, totalW = 0
-          for (const [sType, sobjs] of Object.entries(grouped) as [string,any[]][]) {
+          for (const [sType, sobjs] of Object.entries(tGrouped) as [string,any[]][]) {
             const w = STRAT_W[sType] || 0.10
             const scorable = sobjs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
             const avg = scorable.length ? scorable.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/scorable.length : 0
@@ -1673,15 +1675,21 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         // Group by strategy type
         const grouped: Record<string, any[]> = {}
         for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
-        const sortedTypes = Object.keys(grouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
+        const sortedTypes = Object.keys(tenantGrouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
 
-        // Compute weighted strategic alignment: Business(40%) > DT(35%) > EA(25%)
+        // Split tenant strategies (scored) from national/common (recommendations only)
+        const NATIONAL_TYPES = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
+        const tenantObjectives = objectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_TYPES.includes((o.strategyType||'').toUpperCase()))
+        const nationalObjectives = objectives.filter((o:any) => o.isTenantStrategy === false || NATIONAL_TYPES.includes((o.strategyType||'').toUpperCase()))
+
+        // Compute weighted alignment using ONLY tenant strategies
         const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
         const rawPct = report.strategicAlignment?.overallAlignmentPercentage || 0
+        const tenantGrouped: Record<string, any[]> = {}
+        for (const obj of tenantObjectives) { const k = obj.strategyType || 'OTHER'; if (!tenantGrouped[k]) tenantGrouped[k]=[]; tenantGrouped[k].push(obj) }
         let weightedSum = 0, totalW = 0
-        for (const [sType, sobjs] of Object.entries(grouped) as [string, any[]][]) {
+        for (const [sType, sobjs] of Object.entries(tenantGrouped) as [string, any[]][]) {
           const w = STRAT_W[sType] || 0.10
-          // Exclude NOT_APPLICABLE from alignment percentage calculation
           const scorableObjs = sobjs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
           const avg = scorableObjs.length ? scorableObjs.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/scorableObjs.length : 0
           weightedSum += avg * w; totalW += w
@@ -1725,7 +1733,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                   </div>
                   {/* Per-strategy weight summary */}
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {sortedTypes.filter(t => STRAT_META[t]?.weight > 0).map(t => {
+                    {sortedTypes.filter(t => (STRAT_META[t]?.weight||0) > 0).map(t => {
                       const meta = STRAT_META[t]
                       const objs = grouped[t]
                       const scorableObjs2 = objs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
@@ -1745,6 +1753,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             </div>
 
             {/* Per-strategy groups */}
+            {/* Tenant Strategies — scored */}
             {sortedTypes.map(stratType => {
               const meta = STRAT_META[stratType]
               const objs = grouped[stratType]
@@ -1823,6 +1832,28 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 </div>
               )
             })}
+
+            {/* National / Common Strategies — recommendations only, not scored */}
+            {nationalObjectives.length > 0 && (
+              <div style={{ marginTop: 24, padding: '14px 16px', borderRadius: 10, background: '#f39c1210', border: '1px solid #f39c1233' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#f39c12', marginBottom: 4 }}>🌐 National Strategy Alignment — Recommendations Only</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>These goals are from national/government strategies. They do not affect the review score but are shown as alignment recommendations.</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {nationalObjectives.map((o:any, i:number) => (
+                    <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <span style={{ fontSize: 14, marginTop: 1 }}>{o.alignmentStatus === 'FULLY_ALIGNED' ? '✅' : o.alignmentStatus === 'PARTIALLY_ALIGNED' ? '⚠️' : o.alignmentStatus === 'NOT_APPLICABLE' ? '—' : '🔶'}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{o.objectiveName}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{o.strategyName} · {(o.strategyType||'').replace(/_/g,' ')}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{o.contributionDescription}</div>
+                        {o.expectedValue && <div style={{ fontSize: 11, color: '#f39c12', marginTop: 4 }}>💡 {o.expectedValue}</div>}
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#f39c12', minWidth: 36, textAlign: 'right' }}>{o.alignmentPercentage}%</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )
       })()}
