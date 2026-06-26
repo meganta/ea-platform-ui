@@ -113,7 +113,7 @@ const DOMAIN_LABEL: Record<string, string> = {
   TOGAF_GOVERNANCE: 'TOGAF Governance',
 }
 
-function DomainsFindingsTab({ findings, report, isAR, resolveText }: { findings: any[], report: any, isAR: boolean, resolveText: (s: string) => string }) {
+function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onFindingUpdate, onFindingDelete }: { findings: any[], report: any, isAR: boolean, resolveText: (s: string) => string, reviewId?: string, onFindingUpdate?: (id: string, data: any) => void, onFindingDelete?: (id: string) => void }) {
   const { t } = useLang()
   const [filterSev, setFilterSev] = React.useState<string[]>([])
   // collapsed state: null = all expanded by default
@@ -227,7 +227,7 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText }: { findings:
                 {domainFindings.length === 0 && allDomainFindings.length > 0 && (
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0 4px', fontStyle: 'italic' }}>No findings match the active severity filter</div>
                 )}
-                {domainFindings.map((f, i) => <FindingCard key={i} f={f} />)}
+                {domainFindings.map((f, i) => <FindingCard key={i} f={f} reviewId={reviewId} onUpdate={onFindingUpdate} onDelete={onFindingDelete} />)}
               </div>
             )}
           </div>
@@ -243,7 +243,7 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText }: { findings:
           <div style={{ marginBottom: 10, border: '1px solid var(--navy-light)', borderRadius: 10, overflow: 'hidden' }}>
             <div style={{ padding: '10px 16px', background: 'var(--navy-mid)', fontSize: 13, fontWeight: 600 }}>⚙️ General / Other</div>
             <div style={{ padding: '8px 12px 4px' }}>
-              {orphans.map((f, i) => <FindingCard key={i} f={f} />)}
+              {orphans.map((f, i) => <FindingCard key={i} f={f} reviewId={reviewId} onUpdate={onFindingUpdate} onDelete={onFindingDelete} />)}
             </div>
           </div>
         )
@@ -253,18 +253,59 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText }: { findings:
 }
 
 
-function FindingCard({ f }: { f: any }) {
+function FindingCard({ f, reviewId, onUpdate, onDelete }: { f: any; reviewId?: string; onUpdate?: (id: string, data: any) => void; onDelete?: (id: string) => void }) {
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<any>({})
+  const [saving, setSaving] = useState(false)
+
+  const startEdit = (e: React.MouseEvent) => { e.stopPropagation(); setDraft({ title: f.title, description: f.description, recommendation: f.recommendation, severity: f.severity, businessImpact: f.businessImpact || '', technicalImpact: f.technicalImpact || '' }); setEditing(true); setOpen(true) }
+
+  const save = async () => {
+    if (!reviewId || !onUpdate) return
+    setSaving(true)
+    try {
+      const token = localStorage.getItem('ea_token') || ''
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+      await fetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(draft),
+      })
+      onUpdate(f.id, draft)
+      setEditing(false)
+    } finally { setSaving(false) }
+  }
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!window.confirm('Remove this finding from the review?')) return
+    if (!reviewId || !onDelete) return
+    const token = localStorage.getItem('ea_token') || ''
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status: 'REJECTED' }),
+    })
+    onDelete(f.id)
+  }
+
+  const fieldStyle: React.CSSProperties = { width: '100%', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-dark)', color: 'var(--text)', fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }
+
   return (
-    <div style={{ border: '1px solid var(--navy-mid)', borderRadius: 8, marginBottom: 8, overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: 'var(--navy-mid)' }} onClick={() => setOpen(o => !o)}>
+    <div style={{ border: '1px solid ' + (f.status === 'REJECTED' ? '#e74c3c33' : 'var(--navy-mid)'), borderRadius: 8, marginBottom: 8, overflow: 'hidden', opacity: f.status === 'REJECTED' ? 0.5 : 1 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: 'var(--navy-mid)' }} onClick={() => !editing && setOpen(o => !o)}>
         <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[f.severity] + '33', color: SEV_COLOR[f.severity] }}>{f.severity}</span>
-        <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{f.title}</span>
+        <span style={{ fontSize: 13, flex: 1, color: 'var(--text)', textDecoration: f.status === 'REJECTED' ? 'line-through' : 'none' }}>{f.title}</span>
         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>{f.category?.replace(/_/g, ' ')}</span>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.domain?.replace(/_/g, ' ')}</span>
-        <span style={{ color: 'var(--text-muted)' }}>{open ? '▲' : '▼'}</span>
+        {reviewId && !editing && (
+          <>
+            <button onClick={startEdit} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, border: '1px solid var(--accent)44', background: 'none', color: 'var(--accent)', cursor: 'pointer' }}>✏</button>
+            <button onClick={handleDelete} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕</button>
+          </>
+        )}
+        {!editing && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{open ? '▲' : '▼'}</span>}
       </div>
-      {open && (
+      {open && !editing && (
         <div style={{ padding: '12px 14px', fontSize: 13, lineHeight: 1.6 }}>
           <div style={{ marginBottom: 8 }}><span style={{ color: 'var(--text-muted)' }}>Description: </span>{f.description}</div>
           <div style={{ marginBottom: 8, color: 'var(--accent)' }}><span style={{ color: 'var(--text-muted)' }}>Recommendation: </span>{f.recommendation}</div>
@@ -272,6 +313,33 @@ function FindingCard({ f }: { f: any }) {
           {f.technicalImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Technical Impact: </span>{f.technicalImpact}</div>}
           {f.relatedPrinciple && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Principle: </span>{f.relatedPrinciple}</div>}
           {f.relatedStandard && <div><span style={{ color: 'var(--text-muted)' }}>Standard: </span>{f.relatedStandard}</div>}
+        </div>
+      )}
+      {editing && (
+        <div style={{ padding: '12px 14px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4 }}>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Title</div>
+              <input value={draft.title || ''} onChange={e => setDraft((d: any) => ({...d, title: e.target.value}))} style={fieldStyle} />
+            </div>
+            <div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Severity</div>
+              <select value={draft.severity || ''} onChange={e => setDraft((d: any) => ({...d, severity: e.target.value}))} style={fieldStyle}>
+                <option value='CRITICAL'>CRITICAL</option>
+                <option value='HIGH'>HIGH</option>
+                <option value='MEDIUM'>MEDIUM</option>
+                <option value='LOW'>LOW</option>
+              </select>
+            </div>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Description</div>
+          <textarea value={draft.description || ''} onChange={e => setDraft((d: any) => ({...d, description: e.target.value}))} style={{ ...fieldStyle, minHeight: 60, resize: 'vertical' }} />
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Recommendation</div>
+          <textarea value={draft.recommendation || ''} onChange={e => setDraft((d: any) => ({...d, recommendation: e.target.value}))} style={{ ...fieldStyle, minHeight: 60, resize: 'vertical' }} />
+          <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+            <button onClick={save} disabled={saving} style={{ padding: '5px 16px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'var(--accent)', border: 'none', color: '#fff' }}>{saving ? '...' : '✓ Save'}</button>
+            <button onClick={() => setEditing(false)} style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)' }}>Cancel</button>
+          </div>
         </div>
       )}
     </div>
@@ -1046,6 +1114,10 @@ export default function GovernancePage() {
 function ReportView({ review, report, findings, tab, setTab }: { review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
   const [riskFilterSev, setRiskFilterSev] = React.useState<string[]>([])
   const [riskFilterCat, setRiskFilterCat] = React.useState<string>('')
+  const [editingFinding, setEditingFinding] = React.useState<string | null>(null)
+  const [editingReport, setEditingReport] = React.useState<string | null>(null) // field name
+  const [editDraft, setEditDraft] = React.useState<any>({})
+  const [saving, setSaving] = React.useState(false)
   const extScores = (report.domainSummaries?._extendedScores) || {}
   const archQualityScore = extScores.architectureQualityScore || 0
   const secScore = extScores.securityScore || 0
@@ -1053,7 +1125,110 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
 
+  // ── Edit helpers ──────────────────────────────────────────────────────────
+  const apiUrl = (process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1')
+  const token = () => localStorage.getItem('ea_token') || ''
+
+  const saveFinding = async (findingId: string, data: any) => {
+    setSaving(true)
+    try {
+      await fetch(`${apiUrl}/governance/reviews/${review.id}/findings/${findingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify(data),
+      })
+    } finally { setSaving(false); setEditingFinding(null); setEditDraft({}) }
+  }
+
+  const saveReportField = async (fieldPath: string, value: any) => {
+    setSaving(true)
+    try {
+      // fieldPath can be 'executiveSummary' or 'complianceMatrix' etc
+      await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ [fieldPath]: value }),
+      })
+    } finally { setSaving(false); setEditingReport(null); setEditDraft({}) }
+  }
+
+  const startEditFinding = (f: any) => { setEditingFinding(f.id); setEditDraft({ ...f }) }
+  const startEditReport = (field: string, value: any) => { setEditingReport(field); setEditDraft({ value }) }
+
+  // Edit toolbar component (inline)
+  const EditBar = ({ onSave, onCancel, isDirty = true }: { onSave: () => void; onCancel: () => void; isDirty?: boolean }) => (
+    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      <button onClick={onSave} disabled={saving || !isDirty} style={{
+        padding: '4px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
+        background: 'var(--accent)', border: 'none', color: '#fff', opacity: saving ? 0.6 : 1
+      }}>{saving ? '...' : '✓ Save'}</button>
+      <button onClick={onCancel} style={{ padding: '4px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)' }}>✕ Cancel</button>
+    </div>
+  )
+
   const { t, isAR, resolveText } = useLang()
+  // Local state for optimistic updates
+  const [localFindings, setLocalFindings] = React.useState(findings)
+  React.useEffect(() => { setLocalFindings(findings) }, [findings])
+  const handleFindingUpdate = (id: string, data: any) => setLocalFindings((prev: any[]) => prev.map(f => f.id === id ? { ...f, ...data } : f))
+  const handleFindingDelete = (id: string) => setLocalFindings((prev: any[]) => prev.filter(f => f.id !== id))
+
+  // Local report state for optimistic updates
+  const [localReport, setLocalReport] = React.useState(report)
+  React.useEffect(() => { setLocalReport(report) }, [report])
+  const updateLocalReport = (field: string, value: any) => setLocalReport((prev: any) => ({ ...prev, [field]: value }))
+
+  // Compliance local state
+  const [localCompliance, setLocalCompliance] = React.useState<any[]>(
+    (report.complianceMatrix as any)?.items || []
+  )
+  React.useEffect(() => { setLocalCompliance((report.complianceMatrix as any)?.items || []) }, [report])
+  const updateComplianceItem = async (idx: number, data: any) => {
+    const newItems = localCompliance.map((item, i) => i === idx ? { ...item, ...data } : item)
+    setLocalCompliance(newItems)
+    const token = localStorage.getItem('ea_token') || ''
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
+    }).catch(() => {})
+  }
+  const removeComplianceItem = (idx: number) => {
+    const newItems = localCompliance.filter((_: any, i: number) => i !== idx)
+    setLocalCompliance(newItems)
+    const token = localStorage.getItem('ea_token') || ''
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
+    }).catch(() => {})
+  }
+
+  // Risk local state
+  const [localRisks, setLocalRisks] = React.useState<any[]>(
+    (report.riskRegister as any)?.risks || []
+  )
+  React.useEffect(() => { setLocalRisks((report.riskRegister as any)?.risks || []) }, [report])
+  const updateRisk = async (idx: number, data: any) => {
+    const newRisks = localRisks.map((r, i) => i === idx ? { ...r, ...data } : r)
+    setLocalRisks(newRisks)
+    const token = localStorage.getItem('ea_token') || ''
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
+    }).catch(() => {})
+  }
+  const removeRisk = (idx: number) => {
+    const newRisks = localRisks.filter((_: any, i: number) => i !== idx)
+    setLocalRisks(newRisks)
+    const token = localStorage.getItem('ea_token') || ''
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
+    }).catch(() => {})
+  }
   const tabs = [
     { key: 'summary', label: t('gov.summary') },
     { key: 'domains', label: 'Domains & Findings' },
@@ -1119,8 +1294,21 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         <div>
           {/* 1. Executive Summary FIRST */}
           <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.executive_summary')}</div>
-            <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{isAR ? resolveText(report.executiveSummary) : report.executiveSummary}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', flex: 1 }}>{t('gov.executive_summary')}</div>
+              {editingReport !== 'executiveSummary' && (
+                <button onClick={() => startEditReport('executiveSummary', report.executiveSummary)} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)44', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>✏ Edit</button>
+              )}
+            </div>
+            {editingReport === 'executiveSummary' ? (
+              <div>
+                <textarea value={editDraft.value || ''} onChange={e => setEditDraft({ value: e.target.value })}
+                  style={{ width: '100%', minHeight: 120, padding: 10, borderRadius: 8, border: '1px solid var(--accent)', background: 'var(--navy-dark)', color: 'var(--text)', fontSize: 13, lineHeight: 1.7, resize: 'vertical', boxSizing: 'border-box' }} />
+                <EditBar onSave={() => saveReportField('executiveSummary', editDraft.value)} onCancel={() => { setEditingReport(null); setEditDraft({}) }} />
+              </div>
+            ) : (
+              <div style={{ fontSize: 14, lineHeight: 1.7, color: 'var(--text)' }}>{isAR ? resolveText(report.executiveSummary) : report.executiveSummary}</div>
+            )}
           </div>
 
           {/* 2. Finding severity snapshot */}
@@ -1217,7 +1405,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       )}
 
       {/* Domains & Findings Tab (merged) */}
-      {tab === 'domains' && <DomainsFindingsTab findings={findings} report={report} isAR={isAR} resolveText={resolveText} />}
+      {tab === 'domains' && <DomainsFindingsTab findings={localFindings} report={report} isAR={isAR} resolveText={resolveText} reviewId={review.id} onFindingUpdate={handleFindingUpdate} onFindingDelete={handleFindingDelete} />}
 
       {/* UNUSED_DOMAINS_PLACEHOLDER */}
       {false && (
@@ -1476,9 +1664,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
         // Rebuild grouped from displayItems
         const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','NCA_STANDARD','NDMO_STANDARD','SDAIA_STANDARD','DGA_STANDARD']
+        // Use localCompliance for optimistic updates
+        const allItemsSource = localCompliance.length > 0 ? localCompliance : items
+        const displayItems = allItemsSource.filter((i:any) => {
+          if (nationalCats.includes(i.category)) return i.complianceStatus !== 'NOT_APPLICABLE'
+          return true
+        })
         const grouped: Record<string,any[]> = {}
         for (const item of displayItems) { const c = item.category || 'OTHER'; if (!grouped[c]) grouped[c]=[]; grouped[c].push(item) }
-
         const countBy = (status: string) => displayItems.filter((i:any) => i.complianceStatus === status).length
         const total = displayItems.length
 
@@ -1696,6 +1889,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 {risk.impact && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Impact: {risk.impact}</div>}
                 {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
                 {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
+                <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
+                  <select value={risk.severity} onChange={e => updateRisk(allRisks.indexOf(risk), { severity: e.target.value })}
+                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (SEV_COLOR[risk.severity] || '#8baac8') + '44', background: (SEV_COLOR[risk.severity] || '#8baac8') + '18', color: SEV_COLOR[risk.severity] || '#8baac8', cursor: 'pointer' }}>
+                    {['CRITICAL','HIGH','MEDIUM','LOW'].map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <button onClick={() => removeRisk(allRisks.indexOf(risk))} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                </div>
               </div>
             ))}
             {allRisks.length === 0 && (
