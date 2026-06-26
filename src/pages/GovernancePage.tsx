@@ -473,17 +473,19 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
 
     setStatusMsg('AI review pipeline running...')
 
-    // Animate engines progressively — first one ticks immediately
-    let engineIdx = 0
+    // Animate engines progressively — use ref so closure stays fresh
+    const engineIdxRef = { current: 0 }
+    const totalEngines = 10
     const tickEngine = () => {
-      if (engineIdx < engines.length) {
-        setEngines(prev => prev.map((e, i) => i === engineIdx ? { ...e, done: true } : e))
-        engineIdx++
-        setProgress(30 + Math.round((engineIdx / engines.length) * 50))
+      const idx = engineIdxRef.current
+      if (idx < totalEngines) {
+        setEngines(prev => prev.map((e, i) => i <= idx ? { ...e, done: true } : e))
+        engineIdxRef.current = idx + 1
+        setProgress(30 + Math.round(((idx + 1) / totalEngines) * 50))
       }
     }
     tickEngine()
-    engineTimerRef.current = setInterval(tickEngine, 8000)
+    engineTimerRef.current = setInterval(tickEngine, 7000)
 
     // Poll for completion — also detect DRAFT (pipeline crashed after start)
     let staleDraftCount = 0
