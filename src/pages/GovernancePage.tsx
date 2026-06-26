@@ -2263,8 +2263,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const fin = report.financialOpportunities || {}
         const opps = fin.opportunities || []
         // Use localOpps for live totals (reflects user edits/deletes)
-        const totalAnnual = localOpps.reduce((s:number,o:any)=>s+(o.annualSaving||0),0) || rescoreResult?.totalAnnualSaving || fin.totalAnnualSaving || 0
-        const totalOneTime = localOpps.reduce((s:number,o:any)=>s+(o.estimatedSaving||0),0) || rescoreResult?.totalOneTimeSaving || fin.totalEstimatedSaving || 0
+        const totalAnnual    = localOpps.reduce((s:number,o:any)=>s+(o.annualSaving||0),0) || rescoreResult?.totalAnnualSaving || fin.totalAnnualSaving || 0
+        const totalOneTime   = localOpps.reduce((s:number,o:any)=>s+(o.estimatedSaving||0),0) || rescoreResult?.totalOneTimeSaving || fin.totalEstimatedSaving || 0
+        const totalMin       = localOpps.reduce((s:number,o:any)=>s+(o.annualSavingMin||0)+(o.estimatedSavingMin||0),0)
+        const totalMax       = localOpps.reduce((s:number,o:any)=>s+(o.annualSavingMax||0)+(o.estimatedSavingMax||0),0)
         const totalSaving = totalAnnual + totalOneTime
 
         const TYPE_COLOR: Record<string,string> = {
@@ -2290,6 +2292,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     SAR {totalSaving.toLocaleString()}
                   </div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{opps.length} opportunities identified</div>
+                  {totalMin > 0 && totalMax > 0 && (
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
+                      Range: <span style={{ color: '#e74c3c' }}>SAR {totalMin.toLocaleString()}</span> – <span style={{ color: '#2ecc71' }}>SAR {totalMax.toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   {totalAnnual > 0 && (
@@ -2387,15 +2394,29 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
                   <div style={{ display: 'grid', gridTemplateColumns: o.estimatedSaving > 0 && o.annualSaving > 0 ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 8 }}>
                     {o.estimatedSaving > 0 && (
-                      <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>One-time Saving</div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: '#3498db' }}>SAR {o.estimatedSaving.toLocaleString()}</div>
+                      <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>One-time Saving</div>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: '#3498db' }}>SAR {o.estimatedSaving.toLocaleString()}</div>
+                        {(o.estimatedSavingMin || o.estimatedSavingMax) && (
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
+                            <span style={{ color: '#e74c3c' }}>Min SAR {(o.estimatedSavingMin||0).toLocaleString()}</span>
+                            <span style={{ margin: '0 6px', color: 'var(--navy-light)' }}>·</span>
+                            <span style={{ color: '#2ecc71' }}>Max SAR {(o.estimatedSavingMax||0).toLocaleString()}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                     {o.annualSaving > 0 && (
-                      <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px' }}>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Annual Saving</div>
-                        <div style={{ fontSize: 16, fontWeight: 700, color: '#2ecc71' }}>SAR {o.annualSaving.toLocaleString()}</div>
+                      <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '10px 12px' }}>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Annual Saving (avg)</div>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: '#2ecc71' }}>SAR {o.annualSaving.toLocaleString()}</div>
+                        {(o.annualSavingMin || o.annualSavingMax) && (
+                          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
+                            <span style={{ color: '#e74c3c' }}>Min SAR {(o.annualSavingMin||0).toLocaleString()}</span>
+                            <span style={{ margin: '0 6px', color: 'var(--navy-light)' }}>·</span>
+                            <span style={{ color: '#2ecc71' }}>Max SAR {(o.annualSavingMax||0).toLocaleString()}</span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
