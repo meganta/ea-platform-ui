@@ -156,19 +156,19 @@ export default function DashboardPage() {
               </div>
             )}
 
-            {/* Compliance trend — avg score per last 5 reviews */}
-            {statsComplete >= 2 && (
+            {/* Score trend from monthly stats */}
+            {monthlyTrend.length > 0 && monthlyTrend.some((m: any) => m.count > 0) && (
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.score_trend')} ({t('gov.last_n').replace('{n}', String(Math.min(5, completedReviews.length)))})</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.score_trend')} (last 6 months)</div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 60 }}>
-                  {completedReviews.slice(-5).map((r: any, i: number) => {
-                    const s = r.overallScore || 0
-                    const color = s >= 70 ? '#2ecc71' : s >= 50 ? '#f39c12' : '#e74c3c'
+                  {monthlyTrend.map((m: any, i: number) => {
+                    const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any) => x.count), 1)) * 48))
+                    const color = m.avgScore >= 70 ? '#2ecc71' : m.avgScore >= 50 ? '#f39c12' : m.avgScore ? '#e74c3c' : '#8baac8'
                     return (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                        <div style={{ fontSize: 10, color, fontWeight: 600 }}>{s}</div>
-                        <div style={{ width: '100%', height: Math.max(6, (s / 100) * 44), background: color + '88', borderRadius: 3, border: '1px solid ' + color + '66' }} />
-                        <div style={{ fontSize: 9, color: 'var(--text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 60 }}>{r.title?.split(' ')[0]}</div>
+                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
+                        {m.avgScore && <div style={{ fontSize: 9, color, fontWeight: 600 }}>{m.avgScore}</div>}
+                        <div style={{ width: '100%', height: h, background: m.count > 0 ? color + '88' : 'var(--navy-light)', borderRadius: 3, border: '1px solid ' + (m.count > 0 ? color : 'var(--navy-light)') }} title={m.count + ' reviews'} />
+                        <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{m.label}</div>
                       </div>
                     )
                   })}
