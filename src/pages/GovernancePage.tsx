@@ -1768,14 +1768,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const overallPct = totalW > 0 ? Math.round(weightedSum / totalW) : rawPct
         const overallColor = overallPct >= 75 ? '#2ecc71' : overallPct >= 50 ? '#f39c12' : '#e74c3c'
 
-        // Guard: if no scorable tenant objectives, show N/A state
-        if (objectives.length === 0 || (tenantObjectives.length > 0 && tenantObjectives.every((o:any) => o.alignmentStatus === 'NOT_APPLICABLE'))) return (
-          <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>
-            <div style={{ fontSize: 32, marginBottom: 12 }}>—</div>
-            <div style={{ fontSize: 15, marginBottom: 6 }}>All tenant strategy goals are Not Applicable</div>
-            <div style={{ fontSize: 12 }}>The solution type does not intersect with any of the tenant\'s strategic goals. This is not a penalty.</div>
-          </div>
-        )
+        // Guard: if no objectives at all, show empty state
+        // Note: all-NA case is now handled by rendering the goals with professional statements — don't skip
         if (objectives.length === 0) return (
           <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🎯</div>
@@ -1873,37 +1867,56 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     const statusColor = STATUS_COLOR[obj.alignmentStatus] || '#8baac8'
                     const pct = obj.alignmentPercentage || 0
                     return (
-                      <div key={i} style={{ background: obj.alignmentStatus === 'NOT_APPLICABLE' ? 'var(--navy-dark)' : 'var(--navy-mid)', border: '1px solid ' + statusColor + '33', borderRadius: 10, padding: 14, marginBottom: 8, opacity: obj.alignmentStatus === 'NOT_APPLICABLE' ? 0.6 : 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                          <span style={{ fontSize: 16, marginTop: 1 }}>{STATUS_ICON[obj.alignmentStatus] || '•'}</span>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                              <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{isAR ? resolveText(obj.objectiveName) : obj.objectiveName}</div>
-                              <div style={{ fontSize: 18, fontWeight: 700, color: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', minWidth: 40, textAlign: 'right' }}>{pct}%</div>
-                            </div>
-                            {/* Progress bar */}
-                            <div style={{ height: 3, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: pct + '%', background: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
-                            </div>
-                            {obj.contributionDescription && obj.contributionDescription !== 'N/A' && obj.contributionDescription !== 'n/a' && (
-                              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription}</div>
-                            )}
-                            {obj.expectedValue && obj.expectedValue !== 'N/A' && obj.expectedValue !== 'n/a' && (
-                              <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>💡 {isAR ? resolveText(obj.expectedValue) : obj.expectedValue}</div>
-                            )}
-                            {obj.evidence && obj.evidence !== 'N/A' && obj.evidence !== 'n/a' && (
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>📋 {obj.evidence}</div>
-                            )}
-                            {obj.relatedKPIs?.length > 0 && obj.relatedKPIs.some((k:string) => k !== 'N/A') && (
-                              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📊 KPIs: {obj.relatedKPIs.filter((k:string) => k !== 'N/A').join(', ')}</div>
-                            )}
-                            {(obj.alignmentStatus === 'NOT_ALIGNED' || obj.alignmentStatus === 'NOT_APPLICABLE') && !obj.contributionDescription && (
-                              <div style={{ fontSize: 11, color: '#8baac8', fontStyle: 'italic' }}>
-                                {obj.alignmentStatus === 'NOT_ALIGNED' ? 'This goal is not addressed by the submitted solution.' : 'This goal is not relevant to this solution type.'}
+                      <div key={i} style={{ background: obj.alignmentStatus === 'NOT_APPLICABLE' ? 'var(--navy-dark)' : 'var(--navy-mid)', border: '1px solid ' + statusColor + (obj.alignmentStatus === 'NOT_APPLICABLE' ? '22' : '33'), borderRadius: 10, padding: 14, marginBottom: 8 }}>
+                        {obj.alignmentStatus === 'NOT_APPLICABLE' ? (
+                          // NOT_APPLICABLE — professional no-impact statement, no score bar
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                            <span style={{ fontSize: 14, marginTop: 2, color: '#8baac8' }}>○</span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', flex: 1 }}>{isAR ? resolveText(obj.objectiveName) : obj.objectiveName}</div>
+                                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8', fontWeight: 600, whiteSpace: 'nowrap' }}>No Direct Impact</span>
                               </div>
-                            )}
+                              <div style={{ fontSize: 12, color: '#8baac8', lineHeight: 1.6, fontStyle: 'italic' }}>
+                                {obj.contributionDescription && obj.contributionDescription !== 'N/A' && obj.contributionDescription !== 'n/a'
+                                  ? (isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription)
+                                  : `This solution operates in a different functional domain and does not directly address "${obj.objectiveName}". The solution's scope, objectives, and technical design have no direct bearing on this strategic pillar. This does not constitute a gap — it reflects the solution's intended purpose and boundary.`
+                                }
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          // Regular alignment card with score
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                            <span style={{ fontSize: 16, marginTop: 1 }}>{STATUS_ICON[obj.alignmentStatus] || '•'}</span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{isAR ? resolveText(obj.objectiveName) : obj.objectiveName}</div>
+                                <div style={{ fontSize: 18, fontWeight: 700, color: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', minWidth: 40, textAlign: 'right' }}>{pct}%</div>
+                              </div>
+                              <div style={{ height: 3, background: 'var(--navy-dark)', borderRadius: 2, marginBottom: 8, overflow: 'hidden' }}>
+                                <div style={{ height: '100%', width: pct + '%', background: pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c', borderRadius: 2 }} />
+                              </div>
+                              {obj.contributionDescription && obj.contributionDescription !== 'N/A' && obj.contributionDescription !== 'n/a' && (
+                                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription}</div>
+                              )}
+                              {obj.expectedValue && obj.expectedValue !== 'N/A' && obj.expectedValue !== 'n/a' && (
+                                <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>💡 {isAR ? resolveText(obj.expectedValue) : obj.expectedValue}</div>
+                              )}
+                              {obj.evidence && obj.evidence !== 'N/A' && obj.evidence !== 'n/a' && (
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>📋 {obj.evidence}</div>
+                              )}
+                              {obj.relatedKPIs?.length > 0 && obj.relatedKPIs.some((k:string) => k !== 'N/A') && (
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📊 KPIs: {obj.relatedKPIs.filter((k:string) => k !== 'N/A').join(', ')}</div>
+                              )}
+                              {obj.alignmentStatus === 'NOT_ALIGNED' && (
+                                <div style={{ fontSize: 11, color: '#e74c3c', fontStyle: 'italic', marginTop: 4 }}>
+                                  This strategic goal is relevant to this solution type but is not addressed in the submitted design. Consider adding a specific design element or roadmap item to close this gap.
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )
                   })}
