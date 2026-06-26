@@ -1704,15 +1704,17 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const tenantObjectives = objectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_TYPES.includes((o.strategyType||'').toUpperCase()))
         const nationalObjectives = objectives.filter((o:any) => o.isTenantStrategy === false || NATIONAL_TYPES.includes((o.strategyType||'').toUpperCase()))
 
-        // Group ALL objectives by type (for pills), tenant-only for scoring/rendering
+        // Group objectives: all (for pills), tenant-only (for scoring/rendering)
         const grouped: Record<string, any[]> = {}
         for (const obj of objectives) { const k = obj.strategyType || 'OTHER'; if (!grouped[k]) grouped[k]=[]; grouped[k].push(obj) }
+        const tenantGrouped: Record<string, any[]> = {}
+        for (const obj of tenantObjectives) { const k = obj.strategyType || 'OTHER'; if (!tenantGrouped[k]) tenantGrouped[k]=[]; tenantGrouped[k].push(obj) }
+        // sortedTypes: tenant groups sorted by weight — used for both pills and group rendering
+        const sortedTypes = Object.keys(tenantGrouped).sort((a,b) => (STRAT_META[b]?.weight||0) - (STRAT_META[a]?.weight||0))
 
         // Compute weighted alignment using ONLY tenant strategies
         const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
         const rawPct = report.strategicAlignment?.overallAlignmentPercentage || 0
-        const tenantGrouped: Record<string, any[]> = {}
-        for (const obj of tenantObjectives) { const k = obj.strategyType || 'OTHER'; if (!tenantGrouped[k]) tenantGrouped[k]=[]; tenantGrouped[k].push(obj) }
         let weightedSum = 0, totalW = 0
         for (const [sType, sobjs] of Object.entries(tenantGrouped) as [string, any[]][]) {
           const w = STRAT_W[sType] || 0.10
