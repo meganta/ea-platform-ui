@@ -1463,8 +1463,15 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         })()} label='Strategic' />
         <ScoreCircle score={Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0)} label='Compliance' />
         <ScoreCircle score={Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0)} label='Risk' />
-        <ScoreCircle score={Math.round(futureScore)} label='Future State' />
-        <ScoreCircle score={Math.round(finScore)} label='Financial' />
+        <ScoreCircle score={Math.round(report.futureStateAlignment?.alignmentPercentage ?? futureScore ?? 0)} label='Future State' />
+        <ScoreCircle score={(() => {
+          const opps = report.financialOpportunities?.opportunities || []
+          if (opps.length === 0) return 0
+          // Score = confidence-weighted: HIGH=100, MEDIUM=70, LOW=40
+          const CONF: Record<string,number> = { HIGH: 100, MEDIUM: 70, LOW: 40 }
+          const avg = Math.round(opps.reduce((s:number,o:any) => s + (CONF[o.confidenceLevel] || 70), 0) / opps.length)
+          return avg
+        })()} label='Financial' />
         <ScoreCircle score={Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => { const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []; const vals = (ds as any[]).map((d:any) => d?.score || d?.domainScore || 0).filter((v:number) => v > 0); return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0; })())} label='Domains' />
       </div>
 
