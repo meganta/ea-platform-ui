@@ -1402,6 +1402,30 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     (report.riskRegister as any)?.risks || []
   )
   React.useEffect(() => { setLocalRisks((report.riskRegister as any)?.risks || []) }, [report])
+  const [localObjectives, setLocalObjectives] = React.useState<any[]>(report.strategicAlignment?.objectives || [])
+  React.useEffect(() => { setLocalObjectives(report.strategicAlignment?.objectives || []) }, [report])
+  const updateObjective = async (idx: number, data: any) => {
+    const newObjs = localObjectives.map((o, i) => i === idx ? { ...o, ...data } : o)
+    setLocalObjectives(newObjs)
+    const t2 = localStorage.getItem('ea_token') || ''
+    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
+      body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
+    }).catch(() => {})
+    setTimeout(() => triggerRescore(), 300)
+  }
+  const removeObjective = async (idx: number) => {
+    const newObjs = localObjectives.filter((_: any, i: number) => i !== idx)
+    setLocalObjectives(newObjs)
+    const t2 = localStorage.getItem('ea_token') || ''
+    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
+      body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
+    }).catch(() => {})
+    setTimeout(() => triggerRescore(), 300)
+  }
   const [localFutureAreas, setLocalFutureAreas] = React.useState<any[]>(report.futureStateAlignment?.alignmentAreas || [])
   React.useEffect(() => { setLocalFutureAreas(report.futureStateAlignment?.alignmentAreas || []) }, [report])
   const updateFutureArea = async (idx: number, data: any) => {
@@ -1492,7 +1516,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         <ScoreCircle score={(() => {
           // Use weighted goal alignment % as Strategic score (Option A)
           const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
-          const objectives = report.strategicAlignment?.objectives || []
+          const objectives = localObjectives
           const NATIONAL_T = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
           const tenantObjs = objectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_T.includes((o.strategyType||'').toUpperCase()))
           const tGrouped: Record<string,any[]> = {}
@@ -1745,7 +1769,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
       {/* Strategic Tab */}
       {tab === 'strategic' && (() => {
-        const objectives = report.strategicAlignment?.objectives || []
+        const objectives = localObjectives
 
         // Strategy type weights and colors — declared FIRST (used in sort below)
         const STRAT_META: Record<string, { weight: number; label: string; color: string }> = {
@@ -1899,6 +1923,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                                   : `This solution operates in a different functional domain and does not directly address "${obj.objectiveName}". The solution's scope, objectives, and technical design have no direct bearing on this strategic pillar. This does not constitute a gap — it reflects the solution's intended purpose and boundary.`
                                 }
                               </div>
+                              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6 }}>
+                                <select value={obj.alignmentStatus} onChange={e => updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: e.target.value === 'NOT_APPLICABLE' ? 0 : obj.alignmentPercentage })}
+                                  style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #8baac844', background: '#8baac818', color: '#8baac8', cursor: 'pointer' }}>
+                                  {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                                </select>
+                                <button onClick={() => removeObjective(localObjectives.indexOf(obj))} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                              </div>
                             </div>
                           </div>
                         ) : (
@@ -1930,6 +1961,20 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                                   This strategic goal is relevant to this solution type but is not addressed in the submitted design. Consider adding a specific design element or roadmap item to close this gap.
                                 </div>
                               )}
+                              {/* Edit controls */}
+                              <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                                <select value={obj.alignmentStatus} onChange={e => {
+                                  const newPct = e.target.value === 'FULLY_ALIGNED' ? 100 : e.target.value === 'PARTIALLY_ALIGNED' ? 65 : e.target.value === 'WEAKLY_ALIGNED' ? 35 : e.target.value === 'NOT_ALIGNED' ? 0 : 0
+                                  updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: newPct })
+                                }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (STATUS_COLOR[obj.alignmentStatus]||'#8baac8') + '44', background: (STATUS_COLOR[obj.alignmentStatus]||'#8baac8') + '18', color: STATUS_COLOR[obj.alignmentStatus]||'#8baac8', cursor: 'pointer' }}>
+                                  {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                                </select>
+                                <input type='number' min={0} max={100} value={obj.alignmentPercentage || 0}
+                                  onChange={e => updateObjective(localObjectives.indexOf(obj), { alignmentPercentage: Math.min(100, Math.max(0, Number(e.target.value))) })}
+                                  style={{ width: 64, fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--navy-light)', background: 'var(--navy-dark)', color: 'var(--text-primary)', textAlign: 'center' }} />
+                                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>%</span>
+                                <button onClick={() => removeObjective(localObjectives.indexOf(obj))} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: 'auto' }}>✕ Remove</button>
+                              </div>
                             </div>
                           </div>
                         )}
