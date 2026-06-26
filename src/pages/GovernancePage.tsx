@@ -767,19 +767,10 @@ export default function GovernancePage() {
     } catch { alert('Export failed') }
   }
 
-  const reRunReview = async () => {
-    if (!review?.id) return
-    const confirmed = window.confirm(
-      '⚠️ Re-run Review — WARNING\n\n' +
-      'This will permanently overwrite ALL current results:\n\n' +
-      '  ✕ All findings (including edited/deleted ones)\n' +
-      '  ✕ Compliance matrix and all status changes\n' +
-      '  ✕ Risk register and severity adjustments\n' +
-      '  ✕ Financial savings and your edits\n' +
-      '  ✕ Scores, decision, and executive summary\n\n' +
-      'This cannot be undone. Continue?'
-    )
-    if (!confirmed) return
+  const [showRerunModal, setShowRerunModal] = React.useState(false)
+  const reRunReview = () => setShowRerunModal(true)
+  const confirmReRunModal = async () => {
+    setShowRerunModal(false)
     try {
       await api.post('/governance/reviews/' + review.id + '/run')
       setView('progress')
@@ -1461,6 +1452,59 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           <span>⏳</span> Recalculating scores...
         </div>
       )}
+      {/* Re-run Confirmation Modal */}
+      {showRerunModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 16, padding: 32, maxWidth: 480, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>
+            {/* Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: '#e74c3c22', border: '1px solid #e74c3c44', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>⚠️</div>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>Re-run AI Review</div>
+                <div style={{ fontSize: 12, color: '#e74c3c' }}>This action cannot be undone</div>
+              </div>
+            </div>
+            {/* Warning body */}
+            <div style={{ background: '#e74c3c0d', border: '1px solid #e74c3c33', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.6 }}>
+                Re-running the review will regenerate all AI analysis from scratch. The following will be <strong style={{ color: '#e74c3c' }}>permanently overwritten</strong>:
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  ['All domain findings', 'Including any edits or deletions you have made'],
+                  ['Compliance matrix', 'All principle assessments and status changes'],
+                  ['Risk register', 'All risks and severity adjustments'],
+                  ['Financial opportunities', 'All saving estimates and your edits'],
+                  ['Scores & decision', 'Overall score, domain scores, and approval decision'],
+                  ['Executive summary', 'The AI-generated narrative will be replaced'],
+                ].map(([title, desc]) => (
+                  <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                    <span style={{ color: '#e74c3c', fontSize: 14, marginTop: 1, flexShrink: 0 }}>✕</span>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Recommendation */}
+            <div style={{ background: '#3498db0d', border: '1px solid #3498db33', borderRadius: 8, padding: '10px 14px', marginBottom: 24, fontSize: 12, color: '#3498db', lineHeight: 1.6 }}>
+              💡 <strong>Recommended:</strong> Only re-run if you have uploaded new documents or made significant changes to the repository. If you just want to adjust scores, use the inline editing controls instead.
+            </div>
+            {/* Actions */}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowRerunModal(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
+                Cancel
+              </button>
+              <button onClick={confirmReRunModal} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: '#e74c3c', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+                Yes, Re-run Review
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {rescoreResult && !rescoring && (
         <div style={{ background: '#2ecc7115', border: '1px solid #2ecc7144', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 12, color: '#2ecc71', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span>✓</span>
