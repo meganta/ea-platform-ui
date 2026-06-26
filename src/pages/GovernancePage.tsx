@@ -287,6 +287,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete }: { f: any; reviewId?: s
       body: JSON.stringify({ status: 'REJECTED' }),
     })
     onDelete(f.id)
+    if (onRescore) onRescore()
   }
 
   const fieldStyle: React.CSSProperties = { width: '100%', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-dark)', color: 'var(--text)', fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }
@@ -1241,6 +1242,44 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
   return (
     <div dir={isAR ? 'rtl' : 'ltr'}>
+      {/* Re-run confirmation modal */}
+      {showRerunConfirm && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'var(--navy-mid)', border: '2px solid #e74c3c', borderRadius: 16, padding: 32, maxWidth: 480, width: '90%', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+            <div style={{ fontSize: 28, marginBottom: 12 }}>⚠️</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#e74c3c', marginBottom: 12 }}>Re-run Review — Confirm</div>
+            <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7, marginBottom: 16 }}>
+              Running a new AI review will <strong>permanently overwrite all current results</strong>, including:
+            </div>
+            <div style={{ background: '#e74c3c15', border: '1px solid #e74c3c33', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+              {[
+                'All findings — including any you edited or deleted',
+                'Compliance matrix — all status changes you made',
+                'Risk register — severity adjustments',
+                'Financial savings — your edits and amounts',
+                'Scores and decision outcome',
+                'Executive summary — your edits',
+              ].map((item, i) => (
+                <div key={i} style={{ fontSize: 13, color: '#e74c3c', marginBottom: 4, display: 'flex', gap: 8 }}>
+                  <span style={{ flexShrink: 0 }}>✕</span><span>{item}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+              This action cannot be undone. The new AI analysis will start immediately and takes 1–2 minutes.
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button onClick={() => setShowRerunConfirm(false)} style={{ padding: '10px 20px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer' }}>
+                ← Keep current results
+              </button>
+              <button onClick={confirmReRun} style={{ padding: '10px 24px', borderRadius: 8, border: 'none', background: '#e74c3c', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                Yes, overwrite and re-run →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Review Header */}
       <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '12px 20px', marginBottom: 20, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>REVIEW TYPE</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.reviewType?.replace(/_/g, ' ')}</div></div>
@@ -1251,12 +1290,27 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         {confScore > 0 && <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>CONFIDENCE</div><div style={{ fontSize: 13, fontWeight: 600, color: confScore >= 75 ? '#2ecc71' : confScore >= 50 ? '#f39c12' : '#e74c3c' }}>{confScore}%</div></div>}
       </div>
 
-      {/* Score Row — one circle per tab so user knows what drives each score */}
+      {/* Rescore banner */}
+      {rescoring && (
+        <div style={{ background: '#f39c1215', border: '1px solid #f39c1244', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 12, color: '#f39c12', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>⏳</span> Recalculating scores...
+        </div>
+      )}
+      {rescoreResult && !rescoring && (
+        <div style={{ background: '#2ecc7115', border: '1px solid #2ecc7144', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 12, color: '#2ecc71', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span>✓</span>
+          <span>Scores recalculated · Overall: <strong>{rescoreResult.overallScore}</strong> · Decision: <strong>{rescoreResult.decision?.replace(/_/g,' ')}</strong></span>
+          {rescoreResult.totalAnnualSaving > 0 && <span>· Annual savings: <strong>SAR {rescoreResult.totalAnnualSaving.toLocaleString()}</strong></span>}
+          <button onClick={() => setRescoreResult(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#2ecc71', cursor: 'pointer', fontSize: 14 }}>×</button>
+        </div>
+      )}
+
+      {/* Score Row — use rescoreResult when available for live updates */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
-        <ScoreCircle score={Math.round(report.overallScore || 0)} label='Overall' />
-        <ScoreCircle score={Math.round(report.strategicScore || 0)} label='Strategic' />
-        <ScoreCircle score={Math.round(report.complianceScore || 0)} label='Compliance' />
-        <ScoreCircle score={Math.round(report.riskScore || 0)} label='Risk' />
+        <ScoreCircle score={Math.round(rescoreResult?.overallScore    ?? report.overallScore    ?? 0)} label='Overall' />
+        <ScoreCircle score={Math.round(rescoreResult?.strategicScore  ?? report.strategicScore  ?? 0)} label='Strategic' />
+        <ScoreCircle score={Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0)} label='Compliance' />
+        <ScoreCircle score={Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0)} label='Risk' />
         <ScoreCircle score={Math.round(futureScore)} label='Future State' />
         <ScoreCircle score={Math.round(finScore)} label='Financial' />
       </div>
@@ -2013,8 +2067,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {tab === 'financial' && (() => {
         const fin = report.financialOpportunities || {}
         const opps = fin.opportunities || []
-        const totalAnnual = fin.totalAnnualSaving || opps.reduce((s:number,o:any)=>s+(o.annualSaving||0),0)
-        const totalOneTime = fin.totalEstimatedSaving || opps.reduce((s:number,o:any)=>s+(o.estimatedSaving||0),0)
+        // Use live totals from rescore if available (reflects deleted/edited savings)
+        const totalAnnual = rescoreResult?.totalAnnualSaving ?? (fin.totalAnnualSaving || opps.reduce((s:number,o:any)=>s+(o.annualSaving||0),0))
+        const totalOneTime = rescoreResult?.totalOneTimeSaving ?? (fin.totalEstimatedSaving || opps.reduce((s:number,o:any)=>s+(o.estimatedSaving||0),0))
         const totalSaving = totalAnnual + totalOneTime
 
         const TYPE_COLOR: Record<string,string> = {
