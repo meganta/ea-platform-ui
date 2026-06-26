@@ -639,7 +639,8 @@ export default function GovernancePage() {
   const [wizardStep, setWizardStep] = useState(1)
   const [uploadStatus, setUploadStatus] = useState('')
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; fileName: string; pct: number } | null>(null)
-  const [exportLang, setExportLang] = useState<'auto'|'ar'|'en'>('auto')
+  const [exportLang, setExportLang] = useState<'ar'|'en'>('en')
+  const [showExportModal, setShowExportModal] = React.useState(false)
   const [showRerunModal, setShowRerunModal] = React.useState(false)
   const handleRerunConfirm = async () => {
     setShowRerunModal(false)
@@ -763,7 +764,7 @@ export default function GovernancePage() {
 
   const exportWord = async (lang?: string) => {
     const token = localStorage.getItem('ea_token')
-    const langParam = lang || (exportLang !== 'auto' ? exportLang : '')
+    const langParam = lang || exportLang || ''
     try {
       const url = API_URL + '/governance/reviews/' + review?.id + '/export/word' + (langParam ? '?lang=' + langParam : '')
       const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } })
@@ -1201,17 +1202,47 @@ export default function GovernancePage() {
         <button onClick={() => { setView('list'); loadReviews() }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back to reviews</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', flex: 1 }}>{review?.title}</div>
         <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[review?.decision] + '22', color: DECISION_COLOR[review?.decision] }}>{review?.decision?.replace(/_/g, ' ')}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <select value={exportLang} onChange={e => setExportLang(e.target.value as any)}
-            style={{ padding: '5px 8px', borderRadius: '8px 0 0 8px', border: '1px solid var(--navy-light)', borderRight: 'none', background: 'var(--navy-mid)', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer' }}>
-            <option value='auto'>🌐 Auto</option>
-            <option value='en'>🇬🇧 EN</option>
-            <option value='ar'>🇸🇦 AR</option>
-          </select>
-          <button onClick={() => exportWord()} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: '0 8px 8px 0', padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>📄 Export Word</button>
-        </div>
+        <button onClick={() => { setExportLang(isAR ? 'ar' : 'en'); setShowExportModal(true) }} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>📄 Export Word</button>
         <button onClick={() => setShowRerunModal(true)} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
       </div>
+      {/* Export Language Modal */}
+      {showExportModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 16, padding: 32, maxWidth: 400, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.5)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--accent)22', border: '1px solid var(--accent)44', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>📄</div>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>Export Report</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Choose the language for the Word document</div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+              {[['en', '🇬🇧', 'English', 'Full report in English'], ['ar', '🇸🇦', 'العربية', 'التقرير الكامل باللغة العربية']].map(([val, flag, label, desc]) => (
+                <div key={val} onClick={() => setExportLang(val as 'ar'|'en')}
+                  style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                    border: '2px solid ' + (exportLang === val ? 'var(--accent)' : 'var(--navy-light)'),
+                    background: exportLang === val ? 'var(--accent)11' : 'var(--navy-dark)' }}>
+                  <span style={{ fontSize: 24 }}>{flag}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</div>
+                  </div>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid ' + (exportLang === val ? 'var(--accent)' : 'var(--navy-light)'), display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {exportLang === val && <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)' }} />}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => setShowExportModal(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Cancel</button>
+              <button onClick={() => { setShowExportModal(false); exportWord(exportLang) }} style={{ flex: 2, padding: '10px 0', borderRadius: 10, background: 'var(--accent)', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+                Download {exportLang === 'ar' ? 'Arabic' : 'English'} Report
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Re-run Confirmation Modal */}
       {showRerunModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
