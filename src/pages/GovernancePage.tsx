@@ -618,6 +618,7 @@ function MetadataPreview({ meta }: { meta: any }) {
 
 export default function GovernancePage() {
   const api = useApi()
+  const { isAR } = useLang()
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
   const [reviews, setReviews] = useState<any[]>([])
   const location = useLocation()
