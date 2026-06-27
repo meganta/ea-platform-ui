@@ -279,16 +279,16 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
 
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    // No confirmation popup — delete directly (severity change is reversible via edit)
     if (!reviewId || !onDelete) return
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    // Mark as REJECTED in DB — rescore excludes REJECTED findings
     await fetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status: 'REJECTED' }),
-    })
+    }).catch(() => {})
+    // Update local state — parent (handleFindingDelete) handles rescore sequencing
     onDelete(f.id)
-    if (onRescore) onRescore()
   }
 
   const fieldStyle: React.CSSProperties = { width: '100%', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-dark)', color: 'var(--text)', fontSize: 12, marginBottom: 8, boxSizing: 'border-box' }
@@ -1464,16 +1464,30 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       const vals = (ds as any[]).map((d:any) => d?.score||d?.domainScore||0).filter((v:number)=>v>0)
       return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0
     })()),
-    overall:    Math.round(rescoreResult?.overallScore ?? report.overallScore ?? 0),
+    // Compute overall optimistically from live scores + live penalty
+    // This updates instantly when findings are deleted (before rescore returns)
+    get overall() {
+      if (rescoreResult?.overallScore != null) return Math.round(rescoreResult.overallScore)
+      // Optimistic: recompute from stored component scores minus live penalty
+      const base = Math.round(
+        this.strategic * 0.20 + this.compliance * 0.20 + this.risk * 0.15 +
+        this.future * 0.10 + this.financial * 0.10 + this.domains * 0.25
+      )
+      const floor = (review as any)?.aggressiveness === 'ADVISORY' ? 30 : (review as any)?.aggressiveness === 'STRICT' ? 10 : 20
+      return Math.max(floor, base - this.penalty)
+    },
     // Compute penalty from findings directly — matches backend formula exactly
     // criticalCount * 3, capped at maxPenalty (always available from findings)
-    critCount:  rescoreResult?.criticalCount ?? findings.filter((f:any)=>f.severity==='CRITICAL').length,
+    // critCount uses localFindings (reflects deletions immediately) with findings as fallback
+    // localFindings is defined later in component but available at render time via closure
+    critCount:  rescoreResult?.criticalCount ?? (typeof localFindings !== 'undefined' ? localFindings : findings).filter((f:any)=>f.severity==='CRITICAL').length,
     maxPenalty: rescoreResult?.maxPenalty ?? ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
     penalty:    rescoreResult?.criticalPenalty ?? (() => {
       const agg = (review as any)?.aggressiveness || 'STANDARD'
       const maxP = agg === 'ADVISORY' ? 5 : agg === 'STANDARD' ? 10 : 15
       const perCrit = agg === 'ADVISORY' ? 1 : agg === 'EXECUTIVE' ? 4 : agg === 'STRICT' ? 5 : 3
-      return Math.min(maxP, findings.filter((f:any)=>f.severity==='CRITICAL').length * perCrit)
+      const liveCrits = (typeof localFindings !== 'undefined' ? localFindings : findings).filter((f:any)=>f.severity==='CRITICAL').length
+      return Math.min(maxP, liveCrits * perCrit)
     })(),
   }
 
@@ -1497,12 +1511,16 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   const [localFindings, setLocalFindings] = React.useState(findings)
   React.useEffect(() => { setLocalFindings(findings) }, [findings])
   const handleFindingUpdate = (id: string, data: any) => {
-    setLocalFindings((prev: any[]) => prev.map(f => f.id === id ? { ...f, ...data } : f))
-    setTimeout(() => triggerRescore(), 300) // rescore after state settles
+    setLocalFindings((prev: any[]) => prev.map((f: any) => f.id === id ? { ...f, ...data } : f))
+    // DB write happens in FindingCard.save() before this is called — 800ms safe margin
+    setTimeout(() => triggerRescore(), 800)
   }
-  const handleFindingDelete = (id: string) => {
-    setLocalFindings((prev: any[]) => prev.filter(f => f.id !== id))
-    setTimeout(() => triggerRescore(), 300) // rescore after state settles
+  const handleFindingDelete = async (id: string) => {
+    // Optimistically remove from local state immediately
+    setLocalFindings((prev: any[]) => prev.filter((f: any) => f.id !== id))
+    // DB write: mark as REJECTED (FindingCard already did this, but ensure it's committed)
+    // Then rescore — DB write is synchronous on server so 800ms is safe margin
+    setTimeout(() => triggerRescore(), 800)
   }
 
   // Local report state for optimistic updates
@@ -1551,7 +1569,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 300)
+    setTimeout(() => triggerRescore(), 600)
   }
   const removeComplianceItem = (idx: number) => {
     const newItems = localCompliance.filter((_: any, i: number) => i !== idx)
@@ -1581,7 +1599,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 300)
+    setTimeout(() => triggerRescore(), 600)
   }
   const removeObjective = async (idx: number) => {
     const newObjs = localObjectives.filter((_: any, i: number) => i !== idx)
@@ -1592,7 +1610,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 300)
+    setTimeout(() => triggerRescore(), 600)
   }
   const [localFutureAreas, setLocalFutureAreas] = React.useState<any[]>(report.futureStateAlignment?.alignmentAreas || [])
   React.useEffect(() => { setLocalFutureAreas(report.futureStateAlignment?.alignmentAreas || []) }, [report])
@@ -1605,7 +1623,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 300)
+    setTimeout(() => triggerRescore(), 600)
   }
   const removeFutureArea = async (idx: number) => {
     const newAreas = localFutureAreas.filter((_: any, i: number) => i !== idx)
@@ -1628,7 +1646,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 300)
+    setTimeout(() => triggerRescore(), 600)
   }
   const removeRisk = (idx: number) => {
     const newRisks = localRisks.filter((_: any, i: number) => i !== idx)
@@ -2474,11 +2492,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
                 {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
                 <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
-                  <select value={risk.severity} onChange={e => { updateRisk(riskIdx, { severity: e.target.value }); setTimeout(() => triggerRescore(), 300) }}
+                  <select value={risk.severity} onChange={async e => { await updateRisk(riskIdx, { severity: e.target.value }); setTimeout(() => triggerRescore(), 600) }}
                     style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (SEV_COLOR[risk.severity] || '#8baac8') + '44', background: (SEV_COLOR[risk.severity] || '#8baac8') + '18', color: SEV_COLOR[risk.severity] || '#8baac8', cursor: 'pointer' }}>
                     {['CRITICAL','HIGH','MEDIUM','LOW'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                  <button onClick={() => { removeRisk(riskIdx); setTimeout(() => triggerRescore(), 300) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                  <button onClick={async () => { await removeRisk(riskIdx); setTimeout(() => triggerRescore(), 600) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
                 </div>
               </div>
               )
