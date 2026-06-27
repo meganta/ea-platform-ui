@@ -1404,25 +1404,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
 
-  // ── Unified score sources — used in ScoreCircles, formula, and penalty display ──
-  // Always prefer rescoreResult (reflects latest edits), then report stored values
-  const uScores = {
-    strategic:  0, // computed below from objectives
-    compliance: Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0),
-    risk:       Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0),
-    future:     Math.round(rescoreResult?.futureStateScore ?? report.futureStateAlignment?.alignmentPercentage ?? futureScore ?? 0),
-    financial:  Math.round(rescoreResult?.financialScore  ?? report.financialScore  ?? finScore ?? 0),
-    domains:    Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => {
-      const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []
-      const vals = (ds as any[]).map((d:any) => d?.score||d?.domainScore||0).filter((v:number)=>v>0)
-      return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0
-    })()),
-    overall:    Math.round(rescoreResult?.overallScore ?? report.overallScore ?? 0),
-    penalty:    rescoreResult?.criticalPenalty ?? 0,
-    critCount:  rescoreResult?.criticalCount ?? (localFindings.length > 0 ? localFindings : findings).filter((f:any)=>f.severity==='CRITICAL').length,
-    maxPenalty: rescoreResult?.maxPenalty ?? ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
-  }
-
   // ── Edit helpers ──────────────────────────────────────────────────────────
   const apiUrl = (process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1')
   const token = () => localStorage.getItem('ea_token') || ''
@@ -1469,6 +1450,26 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   // ── Rescore state ──────────────────────────────────────────────────────────
   const [rescoring, setRescoring] = React.useState(false)
   const [rescoreResult, setRescoreResult] = React.useState<any>(null)
+
+  // ── Unified score sources — used in ScoreCircles, formula, and penalty display ──
+  // Always prefer rescoreResult (reflects latest edits), then report stored values
+  const uScores = {
+    strategic:  0, // computed below from objectives
+    compliance: Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0),
+    risk:       Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0),
+    future:     Math.round(rescoreResult?.futureStateScore ?? report.futureStateAlignment?.alignmentPercentage ?? futureScore ?? 0),
+    financial:  Math.round(rescoreResult?.financialScore  ?? report.financialScore  ?? finScore ?? 0),
+    domains:    Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => {
+      const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []
+      const vals = (ds as any[]).map((d:any) => d?.score||d?.domainScore||0).filter((v:number)=>v>0)
+      return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0
+    })()),
+    overall:    Math.round(rescoreResult?.overallScore ?? report.overallScore ?? 0),
+    penalty:    rescoreResult?.criticalPenalty ?? 0,
+    critCount:  rescoreResult?.criticalCount ?? (localFindings.length > 0 ? localFindings : findings).filter((f:any)=>f.severity==='CRITICAL').length,
+    maxPenalty: rescoreResult?.maxPenalty ?? ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
+  }
+
   // showRerunModal is managed by parent GovernancePage
 
   const triggerRescore = React.useCallback(async () => {
