@@ -651,6 +651,83 @@ export default function GovernancePage() {
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; fileName: string; pct: number } | null>(null)
   const [exportLang, setExportLang] = useState<'ar'|'en'>('en')
   const [showExportModal, setShowExportModal] = React.useState(false)
+  const [exporting, setExporting] = React.useState(false)
+  const [exportProgress, setExportProgress] = React.useState(0)
+  const [exportStep, setExportStep] = React.useState('')
+
+  const exportWord = async (lang?: string) => {
+    const token = localStorage.getItem('ea_token')
+    const langParam = lang || exportLang || ''
+    const isArabic = langParam === 'ar'
+    setExporting(true)
+    setExportProgress(0)
+    setExportStep(isArabic ? 'جارٍ تحضير التقرير...' : 'Preparing report...')
+
+    // Arabic steps shown as label milestones while smooth progress runs underneath
+    const arSteps = [
+      [8,  'جارٍ ترجمة الملخص التنفيذي...'],
+      [20, 'جارٍ ترجمة الملاحظات والنتائج...'],
+      [35, 'جارٍ ترجمة تقييم المجالات...'],
+      [50, 'جارٍ ترجمة تقييم الامتثال...'],
+      [63, 'جارٍ ترجمة سجل المخاطر...'],
+      [75, 'جارٍ ترجمة الفرص المالية والاستراتيجية...'],
+      [87, 'جارٍ بناء الوثيقة وتنسيقها...'],
+      [94, 'جارٍ تجميع الملف النهائي...'],
+    ]
+    const enSteps = [
+      [20, 'Loading report data...'],
+      [50, 'Generating tables and sections...'],
+      [80, 'Finalizing document...'],
+      [92, 'Packing file...'],
+    ]
+    const steps = isArabic ? arSteps : enSteps
+
+    // Smooth continuous tick — increment slows near ceiling to avoid reaching 100 before done
+    let currentPct = 0
+    let stepIdx = 0
+    const progressTimer = setInterval(() => {
+      // Advance step label if we've passed that threshold
+      if (stepIdx < steps.length && currentPct >= (steps[stepIdx][0] as number) - 2) {
+        setExportStep(steps[stepIdx][1] as string)
+        stepIdx++
+      }
+      // Smooth increment: fast early, slow near 95
+      const remaining = 95 - currentPct
+      const increment = remaining > 40 ? 2.5 : remaining > 20 ? 1.2 : remaining > 5 ? 0.4 : 0.1
+      currentPct = Math.min(95, currentPct + increment)
+      setExportProgress(Math.round(currentPct))
+    }, 600)
+
+    try {
+      const url = API_URL + '/governance/reviews/' + review?.id + '/export/word' + (langParam ? '?lang=' + langParam : '')
+      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+      clearInterval(progressTimer)
+      if (!res.ok) {
+        const errText = await res.text().catch(() => res.status.toString())
+        setExporting(false)
+        alert('Export failed: ' + errText.slice(0, 200))
+        return
+      }
+      const blob = await res.blob()
+      if (blob.size === 0) { setExporting(false); alert('Export failed: empty file received'); return }
+      setExportProgress(100)
+      setExportStep(isArabic ? 'اكتمل التصدير!' : 'Complete!')
+      await new Promise(r => setTimeout(r, 800))
+      const objUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = objUrl
+      a.download = (review?.title || 'governance-review') + (langParam === 'ar' ? '_AR' : '_EN') + '.docx'
+      document.body.appendChild(a)
+      a.click()
+      setTimeout(() => { URL.revokeObjectURL(objUrl); document.body.removeChild(a) }, 2000)
+    } catch (e: any) {
+      clearInterval(progressTimer)
+      alert('Export failed: ' + (e?.message || 'Unknown error'))
+    } finally {
+      setTimeout(() => { setExporting(false); setExportProgress(0); setExportStep('') }, 1500)
+    }
+  }
+
   const [showRerunModal, setShowRerunModal] = React.useState(false)
   const handleRerunConfirm = async () => {
     setShowRerunModal(false)
@@ -772,82 +849,7 @@ export default function GovernancePage() {
     finally { setLoading(false) }
   }
 
-  const [exporting, setExporting] = React.useState(false)
-  const [exportProgress, setExportProgress] = React.useState(0)
-  const [exportStep, setExportStep] = React.useState('')
 
-  const exportWord = async (lang?: string) => {
-    const token = localStorage.getItem('ea_token')
-    const langParam = lang || exportLang || ''
-    const isArabic = langParam === 'ar'
-    setExporting(true)
-    setExportProgress(0)
-    setExportStep(isArabic ? 'جارٍ تحضير التقرير...' : 'Preparing report...')
-
-    // Arabic steps shown as label milestones while smooth progress runs underneath
-    const arSteps = [
-      [8,  'جارٍ ترجمة الملخص التنفيذي...'],
-      [20, 'جارٍ ترجمة الملاحظات والنتائج...'],
-      [35, 'جارٍ ترجمة تقييم المجالات...'],
-      [50, 'جارٍ ترجمة تقييم الامتثال...'],
-      [63, 'جارٍ ترجمة سجل المخاطر...'],
-      [75, 'جارٍ ترجمة الفرص المالية والاستراتيجية...'],
-      [87, 'جارٍ بناء الوثيقة وتنسيقها...'],
-      [94, 'جارٍ تجميع الملف النهائي...'],
-    ]
-    const enSteps = [
-      [20, 'Loading report data...'],
-      [50, 'Generating tables and sections...'],
-      [80, 'Finalizing document...'],
-      [92, 'Packing file...'],
-    ]
-    const steps = isArabic ? arSteps : enSteps
-
-    // Smooth continuous tick — increment slows near ceiling to avoid reaching 100 before done
-    let currentPct = 0
-    let stepIdx = 0
-    const progressTimer = setInterval(() => {
-      // Advance step label if we've passed that threshold
-      if (stepIdx < steps.length && currentPct >= (steps[stepIdx][0] as number) - 2) {
-        setExportStep(steps[stepIdx][1] as string)
-        stepIdx++
-      }
-      // Smooth increment: fast early, slow near 95
-      const remaining = 95 - currentPct
-      const increment = remaining > 40 ? 2.5 : remaining > 20 ? 1.2 : remaining > 5 ? 0.4 : 0.1
-      currentPct = Math.min(95, currentPct + increment)
-      setExportProgress(Math.round(currentPct))
-    }, 600)
-
-    try {
-      const url = API_URL + '/governance/reviews/' + review?.id + '/export/word' + (langParam ? '?lang=' + langParam : '')
-      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
-      clearInterval(progressTimer)
-      if (!res.ok) {
-        const errText = await res.text().catch(() => res.status.toString())
-        setExporting(false)
-        alert('Export failed: ' + errText.slice(0, 200))
-        return
-      }
-      const blob = await res.blob()
-      if (blob.size === 0) { setExporting(false); alert('Export failed: empty file received'); return }
-      setExportProgress(100)
-      setExportStep(isArabic ? 'اكتمل التصدير!' : 'Complete!')
-      await new Promise(r => setTimeout(r, 800))
-      const objUrl = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = objUrl
-      a.download = (review?.title || 'governance-review') + (langParam === 'ar' ? '_AR' : '_EN') + '.docx'
-      document.body.appendChild(a)
-      a.click()
-      setTimeout(() => { URL.revokeObjectURL(objUrl); document.body.removeChild(a) }, 2000)
-    } catch (e: any) {
-      clearInterval(progressTimer)
-      alert('Export failed: ' + (e?.message || 'Unknown error'))
-    } finally {
-      setTimeout(() => { setExporting(false); setExportProgress(0); setExportStep('') }, 1500)
-    }
-  }
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return
