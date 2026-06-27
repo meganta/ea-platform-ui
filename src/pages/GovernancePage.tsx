@@ -1469,10 +1469,12 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     // criticalCount * 3, capped at maxPenalty (always available from findings)
     critCount:  rescoreResult?.criticalCount ?? findings.filter((f:any)=>f.severity==='CRITICAL').length,
     maxPenalty: rescoreResult?.maxPenalty ?? ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
-    penalty:    rescoreResult?.criticalPenalty ?? Math.min(
-      ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
-      findings.filter((f:any)=>f.severity==='CRITICAL').length * 3
-    ),
+    penalty:    rescoreResult?.criticalPenalty ?? (() => {
+      const agg = (review as any)?.aggressiveness || 'STANDARD'
+      const maxP = agg === 'ADVISORY' ? 5 : agg === 'STANDARD' ? 10 : 15
+      const perCrit = agg === 'ADVISORY' ? 1 : agg === 'EXECUTIVE' ? 4 : agg === 'STRICT' ? 5 : 3
+      return Math.min(maxP, findings.filter((f:any)=>f.severity==='CRITICAL').length * perCrit)
+    })(),
   }
 
   // showRerunModal is managed by parent GovernancePage
@@ -1751,7 +1753,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               <span style={{ color: '#e74c3c', fontWeight: 600 }}>Domains 25%</span>
               {penalty > 0 && <>
                 <span style={{ color: '#e74c3c', fontWeight: 700 }}>− {penalty} pts</span>
-                <span style={{ color: '#e74c3c', fontSize: 10 }}>({critCount} CRITICAL × 3, max {maxPenalty})</span>
+                <span style={{ color: '#e74c3c', fontSize: 10 }}>
+                  ({critCount} CRITICAL × {(review as any)?.aggressiveness === 'ADVISORY' ? 1 : (review as any)?.aggressiveness === 'STRICT' ? 5 : (review as any)?.aggressiveness === 'EXECUTIVE' ? 4 : 3}pt, max {maxPenalty})
+                </span>
               </>}
             </div>
             {/* Actual calculation row */}
