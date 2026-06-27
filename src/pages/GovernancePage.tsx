@@ -1466,7 +1466,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     })()),
     overall:    Math.round(rescoreResult?.overallScore ?? report.overallScore ?? 0),
     penalty:    rescoreResult?.criticalPenalty ?? 0,
-    critCount:  rescoreResult?.criticalCount ?? (localFindings.length > 0 ? localFindings : findings).filter((f:any)=>f.severity==='CRITICAL').length,
+    critCount:  rescoreResult?.criticalCount ?? findings.filter((f:any)=>f.severity==='CRITICAL').length,
     maxPenalty: rescoreResult?.maxPenalty ?? ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
   }
 
