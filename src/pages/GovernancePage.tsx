@@ -1465,9 +1465,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0
     })()),
     overall:    Math.round(rescoreResult?.overallScore ?? report.overallScore ?? 0),
-    penalty:    rescoreResult?.criticalPenalty ?? 0,
+    // Compute penalty from findings directly — matches backend formula exactly
+    // criticalCount * 3, capped at maxPenalty (always available from findings)
     critCount:  rescoreResult?.criticalCount ?? findings.filter((f:any)=>f.severity==='CRITICAL').length,
     maxPenalty: rescoreResult?.maxPenalty ?? ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
+    penalty:    rescoreResult?.criticalPenalty ?? Math.min(
+      ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
+      findings.filter((f:any)=>f.severity==='CRITICAL').length * 3
+    ),
   }
 
   // showRerunModal is managed by parent GovernancePage
