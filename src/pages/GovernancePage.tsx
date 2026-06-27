@@ -772,28 +772,69 @@ export default function GovernancePage() {
     finally { setLoading(false) }
   }
 
+  const [exporting, setExporting] = React.useState(false)
+  const [exportProgress, setExportProgress] = React.useState(0)
+  const [exportStep, setExportStep] = React.useState('')
+
   const exportWord = async (lang?: string) => {
     const token = localStorage.getItem('ea_token')
     const langParam = lang || exportLang || ''
+    const isArabic = langParam === 'ar'
+    setExporting(true)
+    setExportProgress(0)
+    setExportStep(isArabic ? 'جارٍ تحضير التقرير...' : 'Preparing report...')
+
+    // Simulate progress steps for Arabic (translation takes time)
+    const steps = isArabic ? [
+      [10, 'جارٍ ترجمة الملخص التنفيذي...'],
+      [25, 'جارٍ ترجمة الملاحظات والنتائج...'],
+      [45, 'جارٍ ترجمة تقييم الامتثال...'],
+      [60, 'جارٍ ترجمة سجل المخاطر...'],
+      [75, 'جارٍ ترجمة الفرص المالية...'],
+      [88, 'جارٍ بناء الوثيقة...'],
+    ] : [
+      [30, 'Building document...'],
+      [70, 'Generating tables...'],
+      [90, 'Finalizing...'],
+    ]
+
+    let stepIdx = 0
+    const progressTimer = setInterval(() => {
+      if (stepIdx < steps.length) {
+        setExportProgress(steps[stepIdx][0] as number)
+        setExportStep(steps[stepIdx][1] as string)
+        stepIdx++
+      }
+    }, isArabic ? 4000 : 1500)
+
     try {
       const url = API_URL + '/governance/reviews/' + review?.id + '/export/word' + (langParam ? '?lang=' + langParam : '')
       const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+      clearInterval(progressTimer)
       if (!res.ok) {
         const errText = await res.text().catch(() => res.status.toString())
+        setExporting(false)
         alert('Export failed: ' + errText.slice(0, 200))
         return
       }
       const blob = await res.blob()
-      if (blob.size === 0) { alert('Export failed: empty file received'); return }
+      if (blob.size === 0) { setExporting(false); alert('Export failed: empty file received'); return }
+      setExportProgress(100)
+      setExportStep(isArabic ? 'اكتمل التصدير!' : 'Complete!')
+      await new Promise(r => setTimeout(r, 800))
       const objUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objUrl
-      a.download = (review?.title || 'governance-review') + (langParam === 'ar' ? '_AR' : langParam === 'en' ? '_EN' : '') + '.docx'
+      a.download = (review?.title || 'governance-review') + (langParam === 'ar' ? '_AR' : '_EN') + '.docx'
       document.body.appendChild(a)
       a.click()
-      // Delay revoke to ensure download starts
       setTimeout(() => { URL.revokeObjectURL(objUrl); document.body.removeChild(a) }, 2000)
-    } catch (e: any) { alert('Export failed: ' + (e?.message || 'Unknown error')) }
+    } catch (e: any) {
+      clearInterval(progressTimer)
+      alert('Export failed: ' + (e?.message || 'Unknown error'))
+    } finally {
+      setTimeout(() => { setExporting(false); setExportProgress(0); setExportStep('') }, 1500)
+    }
   }
 
   const handleFileSelect = (files: FileList | null) => {
@@ -1222,6 +1263,29 @@ export default function GovernancePage() {
         <button onClick={() => { setExportLang(isAR ? 'ar' : 'en'); setShowExportModal(true) }} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>📄 Export Word</button>
         <button onClick={() => setShowRerunModal(true)} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
       </div>
+      {/* Export Progress Modal */}
+      {exporting && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+          <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 16, padding: 36, maxWidth: 420, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', textAlign: 'center' }}>
+            <div style={{ fontSize: 40, marginBottom: 16 }}>📄</div>
+            <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
+              {exportLang === 'ar' ? 'جارٍ تصدير التقرير بالعربية' : 'Exporting Report'}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 24, minHeight: 18 }}>{exportStep}</div>
+            {/* Progress bar */}
+            <div style={{ height: 8, background: 'var(--navy-dark)', borderRadius: 4, overflow: 'hidden', marginBottom: 12 }}>
+              <div style={{ height: '100%', width: exportProgress + '%', background: 'var(--accent)', borderRadius: 4, transition: 'width 0.6s ease' }} />
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>{exportProgress}%</div>
+            {exportLang === 'ar' && exportProgress < 100 && (
+              <div style={{ marginTop: 16, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                يتم ترجمة محتوى التقرير إلى العربية باستخدام الذكاء الاصطناعي.<br/>قد يستغرق هذا 30-60 ثانية.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Export Language Modal */}
       {showExportModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
