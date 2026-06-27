@@ -1663,22 +1663,49 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         <ScoreCircle score={Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => { const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []; const vals = (ds as any[]).map((d:any) => d?.score || d?.domainScore || 0).filter((v:number) => v > 0); return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0; })())} label='Domains' />
       </div>
 
-      {/* Score formula explainer */}
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16, display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ color: 'var(--text-muted)' }}>Overall =</span>
-        <span style={{ color: '#9b59b6', fontWeight: 600 }}>Strategic 20%</span>
-        <span>+</span>
-        <span style={{ color: '#1abc9c', fontWeight: 600 }}>Compliance 20%</span>
-        <span>+</span>
-        <span style={{ color: '#e67e22', fontWeight: 600 }}>Risk 15%</span>
-        <span>+</span>
-        <span style={{ color: '#3498db', fontWeight: 600 }}>Future State 10%</span>
-        <span>+</span>
-        <span style={{ color: '#2ecc71', fontWeight: 600 }}>Financial 10%</span>
-        <span>+</span>
-        <span style={{ color: '#e74c3c', fontWeight: 600 }}>Domains 25%</span>
-        <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>− CRITICAL penalty</span>
-      </div>
+      {/* Score formula explainer — shows actual computed values */}
+      {(() => {
+        const liveFindings = localFindings.length > 0 ? localFindings : findings
+        const critCount = liveFindings.filter((f:any) => f.severity === 'CRITICAL').length
+        const aggressiveness = (review as any)?.aggressiveness || 'STANDARD'
+        const maxPenalty = aggressiveness === 'ADVISORY' ? 5 : aggressiveness === 'STANDARD' ? 10 : 15
+        const penalty = Math.min(maxPenalty, critCount * 3)
+        const overallDisplay = rescoreResult?.overallScore ?? report.overallScore ?? 0
+        return (
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16 }}>
+            {/* Formula row */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Overall =</span>
+              <span style={{ color: '#9b59b6', fontWeight: 600 }}>Strategic 20%</span>
+              <span>+</span>
+              <span style={{ color: '#1abc9c', fontWeight: 600 }}>Compliance 20%</span>
+              <span>+</span>
+              <span style={{ color: '#e67e22', fontWeight: 600 }}>Risk 15%</span>
+              <span>+</span>
+              <span style={{ color: '#3498db', fontWeight: 600 }}>Future State 10%</span>
+              <span>+</span>
+              <span style={{ color: '#2ecc71', fontWeight: 600 }}>Financial 10%</span>
+              <span>+</span>
+              <span style={{ color: '#e74c3c', fontWeight: 600 }}>Domains 25%</span>
+              {penalty > 0 && <>
+                <span style={{ color: '#e74c3c', fontWeight: 700 }}>− {penalty} pts</span>
+                <span style={{ color: '#e74c3c', fontSize: 10 }}>({critCount} CRITICAL × 3, max {maxPenalty})</span>
+              </>}
+            </div>
+            {/* Actual calculation row */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 10, color: 'var(--text-muted)', opacity: 0.8 }}>
+              <span>= (20%×{rescoreResult?.strategicScore??report.strategicScore??0}</span>
+              <span>+ 20%×{rescoreResult?.complianceScore??report.complianceScore??0}</span>
+              <span>+ 15%×{rescoreResult?.riskScore??report.riskScore??0}</span>
+              <span>+ 10%×{Math.round(report.futureStateAlignment?.alignmentPercentage??report.futureStateScore??0)}</span>
+              <span>+ 10%×{rescoreResult?.financialScore??report.financialScore??0}</span>
+              <span>+ 25%×{rescoreResult?.domainQualityScore??report.domainQualityScore??0})</span>
+              {penalty > 0 && <span style={{ color: '#e74c3c' }}>− {penalty}</span>}
+              <span style={{ color: 'var(--accent)', fontWeight: 700 }}>= {overallDisplay}</span>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Decision Box */}
       <div style={{ background: (DECISION_COLOR[report.decision] || '#8baac8') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#8baac8'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
