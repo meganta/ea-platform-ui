@@ -784,28 +784,40 @@ export default function GovernancePage() {
     setExportProgress(0)
     setExportStep(isArabic ? 'جارٍ تحضير التقرير...' : 'Preparing report...')
 
-    // Simulate progress steps for Arabic (translation takes time)
-    const steps = isArabic ? [
-      [10, 'جارٍ ترجمة الملخص التنفيذي...'],
-      [25, 'جارٍ ترجمة الملاحظات والنتائج...'],
-      [45, 'جارٍ ترجمة تقييم الامتثال...'],
-      [60, 'جارٍ ترجمة سجل المخاطر...'],
-      [75, 'جارٍ ترجمة الفرص المالية...'],
-      [88, 'جارٍ بناء الوثيقة...'],
-    ] : [
-      [30, 'Building document...'],
-      [70, 'Generating tables...'],
-      [90, 'Finalizing...'],
+    // Arabic steps shown as label milestones while smooth progress runs underneath
+    const arSteps = [
+      [8,  'جارٍ ترجمة الملخص التنفيذي...'],
+      [20, 'جارٍ ترجمة الملاحظات والنتائج...'],
+      [35, 'جارٍ ترجمة تقييم المجالات...'],
+      [50, 'جارٍ ترجمة تقييم الامتثال...'],
+      [63, 'جارٍ ترجمة سجل المخاطر...'],
+      [75, 'جارٍ ترجمة الفرص المالية والاستراتيجية...'],
+      [87, 'جارٍ بناء الوثيقة وتنسيقها...'],
+      [94, 'جارٍ تجميع الملف النهائي...'],
     ]
+    const enSteps = [
+      [20, 'Loading report data...'],
+      [50, 'Generating tables and sections...'],
+      [80, 'Finalizing document...'],
+      [92, 'Packing file...'],
+    ]
+    const steps = isArabic ? arSteps : enSteps
 
+    // Smooth continuous tick — increment slows near ceiling to avoid reaching 100 before done
+    let currentPct = 0
     let stepIdx = 0
     const progressTimer = setInterval(() => {
-      if (stepIdx < steps.length) {
-        setExportProgress(steps[stepIdx][0] as number)
+      // Advance step label if we've passed that threshold
+      if (stepIdx < steps.length && currentPct >= (steps[stepIdx][0] as number) - 2) {
         setExportStep(steps[stepIdx][1] as string)
         stepIdx++
       }
-    }, isArabic ? 4000 : 1500)
+      // Smooth increment: fast early, slow near 95
+      const remaining = 95 - currentPct
+      const increment = remaining > 40 ? 2.5 : remaining > 20 ? 1.2 : remaining > 5 ? 0.4 : 0.1
+      currentPct = Math.min(95, currentPct + increment)
+      setExportProgress(Math.round(currentPct))
+    }, 600)
 
     try {
       const url = API_URL + '/governance/reviews/' + review?.id + '/export/word' + (langParam ? '?lang=' + langParam : '')
