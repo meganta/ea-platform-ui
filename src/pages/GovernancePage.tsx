@@ -1520,7 +1520,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     setLocalFindings((prev: any[]) => prev.filter((f: any) => f.id !== id))
     // DB write: mark as REJECTED (FindingCard already did this, but ensure it's committed)
     // Then rescore — DB write is synchronous on server so 800ms is safe margin
-    setTimeout(() => triggerRescore(), 800)
+    triggerRescore()
   }
 
   // Local report state for optimistic updates
@@ -1549,6 +1549,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ financialOpportunities: { ...report.financialOpportunities, opportunities: newOpps } }),
     }).catch(() => {})
+    triggerRescore()
   }
   const removeOpp = async (idx: number) => {
     const newOpps = localOpps.filter((_: any, i: number) => i !== idx)
@@ -1559,6 +1560,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ financialOpportunities: { ...report.financialOpportunities, opportunities: newOpps } }),
     }).catch(() => {})
+    triggerRescore()
   }
   const updateComplianceItem = async (idx: number, data: any) => {
     const newItems = localCompliance.map((item, i) => i === idx ? { ...item, ...data } : item)
@@ -1569,18 +1571,18 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 600)
+    triggerRescore()
   }
-  const removeComplianceItem = (idx: number) => {
+  const removeComplianceItem = async (idx: number) => {
     const newItems = localCompliance.filter((_: any, i: number) => i !== idx)
     setLocalCompliance(newItems)
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
-    fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 300)
+    triggerRescore()
   }
 
   // Risk local state
@@ -1599,7 +1601,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 600)
+    triggerRescore()
   }
   const removeObjective = async (idx: number) => {
     const newObjs = localObjectives.filter((_: any, i: number) => i !== idx)
@@ -1610,7 +1612,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 600)
+    triggerRescore()
   }
   const [localFutureAreas, setLocalFutureAreas] = React.useState<any[]>(report.futureStateAlignment?.alignmentAreas || [])
   React.useEffect(() => { setLocalFutureAreas(report.futureStateAlignment?.alignmentAreas || []) }, [report])
@@ -1623,7 +1625,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 600)
+    triggerRescore()
   }
   const removeFutureArea = async (idx: number) => {
     const newAreas = localFutureAreas.filter((_: any, i: number) => i !== idx)
@@ -1634,7 +1636,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 300)
+    triggerRescore()
   }
 
   const updateRisk = async (idx: number, data: any) => {
@@ -1646,18 +1648,18 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 600)
+    triggerRescore()
   }
-  const removeRisk = (idx: number) => {
+  const removeRisk = async (idx: number) => {
     const newRisks = localRisks.filter((_: any, i: number) => i !== idx)
     setLocalRisks(newRisks)
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
-    fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
     }).catch(() => {})
-    setTimeout(() => triggerRescore(), 300)
+    triggerRescore()
   }
   const tabs = [
     { key: 'summary', label: t('gov.summary') },
@@ -2150,11 +2152,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                                 }
                               </div>
                               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6 }}>
-                                <select value={obj.alignmentStatus} onChange={e => updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: e.target.value === 'NOT_APPLICABLE' ? 0 : obj.alignmentPercentage })}
+                                <select value={obj.alignmentStatus} onChange={async e => { await updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: e.target.value === 'NOT_APPLICABLE' ? 0 : obj.alignmentPercentage }) }}
                                   style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #8baac844', background: '#8baac818', color: '#8baac8', cursor: 'pointer' }}>
                                   {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
                                 </select>
-                                <button onClick={() => removeObjective(localObjectives.indexOf(obj))} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                                <button onClick={async () => { await removeObjective(localObjectives.indexOf(obj)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
                               </div>
                             </div>
                           </div>
@@ -2189,17 +2191,17 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                               )}
                               {/* Edit controls */}
                               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                                <select value={obj.alignmentStatus} onChange={e => {
-                                  const newPct = e.target.value === 'FULLY_ALIGNED' ? 100 : e.target.value === 'PARTIALLY_ALIGNED' ? 65 : e.target.value === 'WEAKLY_ALIGNED' ? 35 : e.target.value === 'NOT_ALIGNED' ? 0 : 0
-                                  updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: newPct })
+                                <select value={obj.alignmentStatus} onChange={async e => {
+                                  const newPct = e.target.value === 'FULLY_ALIGNED' ? 100 : e.target.value === 'PARTIALLY_ALIGNED' ? 65 : e.target.value === 'WEAKLY_ALIGNED' ? 35 : 0
+                                  await updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: newPct })
                                 }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (STATUS_COLOR[obj.alignmentStatus]||'#8baac8') + '44', background: (STATUS_COLOR[obj.alignmentStatus]||'#8baac8') + '18', color: STATUS_COLOR[obj.alignmentStatus]||'#8baac8', cursor: 'pointer' }}>
                                   {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
                                 </select>
                                 <input type='number' min={0} max={100} value={obj.alignmentPercentage || 0}
-                                  onChange={e => updateObjective(localObjectives.indexOf(obj), { alignmentPercentage: Math.min(100, Math.max(0, Number(e.target.value))) })}
+                                  onChange={async e => { await updateObjective(localObjectives.indexOf(obj), { alignmentPercentage: Math.min(100, Math.max(0, Number(e.target.value))) }) }}
                                   style={{ width: 64, fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--navy-light)', background: 'var(--navy-dark)', color: 'var(--text-primary)', textAlign: 'center' }} />
                                 <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>%</span>
-                                <button onClick={() => removeObjective(localObjectives.indexOf(obj))} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: 'auto' }}>✕ Remove</button>
+                                <button onClick={async () => { await removeObjective(localObjectives.indexOf(obj)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: 'auto' }}>✕ Remove</button>
                               </div>
                             </div>
                           </div>
@@ -2401,14 +2403,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                       <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6, alignItems: 'center' }}>
                         <select
                           value={item.complianceStatus}
-                          onChange={e => updateComplianceItem(localCompliance.indexOf(item), { complianceStatus: e.target.value })}
+                          onChange={async e => { await updateComplianceItem(localCompliance.indexOf(item), { complianceStatus: e.target.value }) }}
                           style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (statusColor[item.complianceStatus] || '#8baac8') + '44', background: (statusColor[item.complianceStatus] || '#8baac8') + '18', color: statusColor[item.complianceStatus] || '#8baac8', cursor: 'pointer' }}>
                           {['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE'].map(s => (
                             <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
                           ))}
                         </select>
                         <button
-                          onClick={() => removeComplianceItem(localCompliance.indexOf(item))}
+                          onClick={async () => { await removeComplianceItem(localCompliance.indexOf(item)) }}
                           style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>
                           ✕ Remove
                         </button>
@@ -2492,11 +2494,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
                 {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
                 <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
-                  <select value={risk.severity} onChange={async e => { await updateRisk(riskIdx, { severity: e.target.value }); setTimeout(() => triggerRescore(), 600) }}
+                  <select value={risk.severity} onChange={async e => { await updateRisk(riskIdx, { severity: e.target.value }) }}
                     style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (SEV_COLOR[risk.severity] || '#8baac8') + '44', background: (SEV_COLOR[risk.severity] || '#8baac8') + '18', color: SEV_COLOR[risk.severity] || '#8baac8', cursor: 'pointer' }}>
                     {['CRITICAL','HIGH','MEDIUM','LOW'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
-                  <button onClick={async () => { await removeRisk(riskIdx); setTimeout(() => triggerRescore(), 600) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                  <button onClick={async () => { await removeRisk(riskIdx) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
                 </div>
               </div>
               )
@@ -2579,11 +2581,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                         {area.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>⚠ Gap: {isAR ? resolveText(area.gap) : area.gap}</div>}
                         {area.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>→ {isAR ? resolveText(area.recommendation) : area.recommendation}</div>}
                         <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
-                          <select value={area.status} onChange={e => updateFutureArea(areaIdx, { status: e.target.value })}
+                          <select value={area.status} onChange={async e => { await updateFutureArea(areaIdx, { status: e.target.value }) }}
                             style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + c + '44', background: c + '18', color: c, cursor: 'pointer' }}>
                             {['ALIGNED','PARTIALLY_ALIGNED','GAP_IDENTIFIED','NOT_ALIGNED','FUTURE_REQUIREMENT','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
                           </select>
-                          <button onClick={() => removeFutureArea(areaIdx)} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                          <button onClick={async () => { await removeFutureArea(areaIdx) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
                         </div>
                       </div>
                       )
