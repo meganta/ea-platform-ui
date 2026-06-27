@@ -348,7 +348,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
   )
 }
 
-function IntelligenceAdvisor({ reviewType }: { reviewType: string }) {
+function IntelligenceAdvisor({ reviewType, onReady }: { reviewType: string; onReady?: () => void }) {
   const api = useApi()
   const [availability, setAvailability] = useState<Record<string, any>>({})
   const [checked, setChecked] = useState(false)
@@ -359,6 +359,7 @@ function IntelligenceAdvisor({ reviewType }: { reviewType: string }) {
         setAvailability(contextCheck as any)
       } catch {}
       setChecked(true)
+      if (onReady) onReady()
     }
     check()
   }, [reviewType])
@@ -647,6 +648,7 @@ export default function GovernancePage() {
   const [extractedMeta, setExtractedMeta] = useState<any>(null)
   const [showMeta, setShowMeta] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
+  const [advisorReady, setAdvisorReady] = useState(false)
   const [uploadStatus, setUploadStatus] = useState('')
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number; fileName: string; pct: number } | null>(null)
   const [exportLang, setExportLang] = useState<'ar'|'en'>('en')
@@ -953,7 +955,10 @@ export default function GovernancePage() {
   ]
   const canNext1 = !!form.title
   const canNext2 = inputs.length > 0
-  const wizardNext = () => setWizardStep(s => Math.min(5, s + 1))
+  const wizardNext = () => {
+    if (wizardStep === 2) setAdvisorReady(false) // reset when entering intelligence step
+    setWizardStep(s => Math.min(5, s + 1))
+  }
   const wizardBack = () => setWizardStep(s => Math.max(1, s - 1))
 
   if (view === 'create') return (
@@ -1099,10 +1104,19 @@ export default function GovernancePage() {
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
             These repository items will be used to enrich your review. Missing items reduce review quality — add them before starting if possible.
           </div>
-          <IntelligenceAdvisor reviewType={form.reviewType} />
+          <IntelligenceAdvisor reviewType={form.reviewType} onReady={() => setAdvisorReady(true)} />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28 }}>
             <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
-            <button className='btn-primary' onClick={wizardNext} style={{ padding: '10px 28px' }}>Next: Set Aggressiveness →</button>
+            <button
+              className='btn-primary'
+              onClick={wizardNext}
+              disabled={!advisorReady}
+              style={{ padding: '10px 28px', opacity: advisorReady ? 1 : 0.45, cursor: advisorReady ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {!advisorReady
+                ? <><span style={{ fontSize: 13 }}>⏳</span> Checking repository...</>
+                : 'Next: Set Aggressiveness →'
+              }
+            </button>
           </div>
         </div>
       )}
