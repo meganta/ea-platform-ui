@@ -1376,6 +1376,25 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
 
+  // ── Unified score sources — used in ScoreCircles, formula, and penalty display ──
+  // Always prefer rescoreResult (reflects latest edits), then report stored values
+  const uScores = {
+    strategic:  0, // computed below from objectives
+    compliance: Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0),
+    risk:       Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0),
+    future:     Math.round(rescoreResult?.futureStateScore ?? report.futureStateAlignment?.alignmentPercentage ?? futureScore ?? 0),
+    financial:  Math.round(rescoreResult?.financialScore  ?? report.financialScore  ?? finScore ?? 0),
+    domains:    Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => {
+      const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []
+      const vals = (ds as any[]).map((d:any) => d?.score||d?.domainScore||0).filter((v:number)=>v>0)
+      return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0
+    })()),
+    overall:    Math.round(rescoreResult?.overallScore ?? report.overallScore ?? 0),
+    penalty:    rescoreResult?.criticalPenalty ?? 0,
+    critCount:  rescoreResult?.criticalCount ?? (localFindings.length > 0 ? localFindings : findings).filter((f:any)=>f.severity==='CRITICAL').length,
+    maxPenalty: rescoreResult?.maxPenalty ?? ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
+  }
+
   // ── Edit helpers ──────────────────────────────────────────────────────────
   const apiUrl = (process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1')
   const token = () => localStorage.getItem('ea_token') || ''
@@ -1625,52 +1644,61 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
       {/* Score Row — use rescoreResult when available for live updates */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
-        <ScoreCircle score={Math.round(rescoreResult?.overallScore    ?? report.overallScore    ?? 0)} label='Overall' />
+        <ScoreCircle score={uScores.overall} label='Overall' />
         <ScoreCircle score={(() => {
-          // Use weighted goal alignment % as Strategic score (Option A)
+          // Strategic = weighted alignment % from tenant objectives
           const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
-          const objectives = localObjectives
           const NATIONAL_T = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
-          const tenantObjs = objectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_T.includes((o.strategyType||'').toUpperCase()))
-          const tGrouped: Record<string,any[]> = {}
-          for (const o of tenantObjs) { const k = o.strategyType || 'EA_STRATEGY'; if (!tGrouped[k]) tGrouped[k]=[]; tGrouped[k].push(o) }
-          let weightedSum = 0, totalW = 0
-          for (const [sType, sobjs] of Object.entries(tGrouped) as [string,any[]][]) {
-            const w = STRAT_W[sType] || 0.10
-            const scorable = sobjs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
-            const avg = scorable.length ? scorable.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/scorable.length : 0
-            weightedSum += avg * w; totalW += w
-          }
-          // If all tenant objectives are NOT_APPLICABLE — no violations, score = 100
+          const tenantObjs = localObjectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_T.includes((o.strategyType||'').toUpperCase()))
           const allNA = tenantObjs.length > 0 && tenantObjs.every((o:any) => o.alignmentStatus === 'NOT_APPLICABLE')
           if (allNA) return 100
-          // No tenant objectives at all — not assessed yet, show 0
-          if (tenantObjs.length === 0) return 0
-          const alignPct = totalW > 0 ? Math.round(weightedSum / totalW) : 0
-          return alignPct
+          if (tenantObjs.length === 0) return Math.round(rescoreResult?.strategicScore ?? report.strategicScore ?? 0)
+          const tGrouped: Record<string,any[]> = {}
+          for (const o of tenantObjs) { const k = o.strategyType || 'EA_STRATEGY'; if (!tGrouped[k]) tGrouped[k]=[]; tGrouped[k].push(o) }
+          let wSum = 0, wTot = 0
+          for (const [sType, sobjs] of Object.entries(tGrouped) as [string,any[]][]) {
+            const w = STRAT_W[sType] || 0.10
+            const sc = sobjs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
+            const av = sc.length ? sc.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/sc.length : 0
+            wSum += av * w; wTot += w
+          }
+          return wTot > 0 ? Math.round(wSum / wTot) : 0
         })()} label='Strategic' />
-        <ScoreCircle score={Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0)} label='Compliance' />
-        <ScoreCircle score={Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0)} label='Risk' />
-        <ScoreCircle score={Math.round(report.futureStateAlignment?.alignmentPercentage ?? futureScore ?? 0)} label='Future State' />
-        <ScoreCircle score={(() => {
-          const opps = report.financialOpportunities?.opportunities || []
-          if (opps.length === 0) return 0
-          // Score = confidence-weighted: HIGH=100, MEDIUM=70, LOW=40
-          const CONF: Record<string,number> = { HIGH: 100, MEDIUM: 70, LOW: 40 }
-          const avg = Math.round(opps.reduce((s:number,o:any) => s + (CONF[o.confidenceLevel] || 70), 0) / opps.length)
-          return avg
-        })()} label='Financial' />
-        <ScoreCircle score={Math.round(rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => { const ds = report.domainSummaries ? Object.values(report.domainSummaries) : []; const vals = (ds as any[]).map((d:any) => d?.score || d?.domainScore || 0).filter((v:number) => v > 0); return vals.length ? Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length) : 0; })())} label='Domains' />
+        <ScoreCircle score={uScores.compliance} label='Compliance' />
+        <ScoreCircle score={uScores.risk} label='Risk' />
+        <ScoreCircle score={uScores.future} label='Future State' />
+        <ScoreCircle score={uScores.financial} label='Financial' />
+        <ScoreCircle score={uScores.domains} label='Domains' />
       </div>
 
       {/* Score formula explainer — shows actual computed values */}
       {(() => {
-        const liveFindings = localFindings.length > 0 ? localFindings : findings
-        const critCount = liveFindings.filter((f:any) => f.severity === 'CRITICAL').length
-        const aggressiveness = (review as any)?.aggressiveness || 'STANDARD'
-        const maxPenalty = aggressiveness === 'ADVISORY' ? 5 : aggressiveness === 'STANDARD' ? 10 : 15
-        const penalty = Math.min(maxPenalty, critCount * 3)
-        const overallDisplay = rescoreResult?.overallScore ?? report.overallScore ?? 0
+        // Use uScores — single source of truth for all score displays
+        const critCount = uScores.critCount
+        const penalty = uScores.penalty
+        const maxPenalty = uScores.maxPenalty
+        const overallDisplay = uScores.overall
+        // Strategic comes from objectives calculation above in ScoreCircle
+        const s_strategic  = (() => {
+          const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
+          const NATIONAL_T = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
+          const tenantObjs = localObjectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_T.includes((o.strategyType||'').toUpperCase()))
+          const allNA = tenantObjs.length > 0 && tenantObjs.every((o:any) => o.alignmentStatus === 'NOT_APPLICABLE')
+          if (allNA) return 100
+          if (tenantObjs.length === 0) return Math.round(rescoreResult?.strategicScore ?? report.strategicScore ?? 0)
+          const tGrouped: Record<string,any[]> = {}
+          for (const o of tenantObjs) { const k = o.strategyType || 'EA_STRATEGY'; if (!tGrouped[k]) tGrouped[k]=[]; tGrouped[k].push(o) }
+          let wSum = 0, wTot = 0
+          for (const [sType, sobjs] of Object.entries(tGrouped) as [string,any[]][]) {
+            const w = STRAT_W[sType]||0.10; const sc = sobjs.filter((o:any)=>o.alignmentStatus!=='NOT_APPLICABLE')
+            const av = sc.length ? sc.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/sc.length : 0
+            wSum += av*w; wTot += w
+          }
+          return wTot > 0 ? Math.round(wSum/wTot) : 0
+        })()
+        // Verify formula math
+        const computedBase = Math.round(s_strategic*0.20 + uScores.compliance*0.20 + uScores.risk*0.15 + uScores.future*0.10 + uScores.financial*0.10 + uScores.domains*0.25)
+        const computedOverall = Math.max(20, computedBase - penalty)
         return (
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16 }}>
             {/* Formula row */}
@@ -1694,14 +1722,16 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             </div>
             {/* Actual calculation row */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 8, flexWrap: 'wrap', alignItems: 'center', fontSize: 10, color: 'var(--text-muted)', opacity: 0.8 }}>
-              <span>= (20%×{rescoreResult?.strategicScore??report.strategicScore??0}</span>
-              <span>+ 20%×{rescoreResult?.complianceScore??report.complianceScore??0}</span>
-              <span>+ 15%×{rescoreResult?.riskScore??report.riskScore??0}</span>
-              <span>+ 10%×{Math.round(report.futureStateAlignment?.alignmentPercentage??report.futureStateScore??0)}</span>
-              <span>+ 10%×{rescoreResult?.financialScore??report.financialScore??0}</span>
-              <span>+ 25%×{rescoreResult?.domainQualityScore??report.domainQualityScore??0})</span>
+              <span>= (20%×{s_strategic}</span>
+              <span>+ 20%×{uScores.compliance}</span>
+              <span>+ 15%×{uScores.risk}</span>
+              <span>+ 10%×{uScores.future}</span>
+              <span>+ 10%×{uScores.financial}</span>
+              <span>+ 25%×{uScores.domains})</span>
               {penalty > 0 && <span style={{ color: '#e74c3c' }}>− {penalty}</span>}
-              <span style={{ color: 'var(--accent)', fontWeight: 700 }}>= {overallDisplay}</span>
+              <span style={{ color: 'var(--text-muted)' }}>= {computedBase}{penalty > 0 ? ` − ${penalty}` : ''}</span>
+              <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12 }}>= {computedOverall}</span>
+              {Math.abs(computedOverall - overallDisplay) > 1 && <span style={{ color: '#e74c3c', fontSize: 9 }}>⚠ stored:{overallDisplay}</span>}
             </div>
           </div>
         )
