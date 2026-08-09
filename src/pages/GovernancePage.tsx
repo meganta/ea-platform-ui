@@ -637,6 +637,8 @@ export default function GovernancePage() {
   const [filterType, setFilterType] = useState('')
   const [filterAgg, setFilterAgg] = useState('')
   const [filterScoreMin, setFilterScoreMin] = useState('')
+  const PAGE_SIZE = 12
+  const [page, setPage] = useState(1)
   const [filterSearch, setFilterSearch] = useState('')
   const [review, setReview] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -748,6 +750,9 @@ export default function GovernancePage() {
 
   useEffect(() => { loadReviews() }, [])
 
+  // Reset to page 1 whenever filters change
+  React.useEffect(() => { setPage(1) }, [filterStatus, filterDecision, filterType, filterSearch, filterAgg, filterScoreMin])
+
   const filteredReviews = reviews.filter(r => {
     if (filterStatus && r.status !== filterStatus) return false
     if (filterDecision && r.decision !== filterDecision) return false
@@ -758,6 +763,9 @@ export default function GovernancePage() {
     if (filterSearch && !r.title?.toLowerCase().includes(filterSearch.toLowerCase())) return false
     return true
   })
+
+  const totalPages = Math.ceil(filteredReviews.length / PAGE_SIZE)
+  const paginatedReviews = filteredReviews.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const loadReviews = async () => {
     setLoading(true)
@@ -954,12 +962,12 @@ export default function GovernancePage() {
           </button>
         )}
         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-          {filteredReviews.length}/{reviews.length} reviews
+          {filteredReviews.length}/{reviews.length} reviews{totalPages > 1 ? ` · page ${page}/${totalPages}` : ''}
         </span>
       </div>
 
       <div style={{ display: 'grid', gap: 12 }}>
-        {filteredReviews.map(r => (
+        {paginatedReviews.map(r => (
           <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>

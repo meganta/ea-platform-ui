@@ -11,6 +11,7 @@ import RepositoryPage from './pages/RepositoryPage'
 import KnowledgePage from './pages/KnowledgePage'
 import SettingsPage from './pages/SettingsPage'
 import GovernancePage from './pages/GovernancePage'
+import MetaModelPage from './pages/MetaModelPage'
 import ReportsPage from './pages/ReportsPage'
 import './styles.css'
 
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="knowledge" element={<KnowledgePage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="governance" element={<GovernancePage />} />
+              <Route path="meta-model" element={<MetaModelPage />} />
               <Route path="reports" element={<ReportsPage />} />
             </Route>
           </Routes>
