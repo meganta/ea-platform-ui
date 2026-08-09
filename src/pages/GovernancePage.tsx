@@ -1509,13 +1509,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     // criticalCount * 3, capped at maxPenalty (always available from findings)
     // critCount uses localFindings (reflects deletions immediately) with findings as fallback
     // localFindings is defined later in component but available at render time via closure
-    critCount:  rescoreResult?.criticalCount ?? (typeof localFindings !== 'undefined' ? localFindings : findings).filter((f:any)=>f.severity==='CRITICAL').length,
+    critCount:  rescoreResult?.criticalCount ?? findings.filter((f:any)=>f.severity==='CRITICAL').length,
     maxPenalty: rescoreResult?.maxPenalty ?? ((review as any)?.aggressiveness === 'ADVISORY' ? 5 : (review as any)?.aggressiveness === 'STRICT' ? 15 : 10),
     penalty:    rescoreResult?.criticalPenalty ?? (() => {
       const agg = (review as any)?.aggressiveness || 'STANDARD'
       const maxP = agg === 'ADVISORY' ? 5 : agg === 'STANDARD' ? 10 : 15
       const perCrit = agg === 'ADVISORY' ? 1 : agg === 'EXECUTIVE' ? 4 : agg === 'STRICT' ? 5 : 3
-      const liveCrits = (typeof localFindings !== 'undefined' ? localFindings : findings).filter((f:any)=>f.severity==='CRITICAL').length
+      const liveCrits = findings.filter((f:any)=>f.severity==='CRITICAL').length
       return Math.min(maxP, liveCrits * perCrit)
     })(),
   }
