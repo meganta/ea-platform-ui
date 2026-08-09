@@ -1891,16 +1891,62 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               { key: 'securityComplianceCoverage',   label: '🛡 Security & Compliance Coverage',    color: '#e74c3c' },
               { key: 'slaAssessment',                label: '⏱ SLA & Performance Requirements',    color: '#1abc9c' },
               { key: 'procurementRisk',              label: '⚠️ Procurement Risk Assessment',       color: '#e74c3c' },
+              // CAB_REVIEW sections
+              { key: 'cabDecision',                  label: '🚦 CAB Decision',                       color: '#2ecc71' },
+              { key: 'readinessChecklistDisplay',    label: '✅ Readiness Checklist',                color: '#3498db' },
+              { key: 'deploymentRiskAssessment',     label: '⚡ Deployment Risk Assessment',         color: '#e74c3c' },
+              { key: 'rollbackReadiness',            label: '↩️ Rollback Readiness',                color: '#e67e22' },
+              { key: 'outstandingConditions',        label: '📌 Outstanding Conditions',             color: '#f39c12' },
             ].filter(s => sec[s.key])
             if (!sections.length) return null
+            const cabDec = (sec.cabDecision || '').toUpperCase()
+            const cabColor = cabDec.startsWith('GO') && !cabDec.includes('NO') && !cabDec.includes('CONDITIONAL') ? '#2ecc71' : cabDec.includes('NO-GO') || cabDec.includes('NO GO') ? '#e74c3c' : '#f39c12'
             return (
               <div style={{ marginBottom: 16 }}>
-                {sections.map(s => (
-                  <div key={s.key} style={{ background: 'var(--navy-mid)', border: '1px solid ' + s.color + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: s.color, marginBottom: 8 }}>{s.label}</div>
-                    <div style={{ fontSize: 13, lineHeight: 1.7 }}>{sec[s.key]}</div>
-                  </div>
-                ))}
+                {sections.map(s => {
+                  // CAB Decision gets special prominent treatment
+                  if (s.key === 'cabDecision' && sec[s.key]) {
+                    const dec = sec[s.key].split('—')[0].split('-')[0].trim()
+                    const reason = sec[s.key].includes('—') ? sec[s.key].split('—').slice(1).join('—').trim() : sec[s.key].includes(' - ') ? sec[s.key].split(' - ').slice(1).join(' - ').trim() : ''
+                    return (
+                      <div key={s.key} style={{ background: cabColor + '18', border: '2px solid ' + cabColor, borderRadius: 12, padding: 20, marginBottom: 12 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: cabColor, marginBottom: 8, letterSpacing: 1 }}>🚦 CAB DECISION</div>
+                        <div style={{ fontSize: 28, fontWeight: 800, color: cabColor, marginBottom: reason ? 8 : 0 }}>{dec}</div>
+                        {reason && <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{reason}</div>}
+                      </div>
+                    )
+                  }
+                  // Readiness checklist gets special grid treatment
+                  if (s.key === 'readinessChecklistDisplay' && sec[s.key]) {
+                    const items = sec[s.key].split(' | ')
+                    return (
+                      <div key={s.key} style={{ background: 'var(--navy-mid)', border: '1px solid ' + s.color + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: s.color, marginBottom: 10 }}>✅ Readiness Checklist</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                          {items.map((item: string) => {
+                            const [label, status] = item.split(': ')
+                            const sc = (status||'').includes('PRESENT') ? '#2ecc71' : (status||'').includes('MISSING') ? '#e74c3c' : '#f39c12'
+                            return (
+                              <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: sc + '11', borderRadius: 6, border: '1px solid ' + sc + '33' }}>
+                                <span style={{ color: sc, fontSize: 14 }}>{(status||'').includes('PRESENT') ? '✅' : (status||'').includes('MISSING') ? '❌' : '⚠️'}</span>
+                                <div>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
+                                  <div style={{ fontSize: 10, color: sc }}>{status}</div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div key={s.key} style={{ background: 'var(--navy-mid)', border: '1px solid ' + s.color + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: s.color, marginBottom: 8 }}>{s.label}</div>
+                      <div style={{ fontSize: 13, lineHeight: 1.7 }}>{sec[s.key]}</div>
+                    </div>
+                  )
+                })}
               </div>
             )
           })()}
