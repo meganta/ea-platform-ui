@@ -18,6 +18,293 @@ interface Architect { id: string; code: string; name: string; role: string; doma
 const MODEL_LABEL: Record<string, string> = { haiku: '⚡ Fast', sonnet: '🧠 Smart' }
 const DOMAIN_COLOR: Record<string, string> = { CHIEF: '#f39c12', BUSINESS: '#3498db', APPLICATION: '#e67e22', INTEGRATION: '#16a085', DATA: '#1abc9c', TECHNOLOGY: '#e74c3c', SECURITY: '#9b59b6' }
 
+// ── Meeting Assistant ─────────────────────────────────────────────────────────
+function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) {
+  const [meetings, setMeetings] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState<any>(null)
+  const [view, setView] = useState<'list'|'create'|'detail'>('list')
+  const [form, setForm] = useState({ title: '', description: '', scheduledAt: '', architectCodes: ['CHIEF','BUSINESS','APPLICATION','DATA'] })
+  const [transcriptText, setTranscriptText] = useState('')
+  const [transcriptLang, setTranscriptLang] = useState('en')
+  const [analyzing, setAnalyzing] = useState(false)
+  const [uploadMode, setUploadMode] = useState<'text'|'audio'>('text')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const pollRef = useRef<any>(null)
+
+  const DOMAIN_COLOR: Record<string,string> = { CHIEF:'#f39c12', BUSINESS:'#3498db', APPLICATION:'#e67e22', INTEGRATION:'#16a085', DATA:'#1abc9c', TECHNOLOGY:'#e74c3c', SECURITY:'#9b59b6' }
+  const STATUS_COLOR: Record<string,string> = { COMPLETED:'#2ecc71', PROCESSING:'#f39c12', SCHEDULED:'#3498db', ACTIVE:'#e67e22', CANCELLED:'#7f8c8d' }
+
+  const load = useCallback(() => {
+    setLoading(true)
+    api.get('/copilot/meetings').then((d: any) => { setMeetings(Array.isArray(d)?d:[]); setLoading(false) })
+  }, [api])
+
+  useEffect(() => { load() }, [load])
+
+  const createMeeting = async () => {
+    if (!form.title) return
+    const m = await api.post('/copilot/meetings', form)
+    if (m?.id) { setSelected(m); setView('detail'); load() }
+  }
+
+  const ingestText = async () => {
+    if (!transcriptText.trim() || !selected) return
+    await api.post(`/copilot/meetings/${selected.id}/transcript/text`, { content: transcriptText, language: transcriptLang })
+    const updated = await api.get(`/copilot/meetings/${selected.id}`)
+    setSelected(updated)
+    setTranscriptText('')
+  }
+
+  const ingestAudio = async (file: File) => {
+    if (!selected) return
+    const fd = new FormData()
+    fd.append('audio', file)
+    fd.append('language', transcriptLang)
+    setAnalyzing(true)
+    const token = localStorage.getItem('ea_token') || ''
+    const res = await fetch(`${process.env.REACT_APP_API_URL||'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'}/copilot/meetings/${selected.id}/transcript/audio`, { method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:fd })
+    const data = await res.json()
+    if (data?.content) {
+      const updated = await api.get(`/copilot/meetings/${selected.id}`)
+      setSelected(updated)
+    }
+    setAnalyzing(false)
+  }
+
+  const startAnalysis = async () => {
+    if (!selected) return
+    setAnalyzing(true)
+    await api.post(`/copilot/meetings/${selected.id}/analyze`)
+    // Poll for completion
+    pollRef.current = setInterval(async () => {
+      const updated = await api.get(`/copilot/meetings/${selected.id}`)
+      setSelected(updated)
+      if (updated.status !== 'PROCESSING') {
+        clearInterval(pollRef.current)
+        setAnalyzing(false)
+      }
+    }, 3000)
+  }
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
+  const toggleArchitect = (code: string) => {
+    setForm(f => ({ ...f, architectCodes: f.architectCodes.includes(code) ? f.architectCodes.filter(c=>c!==code) : [...f.architectCodes, code] }))
+  }
+
+  // ── Detail view ───────────────────────────────────────────────────────────
+  const renderDetail = () => {
+    if (!selected) return null
+    const hasTranscript = selected.transcripts?.length > 0
+    const hasAnalyses = selected.analyses?.length > 0
+    const transcript = selected.transcripts?.[selected.transcripts.length-1]
+
+    return (
+      <div>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+          <button style={{ padding:'6px 12px', borderRadius:8, background:'var(--navy-mid)', border:'none', color:'var(--text)', cursor:'pointer', fontSize:13 }} onClick={()=>{ setView('list'); setSelected(null) }}>← Back</button>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:18, fontWeight:700 }}>{selected.title}</div>
+            <div style={{ display:'flex', gap:8, marginTop:3 }}>
+              <span style={{ padding:'2px 10px', borderRadius:10, fontSize:11, fontWeight:600, background:(STATUS_COLOR[selected.status]||'#7f8c8d')+'22', color:STATUS_COLOR[selected.status]||'#7f8c8d' }}>{selected.status}</span>
+              {selected.scheduledAt && <span style={{ fontSize:11, color:'var(--text-dim)' }}>{new Date(selected.scheduledAt).toLocaleDateString()}</span>}
+            </div>
+          </div>
+          {hasTranscript && !hasAnalyses && (
+            <button onClick={startAnalysis} disabled={analyzing} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'#0B1929', border:'none', cursor:analyzing?'default':'pointer', fontSize:13, fontWeight:600 }}>
+              {analyzing ? '⏳ Analyzing...' : '▶ Analyze with Architects'}
+            </button>
+          )}
+          {hasAnalyses && (
+            <button onClick={startAnalysis} disabled={analyzing} style={{ padding:'8px 16px', borderRadius:8, background:'var(--navy-mid)', border:'none', color:'var(--text)', cursor:analyzing?'default':'pointer', fontSize:13 }}>
+              {analyzing ? '⏳ Re-analyzing...' : '↻ Re-analyze'}
+            </button>
+          )}
+        </div>
+
+        {/* Transcript section */}
+        <div style={{ background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, padding:20, marginBottom:16 }}>
+          <div style={{ fontSize:14, fontWeight:600, marginBottom:12 }}>📝 Transcript</div>
+          {hasTranscript ? (
+            <div>
+              <div style={{ display:'flex', gap:8, marginBottom:10, fontSize:12, color:'var(--text-dim)' }}>
+                <span>📄 {transcript.wordCount?.toLocaleString()} words</span>
+                <span>🌐 {transcript.language}</span>
+                <span>📅 {new Date(transcript.createdAt).toLocaleString()}</span>
+              </div>
+              <div style={{ background:'var(--navy)', borderRadius:8, padding:12, maxHeight:200, overflowY:'auto', fontSize:12, lineHeight:1.7, color:'var(--text-dim)', fontFamily:'monospace' }}>
+                {transcript.content.slice(0, 1000)}{transcript.content.length > 1000 ? '...' : ''}
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+                <button onClick={()=>setUploadMode('text')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='text'?'var(--accent)':'var(--border)'}`, background:uploadMode==='text'?'rgba(0,180,216,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>📝 Paste Text</button>
+                <button onClick={()=>setUploadMode('audio')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='audio'?'var(--accent)':'var(--border)'}`, background:uploadMode==='audio'?'rgba(0,180,216,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>🎵 Upload Audio</button>
+              </div>
+              <div style={{ marginBottom:10, display:'flex', gap:8, alignItems:'center' }}>
+                <label style={{ fontSize:12, color:'var(--text-dim)' }}>Language:</label>
+                <select value={transcriptLang} onChange={e=>setTranscriptLang(e.target.value)} style={{ padding:'4px 8px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:6, color:'var(--text)', fontSize:12 }}>
+                  <option value="en">English</option>
+                  <option value="ar">Arabic</option>
+                </select>
+              </div>
+              {uploadMode === 'text' ? (
+                <div>
+                  <textarea value={transcriptText} onChange={e=>setTranscriptText(e.target.value)}
+                    style={{ width:'100%', minHeight:140, padding:'10px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:12, resize:'vertical', fontFamily:'monospace', lineHeight:1.6 }}
+                    placeholder="Paste meeting transcript here...&#10;&#10;You can include speaker names like:&#10;John: Let's discuss the API architecture...&#10;Sarah: I have concerns about the data model..." />
+                  <button onClick={ingestText} disabled={!transcriptText.trim()} style={{ marginTop:8, padding:'8px 16px', borderRadius:8, background:transcriptText.trim()?'var(--accent)':'var(--navy-mid)', color:transcriptText.trim()?'#0B1929':'var(--text-dim)', border:'none', cursor:transcriptText.trim()?'pointer':'default', fontSize:13, fontWeight:600 }}>
+                    Upload Transcript
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <input ref={fileInputRef} type="file" accept="audio/*" style={{ display:'none' }} onChange={e=>{ if(e.target.files?.[0]) ingestAudio(e.target.files[0]) }} />
+                  <div onClick={()=>fileInputRef.current?.click()} style={{ border:'2px dashed var(--border)', borderRadius:8, padding:'30px 20px', textAlign:'center', cursor:'pointer', transition:'all 0.15s' }}
+                    onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--accent)')}
+                    onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}>
+                    <div style={{ fontSize:30, marginBottom:8 }}>{analyzing?'⏳':'🎵'}</div>
+                    <div style={{ fontSize:13, fontWeight:500 }}>{analyzing?'Transcribing with Whisper...':'Click to upload audio recording'}</div>
+                    <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:4 }}>MP3, WAV, MP4, WebM — Whisper AI transcribes automatically</div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Analyses section */}
+        {hasAnalyses && (
+          <div>
+            <div style={{ fontSize:15, fontWeight:600, marginBottom:12 }}>🏛 Architect Analyses</div>
+            <div style={{ display:'flex', flexDirection:'column' as const, gap:12 }}>
+              {selected.analyses.map((analysis: any) => {
+                const code = analysis.architectCode
+                const color = DOMAIN_COLOR[code] || '#7f8c8d'
+                const findings = Array.isArray(analysis.findings) ? analysis.findings : []
+                const risks = Array.isArray(analysis.risks) ? analysis.risks : []
+                const actions = Array.isArray(analysis.actions) ? analysis.actions : []
+                return (
+                  <details key={analysis.id} style={{ background:'var(--navy-light)', border:`1px solid ${color}33`, borderRadius:10, overflow:'hidden' }}>
+                    <summary style={{ padding:'12px 16px', cursor:'pointer', display:'flex', alignItems:'center', gap:10, listStyle:'none' }}>
+                      <div style={{ width:32, height:32, borderRadius:'50%', background:color+'33', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, flexShrink:0 }}>
+                        {architects.find(a=>a.code===code)?.avatar || '🏛'}
+                      </div>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontWeight:600, color }}>{analysis.architectName}</div>
+                        <div style={{ fontSize:11, color:'var(--text-dim)' }}>{findings.length} findings · {risks.length} risks · {actions.length} actions</div>
+                      </div>
+                      <div style={{ fontSize:11, color:'var(--text-dim)' }}>{new Date(analysis.createdAt).toLocaleTimeString()}</div>
+                    </summary>
+                    <div style={{ padding:'0 16px 16px', borderTop:`1px solid ${color}22` }}>
+                      {/* Quick stats */}
+                      <div style={{ display:'flex', gap:10, margin:'12px 0', flexWrap:'wrap' as const }}>
+                        {[{l:'Findings',v:findings.length,c:'#e74c3c'},{l:'Risks',v:risks.length,c:'#f39c12'},{l:'Actions',v:actions.length,c:'#3498db'}].map(s=>(
+                          <div key={s.l} style={{ padding:'6px 12px', borderRadius:8, background:s.c+'11', border:`1px solid ${s.c}33`, fontSize:11, fontWeight:600, color:s.c }}>
+                            {s.v} {s.l}
+                          </div>
+                        ))}
+                      </div>
+                      {/* Full report */}
+                      <div style={{ background:'var(--navy)', borderRadius:8, padding:14, fontSize:12, lineHeight:1.8, color:'var(--text)', whiteSpace:'pre-wrap', maxHeight:400, overflowY:'auto' }}>
+                        {analysis.report}
+                      </div>
+                    </div>
+                  </details>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {!hasTranscript && !hasAnalyses && (
+          <div style={{ background:'rgba(0,180,216,0.05)', border:'1px solid var(--border)', borderRadius:10, padding:24, textAlign:'center', color:'var(--text-dim)', fontSize:13 }}>
+            Upload a transcript above, then click "Analyze with Architects"
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Create form ───────────────────────────────────────────────────────────
+  const renderCreate = () => (
+    <div style={{ maxWidth:560 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+        <button style={{ padding:'6px 12px', borderRadius:8, background:'var(--navy-mid)', border:'none', color:'var(--text)', cursor:'pointer', fontSize:13 }} onClick={()=>setView('list')}>← Back</button>
+        <div style={{ fontSize:18, fontWeight:700 }}>New Meeting</div>
+      </div>
+      <div style={{ background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, padding:20, display:'flex', flexDirection:'column' as const, gap:14 }}>
+        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>Meeting Title *</label><input style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Solution Design Review — HR System" /></div>
+        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>Description</label><input style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
+        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>Meeting Date</label><input type="datetime-local" style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.scheduledAt} onChange={e=>setForm(f=>({...f,scheduledAt:e.target.value}))} /></div>
+        <div>
+          <label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:8 }}>Architects to Analyze ({form.architectCodes.length} selected)</label>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' as const }}>
+            {architects.map(a => {
+              const sel = form.architectCodes.includes(a.code)
+              const color = DOMAIN_COLOR[a.code]||'#7f8c8d'
+              return <span key={a.code} onClick={()=>toggleArchitect(a.code)} style={{ padding:'6px 12px', borderRadius:20, fontSize:12, fontWeight:600, background:sel?color+'22':'transparent', border:`1px solid ${sel?color:' var(--border)'}`, color:sel?color:'var(--text-dim)', cursor:'pointer' }}>{a.avatar} {a.name}</span>
+            })}
+          </div>
+        </div>
+        <button onClick={createMeeting} disabled={!form.title} style={{ padding:'10px 0', borderRadius:8, background:form.title?'var(--accent)':'var(--navy-mid)', color:form.title?'#0B1929':'var(--text-dim)', border:'none', cursor:form.title?'pointer':'default', fontSize:13, fontWeight:600 }}>
+          Create Meeting
+        </button>
+      </div>
+    </div>
+  )
+
+  // ── List view ─────────────────────────────────────────────────────────────
+  return (
+    <div style={{ padding:'24px 28px' }}>
+      {view === 'list' && (
+        <div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
+            <div>
+              <div style={{ fontSize:18, fontWeight:700 }}>📋 Meeting Assistant</div>
+              <div style={{ fontSize:13, color:'var(--text-dim)' }}>Upload meeting transcripts and get domain-specific architect analyses</div>
+            </div>
+            <button onClick={()=>setView('create')} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'#0B1929', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>+ New Meeting</button>
+          </div>
+
+          {loading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:40 }}>Loading...</div> : meetings.length === 0 ? (
+            <div style={{ background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, padding:60, textAlign:'center' }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
+              <div style={{ fontSize:15, fontWeight:600, marginBottom:8 }}>No meetings yet</div>
+              <div style={{ fontSize:13, color:'var(--text-dim)', marginBottom:16 }}>Create a meeting, upload its transcript, and get analysis from multiple EA architects</div>
+              <button onClick={()=>setView('create')} style={{ padding:'8px 20px', borderRadius:8, background:'var(--accent)', color:'#0B1929', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>Create First Meeting</button>
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexDirection:'column' as const, gap:8 }}>
+              {meetings.map(m => (
+                <div key={m.id} onClick={async()=>{ const d=await api.get(`/copilot/meetings/${m.id}`); setSelected(d); setView('detail') }}
+                  style={{ background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, padding:'12px 16px', cursor:'pointer', display:'flex', alignItems:'center', gap:14, transition:'all 0.15s' }}
+                  onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--accent)')}
+                  onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}>
+                  <div style={{ width:40, height:40, borderRadius:10, background:'rgba(0,180,216,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>📋</div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontWeight:600 }}>{m.title}</div>
+                    <div style={{ fontSize:12, color:'var(--text-dim)', display:'flex', gap:8, marginTop:2 }}>
+                      <span>{new Date(m.createdAt).toLocaleDateString()}</span>
+                      <span>{m._count?.transcripts||0} transcript</span>
+                      <span>{m._count?.analyses||0} analyses</span>
+                    </div>
+                  </div>
+                  <span style={{ padding:'2px 10px', borderRadius:10, fontSize:11, fontWeight:600, background:(STATUS_COLOR[m.status]||'#7f8c8d')+'22', color:STATUS_COLOR[m.status]||'#7f8c8d' }}>{m.status}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {view === 'create' && renderCreate()}
+      {view === 'detail' && renderDetail()}
+    </div>
+  )
+}
+
 export default function CopilotPage() {
   const api = useApi()
   const [architects, setArchitects] = useState<Architect[]>([])
@@ -30,7 +317,7 @@ export default function CopilotPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [includeChief, setIncludeChief] = useState(true)
-  const [sidebarTab, setSidebarTab] = useState<'architects' | 'history'>('architects')
+  const [sidebarTab, setSidebarTab] = useState<'architects' | 'history' | 'meetings'>('architects')
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -255,9 +542,9 @@ export default function CopilotPage() {
 
         {/* Sidebar tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-          {(['architects', 'history'] as const).map(t => (
+          {(['architects', 'history', 'meetings'] as const).map(t => (
             <button key={t} style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', border: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSidebarTab(t)}>
-              {t === 'architects' ? '👥 Architects' : '🕐 History'}
+              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : '📋 Meetings'}
             </button>
           ))}
         </div>
@@ -320,6 +607,11 @@ export default function CopilotPage() {
       </div>
 
       {/* ── Main chat area ────────────────────────────────────────────────── */}
+      {sidebarTab === 'meetings' ? (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <MeetingAssistant api={api} architects={architects} />
+        </div>
+      ) : (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Chat header */}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, background: 'var(--navy-light)' }}>
@@ -457,6 +749,7 @@ export default function CopilotPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }
