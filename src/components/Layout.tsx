@@ -20,6 +20,7 @@ export default function Layout() {
           <NavLink to="/copilot" className={({isActive})=>`nav-item${isActive?' active':''}`}>💬 {t('nav.copilot')}</NavLink>
           <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Governance</NavLink>
           <NavLink to="/meta-model" className={({isActive})=>`nav-item${isActive?' active':''}`}>🧩 Meta-Model</NavLink>
+          <NavLink to="/ea-views" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗺 EA Views</NavLink>
           <NavLink to="/reports" className={({isActive})=>`nav-item${isActive?' active':''}`}>📊 {locale === 'AR' ? 'التقارير' : 'Reports'}</NavLink>
           <div className="nav-label" style={{marginTop:8}}>{t('nav.repo_section')}</div>
           <NavLink to="/repository" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗄 {t('nav.repository')}</NavLink>
