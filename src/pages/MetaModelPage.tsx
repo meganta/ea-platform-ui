@@ -1044,6 +1044,452 @@ function VersionsManager({ api }: { api: any }) {
   )
 }
 
+// ── Import Wizard ─────────────────────────────────────────────────────────────
+function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
+  const [step, setStep] = useState<'upload'|'validate'|'preview'|'confirm'|'done'>('upload')
+  const [file, setFile] = useState<File | null>(null)
+  const [validationResult, setValidationResult] = useState<any>(null)
+  const [mode, setMode] = useState<'MERGE'|'REPLACE'>('MERGE')
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState<any>(null)
+
+  const validate = async () => {
+    if (!file) return
+    setLoading(true)
+    const fd = new FormData(); fd.append('file', file)
+    const token = localStorage.getItem('ea_token') || ''
+    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'}/meta-model/import/validate`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+    const data = await res.json()
+    setValidationResult(data)
+    setStep('validate')
+    setLoading(false)
+  }
+
+  const doImport = async () => {
+    if (!file) return
+    setLoading(true)
+    const fd = new FormData(); fd.append('file', file); fd.append('mode', mode)
+    const token = localStorage.getItem('ea_token') || ''
+    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'}/meta-model/import`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+    const data = await res.json()
+    setResult(data); setStep('done')
+    setLoading(false)
+    if (data.success !== false) setTimeout(onDone, 2000)
+  }
+
+  const STEPS = ['upload', 'validate', 'preview', 'confirm', 'done']
+  const stepIdx = STEPS.indexOf(step)
+
+  return (
+    <div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>📥 Import Meta-Model</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>Import object types, domains, and relationships from JSON or CSV</div>
+
+      {/* Step indicator */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 28, alignItems: 'center' }}>
+        {['Upload', 'Validate', 'Preview', 'Confirm', 'Done'].map((s, i) => (
+          <React.Fragment key={s}>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4 }}>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: i <= stepIdx ? 'var(--accent)' : 'var(--navy-mid)', color: i <= stepIdx ? '#0B1929' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{i < stepIdx ? '✓' : i + 1}</div>
+              <div style={{ fontSize: 10, color: i === stepIdx ? 'var(--accent)' : 'var(--text-dim)' }}>{s}</div>
+            </div>
+            {i < 4 && <div style={{ flex: 1, height: 2, background: i < stepIdx ? 'var(--accent)' : 'var(--navy-mid)', margin: '0 4px', marginBottom: 16 }} />}
+          </React.Fragment>
+        ))}
+      </div>
+
+      {step === 'upload' && (
+        <div style={S.card}>
+          <div style={{ border: '2px dashed var(--border)', borderRadius: 10, padding: 40, textAlign: 'center', cursor: 'pointer', transition: 'all 0.15s' }}
+            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = 'var(--accent)' }}
+            onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
+            onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setFile(f) }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>📁</div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Drop file here or click to browse</div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Supported: JSON (full meta-model), CSV (object types only)</div>
+            <input type="file" accept=".json,.csv" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="mm-import-file" />
+            <label htmlFor="mm-import-file" style={{ ...S.btn(), cursor: 'pointer' }}>Browse File</label>
+          </div>
+          {file && (
+            <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--navy)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 18 }}>{file.name.endsWith('.json') ? '📄' : '📊'}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 500 }}>{file.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{(file.size / 1024).toFixed(1)} KB</div>
+              </div>
+              <button style={{ ...S.btn('danger'), fontSize: 12 }} onClick={() => setFile(null)}>✕</button>
+            </div>
+          )}
+          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(0,180,216,0.06)', borderRadius: 8, fontSize: 12, color: 'var(--text-dim)' }}>
+            <strong>JSON format:</strong> {`{ "metaModel": { "name": "...", "domains": [...], "objectTypes": [...], "relationships": [...] } }`}
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button style={S.btn('primary')} onClick={validate} disabled={!file || loading}>{loading ? '⏳ Validating...' : 'Next: Validate →'}</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'validate' && validationResult && (
+        <div style={S.card}>
+          <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
+            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>Errors</div><div style={{ fontSize: 28, fontWeight: 700, color: validationResult.errors?.length ? '#e74c3c' : '#2ecc71' }}>{validationResult.errors?.length || 0}</div></div>
+            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>Warnings</div><div style={{ fontSize: 28, fontWeight: 700, color: '#f39c12' }}>{validationResult.warnings?.length || 0}</div></div>
+            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>Object Types</div><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{validationResult.data?.metaModel?.objectTypes?.length || 0}</div></div>
+            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>Relationships</div><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{validationResult.data?.metaModel?.relationships?.length || 0}</div></div>
+          </div>
+          {validationResult.errors?.length > 0 && (
+            <div style={{ marginBottom: 12 }}>
+              {validationResult.errors.map((e: string, i: number) => <div key={i} style={{ padding: '8px 12px', background: '#e74c3c11', borderRadius: 6, borderLeft: '3px solid #e74c3c', fontSize: 12, marginBottom: 4 }}>❌ {e}</div>)}
+            </div>
+          )}
+          {validationResult.warnings?.map((w: string, i: number) => <div key={i} style={{ padding: '8px 12px', background: '#f39c1211', borderRadius: 6, borderLeft: '3px solid #f39c12', fontSize: 12, marginBottom: 4 }}>⚠ {w}</div>)}
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button style={S.btn()} onClick={() => setStep('upload')}>← Back</button>
+            <button style={S.btn('primary')} onClick={() => setStep('preview')} disabled={validationResult.errors?.length > 0}>Next: Preview →</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'preview' && validationResult?.data && (
+        <div style={S.card}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Preview — {validationResult.data.metaModel.name}</div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={S.label}>Domains ({validationResult.data.metaModel.domains?.length || 0})</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+              {validationResult.data.metaModel.domains?.map((d: any) => <span key={d.code} style={{ ...S.badge(d.color || '#3498db'), fontSize: 12 }}>{d.icon} {d.name}</span>)}
+            </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={S.label}>Object Types ({validationResult.data.metaModel.objectTypes?.length || 0})</div>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, maxHeight: 200, overflowY: 'auto' as const }}>
+              {validationResult.data.metaModel.objectTypes?.map((ot: any) => (
+                <div key={ot.code} style={{ fontSize: 12, padding: '4px 8px', background: 'var(--navy)', borderRadius: 4, display: 'flex', gap: 8 }}>
+                  <span>{ot.icon || '⬜'}</span><span style={{ fontWeight: 500 }}>{ot.name}</span><span style={{ color: 'var(--text-dim)' }}>{ot.domain}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={S.label}>Import Mode</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              {(['MERGE', 'REPLACE'] as const).map(m => (
+                <div key={m} onClick={() => setMode(m)} style={{ flex: 1, padding: '12px 16px', borderRadius: 8, border: `2px solid ${mode === m ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', background: mode === m ? 'rgba(0,180,216,0.08)' : 'transparent' }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{m === 'MERGE' ? '🔀 Merge' : '🔄 Replace'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{m === 'MERGE' ? 'Add new items, skip existing codes' : 'Clear draft and replace all content'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button style={S.btn()} onClick={() => setStep('validate')}>← Back</button>
+            <button style={S.btn('primary')} onClick={() => setStep('confirm')}>Next: Confirm →</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'confirm' && (
+        <div style={S.card}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Confirm Import</div>
+          <div style={{ padding: '14px 16px', background: mode === 'REPLACE' ? '#e74c3c11' : 'rgba(0,180,216,0.06)', borderRadius: 8, borderLeft: `3px solid ${mode === 'REPLACE' ? '#e74c3c' : 'var(--accent)'}`, marginBottom: 16, fontSize: 13 }}>
+            {mode === 'REPLACE' ? '⚠ REPLACE mode will clear all existing content in the draft version before importing.' : '✅ MERGE mode will add new items without affecting existing ones.'}
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button style={S.btn()} onClick={() => setStep('preview')}>← Back</button>
+            <button style={S.btn('primary')} onClick={doImport} disabled={loading}>{loading ? '⏳ Importing...' : `🚀 Import (${mode})`}</button>
+          </div>
+        </div>
+      )}
+
+      {step === 'done' && result && (
+        <div style={{ ...S.card, textAlign: 'center', padding: 40 }}>
+          {result.success === false ? <div style={{ color: '#e74c3c', fontSize: 18 }}>❌ Import failed<br /><span style={{ fontSize: 13 }}>{result.errors?.join(', ')}</span></div>
+            : <><div style={{ fontSize: 40, marginBottom: 12 }}>✅</div><div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Import Complete</div><div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{result.imported?.objectTypes || 0} object types · {result.imported?.domains || 0} domains imported</div></>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Export Panel ──────────────────────────────────────────────────────────────
+function ExportPanel({ api }: { api: any }) {
+  const download = async (fmt: 'json' | 'csv') => {
+    const token = localStorage.getItem('ea_token') || ''
+    const base = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const res = await fetch(`${base}/meta-model/export/${fmt}`, { headers: { Authorization: `Bearer ${token}` } })
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `meta-model.${fmt}`; document.body.appendChild(a); a.click()
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a) }, 1500)
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>📤 Export Meta-Model</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24 }}>Download your meta-model for backup, sharing, or use in other tools</div>
+      <div style={S.grid2}>
+        {[
+          { fmt: 'json' as const, icon: '📄', title: 'JSON Export', desc: 'Full meta-model including domains, object types, attributes, relationships and enum definitions. Use this for backup or migration.', badge: 'Recommended' },
+          { fmt: 'csv' as const, icon: '📊', title: 'CSV Export', desc: 'Object types only — code, name, domain, labels, icon, color. Use for spreadsheet review or bulk editing.', badge: 'Object Types Only' },
+        ].map(opt => (
+          <div key={opt.fmt} style={S.card}>
+            <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
+              <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(0,180,216,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{opt.icon}</div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{opt.title}</div>
+                <span style={S.badge('#3498db')}>{opt.badge}</span>
+              </div>
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.6 }}>{opt.desc}</div>
+            <button style={S.btn('primary')} onClick={() => download(opt.fmt)}>⬇ Download .{opt.fmt.toUpperCase()}</button>
+          </div>
+        ))}
+      </div>
+      <div style={{ ...S.card, marginTop: 16, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.7 }}>
+        <strong style={{ color: 'var(--text)' }}>💡 Tip:</strong> Export uses the current draft version. Publish the draft first if you want to export the official published meta-model.
+      </div>
+    </div>
+  )
+}
+
+// ── Enum Designer ─────────────────────────────────────────────────────────────
+function EnumDesigner({ api }: { api: any }) {
+  const [enums, setEnums] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [selected, setSelected] = useState<any>(null)
+  const [form, setForm] = useState({ code: '', name: '', nameAr: '', versionId: '', values: [{ code: '', label: '', labelAr: '', color: '#3498db' }] })
+  const [versionId, setVersionId] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const draft = await api.get('/meta-model/draft')
+    const vid = draft?.id || ''
+    setVersionId(vid)
+    if (vid) {
+      const data = await api.get(`/meta-model/enums?versionId=${vid}`)
+      setEnums(Array.isArray(data) ? data : [])
+    }
+    setLoading(false)
+  }, [api])
+
+  useEffect(() => { load() }, [load])
+
+  const addValue = () => setForm(f => ({ ...f, values: [...f.values, { code: '', label: '', labelAr: '', color: '#3498db' }] }))
+  const removeValue = (i: number) => setForm(f => ({ ...f, values: f.values.filter((_, vi) => vi !== i) }))
+  const updateValue = (i: number, field: string, val: string) => setForm(f => ({ ...f, values: f.values.map((v, vi) => vi === i ? { ...v, [field]: val } : v) }))
+
+  const save = async () => {
+    if (!form.code || !form.name || !versionId) return
+    await api.post('/meta-model/enums', { ...form, versionId })
+    setShowForm(false); setForm({ code: '', name: '', nameAr: '', versionId: '', values: [{ code: '', label: '', labelAr: '', color: '#3498db' }] })
+    load()
+  }
+
+  const COLORS = ['#3498db','#e67e22','#2ecc71','#9b59b6','#e74c3c','#1abc9c','#f39c12','#7f8c8d','#16a085','#c0392b']
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div><div style={{ fontSize: 18, fontWeight: 700 }}>Enum Definitions</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Define dropdown option sets used by ENUM attributes</div></div>
+        <button style={S.btn('primary')} onClick={() => { setShowForm(true); setSelected(null) }}>+ New Enum</button>
+      </div>
+
+      {showForm && (
+        <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>New Enum Definition</div>
+          <div style={S.grid2}>
+            <div><label style={S.label}>Code *</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g,'_') }))} placeholder="MATURITY_LEVEL" /></div>
+            <div><label style={S.label}>Name *</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Maturity Level" /></div>
+            <div style={{ gridColumn: '1/-1' }}><label style={S.label}>Arabic Name</label><input style={{ ...S.input, direction: 'rtl' }} value={form.nameAr} onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))} placeholder="مستوى النضج" /></div>
+          </div>
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={S.label}>Values</label>
+              <button style={{ ...S.btn(), fontSize: 11, padding: '3px 10px' }} onClick={addValue}>+ Add Value</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
+              {form.values.map((v, i) => (
+                <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input style={{ ...S.input, width: 120 }} value={v.code} onChange={e => updateValue(i, 'code', e.target.value.toUpperCase().replace(/\s+/g,'_'))} placeholder="CODE" />
+                  <input style={{ ...S.input, flex: 1 }} value={v.label} onChange={e => updateValue(i, 'label', e.target.value)} placeholder="Label" />
+                  <input style={{ ...S.input, flex: 1, direction: 'rtl' }} value={v.labelAr} onChange={e => updateValue(i, 'labelAr', e.target.value)} placeholder="التسمية" />
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    {COLORS.map(c => <div key={c} onClick={() => updateValue(i, 'color', c)} style={{ width: 16, height: 16, borderRadius: '50%', background: c, cursor: 'pointer', border: `2px solid ${v.color === c ? '#fff' : 'transparent'}` }} />)}
+                  </div>
+                  <button style={{ ...S.btn('danger'), padding: '3px 8px', fontSize: 12 }} onClick={() => removeValue(i)}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            <button style={S.btn()} onClick={() => setShowForm(false)}>Cancel</button>
+            <button style={S.btn('primary')} onClick={save}>Create Enum</button>
+          </div>
+        </div>
+      )}
+
+      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
+          {enums.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No enum definitions yet. Create one to use with ENUM-type attributes.</div>}
+          {enums.map((e: any) => (
+            <div key={e.id} style={{ ...S.card, cursor: 'pointer', transition: 'all 0.15s' }} onClick={() => setSelected(selected?.id === e.id ? null : e)}
+              onMouseEnter={ev => (ev.currentTarget.style.borderColor = 'var(--accent)')}
+              onMouseLeave={ev => (ev.currentTarget.style.borderColor = 'var(--border)')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600 }}>{e.name} {e.nameAr && <span style={{ color: 'var(--text-dim)', direction: 'rtl', fontSize: 13 }}>· {e.nameAr}</span>}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'monospace' }}>{e.code} · {e.values?.length || 0} values</div>
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  {e.values?.slice(0, 5).map((v: any) => <span key={v.code} style={{ ...S.badge(v.color || '#3498db'), fontSize: 11 }}>{v.label}</span>)}
+                  {e.values?.length > 5 && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>+{e.values.length - 5} more</span>}
+                </div>
+              </div>
+              {selected?.id === e.id && (
+                <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
+                  {e.values?.map((v: any) => (
+                    <div key={v.code} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '6px 10px', background: 'var(--navy)', borderRadius: 6 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: '50%', background: v.color || '#3498db', flexShrink: 0 }} />
+                      <span style={{ fontWeight: 500, flex: 1 }}>{v.label}</span>
+                      {v.labelAr && <span style={{ color: 'var(--text-dim)', direction: 'rtl', fontSize: 12 }}>{v.labelAr}</span>}
+                      <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'monospace' }}>{v.code}</span>
+                      {v.isDefault && <span style={{ ...S.badge('#2ecc71'), fontSize: 10 }}>Default</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Shared Attribute Library ──────────────────────────────────────────────────
+function SharedAttributeLibrary({ api }: { api: any }) {
+  const [attrs, setAttrs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filterType, setFilterType] = useState('')
+
+  useEffect(() => {
+    api.get('/meta-model/shared-attributes').then((d: any) => { setAttrs(Array.isArray(d) ? d : []); setLoading(false) })
+  }, [api])
+
+  const SYSTEM_ATTRS = [
+    { code: 'owner', name: 'Owner', nameAr: 'المالك', attributeType: 'USER', description: 'Person responsible for this element' },
+    { code: 'status', name: 'Status', nameAr: 'الحالة', attributeType: 'LIFECYCLE_STATUS', description: 'Current lifecycle status' },
+    { code: 'maturity', name: 'Maturity Level', nameAr: 'مستوى النضج', attributeType: 'MATURITY_SCORE', description: 'Maturity score 1-5' },
+    { code: 'tags', name: 'Tags', nameAr: 'الوسوم', attributeType: 'TEXT', description: 'Classification tags' },
+    { code: 'description', name: 'Description', nameAr: 'الوصف', attributeType: 'LONG_TEXT', description: 'Detailed description' },
+    { code: 'startDate', name: 'Start Date', nameAr: 'تاريخ البدء', attributeType: 'DATE', description: 'When this element became active' },
+    { code: 'endDate', name: 'End Date', nameAr: 'تاريخ الانتهاء', attributeType: 'DATE', description: 'When this element will be retired' },
+    { code: 'costCenter', name: 'Cost Center', nameAr: 'مركز التكلفة', attributeType: 'TEXT', description: 'Financial cost center code' },
+    { code: 'budget', name: 'Annual Budget', nameAr: 'الميزانية السنوية', attributeType: 'CURRENCY', description: 'Annual budget in SAR' },
+    { code: 'slaLevel', name: 'SLA Level', nameAr: 'مستوى الخدمة', attributeType: 'ENUM', description: 'Service level agreement tier' },
+    { code: 'riskLevel', name: 'Risk Level', nameAr: 'مستوى المخاطر', attributeType: 'ENUM', description: 'Risk exposure level' },
+    { code: 'dataClassification', name: 'Data Classification', nameAr: 'تصنيف البيانات', attributeType: 'ENUM', description: 'Confidential / Internal / Public' },
+    { code: 'ncaCompliance', name: 'NCA Compliance', nameAr: 'امتثال هيئة الأمن', attributeType: 'PERCENTAGE', description: 'NCA ECC compliance percentage' },
+    { code: 'vendor', name: 'Vendor', nameAr: 'المورّد', attributeType: 'TEXT', description: 'Vendor or supplier name' },
+    { code: 'version', name: 'Version', nameAr: 'الإصدار', attributeType: 'TEXT', description: 'Current version number' },
+  ]
+
+  const ATTR_TYPE_COLOR: Record<string, string> = { TEXT: '#3498db', LONG_TEXT: '#3498db', ENUM: '#e67e22', USER: '#9b59b6', DATE: '#f39c12', CURRENCY: '#2ecc71', PERCENTAGE: '#1abc9c', LIFECYCLE_STATUS: '#e67e22', MATURITY_SCORE: '#e74c3c' }
+  const allAttrs = [...SYSTEM_ATTRS, ...attrs.filter(a => !a.isSystem)]
+  const filtered = allAttrs.filter(a =>
+    (!search || a.name.toLowerCase().includes(search.toLowerCase()) || a.code.toLowerCase().includes(search.toLowerCase())) &&
+    (!filterType || a.attributeType === filterType)
+  )
+
+  return (
+    <div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>📚 Shared Attribute Library</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>Common attributes that can be added to any object type — ensures consistency across your meta-model</div>
+
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
+        <input style={{ ...S.input, maxWidth: 280 }} placeholder="🔍 Search attributes..." value={search} onChange={e => setSearch(e.target.value)} />
+        <select style={{ ...S.input, maxWidth: 180 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
+          <option value="">All Types</option>
+          {['TEXT','LONG_TEXT','ENUM','USER','DATE','CURRENCY','PERCENTAGE','LIFECYCLE_STATUS','MATURITY_SCORE'].map(t => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+        </select>
+        <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>{filtered.length} attributes</span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        {filtered.map(a => (
+          <div key={a.code} style={{ ...S.card, padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: ATTR_TYPE_COLOR[a.attributeType] || '#7f8c8d', flexShrink: 0, marginTop: 5 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{a.name}{a.nameAr && <span style={{ color: 'var(--text-dim)', fontWeight: 400, marginLeft: 6, direction: 'rtl', fontSize: 12 }}>{a.nameAr}</span>}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4, fontFamily: 'monospace' }}>{a.code}</div>
+              {a.description && <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{a.description}</div>}
+            </div>
+            <span style={{ ...S.badge(ATTR_TYPE_COLOR[a.attributeType] || '#7f8c8d'), flexShrink: 0, fontSize: 10 }}>{a.attributeType.replace(/_/g,' ')}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Audit History ─────────────────────────────────────────────────────────────
+function AuditHistory({ api }: { api: any }) {
+  const [logs, setLogs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [limit, setLimit] = useState(50)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    api.get(`/meta-model/audit?limit=${limit}`).then((d: any) => { setLogs(Array.isArray(d) ? d : []); setLoading(false) })
+  }, [api, limit])
+
+  useEffect(() => { load() }, [load])
+
+  const ACTION_COLOR: Record<string, string> = {
+    META_MODEL_CREATED: '#2ecc71', META_MODEL_IMPORTED: '#3498db',
+    DOMAIN_CREATED: '#3498db', DOMAIN_UPDATED: '#f39c12', DOMAIN_DELETED: '#e74c3c',
+    OBJECT_TYPE_CREATED: '#3498db', OBJECT_TYPE_UPDATED: '#f39c12', OBJECT_TYPE_DELETED: '#e74c3c',
+    ATTRIBUTE_CREATED: '#9b59b6', ATTRIBUTE_UPDATED: '#f39c12', ATTRIBUTE_DELETED: '#e74c3c',
+    RELATIONSHIP_CREATED: '#1abc9c', RELATIONSHIP_UPDATED: '#f39c12', RELATIONSHIP_DELETED: '#e74c3c',
+    VERSION_CREATED: '#3498db', VERSION_PUBLISHED: '#2ecc71',
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div><div style={{ fontSize: 18, fontWeight: 700 }}>Audit History</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Track all changes made to the meta-model</div></div>
+        <div style={S.row}>
+          <select style={{ ...S.input, maxWidth: 120 }} value={limit} onChange={e => setLimit(Number(e.target.value))}>
+            {[20, 50, 100, 200].map(l => <option key={l} value={l}>Last {l}</option>)}
+          </select>
+          <button style={S.btn()} onClick={load}>↻ Refresh</button>
+        </div>
+      </div>
+
+      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 2 }}>
+          {logs.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No audit logs yet</div>}
+          {logs.map((log, i) => (
+            <div key={log.id || i} style={{ padding: '10px 16px', background: i % 2 === 0 ? 'var(--navy-light)' : 'transparent', borderRadius: 6, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: ACTION_COLOR[log.action] || '#7f8c8d', flexShrink: 0, marginTop: 5 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: ACTION_COLOR[log.action] || 'var(--text)' }}>{log.action?.replace(/_/g,' ')}</span>
+                  <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{log.resourceType}</span>
+                  {log.resourceName && <span style={{ fontSize: 12 }}>{log.resourceName}</span>}
+                </div>
+                {log.userId && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>by {log.userId}</div>}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0, textAlign: 'right' }}>{log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MetaModelPage() {
   const api = useMetaApi()
@@ -1063,10 +1509,15 @@ export default function MetaModelPage() {
     { id: 'domains', label: '🗂 Domains' },
     { id: 'objects', label: '⬛ Object Types' },
     { id: 'relationships', label: '🔗 Relationships' },
+    { id: 'enums', label: '🏷 Enums' },
+    { id: 'shared-attrs', label: '📚 Shared Attrs' },
     { id: 'designer', label: '🎨 Designer' },
+    { id: 'import', label: '📥 Import' },
+    { id: 'export', label: '📤 Export' },
     { id: 'validation', label: '✅ Validation' },
     { id: 'ai', label: '🤖 AI Advisor' },
     { id: 'versions', label: '📋 Versions' },
+    { id: 'audit', label: '📜 Audit' },
   ]
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>Loading...</div>
@@ -1101,9 +1552,14 @@ export default function MetaModelPage() {
         {tab === 'objects' && selectedObjectType && <ObjectTypeEditor api={api} objectType={selectedObjectType} onBack={() => setSelectedObjectType(null)} />}
         {tab === 'relationships' && <RelationshipsManager api={api} />}
         {tab === 'designer' && <MetaModelDesigner api={api} />}
+        {tab === 'enums' && <EnumDesigner api={api} />}
+        {tab === 'shared-attrs' && <SharedAttributeLibrary api={api} />}
+        {tab === 'import' && <ImportWizard api={api} onDone={() => { setTab('objects'); }} />}
+        {tab === 'export' && <ExportPanel api={api} />}
         {tab === 'validation' && <ValidationPanel api={api} />}
         {tab === 'ai' && <AiAdvisor api={api} />}
         {tab === 'versions' && <VersionsManager api={api} />}
+        {tab === 'audit' && <AuditHistory api={api} />}
       </div>
     </div>
   )
