@@ -2336,22 +2336,54 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
             {/* National / Common Strategies — recommendations only, not scored */}
             {nationalObjectives.length > 0 && (
-              <div style={{ marginTop: 24, padding: '14px 16px', borderRadius: 10, background: '#f39c1210', border: '1px solid #f39c1233' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#f39c12', marginBottom: 4 }}>🌐 National Strategy Alignment — Recommendations Only</div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>These goals are from national/government strategies. They do not affect the review score but are shown as alignment recommendations.</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {nationalObjectives.map((o:any, i:number) => (
-                    <div key={i} style={{ padding: '8px 12px', borderRadius: 8, background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                      <span style={{ fontSize: 14, marginTop: 1 }}>{o.alignmentStatus === 'FULLY_ALIGNED' ? '✅' : o.alignmentStatus === 'PARTIALLY_ALIGNED' ? '⚠️' : o.alignmentStatus === 'NOT_APPLICABLE' ? '—' : '🔶'}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{o.objectiveName}</div>
-                        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>{o.strategyName} · {(o.strategyType||'').replace(/_/g,' ')}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{o.contributionDescription}</div>
-                        {o.expectedValue && <div style={{ fontSize: 11, color: '#f39c12', marginTop: 4 }}>💡 {o.expectedValue}</div>}
+              <div style={{ marginTop: 24, borderRadius: 12, background: '#f39c1208', border: '1px solid #f39c1230', overflow: 'hidden' }}>
+                {/* Header */}
+                <div style={{ padding: '12px 16px', background: '#f39c1215', borderBottom: '1px solid #f39c1225', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ fontSize: 18 }}>🌐</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#f39c12' }}>National Strategy Context</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>These national strategies provide context and direction. They are not scored — alignment is advisory and informational only.</div>
+                  </div>
+                </div>
+                {/* Objectives */}
+                <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {nationalObjectives.map((o:any, i:number) => {
+                    const natColor = o.alignmentStatus === 'FULLY_ALIGNED' ? '#2ecc71' : o.alignmentStatus === 'PARTIALLY_ALIGNED' ? '#f39c12' : o.alignmentStatus === 'WEAKLY_ALIGNED' ? '#e67e22' : '#8baac8'
+                    const natIcon = o.alignmentStatus === 'FULLY_ALIGNED' ? '✅' : o.alignmentStatus === 'PARTIALLY_ALIGNED' ? '⚠️' : o.alignmentStatus === 'WEAKLY_ALIGNED' ? '🔶' : '○'
+                    // Generate professional context statement when contribution is missing or for NOT_APPLICABLE
+                    const contextStatement = o.contributionDescription && o.contributionDescription !== 'N/A' && o.contributionDescription.length > 10
+                      ? o.contributionDescription
+                      : o.alignmentStatus === 'NOT_APPLICABLE'
+                        ? `This solution operates within a specific functional boundary and does not directly contribute to "${o.objectiveName}". This is expected for solutions of this type and does not indicate a gap or misalignment with national direction.`
+                        : o.alignmentStatus === 'FULLY_ALIGNED'
+                          ? `This solution directly supports "${o.objectiveName}" as a core contributor to the national agenda.`
+                          : `This solution has indirect relevance to "${o.objectiveName}". While not a primary contributor, it supports the broader national direction through its digital and governance capabilities.`
+                    return (
+                      <div key={i} style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--navy-dark)', border: '1px solid ' + natColor + '33', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <span style={{ fontSize: 14, marginTop: 2, color: natColor }}>{natIcon}</span>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{o.objectiveName}</div>
+                            {o.alignmentStatus !== 'NOT_APPLICABLE' && (
+                              <div style={{ fontSize: 12, fontWeight: 700, color: natColor }}>{o.alignmentPercentage || 0}%</div>
+                            )}
+                            {o.alignmentStatus === 'NOT_APPLICABLE' && (
+                              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8', fontWeight: 600 }}>No Direct Impact</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#f39c12', marginBottom: 6 }}>
+                            {o.strategyName || (o.strategyType||'').replace(/_/g,' ')}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, fontStyle: o.alignmentStatus === 'NOT_APPLICABLE' ? 'italic' : 'normal' }}>
+                            {contextStatement}
+                          </div>
+                          {o.expectedValue && o.expectedValue !== 'N/A' && (
+                            <div style={{ fontSize: 11, color: '#f39c12', marginTop: 6 }}>💡 {o.expectedValue}</div>
+                          )}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#f39c12', minWidth: 36, textAlign: 'right' }}>{o.alignmentPercentage}%</div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
