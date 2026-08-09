@@ -1859,6 +1859,31 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             )}
           </div>
 
+          {/* Review-type specific sections */}
+          {(report as any).additionalSections && (() => {
+            const sec = (report as any).additionalSections
+            const sections = [
+              { key: 'businessCase',       label: '💼 Business Case Assessment',      color: '#2ecc71' },
+              { key: 'roadmapAssessment',  label: '🗺 Implementation Roadmap',        color: '#3498db' },
+              { key: 'proposalQuality',    label: '📋 Proposal Quality Assessment',   color: '#9b59b6' },
+              { key: 'evaluationSummary',  label: '⚖️ Evaluation Summary',           color: '#e67e22' },
+              { key: 'vendorRisk',         label: '🔒 Vendor & Technology Risk',      color: '#e74c3c' },
+              { key: 'apiAssessment',      label: '🔌 API & Integration Assessment',  color: '#1abc9c' },
+              { key: 'iamAssessment',      label: '🛡 Security & IAM Assessment',     color: '#e74c3c' },
+            ].filter(s => sec[s.key])
+            if (!sections.length) return null
+            return (
+              <div style={{ marginBottom: 16 }}>
+                {sections.map(s => (
+                  <div key={s.key} style={{ background: 'var(--navy-mid)', border: '1px solid ' + s.color + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: s.color, marginBottom: 8 }}>{s.label}</div>
+                    <div style={{ fontSize: 13, lineHeight: 1.7 }}>{sec[s.key]}</div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
           {/* 2. Finding severity snapshot */}
           {(() => {
             const crit = findings.filter(f => f.severity === 'CRITICAL')
