@@ -1879,7 +1879,18 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               { key: 'impactAssessment',      label: '💥 Change Impact Assessment',            color: '#e74c3c' },
               { key: 'rollbackAssessment',    label: '↩️ Rollback Plan Assessment',           color: '#e67e22' },
               { key: 'testCoverageAssessment',label: '🧪 Test Coverage Assessment',            color: '#3498db' },
-              { key: 'changeRecommendation',  label: '🎯 Change Recommendation',              color: '#2ecc71' },
+              { key: 'changeRecommendation',    label: '🎯 Change Recommendation',              color: '#2ecc71' },
+              // BUSINESS_DEMAND sections
+              { key: 'prioritizationRecommendation', label: '🏷 Prioritization Recommendation',     color: '#2ecc71' },
+              { key: 'duplicationCheck',             label: '🔍 Capability Duplication Check',      color: '#3498db' },
+              { key: 'feasibilitySnapshot',          label: '⚙️ Feasibility Snapshot',              color: '#e67e22' },
+              { key: 'demandStrength',               label: '💪 Business Case Strength',            color: '#9b59b6' },
+              // RFP_SOW sections
+              { key: 'completenessAssessment',       label: '📋 Document Completeness Assessment',  color: '#3498db' },
+              { key: 'requirementsQuality',          label: '📐 Requirements Quality Assessment',   color: '#9b59b6' },
+              { key: 'securityComplianceCoverage',   label: '🛡 Security & Compliance Coverage',    color: '#e74c3c' },
+              { key: 'slaAssessment',                label: '⏱ SLA & Performance Requirements',    color: '#1abc9c' },
+              { key: 'procurementRisk',              label: '⚠️ Procurement Risk Assessment',       color: '#e74c3c' },
             ].filter(s => sec[s.key])
             if (!sections.length) return null
             return (
