@@ -635,6 +635,8 @@ export default function GovernancePage() {
   const [filterStatus, setFilterStatus] = useState('')
   const [filterDecision, setFilterDecision] = useState('')
   const [filterType, setFilterType] = useState('')
+  const [filterAgg, setFilterAgg] = useState('')
+  const [filterScoreMin, setFilterScoreMin] = useState('')
   const [filterSearch, setFilterSearch] = useState('')
   const [review, setReview] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -750,6 +752,9 @@ export default function GovernancePage() {
     if (filterStatus && r.status !== filterStatus) return false
     if (filterDecision && r.decision !== filterDecision) return false
     if (filterType && r.reviewType !== filterType) return false
+    if (filterAgg && r.aggressiveness !== filterAgg) return false
+    if (filterScoreMin === '0') { if ((r.overallScore || 0) >= 45) return false }
+    else if (filterScoreMin && (r.overallScore || 0) < Number(filterScoreMin)) return false
     if (filterSearch && !r.title?.toLowerCase().includes(filterSearch.toLowerCase())) return false
     return true
   })
@@ -917,9 +922,33 @@ export default function GovernancePage() {
           <option value=''>All Types</option>
           <option value='HLD_REVIEW'>HLD Review</option>
           <option value='LLD_REVIEW'>LLD Review</option>
+          <option value='SOLUTION_DESIGN'>Solution Design</option>
+          <option value='NEW_PROJECT'>New Project</option>
+          <option value='RFP_SOW'>RFP / SOW</option>
+          <option value='CHANGE_REQUEST'>Change Request</option>
+          <option value='CAB_REVIEW'>CAB Review</option>
+          <option value='DIGITAL_INITIATIVE'>Digital Initiative</option>
+          <option value='TECHNICAL_PROPOSAL'>Technical Proposal</option>
+          <option value='BUSINESS_DEMAND'>Business Demand</option>
         </select>
-        {(filterStatus || filterDecision || filterType || filterSearch) && (
-          <button onClick={() => { setFilterStatus(''); setFilterDecision(''); setFilterType(''); setFilterSearch('') }}
+        <select value={filterAgg} onChange={e => setFilterAgg(e.target.value)}
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
+          <option value=''>All Modes</option>
+          <option value='ADVISORY'>Advisory</option>
+          <option value='STANDARD'>Standard</option>
+          <option value='STRICT'>Strict</option>
+          <option value='EXECUTIVE'>Executive</option>
+        </select>
+        <select value={filterScoreMin} onChange={e => setFilterScoreMin(e.target.value)}
+          style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
+          <option value=''>Any Score</option>
+          <option value='75'>≥ 75 (Good)</option>
+          <option value='60'>≥ 60 (Acceptable)</option>
+          <option value='45'>≥ 45 (Needs Work)</option>
+          <option value='0'>≤ 44 (Critical)</option>
+        </select>
+        {(filterStatus || filterDecision || filterType || filterSearch || filterAgg || filterScoreMin) && (
+          <button onClick={() => { setFilterStatus(''); setFilterDecision(''); setFilterType(''); setFilterSearch(''); setFilterAgg(''); setFilterScoreMin('') }}
             style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer' }}>
             ✕ Clear
           </button>
