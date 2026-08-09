@@ -34,6 +34,16 @@ export default function CopilotPage() {
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
+  // ── Voice state ───────────────────────────────────────────────────────────
+  const [voiceMode, setVoiceMode] = useState(false)
+  const [recording, setRecording] = useState(false)
+  const [voiceLoading, setVoiceLoading] = useState(false)
+  const [ttsEnabled, setTtsEnabled] = useState(true)
+  const [voiceLanguage, setVoiceLanguage] = useState<'en'|'ar'|''>('')
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null)
+
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
   // Load architects
@@ -91,6 +101,91 @@ export default function CopilotPage() {
       }
     }
   }, [api.token])
+
+  // ── Voice functions ──────────────────────────────────────────────────────
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg'
+      const mr = new MediaRecorder(stream, { mimeType })
+      audioChunksRef.current = []
+      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      mr.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        await processVoiceTurn(blob, mimeType)
+      }
+      mr.start(100) // collect in 100ms chunks
+      mediaRecorderRef.current = mr
+      setRecording(true)
+    } catch (e: any) {
+      alert('Microphone access denied. Please allow microphone access to use voice mode.')
+    }
+  }
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && recording) {
+      mediaRecorderRef.current.stop()
+      setRecording(false)
+    }
+  }
+
+  const processVoiceTurn = async (blob: Blob, mimeType: string) => {
+    setVoiceLoading(true)
+    try {
+      // Add a "processing" indicator
+      const processingId = Date.now() + 'v'
+      setMessages(m => [...m, { id: processingId + 'u', role: 'user', content: '🎤 Processing audio...', timestamp: new Date() }])
+
+      const fd = new FormData()
+      fd.append('audio', blob, 'recording.' + (mimeType.includes('webm') ? 'webm' : 'ogg'))
+      fd.append('architectCode', selectedArchitect?.code || 'CHIEF')
+      if (activeConvId) fd.append('conversationId', activeConvId)
+      if (voiceLanguage) fd.append('language', voiceLanguage)
+      fd.append('ttsEnabled', ttsEnabled ? 'true' : 'false')
+
+      const res = await fetch(`${API}/copilot/voice/turn`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${api.token}` },
+        body: fd,
+      })
+      const data = await res.json()
+
+      if (data.error || !data.userText) {
+        setMessages(m => m.map(msg => msg.id === processingId + 'u' ? { ...msg, content: '🎤 ' + (data.message || 'Could not transcribe audio') } : msg))
+        return
+      }
+
+      // Update user message with transcription
+      setMessages(m => m.map(msg => msg.id === processingId + 'u' ? { ...msg, content: '🎤 ' + data.userText } : msg))
+
+      // Add architect response
+      const arch = selectedArchitect
+      setMessages(m => [...m, {
+        id: processingId + 'a', role: 'architect', content: data.architectText,
+        architectCode: arch?.code, architectName: arch?.name, architectAvatar: arch?.avatar,
+        timestamp: new Date(),
+      }])
+
+      if (data.conversationId) setActiveConvId(data.conversationId)
+
+      // Play TTS audio if available
+      if (data.audioBase64 && ttsEnabled) {
+        const audioData = `data:audio/mpeg;base64,${data.audioBase64}`
+        if (audioPlayerRef.current) {
+          audioPlayerRef.current.src = audioData
+          audioPlayerRef.current.play().catch(() => {})
+        }
+      }
+
+      refreshConversations()
+    } catch (e: any) {
+      console.error('Voice turn error:', e)
+      setMessages(m => [...m, { id: Date.now() + 'err', role: 'system', content: 'Voice processing failed: ' + e.message, timestamp: new Date() }])
+    } finally {
+      setVoiceLoading(false)
+    }
+  }
 
   // ── Send message ──────────────────────────────────────────────────────────
   const send = async () => {
@@ -308,15 +403,57 @@ export default function CopilotPage() {
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
               placeholder={mode === 'single' ? `Ask ${selectedArchitect?.name || 'the architect'}... (Enter to send, Shift+Enter for newline)` : 'Ask all selected architects...'}
               rows={2} style={{ flex: 1, padding: '10px 14px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5 }} />
-            <button onClick={send} disabled={loading || !input.trim()}
+            <button onClick={() => setVoiceMode(v => !v)} title="Toggle voice mode"
+            style={{ padding: '10px 14px', borderRadius: 10, background: voiceMode ? '#e74c3c22' : 'var(--navy-mid)', color: voiceMode ? '#e74c3c' : 'var(--text-dim)', border: `1px solid ${voiceMode ? '#e74c3c44' : 'var(--border)'}`, cursor: 'pointer', fontSize: 18 }}>
+            🎤
+          </button>
+          <button onClick={send} disabled={loading || !input.trim()}
               style={{ padding: '10px 20px', borderRadius: 10, background: loading || !input.trim() ? 'var(--navy-mid)' : 'var(--accent)', color: loading || !input.trim() ? 'var(--text-dim)' : '#0B1929', border: 'none', cursor: loading || !input.trim() ? 'default' : 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>
               {loading ? '...' : 'Send ↵'}
             </button>
           </div>
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, display: 'flex', gap: 16 }}>
+          {/* Hidden audio player for TTS */}
+        <audio ref={audioPlayerRef} style={{ display: 'none' }} />
+
+        {/* Voice controls */}
+        {voiceMode && (
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, padding: '10px 14px', background: 'var(--navy)', borderRadius: 10, border: '1px solid var(--border)' }}>
+            <button
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              onTouchStart={e => { e.preventDefault(); startRecording() }}
+              onTouchEnd={e => { e.preventDefault(); stopRecording() }}
+              disabled={voiceLoading}
+              style={{ width: 56, height: 56, borderRadius: '50%', border: 'none', background: recording ? '#e74c3c' : voiceLoading ? 'var(--navy-mid)' : 'var(--accent)', color: recording ? '#fff' : '#0B1929', cursor: voiceLoading ? 'default' : 'pointer', fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', boxShadow: recording ? '0 0 0 8px #e74c3c33' : 'none', flexShrink: 0 }}>
+              {voiceLoading ? '⏳' : recording ? '⏹' : '🎤'}
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: recording ? '#e74c3c' : voiceLoading ? 'var(--text-dim)' : 'var(--text)' }}>
+                {voiceLoading ? 'Processing...' : recording ? 'Recording — release to send' : 'Hold 🎤 to record'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+                Speaking to: {selectedArchitect?.avatar} {selectedArchitect?.name || 'Chief Architect'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6, alignItems: 'flex-end' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={ttsEnabled} onChange={e => setTtsEnabled(e.target.checked)} style={{ width: 12, height: 12 }} />
+                Voice reply
+              </label>
+              <select value={voiceLanguage} onChange={e => setVoiceLanguage(e.target.value as any)} style={{ fontSize: 11, padding: '2px 6px', background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>
+                <option value="">Auto detect</option>
+                <option value="en">English</option>
+                <option value="ar">Arabic</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, display: 'flex', gap: 16 }}>
             <span>Domain architects use ⚡ Haiku (low cost)</span>
             <span>Chief Architect uses 🧠 Sonnet (synthesis only)</span>
             <span>Context cached 5 min</span>
+            {voiceMode && <span>🎤 Whisper STT + TTS-1 (low cost)</span>}
           </div>
         </div>
       </div>
