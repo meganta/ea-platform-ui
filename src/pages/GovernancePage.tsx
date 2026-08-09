@@ -1868,8 +1868,18 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               { key: 'proposalQuality',    label: '📋 Proposal Quality Assessment',   color: '#9b59b6' },
               { key: 'evaluationSummary',  label: '⚖️ Evaluation Summary',           color: '#e67e22' },
               { key: 'vendorRisk',         label: '🔒 Vendor & Technology Risk',      color: '#e74c3c' },
-              { key: 'apiAssessment',      label: '🔌 API & Integration Assessment',  color: '#1abc9c' },
-              { key: 'iamAssessment',      label: '🛡 Security & IAM Assessment',     color: '#e74c3c' },
+              { key: 'apiAssessment',         label: '🔌 API & Integration Assessment',        color: '#1abc9c' },
+              { key: 'iamAssessment',         label: '🛡 Security & IAM Assessment',           color: '#e74c3c' },
+              { key: 'innovationAssessment',  label: '💡 Innovation & Technology Assessment',  color: '#f39c12' },
+              { key: 'changeReadiness',       label: '🔄 Change Readiness Assessment',         color: '#9b59b6' },
+              { key: 'dgaAlignment',          label: '🏛 DGA Interoperability Alignment',      color: '#3498db' },
+              { key: 'portfolioAnalysis',     label: '📊 Portfolio & Capability Analysis',     color: '#1abc9c' },
+              { key: 'feasibilityAssessment', label: '⚙️ Feasibility Assessment',             color: '#e67e22' },
+              { key: 'projectRecommendation', label: '✅ Project Recommendation',              color: '#2ecc71' },
+              { key: 'impactAssessment',      label: '💥 Change Impact Assessment',            color: '#e74c3c' },
+              { key: 'rollbackAssessment',    label: '↩️ Rollback Plan Assessment',           color: '#e67e22' },
+              { key: 'testCoverageAssessment',label: '🧪 Test Coverage Assessment',            color: '#3498db' },
+              { key: 'changeRecommendation',  label: '🎯 Change Recommendation',              color: '#2ecc71' },
             ].filter(s => sec[s.key])
             if (!sections.length) return null
             return (
