@@ -13,6 +13,7 @@ import SettingsPage from './pages/SettingsPage'
 import GovernancePage from './pages/GovernancePage'
 import MetaModelPage from './pages/MetaModelPage'
 import EaViewsPage from './pages/EaViewsPage'
+import ConnectorHubPage from './pages/ConnectorHubPage'
 import ReportsPage from './pages/ReportsPage'
 import './styles.css'
 
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="governance" element={<GovernancePage />} />
               <Route path="meta-model" element={<MetaModelPage />} />
               <Route path="ea-views" element={<EaViewsPage />} />
+              <Route path="connector-hub" element={<ConnectorHubPage />} />
               <Route path="reports" element={<ReportsPage />} />
             </Route>
           </Routes>
