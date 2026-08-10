@@ -2436,6 +2436,16 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                           {o.expectedValue && o.expectedValue !== 'N/A' && (
                             <div style={{ fontSize: 11, color: '#f39c12', marginTop: 6 }}>💡 {o.expectedValue}</div>
                           )}
+                          {/* Edit controls — matches the pattern used for tenant objectives above and every other tab */}
+                          <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <select value={o.alignmentStatus} onChange={async e => {
+                              const newPct = e.target.value === 'FULLY_ALIGNED' ? 100 : e.target.value === 'PARTIALLY_ALIGNED' ? 65 : e.target.value === 'WEAKLY_ALIGNED' ? 35 : 0
+                              await updateObjective(localObjectives.indexOf(o), { alignmentStatus: e.target.value, alignmentPercentage: e.target.value === 'NOT_APPLICABLE' ? 0 : newPct })
+                            }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + natColor + '44', background: natColor + '18', color: natColor, cursor: 'pointer' }}>
+                              {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                            </select>
+                            <button onClick={async () => { await removeObjective(localObjectives.indexOf(o)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: 'auto' }}>✕ Remove</button>
+                          </div>
                         </div>
                       </div>
                     )
