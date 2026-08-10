@@ -50,7 +50,7 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
     })
   }, [])
 
-  const categories = [...new Set(viewpoints.map(v => v.category))]
+  const categories = Array.from(new Set(viewpoints.map(v => v.category)))
   const filtered = viewpoints.filter(v => !filterCat || v.category === filterCat)
 
   return (
