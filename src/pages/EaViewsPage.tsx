@@ -465,8 +465,6 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
     </div>
   )
 
-  const HEATMAP_STATUS: Record<string,string> = { APPROVED:'#2ecc71', ACTIVE:'#2ecc71', UNDER_REVIEW:'#f39c12', DRAFT:'#e67e22', DEPRECATED:'#e74c3c', PLANNED:'#3498db' }
-
   return (
     <div>
       {/* Toolbar */}
