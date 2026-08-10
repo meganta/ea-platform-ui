@@ -545,7 +545,17 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
   const STATES = ['CURRENT','TARGET','TRANSITION','BASELINE','PLANNED']
   const CATS = ['Business','Application','Data','Technology','Security','Cross-Domain','Strategic','Governance','Custom']
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string
+    description: string
+    category: string
+    visualization: string
+    architectureState: string
+    rootObjectTypes: string[]
+    relatedObjectTypes: string[]
+    domains: string[]
+    viewpointId: string | undefined
+  }>({
     name: viewpoint?.name || '',
     description: viewpoint?.description || '',
     category: viewpoint?.category || 'Custom',
@@ -639,10 +649,10 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
               <div><div style={S.label}>Visualization</div><div style={{ fontSize:13 }}>{VIZ_ICONS[form.visualization]} {form.visualization.replace(/_/g,' ')}</div></div>
               <div><div style={S.label}>State</div><div style={{ ...S.badge(STATE_COLOR[form.architectureState]||'#7f8c8d'), display:'inline-flex' }}>{form.architectureState}</div></div>
               <div><div style={S.label}>Primary Types</div><div style={{ display:'flex', gap:4, flexWrap:'wrap' as const }}>
-                {form.rootObjectTypes.length ? form.rootObjectTypes.map(t=><span key={t} style={{ ...S.badge(TYPE_COLOR[t]||'#3498db'), fontSize:10 }}>{t.replace(/_/g,' ')}</span>) : <span style={{ fontSize:12, color:'var(--text-dim)' }}>None selected</span>}
+                {form.rootObjectTypes.length ? form.rootObjectTypes.map((t: string)=><span key={t} style={{ ...S.badge(TYPE_COLOR[t]||'#3498db'), fontSize:10 }}>{t.replace(/_/g,' ')}</span>) : <span style={{ fontSize:12, color:'var(--text-dim)' }}>None selected</span>}
               </div></div>
               <div><div style={S.label}>Domains</div><div style={{ display:'flex', gap:4, flexWrap:'wrap' as const }}>
-                {form.domains.length ? form.domains.map(d=><span key={d} style={{ ...S.badge(DOMAIN_COLOR[d]||'#3498db'), fontSize:10 }}>{d}</span>) : <span style={{ fontSize:12, color:'var(--text-dim)' }}>All domains</span>}
+                {form.domains.length ? form.domains.map((d: string)=><span key={d} style={{ ...S.badge(DOMAIN_COLOR[d]||'#3498db'), fontSize:10 }}>{d}</span>) : <span style={{ fontSize:12, color:'var(--text-dim)' }}>All domains</span>}
               </div></div>
             </div>
             <button style={{ ...S.btn('primary'), width:'100%', marginTop:16 }} onClick={save} disabled={!form.name||saving}>{saving?'Creating...':'✅ Create View'}</button>
