@@ -631,6 +631,8 @@ export default function GovernancePage() {
   const { isAR } = useLang()
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
   const [reviews, setReviews] = useState<any[]>([])
+  const [reviewsTotal, setReviewsTotal] = useState(0)
+  const [loadingMore, setLoadingMore] = useState(false)
   const location = useLocation()
   const [filterStatus, setFilterStatus] = useState('')
   const [filterDecision, setFilterDecision] = useState('')
@@ -767,11 +769,27 @@ export default function GovernancePage() {
   const totalPages = Math.ceil(filteredReviews.length / PAGE_SIZE)
   const paginatedReviews = filteredReviews.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
+  const LOAD_LIMIT = 100
   const loadReviews = async () => {
     setLoading(true)
-    try { const data = await api.get('/governance/reviews'); setReviews(data) }
+    try {
+      const res = await api.get('/governance/reviews?page=1&limit=' + LOAD_LIMIT)
+      setReviews(res?.data || [])
+      setReviewsTotal(res?.total ?? (res?.data || []).length)
+    }
     catch (e) { setError('Failed to load reviews') }
     finally { setLoading(false) }
+  }
+
+  const loadMoreReviews = async () => {
+    setLoadingMore(true)
+    try {
+      const nextPage = Math.floor(reviews.length / LOAD_LIMIT) + 1
+      const res = await api.get('/governance/reviews?page=' + nextPage + '&limit=' + LOAD_LIMIT)
+      setReviews(prev => [...prev, ...(res?.data || [])])
+    }
+    catch (e) { /* non-fatal — user can retry */ }
+    finally { setLoadingMore(false) }
   }
 
   // Handle deep-link from Reports page — auto-open specific review at specific tab
@@ -781,6 +799,13 @@ export default function GovernancePage() {
     const target = reviews.find((r: any) => r.id === state.reviewId)
     if (target) {
       openReview(target).then(() => { if (state.tab) setTab(state.tab as any) })
+      window.history.replaceState({}, '')
+    } else {
+      // Not in the currently-loaded page window (pagination means we no
+      // longer always load every review) — fetch it directly by id instead.
+      api.get('/governance/reviews/' + state.reviewId).then((r: any) => {
+        if (r) { openReview(r).then(() => { if (state.tab) setTab(state.tab as any) }) }
+      }).catch(() => {})
       window.history.replaceState({}, '')
     }
   }, [location.state, reviews])
@@ -962,7 +987,7 @@ export default function GovernancePage() {
           </button>
         )}
         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-          {filteredReviews.length}/{reviews.length} reviews{totalPages > 1 ? ` · page ${page}/${totalPages}` : ''}
+          {filteredReviews.length}/{reviews.length}{reviewsTotal > reviews.length ? ` of ${reviewsTotal}` : ''} reviews{totalPages > 1 ? ` · page ${page}/${totalPages}` : ''}
         </span>
       </div>
 
@@ -979,6 +1004,29 @@ export default function GovernancePage() {
           </div>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 16 }}>
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: page <= 1 ? 'var(--text-muted)' : 'var(--text)', cursor: page <= 1 ? 'default' : 'pointer', opacity: page <= 1 ? 0.5 : 1 }}>
+            ← Previous
+          </button>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Page {page} of {totalPages}</span>
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
+            style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: page >= totalPages ? 'var(--text-muted)' : 'var(--text)', cursor: page >= totalPages ? 'default' : 'pointer', opacity: page >= totalPages ? 0.5 : 1 }}>
+            Next →
+          </button>
+        </div>
+      )}
+
+      {reviewsTotal > reviews.length && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+          <button onClick={loadMoreReviews} disabled={loadingMore}
+            style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: loadingMore ? 'default' : 'pointer', fontSize: 12 }}>
+            {loadingMore ? 'Loading…' : `Load more (${reviewsTotal - reviews.length} remaining)`}
+          </button>
+        </div>
+      )}
     </div>
   )
 

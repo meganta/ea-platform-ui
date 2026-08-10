@@ -29,8 +29,8 @@ export default function DashboardPage() {
     api.getDocuments().then(setDocs).catch(() => {})
     const token = getToken() || ''
     // Load reviews list for recent reviews section
-    fetch(GOV_API + '/governance/reviews', { headers: { Authorization: 'Bearer ' + token } })
-      .then(r => r.json()).then((r: any) => setReviews(Array.isArray(r) ? r : [])).catch(() => {})
+    fetch(GOV_API + '/governance/reviews?page=1&limit=10', { headers: { Authorization: 'Bearer ' + token } })
+      .then(r => r.json()).then((r: any) => setReviews(Array.isArray(r?.data) ? r.data : (Array.isArray(r) ? r : []))).catch(() => {})
     // Load aggregated stats from dedicated endpoint
     fetch(GOV_API + '/governance/stats', { headers: { Authorization: 'Bearer ' + token } })
       .then(r => r.json()).then(setGovStats).catch(() => {})
