@@ -1,4 +1,4 @@
-const API_BASE = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+export const API_BASE = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 let authToken: string | null = localStorage.getItem('ea_token')
 export const setToken = (t: string) => { authToken = t; localStorage.setItem('ea_token', t) }
 export const clearToken = () => { authToken = null; localStorage.removeItem('ea_token') }

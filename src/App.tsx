@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LangProvider } from './contexts/LangContext'
+import { BrandingProvider } from './contexts/BrandingContext'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import Layout from './components/Layout'
@@ -28,6 +29,7 @@ export default function App() {
   return (
     <LangProvider>
       <AuthProvider>
+        <BrandingProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
@@ -47,6 +49,7 @@ export default function App() {
             </Route>
           </Routes>
         </BrowserRouter>
+        </BrandingProvider>
       </AuthProvider>
     </LangProvider>
   )

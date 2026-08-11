@@ -1,16 +1,23 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
+import { useBranding } from '../contexts/BrandingContext'
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const { t, locale, setLocale } = useLang()
+  const { branding, logoUrl } = useBranding()
+  const [logoFailed, setLogoFailed] = useState(false)
   const nav = useNavigate()
+  const orgName = locale === 'AR' ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
   return (
     <div className="layout">
       <div className="sidebar">
         <div className="sidebar-logo">
-          <div className="logo-text">EA Platform</div>
+          {logoUrl && !logoFailed
+            ? <img src={logoUrl} alt={orgName || 'Logo'} style={{ maxHeight: 32, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />
+            : <div className="logo-text">{orgName || 'EA Platform'}</div>}
           <div className="logo-sub">{locale === 'AR' ? 'هندسة المؤسسات' : 'Enterprise Architecture'}</div>
         </div>
         <nav className="sidebar-nav">

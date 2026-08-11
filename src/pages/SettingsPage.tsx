@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
+import { useBranding } from '../contexts/BrandingContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -12,6 +13,7 @@ function useApi() {
 
 
 function BrandingTab() {
+  const { previewAccentColor, reload: reloadGlobalBranding } = useBranding()
   const [form, setForm] = useState({ organizationNameEn: '', organizationNameAr: '', primaryColor: '#00b4d8', secondaryColor: '#1a2332', accentColor: '#f39c12', fontFamily: '' })
   const [saving, setSaving] = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -30,14 +32,24 @@ function BrandingTab() {
         setHasFavicon(!!b.faviconStorageKey)
       }
     })
+    // Revert any unsaved live-preview color when leaving this tab.
+    return () => previewAccentColor(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const updateAccentColor = (color: string) => {
+    setForm(f => ({ ...f, accentColor: color }))
+    previewAccentColor(color) // live preview across the real app shell, not persisted until Save
+  }
 
   const save = async () => {
     setSaving(true); setMsg(null)
     try {
       const updated = await authFetch('/branding', { method: 'PUT', body: JSON.stringify(form) })
-      if (updated?.id) setMsg({ type: 'success', text: 'Branding saved' })
-      else setMsg({ type: 'error', text: 'Failed to save' })
+      if (updated?.id) {
+        setMsg({ type: 'success', text: 'Branding saved' })
+        reloadGlobalBranding() // pulls the now-persisted color as the new baseline
+      } else setMsg({ type: 'error', text: 'Failed to save' })
     } finally { setSaving(false) }
   }
 
@@ -111,12 +123,12 @@ function BrandingTab() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          {[['primaryColor', 'Primary Color'], ['secondaryColor', 'Secondary Color'], ['accentColor', 'Accent Color']].map(([k, l]) => (
+          {[['primaryColor', 'Primary Color'], ['secondaryColor', 'Secondary Color'], ['accentColor', 'Accent Color (live preview)']].map(([k, l]) => (
             <div key={k}>
               <div style={{ fontSize: 11, marginBottom: 3 }}>{l}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="color" value={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} style={{ width: 36, height: 30, border: 'none', background: 'none', cursor: 'pointer' }} />
-                <input className="form-input" value={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} style={{ flex: 1, fontSize: 11, fontFamily: 'var(--font-mono)' }} />
+                <input type="color" value={(form as any)[k]} onChange={e => k === 'accentColor' ? updateAccentColor(e.target.value) : setForm(f => ({ ...f, [k as string]: e.target.value }))} style={{ width: 36, height: 30, border: 'none', background: 'none', cursor: 'pointer' }} />
+                <input className="form-input" value={(form as any)[k]} onChange={e => k === 'accentColor' ? updateAccentColor(e.target.value) : setForm(f => ({ ...f, [k as string]: e.target.value }))} style={{ flex: 1, fontSize: 11, fontFamily: 'var(--font-mono)' }} />
               </div>
             </div>
           ))}
