@@ -12,24 +12,57 @@ function useApi() {
 
 
 function BrandingTab() {
-  const [form, setForm] = useState({ organizationNameEn: '', organizationNameAr: '', primaryColor: '#00b4d8', accentColor: '#f39c12', logoUrl: '' })
+  const [form, setForm] = useState({ organizationNameEn: '', organizationNameAr: '', primaryColor: '#00b4d8', secondaryColor: '#1a2332', accentColor: '#f39c12', fontFamily: '' })
   const [saving, setSaving] = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingFavicon, setUploadingFavicon] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [hasLogo, setHasLogo] = useState(false)
+  const [hasFavicon, setHasFavicon] = useState(false)
+  const [logoCacheBust, setLogoCacheBust] = useState(Date.now())
+  const [faviconCacheBust, setFaviconCacheBust] = useState(Date.now())
 
   useEffect(() => {
-    authFetch('/config').then(c => {
-      const b = c.ai?.branding || {}
-      setForm(f => ({ ...f, ...b }))
+    authFetch('/branding').then(b => {
+      if (b) {
+        setForm(f => ({ ...f, ...b }))
+        setHasLogo(!!b.logoStorageKey)
+        setHasFavicon(!!b.faviconStorageKey)
+      }
     })
   }, [])
 
   const save = async () => {
     setSaving(true); setMsg(null)
     try {
-      const res = await authFetch('/config/branding', { method: 'PUT', body: JSON.stringify(form) })
-      if (res.message) setMsg({ type: 'success', text: 'Branding saved' })
+      const updated = await authFetch('/branding', { method: 'PUT', body: JSON.stringify(form) })
+      if (updated?.id) setMsg({ type: 'success', text: 'Branding saved' })
       else setMsg({ type: 'error', text: 'Failed to save' })
     } finally { setSaving(false) }
+  }
+
+  const uploadAsset = async (kind: 'logo' | 'favicon', file: File) => {
+    const setUploading = kind === 'logo' ? setUploadingLogo : setUploadingFavicon
+    setUploading(true); setMsg(null)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const res = await fetch(`${API_URL_LOCAL}/branding/${kind}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token()}` }, // no Content-Type — browser sets multipart boundary itself
+        body,
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setMsg({ type: 'success', text: `${kind === 'logo' ? 'Logo' : 'Favicon'} uploaded` })
+        if (kind === 'logo') { setHasLogo(true); setLogoCacheBust(Date.now()) }
+        else { setHasFavicon(true); setFaviconCacheBust(Date.now()) }
+      } else {
+        setMsg({ type: 'error', text: data?.message || `Failed to upload ${kind}` })
+      }
+    } catch (e) {
+      setMsg({ type: 'error', text: `Upload failed: ${(e as Error).message}` })
+    } finally { setUploading(false) }
   }
 
   return (
@@ -37,31 +70,63 @@ function BrandingTab() {
       <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>🎨 Branding</div>
       <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Customize the platform appearance for your organization</div>
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {[['organizationNameEn', 'Organization Name (EN)', 'text', false], ['organizationNameAr', 'Organization Name (AR)', 'text', true], ['logoUrl', 'Logo URL', 'url', false]].map(([k, l, t, rtl]) => (
+          {[['organizationNameEn', 'Organization Name (EN)', false], ['organizationNameAr', 'Organization Name (AR)', true]].map(([k, l, rtl]) => (
             <div key={k as string}>
               <div style={{ fontSize: 11, marginBottom: 3 }}>{l as string}</div>
-              <input className="form-input" type={t as string} value={(form as any)[k as string]} onChange={e => setForm(f => ({ ...f, [k as string]: e.target.value }))} style={{ width: '100%', fontSize: 11, direction: rtl ? 'rtl' : 'ltr' }} />
+              <input className="form-input" type="text" value={(form as any)[k as string] || ''} onChange={e => setForm(f => ({ ...f, [k as string]: e.target.value }))} style={{ width: '100%', fontSize: 11, direction: rtl ? 'rtl' : 'ltr' }} />
             </div>
           ))}
         </div>
+
+        {/* Logo & Favicon upload */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {[['primaryColor', 'Primary Color'], ['accentColor', 'Accent Color']].map(([k, l]) => (
+          <div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Logo</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              {hasLogo
+                ? <img src={`${API_URL_LOCAL}/branding/logo?t=${logoCacheBust}`} alt="Logo" style={{ maxHeight: 40, maxWidth: 100, objectFit: 'contain' }} />
+                : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No logo uploaded</div>}
+              <label className="btn btn-secondary" style={{ fontSize: 11, cursor: 'pointer', marginLeft: 'auto' }}>
+                {uploadingLogo ? 'Uploading…' : 'Upload'}
+                <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" style={{ display: 'none' }} disabled={uploadingLogo}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadAsset('logo', f); e.target.value = '' }} />
+              </label>
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>Favicon</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+              {hasFavicon
+                ? <img src={`${API_URL_LOCAL}/branding/favicon?t=${faviconCacheBust}`} alt="Favicon" style={{ maxHeight: 24, maxWidth: 24, objectFit: 'contain' }} />
+                : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No favicon uploaded</div>}
+              <label className="btn btn-secondary" style={{ fontSize: 11, cursor: 'pointer', marginLeft: 'auto' }}>
+                {uploadingFavicon ? 'Uploading…' : 'Upload'}
+                <input type="file" accept="image/png,image/x-icon,image/svg+xml" style={{ display: 'none' }} disabled={uploadingFavicon}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadAsset('favicon', f); e.target.value = '' }} />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+          {[['primaryColor', 'Primary Color'], ['secondaryColor', 'Secondary Color'], ['accentColor', 'Accent Color']].map(([k, l]) => (
             <div key={k}>
               <div style={{ fontSize: 11, marginBottom: 3 }}>{l}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <input type="color" value={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} style={{ width: 40, height: 32, border: 'none', background: 'none', cursor: 'pointer' }} />
+                <input type="color" value={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} style={{ width: 36, height: 30, border: 'none', background: 'none', cursor: 'pointer' }} />
                 <input className="form-input" value={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))} style={{ flex: 1, fontSize: 11, fontFamily: 'var(--font-mono)' }} />
-                <div style={{ width: 32, height: 32, borderRadius: 4, background: (form as any)[k], border: '1px solid var(--border)' }} />
               </div>
             </div>
           ))}
         </div>
-        {form.logoUrl && <div style={{ padding: 12, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', display: 'flex', alignItems: 'center', gap: 12 }}>
-          <img src={form.logoUrl} alt="Logo preview" style={{ maxHeight: 48, maxWidth: 120, objectFit: 'contain' }} onError={e => (e.currentTarget.style.display = 'none')} />
-          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Logo preview</div>
-        </div>}
+
+        <div>
+          <div style={{ fontSize: 11, marginBottom: 3 }}>Font Family (optional — CSS font-family value)</div>
+          <input className="form-input" placeholder="e.g. 'Inter', 'IBM Plex Sans Arabic', sans-serif" value={form.fontFamily || ''} onChange={e => setForm(f => ({ ...f, fontFamily: e.target.value }))} style={{ width: '100%', fontSize: 11 }} />
+        </div>
+
         <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Branding'}</button>
       </div>
     </div>
