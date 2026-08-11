@@ -45,12 +45,12 @@ const CONNECTOR_TYPES = [
   { code: 'BIZZDESIGN',      name: 'Bizzdesign Horizzon', icon: '🔷', color: '#2ecc71', desc: 'Import/export via Bizzdesign API', fileOnly: false },
   { code: 'GENERIC_CSV',     name: 'Generic CSV',       icon: '📊', color: '#7f8c8d', desc: 'Import any CSV file with column mapping', fileOnly: true },
   { code: 'GENERIC_JSON',    name: 'Generic JSON',      icon: '📄', color: '#7f8c8d', desc: 'ArchMind canonical JSON format', fileOnly: true },
-  { code: 'ENTRA_ID',        name: 'Microsoft Entra ID', icon: '🔑', color: '#0078d4', desc: 'Users, groups, and enterprise apps via Microsoft Graph', fileOnly: false, comingSoon: true },
-  { code: 'GENERIC_CMDB',    name: 'Generic CMDB',      icon: '🗄', color: '#5d6d7e', desc: 'Any CMDB exposing a REST/OData API', fileOnly: false, comingSoon: true },
+  { code: 'ENTRA_ID',        name: 'Microsoft Entra ID', icon: '🔑', color: '#0078d4', desc: 'Users, groups, and enterprise apps via Microsoft Graph', fileOnly: false },
+  { code: 'GENERIC_CMDB',    name: 'Generic CMDB',      icon: '🗄', color: '#5d6d7e', desc: 'Any CMDB exposing a REST/OData API (requires endpoint configuration)', fileOnly: false },
   { code: 'CLOUD_PROVIDER',  name: 'Cloud Provider',    icon: '☁️', color: '#f39c12', desc: 'Cloud resource inventory (AWS/Azure/GCP)', fileOnly: false, comingSoon: true },
-  { code: 'API_MANAGEMENT',  name: 'API Management',    icon: '🔌', color: '#8e44ad', desc: 'API gateway/management platform catalog discovery', fileOnly: false, comingSoon: true },
-  { code: 'DATA_CATALOG',    name: 'Data Catalog',      icon: '📚', color: '#16a085', desc: 'Data governance/catalog platform asset discovery', fileOnly: false, comingSoon: true },
-  { code: 'PPM_TOOL',        name: 'PPM Tool',          icon: '📅', color: '#2980b9', desc: 'Project & portfolio management tool initiative data', fileOnly: false, comingSoon: true },
+  { code: 'API_MANAGEMENT',  name: 'API Management',    icon: '🔌', color: '#8e44ad', desc: 'API gateway/management platform catalog discovery (requires endpoint configuration)', fileOnly: false },
+  { code: 'DATA_CATALOG',    name: 'Data Catalog',      icon: '📚', color: '#16a085', desc: 'Data governance/catalog platform asset discovery (requires endpoint configuration)', fileOnly: false },
+  { code: 'PPM_TOOL',        name: 'PPM Tool',          icon: '📅', color: '#2980b9', desc: 'Project & portfolio management tool initiative data (requires endpoint configuration)', fileOnly: false },
 ]
 
 const STATUS_COLOR: Record<string, string> = { ACTIVE: '#2ecc71', INACTIVE: '#7f8c8d', ERROR: '#e74c3c', SYNCING: '#f39c12' }
@@ -277,9 +277,15 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
     SERVICENOW_CMDB: [{ label: 'Username', key: 'username' }, { label: 'Password', key: 'password', type: 'password' }],
     MEGA_HOPEX: [{ label: 'API Key', key: 'apiKey', type: 'password' }, { label: 'API Secret', key: 'apiSecret', type: 'password' }],
     BIZZDESIGN: [{ label: 'Username', key: 'username' }, { label: 'Password', key: 'password', type: 'password' }],
+    ENTRA_ID: [{ label: 'App Client ID', key: 'clientId' }, { label: 'Client Secret', key: 'clientSecret', type: 'password' }],
+    GENERIC_CMDB: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
+    API_MANAGEMENT: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
+    DATA_CATALOG: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
+    PPM_TOOL: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
   }
 
   const credFields = CRED_FIELDS[connector.connectorType] || []
+  const isGenericRestType = ['GENERIC_CMDB', 'API_MANAGEMENT', 'DATA_CATALOG', 'PPM_TOOL'].includes(connector.connectorType)
 
   return (
     <div>
@@ -363,6 +369,16 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
               <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(0,180,216,0.06)', borderRadius: 8 }}>
                 🔒 Credentials are encrypted with AES-256-GCM before storage. They are never stored in plaintext.
               </div>
+              {isGenericRestType && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(243,156,18,0.08)', borderRadius: 8 }}>
+                  ⚠️ This connector type also requires <code>authType</code>, <code>baseUrl</code>, and <code>resources</code> (per-object-type endpoint paths and field names) to be set in the connector's config — there's no dedicated editor for this yet. Contact your platform admin to set it via the API directly (<code>PUT /connectors/:id</code>, <code>config</code> field) until a config editor UI is built.
+                </div>
+              )}
+              {connector.connectorType === 'ENTRA_ID' && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(243,156,18,0.08)', borderRadius: 8 }}>
+                  ⚠️ This connector also requires your Entra ID tenant (directory) ID set as <code>config.tenantId</code> — no dedicated editor for this yet, set via <code>PUT /connectors/:id</code> directly. The app registration needs application-level Graph API permissions (User.Read.All, Group.Read.All, Application.Read.All) with admin consent granted.
+                </div>
+              )}
               {credFields.map(f => (
                 <div key={f.key}>
                   <label style={S.label}>{f.label}</label>
