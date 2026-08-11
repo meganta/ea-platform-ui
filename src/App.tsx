@@ -16,6 +16,7 @@ import MetaModelPage from './pages/MetaModelPage'
 import EaViewsPage from './pages/EaViewsPage'
 import ConnectorHubPage from './pages/ConnectorHubPage'
 import ReportsPage from './pages/ReportsPage'
+import SharedViewPage from './pages/SharedViewPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/shared/:token" element={<SharedViewPage />} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<DashboardPage />} />
               <Route path="adm" element={<AdmPage />} />
