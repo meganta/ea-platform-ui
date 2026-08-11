@@ -45,6 +45,12 @@ const CONNECTOR_TYPES = [
   { code: 'BIZZDESIGN',      name: 'Bizzdesign Horizzon', icon: '🔷', color: '#2ecc71', desc: 'Import/export via Bizzdesign API', fileOnly: false },
   { code: 'GENERIC_CSV',     name: 'Generic CSV',       icon: '📊', color: '#7f8c8d', desc: 'Import any CSV file with column mapping', fileOnly: true },
   { code: 'GENERIC_JSON',    name: 'Generic JSON',      icon: '📄', color: '#7f8c8d', desc: 'ArchMind canonical JSON format', fileOnly: true },
+  { code: 'ENTRA_ID',        name: 'Microsoft Entra ID', icon: '🔑', color: '#0078d4', desc: 'Users, groups, and enterprise apps via Microsoft Graph', fileOnly: false, comingSoon: true },
+  { code: 'GENERIC_CMDB',    name: 'Generic CMDB',      icon: '🗄', color: '#5d6d7e', desc: 'Any CMDB exposing a REST/OData API', fileOnly: false, comingSoon: true },
+  { code: 'CLOUD_PROVIDER',  name: 'Cloud Provider',    icon: '☁️', color: '#f39c12', desc: 'Cloud resource inventory (AWS/Azure/GCP)', fileOnly: false, comingSoon: true },
+  { code: 'API_MANAGEMENT',  name: 'API Management',    icon: '🔌', color: '#8e44ad', desc: 'API gateway/management platform catalog discovery', fileOnly: false, comingSoon: true },
+  { code: 'DATA_CATALOG',    name: 'Data Catalog',      icon: '📚', color: '#16a085', desc: 'Data governance/catalog platform asset discovery', fileOnly: false, comingSoon: true },
+  { code: 'PPM_TOOL',        name: 'PPM Tool',          icon: '📅', color: '#2980b9', desc: 'Project & portfolio management tool initiative data', fileOnly: false, comingSoon: true },
 ]
 
 const STATUS_COLOR: Record<string, string> = { ACTIVE: '#2ecc71', INACTIVE: '#7f8c8d', ERROR: '#e74c3c', SYNCING: '#f39c12' }
@@ -149,15 +155,15 @@ function NewConnector({ api, onCreated, onCancel }: { api: any, onCreated: (c: a
       {step === 'pick' && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           {CONNECTOR_TYPES.map(ct => (
-            <div key={ct.code} onClick={() => { setSelectedType(ct); setForm(f => ({ ...f, name: ct.name, direction: ct.fileOnly ? 'IMPORT' : 'BIDIRECTIONAL' })); setStep('configure') }}
-              style={{ ...S.card, cursor: 'pointer', transition: 'all 0.15s' }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = ct.color)}
+            <div key={ct.code} onClick={() => { if (ct.comingSoon) return; setSelectedType(ct); setForm(f => ({ ...f, name: ct.name, direction: ct.fileOnly ? 'IMPORT' : 'BIDIRECTIONAL' })); setStep('configure') }}
+              style={{ ...S.card, cursor: ct.comingSoon ? 'default' : 'pointer', opacity: ct.comingSoon ? 0.5 : 1, transition: 'all 0.15s' }}
+              onMouseEnter={e => { if (!ct.comingSoon) e.currentTarget.style.borderColor = ct.color }}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
               <div style={{ display: 'flex', gap: 12, marginBottom: 10 }}>
                 <div style={{ width: 44, height: 44, borderRadius: 10, background: ct.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{ct.icon}</div>
                 <div>
                   <div style={{ fontWeight: 700 }}>{ct.name}</div>
-                  {ct.fileOnly ? <span style={S.badge('#7f8c8d')}>File-based</span> : <span style={S.badge('#2ecc71')}>API Sync</span>}
+                  {ct.comingSoon ? <span style={S.badge('#f39c12')}>Coming Soon</span> : ct.fileOnly ? <span style={S.badge('#7f8c8d')}>File-based</span> : <span style={S.badge('#2ecc71')}>API Sync</span>}
                 </div>
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.5 }}>{ct.desc}</div>
@@ -211,7 +217,7 @@ function NewConnector({ api, onCreated, onCancel }: { api: any, onCreated: (c: a
 // ── Connector Detail ──────────────────────────────────────────────────────────
 function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, connector: any, onBack: () => void, onRefresh: () => void }) {
   const [detail, setDetail] = useState<any>(connector)
-  const [tab, setTab] = useState<'overview' | 'credentials' | 'mappings' | 'jobs'>('overview')
+  const [tab, setTab] = useState<'overview' | 'credentials' | 'mappings' | 'staging' | 'jobs'>('overview')
   const [creds, setCreds] = useState<any>({})
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -313,9 +319,9 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-        {(['overview', 'credentials', 'mappings', 'jobs'] as const).map(t => (
+        {(['overview', 'credentials', 'mappings', 'staging', 'jobs'] as const).map(t => (
           <button key={t} style={S.tab(tab === t)} onClick={() => setTab(t)}>
-            {t === 'overview' ? '📋 Overview' : t === 'credentials' ? '🔐 Credentials' : t === 'mappings' ? '🗺 Mappings' : `📊 Sync Jobs (${jobs.length})`}
+            {t === 'overview' ? '📋 Overview' : t === 'credentials' ? '🔐 Credentials' : t === 'mappings' ? '🗺 Mappings' : t === 'staging' ? '📥 Staging' : `📊 Sync Jobs (${jobs.length})`}
           </button>
         ))}
       </div>
@@ -369,18 +375,9 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
         </div>
       )}
 
-      {tab === 'mappings' && (
-        <div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
-            Define how object types in {ct?.name} map to ArchMind asset types. Default mappings are applied automatically.
-          </div>
-          <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>
-            <div style={{ fontSize: 20, marginBottom: 8 }}>🗺</div>
-            <div>Default mappings are pre-configured for {ct?.name}.</div>
-            <div style={{ marginTop: 8, fontSize: 12 }}>Custom field mapping UI coming in next sprint.</div>
-          </div>
-        </div>
-      )}
+      {tab === 'mappings' && <MappingsTab api={api} connectorId={connector.id} connectorTypeName={ct?.name} />}
+
+      {tab === 'staging' && <StagingTab api={api} connectorId={connector.id} />}
 
       {tab === 'jobs' && (
         <div>
@@ -406,6 +403,239 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
             </div>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── Mappings Tab (Data Sync Studio) ─────────────────────────────────────────
+const TRANSFORMS = ['NONE', 'UPPERCASE', 'LOWERCASE', 'TRIM', 'DATE_ISO', 'ENUM_MAP']
+
+function MappingsTab({ api, connectorId, connectorTypeName }: { api: any, connectorId: string, connectorTypeName?: string }) {
+  const [mappings, setMappings] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [editing, setEditing] = useState<any>(null) // the mapping being edited, or a fresh draft
+  const [discovered, setDiscovered] = useState<string[]>([])
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    api.get(`/connectors/${connectorId}/mappings`).then((d: any) => { setMappings(Array.isArray(d) ? d : []); setLoading(false) })
+  }, [api, connectorId])
+  useEffect(() => { load() }, [load])
+
+  const startNew = () => setEditing({ sourceType: '', targetType: '', direction: 'BIDIRECTIONAL', fieldMaps: [{ sourceField: '', targetField: '', transform: 'NONE' }] })
+  const startEdit = (m: any) => setEditing({ ...m, fieldMaps: [...(m.fieldMaps || [])] })
+
+  const discoverFields = async (objectTypeCode: string) => {
+    if (!objectTypeCode) return
+    const fields = await api.get(`/connectors/${connectorId}/staging-fields/${objectTypeCode}`)
+    setDiscovered(Array.isArray(fields) ? fields : [])
+  }
+
+  const addFieldRow = () => setEditing((e: any) => ({ ...e, fieldMaps: [...e.fieldMaps, { sourceField: '', targetField: '', transform: 'NONE' }] }))
+  const updateFieldRow = (i: number, patch: any) => setEditing((e: any) => ({ ...e, fieldMaps: e.fieldMaps.map((fm: any, idx: number) => idx === i ? { ...fm, ...patch } : fm) }))
+  const removeFieldRow = (i: number) => setEditing((e: any) => ({ ...e, fieldMaps: e.fieldMaps.filter((_: any, idx: number) => idx !== i) }))
+
+  const save = async () => {
+    if (!editing.sourceType || !editing.targetType) return alert('Source type and target type are required')
+    setSaving(true)
+    // The save endpoint replaces the FULL mapping set for this connector —
+    // merge the edited/new mapping into the existing list by sourceType.
+    const others = mappings.filter(m => m.sourceType !== editing.sourceType)
+    const next = [...others, editing]
+    await api.post(`/connectors/${connectorId}/mappings`, { mappings: next })
+    setSaving(false); setEditing(null); load()
+  }
+
+  const deleteMapping = async (sourceType: string) => {
+    if (!window.confirm(`Delete the mapping for "${sourceType}"?`)) return
+    const next = mappings.filter(m => m.sourceType !== sourceType)
+    await api.post(`/connectors/${connectorId}/mappings`, { mappings: next })
+    load()
+  }
+
+  if (loading) return <div style={{ color: 'var(--text-dim)', padding: 20 }}>Loading…</div>
+
+  if (editing) {
+    return (
+      <div style={{ maxWidth: 720 }}>
+        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={S.grid2}>
+            <div>
+              <label style={S.label}>Source Type (external field, e.g. "User" or an Entra ID object type)</label>
+              <input style={S.input} value={editing.sourceType} onChange={e => setEditing((v: any) => ({ ...v, sourceType: e.target.value }))} placeholder="e.g. Application" />
+            </div>
+            <div>
+              <label style={S.label}>Target Type (ArchMind object type code)</label>
+              <input style={S.input} value={editing.targetType} onChange={e => setEditing((v: any) => ({ ...v, targetType: e.target.value }))} placeholder="e.g. APPLICATION" />
+            </div>
+          </div>
+          <div>
+            <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => discoverFields(editing.targetType)}>🔍 Discover fields from staged data</button>
+            {discovered.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>Found: {discovered.join(', ')}</div>}
+          </div>
+
+          <div style={{ fontWeight: 600, fontSize: 13, marginTop: 4 }}>Field Mappings</div>
+          {editing.fieldMaps.map((fm: any, i: number) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 8, alignItems: 'center' }}>
+              <input style={S.input} placeholder="Source field" value={fm.sourceField} onChange={e => updateFieldRow(i, { sourceField: e.target.value })} list="discovered-fields" />
+              <input style={S.input} placeholder="Target field" value={fm.targetField} onChange={e => updateFieldRow(i, { targetField: e.target.value })} />
+              <select style={S.input} value={fm.transform || 'NONE'} onChange={e => updateFieldRow(i, { transform: e.target.value })}>
+                {TRANSFORMS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <button style={{ ...S.btn('danger'), fontSize: 11, padding: '6px 10px' }} onClick={() => removeFieldRow(i)}>✕</button>
+            </div>
+          ))}
+          <datalist id="discovered-fields">{discovered.map(f => <option key={f} value={f} />)}</datalist>
+          <button style={{ ...S.btn(), alignSelf: 'flex-start' }} onClick={addFieldRow}>+ Add Field</button>
+
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? 'Saving…' : '💾 Save Mapping'}</button>
+            <button style={S.btn()} onClick={() => setEditing(null)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
+        Define how object types in {connectorTypeName || 'this source'} map to ArchMind asset fields. Used by the mapping engine when processing staged records.
+      </div>
+      <button style={{ ...S.btn('primary'), marginBottom: 16 }} onClick={startNew}>+ New Mapping</button>
+      {mappings.length === 0 ? (
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No field mappings configured yet.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {mappings.map(m => (
+            <div key={m.id || m.sourceType} style={{ ...S.card, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{m.sourceType} → {m.targetType}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{(m.fieldMaps || []).length} field(s) mapped</div>
+              </div>
+              <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => startEdit(m)}>Edit</button>
+              <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => deleteMapping(m.sourceType)}>Delete</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Staging Tab (Data Sync Studio) ──────────────────────────────────────────
+const MATCH_STATUS_COLOR: Record<string, string> = { PENDING: '#7f8c8d', MATCHED: '#2ecc71', NEW: '#3498db', CONFLICT: '#e74c3c', IGNORED: '#7f8c8d' }
+
+function StagingTab({ api, connectorId }: { api: any, connectorId: string }) {
+  const [objectTypeCode, setObjectTypeCode] = useState('')
+  const [summary, setSummary] = useState<any[]>([])
+  const [records, setRecords] = useState<any[]>([])
+  const [statusFilter, setStatusFilter] = useState('')
+  const [running, setRunning] = useState(false)
+  const [autoCommit, setAutoCommit] = useState(false)
+
+  const loadSummary = useCallback(() => {
+    api.get(`/connectors/${connectorId}/staging/summary`).then((d: any) => setSummary(Array.isArray(d) ? d : []))
+  }, [api, connectorId])
+  useEffect(() => { loadSummary() }, [loadSummary])
+
+  const objectTypes = [...new Set(summary.map((s: any) => s.objectTypeCode))]
+
+  const loadRecords = useCallback(() => {
+    if (!objectTypeCode) { setRecords([]); return }
+    const q = new URLSearchParams({ objectTypeCode, ...(statusFilter ? { matchStatus: statusFilter } : {}) })
+    api.get(`/connectors/${connectorId}/staging?${q}`).then((d: any) => setRecords(Array.isArray(d) ? d : []))
+  }, [api, connectorId, objectTypeCode, statusFilter])
+  useEffect(() => { loadRecords() }, [loadRecords])
+
+  const runPipeline = async () => {
+    if (!objectTypeCode) return alert('Select an object type first')
+    setRunning(true)
+    const result = await api.post(`/connectors/${connectorId}/pipeline/${objectTypeCode}`, { autoCommit })
+    setRunning(false)
+    alert(`Pipeline complete: ${result.mapped ?? 0} mapped · ${result.matched ?? 0} matched · ${result.conflicts ?? 0} conflicts · ${result.new ?? 0} new${result.committed ? ` · ${result.committed.created} created, ${result.committed.updated} updated` : ''}`)
+    loadSummary(); loadRecords()
+  }
+
+  const resolveConflict = async (stagingRecordId: string, matchedAssetId?: string, markAsNew?: boolean) => {
+    await api.post(`/connectors/staging/${stagingRecordId}/resolve-match`, { matchedAssetId, markAsNew })
+    loadRecords(); loadSummary()
+  }
+
+  const commitRecord = async (stagingRecordId: string) => {
+    const result = await api.post(`/connectors/staging/${stagingRecordId}/commit`)
+    if (result?.assetId) { loadRecords(); loadSummary() } else { alert(result?.message || 'Commit failed') }
+  }
+
+  const commitAll = async () => {
+    if (!objectTypeCode) return
+    const result = await api.post(`/connectors/${connectorId}/staging/${objectTypeCode}/commit-all`)
+    alert(`Committed: ${result.created} created, ${result.updated} updated${result.errors?.length ? `, ${result.errors.length} error(s)` : ''}`)
+    loadRecords(); loadSummary()
+  }
+
+  const summaryForType = summary.filter((s: any) => s.objectTypeCode === objectTypeCode)
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
+        Records land here after being pulled/imported from the source, before being committed into the EA Repository. Run the pipeline to map, match, and (optionally) auto-commit.
+      </div>
+
+      <div style={{ ...S.card, marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' as const }}>
+        <div style={{ minWidth: 200 }}>
+          <label style={S.label}>Object Type</label>
+          <select style={S.input} value={objectTypeCode} onChange={e => setObjectTypeCode(e.target.value)}>
+            <option value="">Select…</option>
+            {objectTypes.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginTop: 16 }}>
+          <input type="checkbox" checked={autoCommit} onChange={e => setAutoCommit(e.target.checked)} /> Auto-commit high-confidence matches
+        </label>
+        <button style={{ ...S.btn('primary'), marginTop: 16 }} onClick={runPipeline} disabled={running || !objectTypeCode}>{running ? '⏳ Running…' : '▶ Run Pipeline'}</button>
+        <button style={{ ...S.btn(), marginTop: 16 }} onClick={commitAll} disabled={!objectTypeCode}>✅ Commit All Ready</button>
+      </div>
+
+      {objectTypeCode && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {['PENDING', 'MATCHED', 'NEW', 'CONFLICT'].map(status => {
+            const count = summaryForType.find((s: any) => s.matchStatus === status)?._count || 0
+            return (
+              <button key={status} style={{ ...S.statCard, cursor: 'pointer', flex: 1, textAlign: 'center', border: statusFilter === status ? `1px solid ${MATCH_STATUS_COLOR[status]}` : undefined }} onClick={() => setStatusFilter(statusFilter === status ? '' : status)}>
+                <div style={{ fontSize: 20, fontWeight: 700, color: MATCH_STATUS_COLOR[status] }}>{count}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{status}</div>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
+      {objectTypeCode && (
+        records.length === 0 ? (
+          <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No staged records{statusFilter ? ` with status ${statusFilter}` : ''}.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {records.map((r: any) => (
+              <div key={r.id} style={{ ...S.card, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <span style={S.badge(MATCH_STATUS_COLOR[r.matchStatus])}>{r.matchStatus}</span>
+                <div style={{ flex: 1, fontSize: 12 }}>
+                  <div style={{ fontWeight: 500 }}>{r.mappedData?.name || r.rawData?.name || r.externalId}</div>
+                  {r.matchConfidence != null && <div style={{ color: 'var(--text-dim)', fontSize: 11 }}>Confidence: {Math.round(r.matchConfidence * 100)}%</div>}
+                </div>
+                {r.matchStatus === 'CONFLICT' && (
+                  <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => resolveConflict(r.id, undefined, true)}>Mark as New</button>
+                )}
+                {(r.matchStatus === 'MATCHED' || r.matchStatus === 'NEW') && !r.reviewedAt && (
+                  <button style={{ ...S.btn('primary'), fontSize: 11 }} onClick={() => commitRecord(r.id)}>Commit</button>
+                )}
+                {r.reviewedAt && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>✓ Committed</span>}
+              </div>
+            ))}
+          </div>
+        )
       )}
     </div>
   )
@@ -632,6 +862,156 @@ function ConflictsPanel({ api }: { api: any }) {
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
+// ── Population Strategy Tab (Data Sync Studio) ──────────────────────────────
+const POPULATION_MODES = [
+  { code: 'MANUAL', label: 'Manual', desc: 'Created and edited by hand only — never touched by a sync' },
+  { code: 'IMPORT', label: 'Import', desc: 'Populated from one-time/periodic imports (e.g. file upload), fully overwritten each time' },
+  { code: 'SYNC', label: 'Sync', desc: 'Kept in sync with a connector — every field overwritten from the source' },
+  { code: 'PUSH', label: 'Push', desc: 'ArchMind is the source of truth — data flows out to the connector, not in' },
+  { code: 'HYBRID', label: 'Hybrid', desc: 'Some fields synced from a source, others protected as manually-owned' },
+]
+
+function PopulationStrategyTab({ api }: { api: any }) {
+  const [strategies, setStrategies] = useState<any[]>([])
+  const [objectTypes, setObjectTypes] = useState<any[]>([])
+  const [connectors, setConnectors] = useState<any[]>([])
+  const [editing, setEditing] = useState<any>(null)
+  const [editingAttributes, setEditingAttributes] = useState<any[]>([])
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(() => {
+    api.get('/connectors/population-strategy').then((d: any) => setStrategies(Array.isArray(d) ? d : []))
+    api.get('/meta-model/object-types').then((d: any) => setObjectTypes(Array.isArray(d) ? d : []))
+    api.get('/connectors').then((d: any) => setConnectors(Array.isArray(d) ? d : []))
+  }, [api])
+  useEffect(() => { load() }, [load])
+
+  const startEdit = (objType: any) => {
+    const existing = strategies.find(s => s.objectTypeCode === objType.code)
+    setEditing(existing ? { ...existing, fieldOwnership: { ...(existing.fieldOwnership || {}) } } : { objectTypeCode: objType.code, populationMode: 'MANUAL', sourceConnectorId: '', fieldOwnership: {}, deletionPolicy: 'MARK_MISSING' })
+    setEditingAttributes([])
+    // The object-types LIST endpoint only returns an attribute count, not
+    // the actual attributes — fetch them via the dedicated endpoint.
+    api.get(`/meta-model/object-types/${objType.id}/attributes`).then((d: any) => setEditingAttributes(Array.isArray(d) ? d : []))
+  }
+
+  const save = async () => {
+    if (['SYNC', 'HYBRID'].includes(editing.populationMode) && !editing.sourceConnectorId) return alert('Select a source connector for SYNC/HYBRID mode')
+    setSaving(true)
+    const result = await api.put('/connectors/population-strategy', editing)
+    setSaving(false)
+    if (result?.id || result?.objectTypeCode) { setEditing(null); load() } else { alert(result?.message || 'Save failed') }
+  }
+
+  const remove = async (objectTypeCode: string) => {
+    if (!window.confirm(`Reset "${objectTypeCode}" to the default (MANUAL) strategy?`)) return
+    await api.del(`/connectors/population-strategy/${objectTypeCode}`)
+    load()
+  }
+
+  const setFieldOwner = (field: string, owner: string) => setEditing((e: any) => ({ ...e, fieldOwnership: { ...e.fieldOwnership, [field]: owner } }))
+
+  if (editing) {
+    return (
+      <div style={{ maxWidth: 640 }}>
+        <div style={{ ...S.row, marginBottom: 16 }}>
+          <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={() => setEditing(null)}>← Back</button>
+          <div style={{ fontSize: 16, fontWeight: 700 }}>{editing.objectTypeCode}</div>
+        </div>
+        <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <label style={S.label}>Population Mode</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
+              {POPULATION_MODES.map(m => (
+                <label key={m.code} style={{ display: 'flex', gap: 10, padding: 10, borderRadius: 8, background: editing.populationMode === m.code ? 'rgba(0,180,216,0.08)' : 'var(--navy)', border: `1px solid ${editing.populationMode === m.code ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer' }}>
+                  <input type="radio" checked={editing.populationMode === m.code} onChange={() => setEditing((e: any) => ({ ...e, populationMode: m.code }))} style={{ marginTop: 2 }} />
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{m.label}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{m.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {['SYNC', 'HYBRID'].includes(editing.populationMode) && (
+            <div>
+              <label style={S.label}>Source Connector (source of truth)</label>
+              <select style={S.input} value={editing.sourceConnectorId || ''} onChange={e => setEditing((v: any) => ({ ...v, sourceConnectorId: e.target.value }))}>
+                <option value="">Select…</option>
+                {connectors.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {editing.populationMode === 'HYBRID' && (
+            <div>
+              <label style={S.label}>Field Ownership</label>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Fields not listed here default to Manual — never auto-overwritten by a sync.</div>
+              {editingAttributes.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No attributes found for this object type in Meta-Model Studio.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {editingAttributes.map((attr: any) => (
+                    <div key={attr.code} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+                      <div style={{ flex: 1 }}>{attr.name}</div>
+                      <select style={{ ...S.input, width: 140 }} value={editing.fieldOwnership[attr.code] || 'MANUAL'} onChange={e => setFieldOwner(attr.code, e.target.value)}>
+                        <option value="MANUAL">Manual</option>
+                        <option value="SOURCE">Source</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
+            <label style={S.label}>Deletion Policy (when a record disappears from the source)</label>
+            <select style={S.input} value={editing.deletionPolicy || 'MARK_MISSING'} onChange={e => setEditing((v: any) => ({ ...v, deletionPolicy: e.target.value }))}>
+              <option value="MARK_MISSING">Mark as Deprecated (recommended)</option>
+              <option value="IGNORE">Ignore — leave as-is</option>
+              <option value="HARD_DELETE">Hard Delete</option>
+            </select>
+          </div>
+
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? 'Saving…' : '💾 Save Strategy'}</button>
+            <button style={S.btn()} onClick={() => setEditing(null)}>Cancel</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
+        Configure how each EA object type gets populated tenant-wide — manually curated, synced from a connector, or a hybrid of both with per-field ownership.
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {objectTypes.map((t: any) => {
+          const strategy = strategies.find(s => s.objectTypeCode === t.code)
+          const mode = strategy?.populationMode || 'MANUAL'
+          const modeInfo = POPULATION_MODES.find(m => m.code === mode)
+          return (
+            <div key={t.code} style={{ ...S.card, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t.code}</div>
+              </div>
+              <span style={S.badge(mode === 'MANUAL' ? '#7f8c8d' : mode === 'SYNC' ? '#2ecc71' : mode === 'HYBRID' ? '#f39c12' : mode === 'PUSH' ? '#8e44ad' : '#3498db')}>{modeInfo?.label || mode}</span>
+              <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => startEdit(t)}>{strategy ? 'Edit' : 'Configure'}</button>
+              {strategy && <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => remove(t.code)}>Reset</button>}
+            </div>
+          )
+        })}
+        {objectTypes.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No object types found — configure your meta-model first in Meta-Model Studio.</div>}
+      </div>
+    </div>
+  )
+}
+
 export default function ConnectorHubPage() {
   const api = useApi()
   const [tab, setTab] = useState('dashboard')
@@ -644,6 +1024,7 @@ export default function ConnectorHubPage() {
   const TABS = [
     { id: 'dashboard', label: '🏠 Dashboard' },
     { id: 'connectors', label: '🔌 Connectors' },
+    { id: 'strategy', label: '⚙️ Population Strategy' },
     { id: 'archimate', label: '📐 ArchiMate' },
     { id: 'conflicts', label: '⚠️ Conflicts' },
     { id: 'new', label: '+ Add' },
@@ -669,6 +1050,7 @@ export default function ConnectorHubPage() {
       <div style={S.content}>
         {tab === 'dashboard' && <ConnectorDashboard api={api} stats={stats} onTab={setTab} onOpen={openConnector} />}
         {tab === 'connectors' && <ConnectorsList api={api} onOpen={openConnector} />}
+        {tab === 'strategy' && <PopulationStrategyTab api={api} />}
         {tab === 'archimate' && <ArchiMatePanel api={api} />}
         {tab === 'conflicts' && <ConflictsPanel api={api} />}
         {tab === 'new' && <NewConnector api={api} onCreated={c => { openConnector(c); loadStats() }} onCancel={() => setTab('dashboard')} />}
