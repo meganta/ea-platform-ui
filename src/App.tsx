@@ -21,6 +21,7 @@ import AccessGovernancePage from './pages/AccessGovernancePage'
 import SetupAssistantPage from './pages/SetupAssistantPage'
 import StrategyPage from './pages/StrategyPage'
 import EaPlanningPage from './pages/EaPlanningPage'
+import GlossaryPage from './pages/GlossaryPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -56,6 +57,7 @@ export default function App() {
               <Route path="setup" element={<SetupAssistantPage />} />
               <Route path="strategy" element={<StrategyPage />} />
               <Route path="ea-planning" element={<EaPlanningPage />} />
+              <Route path="glossary" element={<GlossaryPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
