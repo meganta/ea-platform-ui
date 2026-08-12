@@ -51,6 +51,8 @@ const CONNECTOR_TYPES = [
   { code: 'API_MANAGEMENT',  name: 'API Management',    icon: '🔌', color: '#8e44ad', desc: 'API gateway/management platform catalog discovery (requires endpoint configuration)', fileOnly: false },
   { code: 'DATA_CATALOG',    name: 'Data Catalog',      icon: '📚', color: '#16a085', desc: 'Data governance/catalog platform asset discovery (requires endpoint configuration)', fileOnly: false },
   { code: 'PPM_TOOL',        name: 'PPM Tool',          icon: '📅', color: '#2980b9', desc: 'Project & portfolio management tool initiative data (requires endpoint configuration)', fileOnly: false },
+  { code: 'ZOOM_MEETINGS',   name: 'Zoom Meetings',     icon: '📹', color: '#2d8cff', desc: 'Auto-analyze Zoom meetings via webhook + recording transcript', fileOnly: false },
+  { code: 'TEAMS_MEETINGS',  name: 'Microsoft Teams Meetings', icon: '💬', color: '#5059c9', desc: 'Auto-analyze Teams meetings via Graph webhook + transcript', fileOnly: false },
 ]
 
 const STATUS_COLOR: Record<string, string> = { ACTIVE: '#2ecc71', INACTIVE: '#7f8c8d', ERROR: '#e74c3c', SYNCING: '#f39c12' }
@@ -282,6 +284,20 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
     API_MANAGEMENT: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
     DATA_CATALOG: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
     PPM_TOOL: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
+    ZOOM_MEETINGS: [
+      { label: 'Webhook Secret Token (from Zoom App > Feature > Event Subscriptions)', key: 'webhookSecretToken', type: 'password' },
+      { label: 'Account ID (Server-to-Server OAuth app)', key: 'accountId' },
+      { label: 'Client ID', key: 'clientId' },
+      { label: 'Client Secret', key: 'clientSecret', type: 'password' },
+    ],
+    TEAMS_MEETINGS: [
+      { label: 'Azure Tenant (Directory) ID', key: 'azureTenantId' },
+      { label: 'App Registration Client ID', key: 'clientId' },
+      { label: 'Client Secret', key: 'clientSecret', type: 'password' },
+      { label: 'Client State (shared secret you choose for webhook verification)', key: 'clientState', type: 'password' },
+      { label: 'Organizer User ID (for transcript retrieval)', key: 'organizerUserId' },
+      { label: 'Online Meeting ID (for transcript retrieval)', key: 'onlineMeetingId' },
+    ],
   }
 
   const credFields = CRED_FIELDS[connector.connectorType] || []
@@ -377,6 +393,24 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
               {connector.connectorType === 'ENTRA_ID' && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(243,156,18,0.08)', borderRadius: 8 }}>
                   ⚠️ This connector also requires your Entra ID tenant (directory) ID set as <code>config.tenantId</code> — no dedicated editor for this yet, set via <code>PUT /connectors/:id</code> directly. The app registration needs application-level Graph API permissions (User.Read.All, Group.Read.All, Application.Read.All) with admin consent granted.
+                </div>
+              )}
+              {connector.connectorType === 'ZOOM_MEETINGS' && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(45,140,255,0.08)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div>⚠️ After saving credentials, paste this URL into your Zoom App's <b>Event Subscriptions</b> settings (Feature tab), and subscribe to <code>meeting.ended</code> and <code>recording.completed</code>. Zoom will send a one-time validation request to this URL, which is handled automatically.</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input style={{ ...S.input, fontFamily: 'monospace', fontSize: 11 }} readOnly value={`${API}/copilot/meetings/webhook/${connector.id}`} />
+                    <button style={{ ...S.btn(), whiteSpace: 'nowrap' as const }} onClick={() => { navigator.clipboard.writeText(`${API}/copilot/meetings/webhook/${connector.id}`); alert('Copied!') }}>Copy</button>
+                  </div>
+                </div>
+              )}
+              {connector.connectorType === 'TEAMS_MEETINGS' && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(80,89,201,0.08)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div>⚠️ This connector needs a Microsoft Graph subscription created for <code>/communications/callRecords</code> pointing at the URL below, with <b>Client State</b> above matching what you configure — there's no dedicated editor for this yet; create the subscription via the Graph API directly (<code>POST /subscriptions</code>). Graph subscriptions expire after ~3 days and must be renewed periodically. Requires OnlineMeetingTranscript.Read.All and CallRecords.Read.All application permissions with admin consent, and Teams Premium or equivalent licensing for transcript access.</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input style={{ ...S.input, fontFamily: 'monospace', fontSize: 11 }} readOnly value={`${API}/copilot/meetings/webhook/${connector.id}`} />
+                    <button style={{ ...S.btn(), whiteSpace: 'nowrap' as const }} onClick={() => { navigator.clipboard.writeText(`${API}/copilot/meetings/webhook/${connector.id}`); alert('Copied!') }}>Copy</button>
+                  </div>
                 </div>
               )}
               {credFields.map(f => (
