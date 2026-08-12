@@ -387,12 +387,12 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
               </div>
               {isGenericRestType && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(243,156,18,0.08)', borderRadius: 8 }}>
-                  ⚠️ This connector type also requires <code>authType</code>, <code>baseUrl</code>, and <code>resources</code> (per-object-type endpoint paths and field names) to be set in the connector's config — there's no dedicated editor for this yet. Contact your platform admin to set it via the API directly (<code>PUT /connectors/:id</code>, <code>config</code> field) until a config editor UI is built.
+                  ⚠️ This connector type also requires <code>authType</code> and <code>resources</code> (per-object-type endpoint paths and field names) — configure these in the Connector Configuration panel below.
                 </div>
               )}
               {connector.connectorType === 'ENTRA_ID' && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(243,156,18,0.08)', borderRadius: 8 }}>
-                  ⚠️ This connector also requires your Entra ID tenant (directory) ID set as <code>config.tenantId</code> — no dedicated editor for this yet, set via <code>PUT /connectors/:id</code> directly. The app registration needs application-level Graph API permissions (User.Read.All, Group.Read.All, Application.Read.All) with admin consent granted.
+                  ⚠️ This connector also requires your Entra ID tenant (directory) ID — configure it in the Connector Configuration panel below. The app registration needs application-level Graph API permissions (User.Read.All, Group.Read.All, Application.Read.All) with admin consent granted.
                 </div>
               )}
               {connector.connectorType === 'ZOOM_MEETINGS' && (
@@ -422,6 +422,9 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
               ))}
               <button style={S.btn('primary')} onClick={saveCreds} disabled={saving}>{saving ? 'Saving...' : '🔐 Save Credentials'}</button>
             </div>
+          )}
+          {['GENERIC_CMDB', 'API_MANAGEMENT', 'DATA_CATALOG', 'PPM_TOOL', 'ENTRA_ID', 'MEGA_HOPEX'].includes(connector.connectorType) && (
+            <ConnectorConfigEditor api={api} connector={connector} onSaved={onRefresh} />
           )}
         </div>
       )}
@@ -693,6 +696,122 @@ function StagingTab({ api, connectorId }: { api: any, connectorId: string }) {
 }
 
 // ── ArchiMate Quick Panel ─────────────────────────────────────────────────────
+function ConnectorConfigEditor({ api, connector, onSaved }: { api: any, connector: any, onSaved: () => void }) {
+  const [config, setConfig] = useState<any>(connector.config || {})
+  const [saving, setSaving] = useState(false)
+  const [rawMode, setRawMode] = useState(false)
+  const [rawText, setRawText] = useState(JSON.stringify(connector.config || {}, null, 2))
+  const [rawError, setRawError] = useState('')
+
+  const isGenericRest = ['GENERIC_CMDB', 'API_MANAGEMENT', 'DATA_CATALOG', 'PPM_TOOL'].includes(connector.connectorType)
+  const isEntraId = connector.connectorType === 'ENTRA_ID'
+  const isMegaHopex = connector.connectorType === 'MEGA_HOPEX'
+  const hasStructuredForm = isGenericRest || isEntraId || isMegaHopex
+
+  const save = async (dataToSave: any) => {
+    setSaving(true)
+    try {
+      await api.put(`/connectors/${connector.id}`, { config: dataToSave })
+      onSaved()
+    } catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+
+  const saveRaw = () => {
+    try {
+      const parsed = JSON.parse(rawText)
+      setRawError('')
+      save(parsed)
+    } catch (e: any) { setRawError('Invalid JSON: ' + e.message) }
+  }
+
+  // ── Generic-REST resources builder ──────────────────────────────────────
+  const resources = config.resources || {}
+  const resourceKeys = Object.keys(resources)
+  const [newResourceKey, setNewResourceKey] = useState('')
+
+  const addResource = () => {
+    if (!newResourceKey.trim()) return
+    setConfig((c: any) => ({ ...c, resources: { ...(c.resources || {}), [newResourceKey.trim()]: { path: '', idField: 'id' } } }))
+    setNewResourceKey('')
+  }
+  const updateResource = (key: string, patch: any) => {
+    setConfig((c: any) => ({ ...c, resources: { ...(c.resources || {}), [key]: { ...(c.resources?.[key] || {}), ...patch } } }))
+  }
+  const removeResource = (key: string) => {
+    setConfig((c: any) => { const r = { ...(c.resources || {}) }; delete r[key]; return { ...c, resources: r } })
+  }
+
+  return (
+    <div style={{ ...S.card, marginTop: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontWeight: 600, flex: 1 }}>⚙ Connector Configuration</div>
+        {hasStructuredForm && <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => { setRawMode(!rawMode); setRawText(JSON.stringify(config, null, 2)) }}>{rawMode ? 'Structured Editor' : 'Raw JSON'}</button>}
+      </div>
+
+      {rawMode || !hasStructuredForm ? (
+        <div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>Any additional settings this connector type needs, as raw JSON.</div>
+          <textarea style={{ ...S.input, minHeight: 160, fontFamily: 'monospace', fontSize: 12 }} value={rawText} onChange={e => setRawText(e.target.value)} />
+          {rawError && <div style={{ fontSize: 11, color: '#e74c3c', marginBottom: 8 }}>{rawError}</div>}
+          <button style={S.btn('primary')} onClick={saveRaw} disabled={saving}>{saving ? 'Saving…' : '💾 Save Config'}</button>
+        </div>
+      ) : (
+        <div>
+          {isEntraId && (
+            <div>
+              <div style={S.label}>Entra ID Tenant (Directory) ID</div>
+              <input style={S.input} value={config.tenantId || ''} onChange={e => setConfig((c: any) => ({ ...c, tenantId: e.target.value }))} placeholder="e.g. 72f988bf-86f1-41af-91ab-2d7cd011db47" />
+            </div>
+          )}
+          {isMegaHopex && (
+            <div style={S.grid2}>
+              <div><div style={S.label}>Environment</div><input style={S.input} value={config.environment || ''} onChange={e => setConfig((c: any) => ({ ...c, environment: e.target.value }))} /></div>
+              <div><div style={S.label}>Repository</div><input style={S.input} value={config.repository || ''} onChange={e => setConfig((c: any) => ({ ...c, repository: e.target.value }))} /></div>
+              <div style={{ gridColumn: '1/-1' }}><div style={S.label}>API Base Path (optional, defaults to /MEGA/WS/api)</div><input style={S.input} value={config.apiBasePath || ''} onChange={e => setConfig((c: any) => ({ ...c, apiBasePath: e.target.value }))} /></div>
+            </div>
+          )}
+          {isGenericRest && (
+            <div>
+              <div style={S.label}>Auth Type</div>
+              <select style={S.input} value={config.authType || ''} onChange={e => setConfig((c: any) => ({ ...c, authType: e.target.value }))}>
+                <option value="">Select…</option>
+                <option value="bearer">Bearer Token</option>
+                <option value="apiKey">API Key (header)</option>
+                <option value="basic">Basic Auth (username/password)</option>
+              </select>
+              {config.authType === 'apiKey' && (
+                <div><div style={S.label}>API Key Header Name</div><input style={S.input} placeholder="e.g. X-Api-Key" value={config.apiKeyHeader || ''} onChange={e => setConfig((c: any) => ({ ...c, apiKeyHeader: e.target.value }))} /></div>
+              )}
+
+              <div style={{ ...S.label, marginTop: 10 }}>Resources (one per object type this connector can fetch)</div>
+              {resourceKeys.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>No resources configured yet.</div>}
+              {resourceKeys.map(key => (
+                <div key={key} style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, flex: 1 }}>{key}</div>
+                    <button style={{ ...S.btn('danger'), fontSize: 10, padding: '3px 8px' }} onClick={() => removeResource(key)}>Remove</button>
+                  </div>
+                  <div style={S.grid2}>
+                    <input style={{ ...S.input, marginBottom: 6 }} placeholder="Endpoint path, e.g. /api/v1/applications" value={resources[key].path || ''} onChange={e => updateResource(key, { path: e.target.value })} />
+                    <input style={{ ...S.input, marginBottom: 6 }} placeholder="ID field (default: id)" value={resources[key].idField || ''} onChange={e => updateResource(key, { idField: e.target.value })} />
+                    <input style={{ ...S.input, marginBottom: 6 }} placeholder="Response envelope field (optional, e.g. items)" value={resources[key].listField || ''} onChange={e => updateResource(key, { listField: e.target.value })} />
+                    <input style={{ ...S.input, marginBottom: 6 }} placeholder="Display label (optional)" value={resources[key].label || ''} onChange={e => updateResource(key, { label: e.target.value })} />
+                  </div>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} placeholder="New object type key, e.g. APPLICATION" value={newResourceKey} onChange={e => setNewResourceKey(e.target.value)} />
+                <button style={S.btn()} onClick={addResource}>+ Add Resource</button>
+              </div>
+            </div>
+          )}
+          <button style={{ ...S.btn('primary'), marginTop: 12 }} onClick={() => save(config)} disabled={saving}>{saving ? 'Saving…' : '💾 Save Config'}</button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function TeamsSubscriptionButton({ connectorId }: { connectorId: string }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [message, setMessage] = useState('')
