@@ -11,8 +11,6 @@ async function govGet(path: string) {
   return res.json()
 }
 
-const API_URL = process.env.REACT_APP_API_URL || ''
-
 const SEV_COLOR: Record<string, string> = {
   CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#f39c12', LOW: '#3498db',
   APPROVED: '#2ecc71', OPEN: '#8baac8', REJECTED: '#e74c3c', ACCEPTED: '#3498db',
@@ -26,7 +24,7 @@ const STATUS_COLOR: Record<string, string> = {
 function ExportBtn({ url, label }: { url: string; label: string }) {
   const token = localStorage.getItem('ea_token') || ''
   const handleExport = async () => {
-    const res = await fetch(`${API_URL}/api/v1/${url}`, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await fetch(`${GOV_API}/${url}`, { headers: { Authorization: `Bearer ${token}` } })
     const blob = await res.blob()
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
     a.download = label.toLowerCase().replace(/ /g, '-') + '.csv'; a.click()
@@ -140,7 +138,7 @@ function SavingsReport() {
                       onChange={async e => {
                         const newStatus = e.target.value
                         const token = localStorage.getItem('ea_token') || ''
-                        await fetch(`${API_URL}/api/v1/governance/reviews/${item.reviewId}/findings/${item.id}`, {
+                        await fetch(`${GOV_API}/governance/reviews/${item.reviewId}/findings/${item.id}`, {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                           body: JSON.stringify({ status: newStatus }),
