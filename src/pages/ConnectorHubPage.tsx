@@ -406,11 +406,12 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
               )}
               {connector.connectorType === 'TEAMS_MEETINGS' && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(80,89,201,0.08)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div>⚠️ This connector needs a Microsoft Graph subscription created for <code>/communications/callRecords</code> pointing at the URL below, with <b>Client State</b> above matching what you configure — there's no dedicated editor for this yet; create the subscription via the Graph API directly (<code>POST /subscriptions</code>). Graph subscriptions expire after ~3 days and must be renewed periodically. Requires OnlineMeetingTranscript.Read.All and CallRecords.Read.All application permissions with admin consent, and Teams Premium or equivalent licensing for transcript access.</div>
+                  <div>⚠️ After saving credentials below, click <b>Setup Subscription</b> to create the Microsoft Graph subscription automatically — no manual Graph API calls needed. Requires OnlineMeetingTranscript.Read.All and CallRecords.Read.All application permissions with admin consent, and Teams Premium or equivalent licensing for transcript access. Once created, the subscription renews itself automatically in the background.</div>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <input style={{ ...S.input, fontFamily: 'monospace', fontSize: 11 }} readOnly value={`${API}/copilot/meetings/webhook/${connector.id}`} />
+                    <input style={{ ...S.input, fontFamily: 'monospace', fontSize: 11, marginBottom: 0 }} readOnly value={`${API}/copilot/meetings/webhook/${connector.id}`} />
                     <button style={{ ...S.btn(), whiteSpace: 'nowrap' as const }} onClick={() => { navigator.clipboard.writeText(`${API}/copilot/meetings/webhook/${connector.id}`); alert('Copied!') }}>Copy</button>
                   </div>
+                  <TeamsSubscriptionButton connectorId={connector.id} />
                 </div>
               )}
               {credFields.map(f => (
@@ -692,6 +693,35 @@ function StagingTab({ api, connectorId }: { api: any, connectorId: string }) {
 }
 
 // ── ArchiMate Quick Panel ─────────────────────────────────────────────────────
+function TeamsSubscriptionButton({ connectorId }: { connectorId: string }) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [message, setMessage] = useState('')
+
+  const setup = async () => {
+    setStatus('loading')
+    try {
+      const token = localStorage.getItem('ea_token')
+      const res = await fetch(`${API}/copilot/meetings/${connectorId}/setup-teams-subscription`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'Setup failed')
+      setStatus('done')
+      setMessage(`Subscription active, expires ${new Date(data.expirationDateTime).toLocaleString()}`)
+    } catch (e: any) {
+      setStatus('error')
+      setMessage(e.message)
+    }
+  }
+
+  return (
+    <div>
+      <button style={{ ...S.btn('primary'), fontSize: 12 }} onClick={setup} disabled={status === 'loading'}>
+        {status === 'loading' ? '⏳ Setting up…' : '🔗 Setup Subscription'}
+      </button>
+      {message && <div style={{ fontSize: 11, marginTop: 6, color: status === 'error' ? '#e74c3c' : '#2ecc71' }}>{message}</div>}
+    </div>
+  )
+}
+
 function ArchiMatePanel({ api }: { api: any }) {
   const [connectors, setConnectors] = useState<any[]>([])
   const [selectedId, setSelectedId] = useState('')
