@@ -20,6 +20,7 @@ import SharedViewPage from './pages/SharedViewPage'
 import AccessGovernancePage from './pages/AccessGovernancePage'
 import SetupAssistantPage from './pages/SetupAssistantPage'
 import StrategyPage from './pages/StrategyPage'
+import EaPlanningPage from './pages/EaPlanningPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="access-governance" element={<AccessGovernancePage />} />
               <Route path="setup" element={<SetupAssistantPage />} />
               <Route path="strategy" element={<StrategyPage />} />
+              <Route path="ea-planning" element={<EaPlanningPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

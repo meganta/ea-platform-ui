@@ -55,6 +55,7 @@ export default function Layout() {
           <NavLink to="/copilot" className={({isActive})=>`nav-item${isActive?' active':''}`}>💬 {t('nav.copilot')}</NavLink>
           <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Governance</NavLink>
           <NavLink to="/strategy" className={({isActive})=>`nav-item${isActive?' active':''}`}>🎯 Strategy</NavLink>
+          <NavLink to="/ea-planning" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗓 EA Planning</NavLink>
           <NavLink to="/meta-model" className={({isActive})=>`nav-item${isActive?' active':''}`}>🧩 Meta-Model</NavLink>
           <NavLink to="/ea-views" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗺 EA Views</NavLink>
           <NavLink to="/connector-hub" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔌 Connectors</NavLink>
