@@ -19,6 +19,7 @@ import ReportsPage from './pages/ReportsPage'
 import SharedViewPage from './pages/SharedViewPage'
 import AccessGovernancePage from './pages/AccessGovernancePage'
 import SetupAssistantPage from './pages/SetupAssistantPage'
+import StrategyPage from './pages/StrategyPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -52,6 +53,7 @@ export default function App() {
               <Route path="reports" element={<ReportsPage />} />
               <Route path="access-governance" element={<AccessGovernancePage />} />
               <Route path="setup" element={<SetupAssistantPage />} />
+              <Route path="strategy" element={<StrategyPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
