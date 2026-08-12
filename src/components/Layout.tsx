@@ -1,16 +1,44 @@
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import { useBranding } from '../contexts/BrandingContext'
+import SetupAssistantPage from '../pages/SetupAssistantPage'
+
+const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
 export default function Layout() {
   const { user, logout } = useAuth()
   const { t, locale, setLocale } = useLang()
   const { branding, logoUrl } = useBranding()
   const [logoFailed, setLogoFailed] = useState(false)
+  const [showSetupModal, setShowSetupModal] = useState(false)
+  const [setupChecked, setSetupChecked] = useState(false)
   const nav = useNavigate()
+  const location = useLocation()
   const orgName = locale === 'AR' ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
+
+  // Auto-show the onboarding assistant once per session for tenants that
+  // haven't completed setup - checked once on mount (not per navigation),
+  // and skipped entirely if the user is already on the full-page /setup
+  // route to avoid a modal stacked on top of the same content. Dismissing
+  // (✕) hides it for the rest of this session without marking setup
+  // complete server-side - it reappears on the next login if still
+  // incomplete, rather than being permanently silenced by one dismissal.
+  useEffect(() => {
+    if (setupChecked || location.pathname === '/setup') return
+    const token = localStorage.getItem('ea_token')
+    if (!token) return
+    fetch(`${API_URL}/setup/profile`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(profile => {
+        setSetupChecked(true)
+        if (profile && !profile.setupCompleted) setShowSetupModal(true)
+      })
+      .catch(() => setSetupChecked(true))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div className="layout">
       <div className="sidebar">
@@ -36,6 +64,7 @@ export default function Layout() {
           <div className="nav-label" style={{marginTop:8}}>Admin</div>
           <NavLink to="/access-governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔐 Access Governance</NavLink>
           <NavLink to="/settings" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ Settings</NavLink>
+          <NavLink to="/setup" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Setup Assistant</NavLink>
         </nav>
         <div className="sidebar-footer">
           <div className="flex items-center gap-2" style={{marginBottom:8}}>
@@ -52,6 +81,7 @@ export default function Layout() {
         </div>
       </div>
       <div className="main-content"><Outlet /></div>
+      {showSetupModal && <SetupAssistantPage modal onClose={() => setShowSetupModal(false)} />}
     </div>
   )
 }

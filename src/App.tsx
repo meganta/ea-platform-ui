@@ -18,6 +18,7 @@ import ConnectorHubPage from './pages/ConnectorHubPage'
 import ReportsPage from './pages/ReportsPage'
 import SharedViewPage from './pages/SharedViewPage'
 import AccessGovernancePage from './pages/AccessGovernancePage'
+import SetupAssistantPage from './pages/SetupAssistantPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -50,6 +51,7 @@ export default function App() {
               <Route path="connector-hub" element={<ConnectorHubPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="access-governance" element={<AccessGovernancePage />} />
+              <Route path="setup" element={<SetupAssistantPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
