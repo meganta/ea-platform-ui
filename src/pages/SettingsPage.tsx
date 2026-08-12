@@ -519,6 +519,91 @@ function RagKbTab() {
   )
 }
 
+const METRIC_LABEL: Record<string, string> = {
+  AI_REQUEST: 'AI Requests', AI_TOKENS: 'AI Tokens', DOCUMENT_INGESTION: 'Documents Ingested',
+  KNOWLEDGE_SEARCH: 'Knowledge Searches', API_CALL: 'API Calls',
+}
+const STATUS_COLOR: Record<string, string> = { OK: 'var(--success)', WARNING: '#f39c12', EXCEEDED: 'var(--danger)' }
+
+function BillingTab({ api, tenant }: { api: any, tenant: any }) {
+  const [usage, setUsage] = useState<any>(null)
+  const [tiers, setTiers] = useState<any>(null)
+  const [history, setHistory] = useState<any[]>([])
+
+  useEffect(() => {
+    api.get('/billing/usage').then(setUsage)
+    api.get('/billing/tiers').then(setTiers)
+    api.get('/billing/history?months=6').then((d: any) => setHistory(Array.isArray(d) ? d : []))
+  }, [api])
+
+  if (!usage || !tiers) return <div className="card"><div style={{ color: 'var(--text-dim)' }}>Loading usage data…</div></div>
+
+  return (
+    <div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-title">💳 Subscription & Usage</div>
+        <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+          {tiers.tiers.map((t: any) => (
+            <div key={t.name} className="card" style={{ flex: 1, padding: 20, border: `1px solid ${tenant?.subscriptionTier === t.name ? 'var(--accent)' : 'var(--border)'}`, position: 'relative' }}>
+              {tenant?.subscriptionTier === t.name && <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: 'var(--accent)', color: 'var(--navy)', fontSize: 10, padding: '2px 8px', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>CURRENT</div>}
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{t.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', lineHeight: 1.8 }}>
+                {Object.entries(t.limits).map(([metric, limit]: any) => (
+                  <div key={metric}>{limit >= 99999 ? 'Unlimited' : limit.toLocaleString()} {METRIC_LABEL[metric] || metric}</div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="alert alert-info">
+          To upgrade your subscription, contact your EA Platform administrator or reach out to support.
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="section-title">📊 Current Month Usage ({usage.period?.start} – {usage.period?.end})</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Overall status:</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: STATUS_COLOR[usage.overallStatus] }}>{usage.overallStatus}</span>
+        </div>
+        {usage.usage.map((u: any) => (
+          <div key={u.metric} style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+              <span>{METRIC_LABEL[u.metric] || u.metric}</span>
+              <span style={{ color: STATUS_COLOR[u.status] }}>{u.used.toLocaleString()} / {u.limit >= 99999 ? '∞' : u.limit.toLocaleString()} ({u.percentage}%)</span>
+            </div>
+            <div style={{ height: 6, background: 'var(--navy)', borderRadius: 3, overflow: 'hidden' }}>
+              <div style={{ width: `${Math.min(u.percentage, 100)}%`, height: '100%', background: STATUS_COLOR[u.status] }} />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {history.length > 0 && (
+        <div className="card">
+          <div className="section-title">📈 Usage History</div>
+          <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-dim)' }}>Month</th>
+                {Object.keys(METRIC_LABEL).map(m => <th key={m} style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--text-dim)' }}>{METRIC_LABEL[m]}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {history.map((h: any) => (
+                <tr key={h.month} style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 8px' }}>{h.month}</td>
+                  {Object.keys(METRIC_LABEL).map(m => <td key={m} style={{ textAlign: 'right', padding: '6px 8px' }}>{(h.metrics[m] || 0).toLocaleString()}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ApiKeysTab() {
   const [status, setStatus] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -1103,27 +1188,7 @@ export default function SettingsPage() {
         {tab === 'users' && <UsersTab />}
         {tab === 'terminology' && <TerminologyTab />}
 
-        {tab === 'billing' && (
-          <div className="card">
-            <div className="section-title">💳 Subscription & Usage</div>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
-              {['MVP', 'STANDARD', 'ENTERPRISE'].map(tier => (
-                <div key={tier} className="card" style={{ flex: 1, padding: 20, border: `1px solid ${config?.tenant?.subscriptionTier === tier ? 'var(--accent)' : 'var(--border)'}`, position: 'relative' }}>
-                  {config?.tenant?.subscriptionTier === tier && <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: 'var(--accent)', color: 'var(--navy)', fontSize: 10, padding: '2px 8px', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>CURRENT</div>}
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{tier}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', lineHeight: 1.8 }}>
-                    {tier === 'MVP' && <>100 AI requests/mo<br />10 documents<br />5,000 API calls</>}
-                    {tier === 'STANDARD' && <>1,000 AI requests/mo<br />100 documents<br />50,000 API calls</>}
-                    {tier === 'ENTERPRISE' && <>Unlimited AI requests<br />Unlimited documents<br />Unlimited API calls</>}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="alert alert-info">
-              To upgrade your subscription, contact your EA Platform administrator or reach out to support.
-            </div>
-          </div>
-        )}
+        {tab === 'billing' && <BillingTab api={api} tenant={config?.tenant} />}
       </div>
     </div>
   )
