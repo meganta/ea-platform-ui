@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import HelpTip from '../components/HelpTip'
+import { useLang } from '../contexts/LangContext'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -44,6 +45,7 @@ const GAP_COLOR: Record<string, string> = { STRONG: '#2ecc71', PARTIAL: '#f39c12
 
 export default function StrategyPage() {
   const api = useApi()
+  const { t, isAR } = useLang()
   const [strategies, setStrategies] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [creating, setCreating] = useState(false)
@@ -66,36 +68,36 @@ export default function StrategyPage() {
   if (selected) return <StrategyDetail api={api} strategy={selected} onBack={() => { setSelected(null); load() }} onRefresh={() => open(selected)} />
 
   return (
-    <div style={S.page}>
+    <div style={S.page} dir={isAR ? 'rtl' : 'ltr'}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🎯 Strategy<HelpTip text="Record your organization's strategic goals here, then connect each one to the specific capabilities that support it. This helps show whether your architecture is actually working toward what the organization is trying to achieve, and highlights any gaps." /></div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Strategic goals, capability alignment, and gap analysis</div>
+          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🎯 {t('strategy.title')}<HelpTip text="Record your organization's strategic goals here, then connect each one to the specific capabilities that support it. This helps show whether your architecture is actually working toward what the organization is trying to achieve, and highlights any gaps." /></div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('strategy.subtitle')}</div>
         </div>
-        <button style={S.btn('primary')} onClick={() => setCreating(true)}>+ New Strategy</button>
+        <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('strategy.new')}</button>
       </div>
       <div style={S.content}>
         {creating && (
           <div style={S.card}>
-            <div style={{ fontWeight: 600, marginBottom: 12 }}>New Strategy</div>
+            <div style={{ fontWeight: 600, marginBottom: 12 }}>{t('strategy.new').replace('+ ', '')}</div>
             <div style={S.grid2}>
-              <div><div style={S.label}>Name (EN) *</div><input style={S.input} value={newStrategy.name} onChange={e => setNewStrategy(s => ({ ...s, name: e.target.value }))} /></div>
-              <div><div style={S.label}>Name (AR)</div><input style={S.input} dir="rtl" value={newStrategy.nameAr} onChange={e => setNewStrategy(s => ({ ...s, nameAr: e.target.value }))} /></div>
+              <div><div style={S.label}>{t('strategy.name_en')} *</div><input style={S.input} value={newStrategy.name} onChange={e => setNewStrategy(s => ({ ...s, name: e.target.value }))} /></div>
+              <div><div style={S.label}>{t('strategy.name_ar')}</div><input style={S.input} dir="rtl" value={newStrategy.nameAr} onChange={e => setNewStrategy(s => ({ ...s, nameAr: e.target.value }))} /></div>
               <div>
-                <div style={S.label}>Type</div>
+                <div style={S.label}>{t('strategy.type')}</div>
                 <select style={S.input} value={newStrategy.strategyType} onChange={e => setNewStrategy(s => ({ ...s, strategyType: e.target.value }))}>
                   {STRATEGY_TYPES.map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
                 </select>
               </div>
-              <div><div style={S.label}>Timeframe</div><input style={S.input} placeholder="e.g. 2026-2030" value={newStrategy.timeframe} onChange={e => setNewStrategy(s => ({ ...s, timeframe: e.target.value }))} /></div>
+              <div><div style={S.label}>{t('strategy.timeframe')}</div><input style={S.input} placeholder="e.g. 2026-2030" value={newStrategy.timeframe} onChange={e => setNewStrategy(s => ({ ...s, timeframe: e.target.value }))} /></div>
             </div>
-            <div style={S.label}>Vision</div><input style={S.input} value={newStrategy.vision} onChange={e => setNewStrategy(s => ({ ...s, vision: e.target.value }))} />
-            <div style={S.label}>Description</div><input style={S.input} value={newStrategy.description} onChange={e => setNewStrategy(s => ({ ...s, description: e.target.value }))} />
-            <div style={S.row}><button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? 'Creating…' : 'Create'}</button><button style={S.btn()} onClick={() => setCreating(false)}>Cancel</button></div>
+            <div style={S.label}>{t('strategy.vision')}</div><input style={S.input} value={newStrategy.vision} onChange={e => setNewStrategy(s => ({ ...s, vision: e.target.value }))} />
+            <div style={S.label}>{t('strategy.description')}</div><input style={S.input} value={newStrategy.description} onChange={e => setNewStrategy(s => ({ ...s, description: e.target.value }))} />
+            <div style={S.row}><button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? t('strategy.creating') : t('strategy.create')}</button><button style={S.btn()} onClick={() => setCreating(false)}>{t('strategy.cancel')}</button></div>
           </div>
         )}
         {strategies.length === 0 && !creating ? (
-          <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No strategies yet. Create one to start mapping goals to EA capabilities.</div>
+          <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('strategy.no_strategies')}</div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {strategies.map(s => {
@@ -108,7 +110,7 @@ export default function StrategyPage() {
                   </div>
                   <span style={S.badge(ti.color)}>{ti.label}</span>
                   <span style={S.badge(s.status === 'ACTIVE' ? '#2ecc71' : '#7f8c8d')}>{s.status}</span>
-                  <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={e => { e.stopPropagation(); remove(s.id) }}>Delete</button>
+                  <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={e => { e.stopPropagation(); remove(s.id) }}>{t('strategy.delete')}</button>
                 </div>
               )
             })}
@@ -121,13 +123,14 @@ export default function StrategyPage() {
 
 // ── Strategy Detail ──────────────────────────────────────────────────────────
 function StrategyDetail({ api, strategy, onBack, onRefresh }: { api: any, strategy: any, onBack: () => void, onRefresh: () => void }) {
+  const { t, isAR } = useLang()
   const [tab, setTab] = useState<'overview'|'goals'|'gap'|'matrix'>('overview')
   const ti = typeInfo(strategy.strategyType)
 
   return (
-    <div style={S.page}>
+    <div style={S.page} dir={isAR ? 'rtl' : 'ltr'}>
       <div style={S.header}>
-        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>← Back</button>
+        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{isAR ? '→ رجوع' : '← Back'}</button>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{strategy.name}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
@@ -137,18 +140,18 @@ function StrategyDetail({ api, strategy, onBack, onRefresh }: { api: any, strate
         </div>
       </div>
       <div style={S.tabs}>
-        {(['overview','goals','gap','matrix'] as const).map(t => (
-          <button key={t} style={S.tab(tab === t)} onClick={() => setTab(t)}>
-            {t === 'overview' ? '📋 Overview' : t === 'goals' ? `🎯 Goals (${strategy.goals?.length || 0})` : t === 'gap' ? '📊 Gap Score' : '🗺 Alignment Matrix'}
+        {(['overview','goals','gap','matrix'] as const).map(tabKey => (
+          <button key={tabKey} style={S.tab(tab === tabKey)} onClick={() => setTab(tabKey)}>
+            {tabKey === 'overview' ? t('strategy.tab_overview') : tabKey === 'goals' ? `${t('strategy.tab_goals')} (${strategy.goals?.length || 0})` : tabKey === 'gap' ? t('strategy.tab_gap') : t('strategy.tab_matrix')}
           </button>
         ))}
       </div>
       <div style={S.content}>
         {tab === 'overview' && (
           <div style={S.grid2}>
-            <div style={S.card}><div style={S.label}>Vision</div><div style={{ fontSize: 13 }}>{strategy.vision || '—'}</div></div>
-            <div style={S.card}><div style={S.label}>Timeframe</div><div style={{ fontSize: 13 }}>{strategy.timeframe || '—'}</div></div>
-            <div style={{ ...S.card, gridColumn: '1/-1' }}><div style={S.label}>Description</div><div style={{ fontSize: 13 }}>{strategy.description || '—'}</div></div>
+            <div style={S.card}><div style={S.label}>{t('strategy.vision')}</div><div style={{ fontSize: 13 }}>{strategy.vision || '—'}</div></div>
+            <div style={S.card}><div style={S.label}>{t('strategy.timeframe')}</div><div style={{ fontSize: 13 }}>{strategy.timeframe || '—'}</div></div>
+            <div style={{ ...S.card, gridColumn: '1/-1' }}><div style={S.label}>{t('strategy.description')}</div><div style={{ fontSize: 13 }}>{strategy.description || '—'}</div></div>
           </div>
         )}
         {tab === 'goals' && <GoalsTab api={api} strategy={strategy} onRefresh={onRefresh} />}
@@ -161,13 +164,14 @@ function StrategyDetail({ api, strategy, onBack, onRefresh }: { api: any, strate
 
 // ── Goals Tab ────────────────────────────────────────────────────────────────
 function GoalsTab({ api, strategy, onRefresh }: { api: any, strategy: any, onRefresh: () => void }) {
+  const { t, isAR } = useLang()
   const [creating, setCreating] = useState(false)
   const [newGoal, setNewGoal] = useState({ title: '', titleAr: '', description: '', pillar: '', targetYear: '', kpis: '' })
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const createGoal = async () => {
-    if (!newGoal.title) return alert('Title is required')
+    if (!newGoal.title) return alert(isAR ? 'العنوان مطلوب' : 'Title is required')
     setSaving(true)
     try {
       await api.post(`/strategy/${strategy.id}/goals`, {
@@ -179,26 +183,26 @@ function GoalsTab({ api, strategy, onRefresh }: { api: any, strategy: any, onRef
     } catch (e: any) { alert(e.message) } finally { setSaving(false) }
   }
 
-  const deleteGoal = async (goalId: string) => { if (!window.confirm('Delete this goal and its alignments?')) return; await api.del(`/strategy/${strategy.id}/goals/${goalId}`); onRefresh() }
+  const deleteGoal = async (goalId: string) => { if (!window.confirm(isAR ? 'حذف هذا الهدف ومواءماته؟' : 'Delete this goal and its alignments?')) return; await api.del(`/strategy/${strategy.id}/goals/${goalId}`); onRefresh() }
 
   return (
     <div>
-      <button style={{ ...S.btn('primary'), marginBottom: 16 }} onClick={() => setCreating(true)}>+ Add Goal</button>
+      <button style={{ ...S.btn('primary'), marginBottom: 16 }} onClick={() => setCreating(true)}>{t('strategy.add_goal')}</button>
       {creating && (
         <div style={S.card}>
           <div style={S.grid2}>
-            <div><div style={S.label}>Title *</div><input style={S.input} value={newGoal.title} onChange={e => setNewGoal(g => ({ ...g, title: e.target.value }))} /></div>
-            <div><div style={S.label}>Title (AR)</div><input style={S.input} dir="rtl" value={newGoal.titleAr} onChange={e => setNewGoal(g => ({ ...g, titleAr: e.target.value }))} /></div>
-            <div><div style={S.label}>Pillar</div><input style={S.input} placeholder="e.g. Digital Excellence" value={newGoal.pillar} onChange={e => setNewGoal(g => ({ ...g, pillar: e.target.value }))} /></div>
-            <div><div style={S.label}>Target Year</div><input style={S.input} type="number" value={newGoal.targetYear} onChange={e => setNewGoal(g => ({ ...g, targetYear: e.target.value }))} /></div>
+            <div><div style={S.label}>{t('strategy.goal_title')} *</div><input style={S.input} value={newGoal.title} onChange={e => setNewGoal(g => ({ ...g, title: e.target.value }))} /></div>
+            <div><div style={S.label}>{t('strategy.goal_title_ar')}</div><input style={S.input} dir="rtl" value={newGoal.titleAr} onChange={e => setNewGoal(g => ({ ...g, titleAr: e.target.value }))} /></div>
+            <div><div style={S.label}>{t('strategy.pillar')}</div><input style={S.input} placeholder="e.g. Digital Excellence" value={newGoal.pillar} onChange={e => setNewGoal(g => ({ ...g, pillar: e.target.value }))} /></div>
+            <div><div style={S.label}>{t('strategy.target_year')}</div><input style={S.input} type="number" value={newGoal.targetYear} onChange={e => setNewGoal(g => ({ ...g, targetYear: e.target.value }))} /></div>
           </div>
-          <div style={S.label}>Description</div><input style={S.input} value={newGoal.description} onChange={e => setNewGoal(g => ({ ...g, description: e.target.value }))} />
-          <div style={S.label}>KPIs (comma-separated)</div><input style={S.input} value={newGoal.kpis} onChange={e => setNewGoal(g => ({ ...g, kpis: e.target.value }))} />
-          <div style={S.row}><button style={S.btn('primary')} onClick={createGoal} disabled={saving}>{saving ? 'Saving…' : 'Add Goal'}</button><button style={S.btn()} onClick={() => setCreating(false)}>Cancel</button></div>
+          <div style={S.label}>{t('strategy.description')}</div><input style={S.input} value={newGoal.description} onChange={e => setNewGoal(g => ({ ...g, description: e.target.value }))} />
+          <div style={S.label}>{t('strategy.kpis')}</div><input style={S.input} value={newGoal.kpis} onChange={e => setNewGoal(g => ({ ...g, kpis: e.target.value }))} />
+          <div style={S.row}><button style={S.btn('primary')} onClick={createGoal} disabled={saving}>{saving ? t('strategy.saving') : t('strategy.add_goal')}</button><button style={S.btn()} onClick={() => setCreating(false)}>{t('strategy.cancel')}</button></div>
         </div>
       )}
       {(!strategy.goals || strategy.goals.length === 0) ? (
-        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No goals defined yet.</div>
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('strategy.no_goals')}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {strategy.goals.map((g: any) => (
@@ -206,10 +210,10 @@ function GoalsTab({ api, strategy, onRefresh }: { api: any, strategy: any, onRef
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setExpandedGoal(expandedGoal === g.id ? null : g.id)}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{g.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{g.pillar || 'No pillar'} {g.targetYear ? `· Target: ${g.targetYear}` : ''} · {g.alignments?.length || 0} capability alignment(s)</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{g.pillar || t('strategy.no_pillar')} {g.targetYear ? `· ${t('strategy.target')}: ${g.targetYear}` : ''} · {g.alignments?.length || 0} {t('strategy.cap_alignments')}</div>
                 </div>
-                <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => setExpandedGoal(expandedGoal === g.id ? null : g.id)}>{expandedGoal === g.id ? 'Collapse' : 'Manage Alignments'}</button>
-                <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => deleteGoal(g.id)}>Delete</button>
+                <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => setExpandedGoal(expandedGoal === g.id ? null : g.id)}>{expandedGoal === g.id ? t('strategy.collapse') : t('strategy.manage_align')}</button>
+                <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => deleteGoal(g.id)}>{t('strategy.delete')}</button>
               </div>
               {g.kpis?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>KPIs: {g.kpis.join(', ')}</div>}
               {expandedGoal === g.id && <AlignmentsPanel api={api} strategyId={strategy.id} goal={g} onRefresh={onRefresh} />}
