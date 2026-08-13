@@ -80,7 +80,7 @@ function DashboardTab({ dashboard, onOpenPlans }: { dashboard: any, onOpenPlans:
   if (!dashboard) return <div style={{ color: 'var(--text-dim)' }}>Loading…</div>
   return (
     <div>
-      <div style={S.grid4}>
+      <div className="stat-grid-4">
         <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Total Plans</div><div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard.total}</div></div>
         <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Active</div><div style={{ fontSize: 28, fontWeight: 700, color: '#2ecc71' }}>{dashboard.active}</div></div>
         <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Avg Progress</div><div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard.avgProgress}%</div></div>

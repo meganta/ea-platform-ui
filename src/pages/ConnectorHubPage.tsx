@@ -67,7 +67,7 @@ function ConnectorDashboard({ api, stats, onTab, onOpen }: { api: any, stats: an
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+      <div className="stat-grid-4">
         {[
           { icon: '🔌', label: 'Total Connectors', value: stats?.total || 0, color: 'var(--accent)' },
           { icon: '✅', label: 'Active', value: stats?.active || 0, color: '#2ecc71' },

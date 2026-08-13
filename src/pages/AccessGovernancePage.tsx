@@ -229,6 +229,7 @@ function RolesTab({ api, isAdmin }: any) {
           )}
         </div>
       )}
+      <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr><th style={S.th}>Name</th><th style={S.th}>Permissions</th><th style={S.th}>Users</th><th style={S.th}>Type</th><th style={S.th}></th></tr></thead>
         <tbody>
@@ -248,6 +249,7 @@ function RolesTab({ api, isAdmin }: any) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
@@ -290,6 +292,7 @@ function UsersTab({ api, isAdmin }: any) {
 
   return (
     <div>
+      <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead><tr><th style={S.th}>User</th><th style={S.th}>Legacy Role</th><th style={S.th}>Governance Roles</th><th style={S.th}>Last Login</th><th style={S.th}></th></tr></thead>
         <tbody>
@@ -331,6 +334,7 @@ function UsersTab({ api, isAdmin }: any) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
@@ -391,6 +395,7 @@ function RequestsTab({ api, isAdmin }: any) {
       </div>
 
       <div style={{ fontWeight: 600, margin: '20px 0 8px' }}>My Requests</div>
+      <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
         <thead><tr><th style={S.th}>Role</th><th style={S.th}>Reason</th><th style={S.th}>Status</th><th style={S.th}></th></tr></thead>
         <tbody>
@@ -405,6 +410,7 @@ function RequestsTab({ api, isAdmin }: any) {
           {myRequests.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>No requests yet.</td></tr>}
         </tbody>
       </table>
+      </div>
 
       {isAdmin && <>
         <div style={S.row}>
@@ -413,6 +419,7 @@ function RequestsTab({ api, isAdmin }: any) {
             {['PENDING','APPROVED','REJECTED','CANCELLED',''].map(s => <option key={s} value={s}>{s || 'All'}</option>)}
           </select>
         </div>
+        <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
           <thead><tr><th style={S.th}>Requester</th><th style={S.th}>Role</th><th style={S.th}>Reason</th><th style={S.th}>Status</th><th style={S.th}></th></tr></thead>
           <tbody>
@@ -431,6 +438,7 @@ function RequestsTab({ api, isAdmin }: any) {
             {requests.length === 0 && <tr><td colSpan={5} style={{ ...S.td, color: 'var(--text-dim)' }}>No requests.</td></tr>}
           </tbody>
         </table>
+        </div>
       </>}
     </div>
   )
@@ -490,6 +498,7 @@ function SodTab({ api, isAdmin }: any) {
       )}
 
       <div style={{ fontWeight: 600, margin: '20px 0 8px' }}>Rules</div>
+      <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
         <thead><tr><th style={S.th}>Name</th><th style={S.th}>Severity</th><th style={S.th}></th></tr></thead>
         <tbody>
@@ -503,6 +512,7 @@ function SodTab({ api, isAdmin }: any) {
           {rules.length === 0 && <tr><td colSpan={3} style={{ ...S.td, color: 'var(--text-dim)' }}>No rules configured.</td></tr>}
         </tbody>
       </table>
+      </div>
 
       <div style={{ fontWeight: 600, marginBottom: 8 }}>Current Conflicts</div>
       {conflicts.length === 0 ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No conflicts detected.</div> : conflicts.map((c: any, i: number) => (
@@ -553,6 +563,7 @@ function ReviewsTab({ api, isAdmin }: any) {
           <div><div style={{ fontSize: 16, fontWeight: 700 }}>{selected.name}</div><div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{items.filter(i => i.decision).length}/{items.length} reviewed</div></div>
           {selected.status === 'ACTIVE' && <button style={S.btn('primary')} onClick={complete}>Complete Campaign</button>}
         </div>
+        <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead><tr><th style={S.th}>User</th><th style={S.th}>Role</th><th style={S.th}>Decision</th><th style={S.th}></th></tr></thead>
           <tbody>
@@ -571,6 +582,7 @@ function ReviewsTab({ api, isAdmin }: any) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     )
   }
@@ -584,6 +596,7 @@ function ReviewsTab({ api, isAdmin }: any) {
           <div style={S.row}><button style={S.btn('primary')} onClick={createCampaign}>Create</button><button style={S.btn()} onClick={() => setCreating(false)}>Cancel</button></div>
         </div>
       )}
+      <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
         <thead><tr><th style={S.th}>Name</th><th style={S.th}>Status</th><th style={S.th}>Items</th><th style={S.th}>Created</th></tr></thead>
         <tbody>
@@ -598,6 +611,7 @@ function ReviewsTab({ api, isAdmin }: any) {
           {campaigns.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>No review campaigns yet.</td></tr>}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
@@ -607,6 +621,7 @@ function AuditTab({ api }: any) {
   const [logs, setLogs] = useState<any[]>([])
   useEffect(() => { api.get('/access-governance/audit?limit=100').then(setLogs).catch(() => {}) }, [api])
   return (
+    <div style={{ overflowX: 'auto' }}>
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
       <thead><tr><th style={S.th}>Time</th><th style={S.th}>Actor</th><th style={S.th}>Action</th><th style={S.th}>Target</th></tr></thead>
       <tbody>
@@ -621,5 +636,6 @@ function AuditTab({ api }: any) {
         {logs.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>No audit events yet.</td></tr>}
       </tbody>
     </table>
+    </div>
   )
 }

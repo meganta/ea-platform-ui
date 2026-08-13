@@ -246,7 +246,7 @@ function ComplianceReport() {
       </div>
 
       {data && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, marginBottom: 16 }}>
+        <div className="stat-grid-4" style={{ marginBottom: 16 }}>
           {[
             ['Total', data.total, '#8baac8'],
             ['Non-Compliant', data.nonCompliantCount, '#e74c3c'],

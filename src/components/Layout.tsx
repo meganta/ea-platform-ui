@@ -14,6 +14,7 @@ export default function Layout() {
   const [logoFailed, setLogoFailed] = useState(false)
   const [showSetupModal, setShowSetupModal] = useState(false)
   const [setupChecked, setSetupChecked] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const nav = useNavigate()
   const location = useLocation()
   const orgName = locale === 'AR' ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
@@ -25,6 +26,8 @@ export default function Layout() {
   // (✕) hides it for the rest of this session without marking setup
   // complete server-side - it reappears on the next login if still
   // incomplete, rather than being permanently silenced by one dismissal.
+  useEffect(() => { setSidebarOpen(false) }, [location.pathname])
+
   useEffect(() => {
     if (setupChecked || location.pathname === '/setup') return
     const token = localStorage.getItem('ea_token')
@@ -41,7 +44,9 @@ export default function Layout() {
 
   return (
     <div className="layout">
-      <div className="sidebar">
+      <button className="mobile-menu-btn" aria-label="Open menu" onClick={() => setSidebarOpen(o => !o)}>☰</button>
+      <div className={`sidebar-backdrop${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
+      <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
           {logoUrl && !logoFailed
             ? <img src={logoUrl} alt={orgName || 'Logo'} style={{ maxHeight: 32, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />

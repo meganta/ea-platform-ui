@@ -138,7 +138,7 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
   return (
     <div>
       {/* Overview stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 8, marginBottom: 14 }}>
+      <div className="stat-grid-5" style={{ marginBottom: 14 }}>
         {[['Total', findings.length, 'var(--text)'], ['Critical', sevCount('CRITICAL'), '#e74c3c'], ['High', sevCount('HIGH'), '#e67e22'], ['Medium', sevCount('MEDIUM'), '#f39c12'], ['Low', sevCount('LOW'), '#3498db']].map(([l,v,c]:any) => (
           <div key={l} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: c }}>{v}</div>
@@ -1785,7 +1785,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       )}
 
       {/* Score Row — use rescoreResult when available for live updates */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
+      <div className="stat-grid-6" style={{ marginBottom: 24 }}>
         <ScoreCircle score={uScores.overall} label='Overall' help="This is the big-picture health score for this review, combining everything below into one number. Green (75+) means things look solid; orange (60-74) means there are some things to fix; red (below 60) means significant issues need addressing before this can move forward." />
         <ScoreCircle score={(() => {
           // Strategic = weighted alignment % from tenant objectives
@@ -2033,7 +2033,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             const med  = findings.filter(f => f.severity === 'MEDIUM')
             const low  = findings.filter(f => f.severity === 'LOW')
             return (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
+              <div className="stat-grid-4" style={{ marginBottom: 16 }}>
                 {[['CRITICAL', crit.length, '#e74c3c'], ['HIGH', high.length, '#e67e22'], ['MEDIUM', med.length, '#f39c12'], ['LOW', low.length, '#3498db']].map(([l, n, c]: any) => (
                   <div key={l} style={{ background: c + '15', border: '1px solid ' + c + '44', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
                     <div style={{ fontSize: 28, fontWeight: 700, color: c }}>{n}</div>
@@ -2165,7 +2165,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 </div>
 
                 {/* Sub-scores */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 12 }}>
+                <div className="stat-grid-4" style={{ marginBottom: 12 }}>
                   {[['Compliance', ds.complianceScore], ['Risk', ds.riskScore], ['Strategic', ds.strategicScore], ['Completeness', ds.completenessScore]].map(([l,v]:any) => (
                     <div key={l} style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '5px 8px', textAlign: 'center' }}>
                       <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{l}</div>
@@ -2679,7 +2679,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         return (
           <div>
             {/* Severity summary cards */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+            <div className="stat-grid-5" style={{ marginBottom: 16 }}>
               {[['Total', allRisks.length, '#8baac8'], ['Critical', sevCount('CRITICAL'), '#e74c3c'], ['High', sevCount('HIGH'), '#e67e22'], ['Medium', sevCount('MEDIUM'), '#f39c12'], ['Low', sevCount('LOW'), '#3498db']].map(([l, v, c]: any) => (
                 <div key={l} style={{ background: c + '18', border: '1px solid ' + c + '44', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: c }}>{v}</div>
