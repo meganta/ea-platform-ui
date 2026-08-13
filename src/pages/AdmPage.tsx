@@ -3,6 +3,7 @@ import { useLang } from '../contexts/LangContext'
 import ReactMarkdown from 'react-markdown'
 import { DiagramViewer } from '../components/DiagramViewer'
 import { Phase7Workspace } from '../components/Phase7Workspace'
+import HelpTip from '../components/HelpTip'
 function DiagramBlock({ chart }: { chart: string }) {
   // Parse mermaid-style text into a readable styled block
   return (
@@ -1628,7 +1629,10 @@ export default function AdmPage() {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <div className="page-title">{t('adm.title')}</div>
+            <div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>
+              {t('adm.title')}
+              <HelpTip text="An ADM cycle is a structured, step-by-step process for planning and documenting your organization's architecture - moving through phases like defining the vision, understanding the current state, and designing the target state. Each phase produces specific deliverables." />
+            </div>
             <div className="page-subtitle">
               {selected ? `${selected.frameworkType} FRAMEWORK · ${selected.name}` : t('adm.subtitle')}
             </div>

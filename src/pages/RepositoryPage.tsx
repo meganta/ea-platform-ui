@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { useLang } from '../contexts/LangContext'
+import HelpTip from '../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -298,7 +299,7 @@ export default function RepositoryPage() {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <div className="page-title">{t('repo.title')}</div>
+            <div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>{t('repo.title')}<HelpTip text="This is the master list of everything in your architecture - applications, business capabilities, data, technology, and how they connect. Other parts of the platform (like reviews and diagrams) pull from what's stored here." /></div>
             <div className="page-subtitle">
               {config?.frameworkType} FRAMEWORK · {summary?.total || 0} ASSETS
             </div>

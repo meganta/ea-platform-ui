@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import HelpTip from '../components/HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -57,7 +58,7 @@ export default function EaPlanningPage() {
     <div style={S.page}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>🗓 EA Planning</div>
+          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🗓 EA Planning<HelpTip text="Create and track the plans that guide the EA practice's work over time - like an annual roadmap or a quarterly focus plan. You can write these yourself or have AI draft a starting point based on your goals." /></div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Strategic and operational plans for the EA practice</div>
         </div>
         <button style={S.btn('primary')} onClick={() => setCreating(true)}>+ New Plan</button>

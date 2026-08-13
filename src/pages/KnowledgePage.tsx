@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useLang } from '../contexts/LangContext'
 import { api } from '../lib/api'
+import HelpTip from '../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -86,7 +87,7 @@ export default function KnowledgePage() {
     <div>
       <div className="page-header">
         <div className="flex items-center justify-between">
-          <div><div className="page-title">{t('know.title')}</div><div className="page-subtitle">{t('know.subtitle')}</div></div>
+          <div><div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>{t('know.title')}<HelpTip text="Upload documents here (like policies, past reviews, or strategy papers) so the AI can reference them when answering questions or reviewing new proposals - instead of only relying on general knowledge." /></div><div className="page-subtitle">{t('know.subtitle')}</div></div>
           <div style={{position:'relative',display:'inline-block'}}>
             <button className="btn btn-primary" disabled={uploading} onClick={()=>setShowTypeSelect(s=>!s)}>
               ⬆ {uploading ? t('know.uploading') : t('know.upload')} ▾

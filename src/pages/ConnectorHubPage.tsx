@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import HelpTip from '../components/HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -555,8 +556,9 @@ function MappingsTab({ api, connectorId, connectorTypeName }: { api: any, connec
 
   return (
     <div>
-      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
-        Define how object types in {connectorTypeName || 'this source'} map to ArchMind asset fields. Used by the mapping engine when processing staged records.
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+        <span>Define how object types in {connectorTypeName || 'this source'} map to ArchMind asset fields. Used by the mapping engine when processing staged records.</span>
+        <HelpTip text="Different systems name things differently - one might call something 'App Name' while ArchMind calls it 'name'. A mapping tells ArchMind which field is which, so incoming data lines up correctly." />
       </div>
       <button style={{ ...S.btn('primary'), marginBottom: 16 }} onClick={startNew}>+ New Mapping</button>
       {mappings.length === 0 ? (
@@ -634,8 +636,9 @@ function StagingTab({ api, connectorId }: { api: any, connectorId: string }) {
 
   return (
     <div>
-      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
-        Records land here after being pulled/imported from the source, before being committed into the EA Repository. Run the pipeline to map, match, and (optionally) auto-commit.
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+        <span>Records land here after being pulled/imported from the source, before being committed into the EA Repository. Run the pipeline to map, match, and (optionally) auto-commit.</span>
+        <HelpTip text="This is a holding area for data pulled in from a connected system. Nothing here affects your repository until you review it and confirm it - so it's safe to look through before anything changes." />
       </div>
 
       <div style={{ ...S.card, marginBottom: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' as const }}>
@@ -1185,8 +1188,9 @@ function PopulationStrategyTab({ api }: { api: any }) {
 
   return (
     <div>
-      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16 }}>
-        Configure how each EA object type gets populated tenant-wide — manually curated, synced from a connector, or a hybrid of both with per-field ownership.
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+        <span>Configure how each EA object type gets populated tenant-wide — manually curated, synced from a connector, or a hybrid of both with per-field ownership.</span>
+        <HelpTip text="For each kind of item in your repository (like Applications or Capabilities), you choose: should people type this in themselves, should it come in automatically from a connected system, or a mix of both?" />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {objectTypes.map((t: any) => {
@@ -1245,6 +1249,21 @@ export default function ConnectorHubPage() {
           {TABS.map(t => <button key={t.id} style={S.tab(tab === t.id)} onClick={() => setTab(t.id)}>{t.label}</button>)}
         </div>
       )}
+      {tab !== 'detail' && (() => {
+        const TAB_HELP: Record<string, string> = {
+          dashboard: "An overview of every external system connected to ArchMind, and how much data has come in from each.",
+          connectors: "The systems ArchMind is connected to (like LeanIX, Ardoq, or ServiceNow) so it can pull in your existing architecture data instead of you re-entering it by hand.",
+          strategy: "For each type of item (applications, capabilities, etc.), decide whether it should be entered by hand, pulled in automatically from a connected system, or a mix of both.",
+          archimate: "Upload an ArchiMate file (a standard architecture-modeling format) to bring its contents into your repository.",
+          conflicts: "When incoming data from a connected system doesn't clearly match anything already in your repository, it shows up here so a person can decide what to do with it.",
+          new: "Connect ArchMind to a new external system.",
+        }
+        return TAB_HELP[tab] ? (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '10px 20px 0', display: 'flex', alignItems: 'center' }}>
+            <HelpTip text={TAB_HELP[tab]} />
+          </div>
+        ) : null
+      })()}
 
       <div style={S.content}>
         {tab === 'dashboard' && <ConnectorDashboard api={api} stats={stats} onTab={setTab} onOpen={openConnector} />}

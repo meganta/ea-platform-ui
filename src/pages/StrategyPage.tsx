@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import HelpTip from '../components/HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -68,7 +69,7 @@ export default function StrategyPage() {
     <div style={S.page}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>🎯 Strategy</div>
+          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🎯 Strategy<HelpTip text="Record your organization's strategic goals here, then connect each one to the specific capabilities that support it. This helps show whether your architecture is actually working toward what the organization is trying to achieve, and highlights any gaps." /></div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Strategic goals, capability alignment, and gap analysis</div>
         </div>
         <button style={S.btn('primary')} onClick={() => setCreating(true)}>+ New Strategy</button>

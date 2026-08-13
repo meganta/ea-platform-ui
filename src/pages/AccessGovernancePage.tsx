@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import HelpTip from '../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -54,6 +55,22 @@ export default function AccessGovernancePage() {
           <button key={k} style={S.tab(tab===k)} onClick={() => setTab(k as any)}>{l}</button>
         ))}
       </div>
+      {(() => {
+        const TAB_HELP: Record<string, string> = {
+          overview: "A snapshot of who has access to what across your organization, and whether anything needs your attention.",
+          roles: "A role is a bundle of permissions you can hand to someone all at once - like 'Architect' or 'Reviewer' - instead of assigning each permission one by one.",
+          users: "See what access each person in your organization currently has, and adjust it if needed.",
+          requests: "When someone asks for access to something they don't already have, it shows up here for an admin to approve or decline.",
+          sod: "Short for 'Segregation of Duties' - a safeguard that flags when one person has been given two roles that shouldn't be combined, like being able to both request and approve the same thing.",
+          reviews: "A periodic check-in where admins confirm that everyone's current access still makes sense, and remove anything that's no longer needed.",
+          audit: "A complete history of every access-related change - who was given what, when, and by whom.",
+        }
+        return (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '10px 20px 0', display: 'flex', alignItems: 'center' }}>
+            <HelpTip text={TAB_HELP[tab]} />
+          </div>
+        )
+      })()}
       <div style={S.content}>
         {tab === 'overview' && <OverviewTab api={api} isAdmin={isAdmin} />}
         {tab === 'roles' && <RolesTab api={api} isAdmin={isAdmin} />}

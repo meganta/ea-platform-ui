@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import HelpTip from '../components/HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -1536,7 +1537,7 @@ export default function MetaModelPage() {
     <div style={S.page}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>🏛 EA Meta-Model Studio</div>
+          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🏛 EA Meta-Model Studio<HelpTip text="This is where you define the building blocks your organization's architecture is made of - things like 'Application' or 'Business Capability' - and what information gets tracked for each one. Most people won't need to change this; it's usually set up once by an administrator." /></div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{stats?.model?.name}</div>
         </div>
       </div>

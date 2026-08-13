@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import HelpTip from '../components/HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -837,6 +838,19 @@ export default function EaViewsPage() {
           {TABS.map(t=><button key={t.id} style={S.tab(tab===t.id)} onClick={()=>setTab(t.id)}>{t.label}</button>)}
         </div>
       )}
+      {tab !== 'viewer' && tab !== 'builder' && (() => {
+        const TAB_HELP: Record<string, string> = {
+          dashboard: "A quick summary of the diagrams and views that have been created from your architecture data.",
+          library: "Ready-made templates for common types of diagrams - pick one to quickly build a view without starting from scratch.",
+          'my-views': "The diagrams and views you've already created. Open one to view, edit, or export it.",
+          snapshots: "A saved copy of a view at a specific point in time, so you can look back at how something looked before it changed.",
+        }
+        return TAB_HELP[tab] ? (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '10px 20px 0', display: 'flex', alignItems: 'center' }}>
+            <HelpTip text={TAB_HELP[tab]} />
+          </div>
+        ) : null
+      })()}
 
       <div style={S.content}>
         {tab === 'dashboard' && <ViewsDashboard api={api} stats={stats} onTab={setTab} onOpenView={openView} />}
