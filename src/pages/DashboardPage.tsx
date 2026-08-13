@@ -239,7 +239,7 @@ export default function DashboardPage() {
               { icon: '🗄', label: t('qa.repo'), sub: t('qa.repo_sub'), path: '/repository' },
               { icon: '🏛', label: t('gov.dashboard'), sub: t('gov.start_review'), path: '/governance' },
             ].map(a => (
-              <button key={a.path} onClick={() => nav(a.path)} style={{ width: '100%', background: 'none', border: 'none', padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'start', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button key={a.path} onClick={() => nav(a.path)} style={{ width: '100%', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'start', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 20 }}>{a.icon}</span>
                 <div><div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{a.label}</div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.sub}</div></div>
               </button>

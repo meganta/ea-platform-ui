@@ -545,7 +545,7 @@ export default function CopilotPage() {
         {/* Sidebar tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
           {(['architects', 'history', 'meetings'] as const).map(t => (
-            <button key={t} style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', border: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSidebarTab(t)}>
+            <button key={t} style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSidebarTab(t)}>
               {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : '📋 Meetings'}
             </button>
           ))}

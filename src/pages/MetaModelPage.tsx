@@ -19,7 +19,7 @@ const S = {
   page: { padding: 0, height: '100%', display: 'flex', flexDirection: 'column' as const, background: 'var(--navy)' },
   header: { padding: '20px 28px 0', display: 'flex', alignItems: 'center', gap: 16, borderBottom: '1px solid var(--border)', paddingBottom: 16 },
   tabs: { display: 'flex', gap: 2, padding: '0 28px', borderBottom: '1px solid var(--border)', background: 'var(--navy-light)' },
-  tab: (active: boolean) => ({ padding: '10px 18px', fontSize: 13, fontWeight: active ? 600 : 400, color: active ? 'var(--accent)' : 'var(--text-dim)', borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent', cursor: 'pointer', background: 'none', border: 'none', transition: 'all 0.15s' }),
+  tab: (active: boolean) => ({ padding: '10px 18px', fontSize: 13, fontWeight: active ? 600 : 400, color: active ? 'var(--accent)' : 'var(--text-dim)', borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', background: 'none', transition: 'all 0.15s' }),
   content: { flex: 1, overflow: 'auto', padding: '24px 28px' },
   card: { background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 10, padding: 20 },
   btn: (variant: 'primary'|'secondary'|'danger' = 'secondary') => ({
