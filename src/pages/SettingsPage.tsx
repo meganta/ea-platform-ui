@@ -583,6 +583,7 @@ function BillingTab({ api, tenant }: { api: any, tenant: any }) {
       {history.length > 0 && (
         <div className="card">
           <div className="section-title">📈 Usage History</div>
+          <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -599,6 +600,7 @@ function BillingTab({ api, tenant }: { api: any, tenant: any }) {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

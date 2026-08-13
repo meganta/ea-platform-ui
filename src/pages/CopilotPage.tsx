@@ -532,10 +532,10 @@ export default function CopilotPage() {
   const archColor = (code?: string) => DOMAIN_COLOR[code || 'CHIEF'] || '#7f8c8d'
 
   return (
-    <div style={{ display: 'flex', height: '100%', background: 'var(--navy)', overflow: 'hidden' }}>
+    <div className="side-panel-parent" style={{ display: 'flex', height: '100%', background: 'var(--navy)', overflow: 'hidden' }}>
 
       {/* ── Left sidebar ─────────────────────────────────────────────────── */}
-      <div style={{ width: 260, background: 'var(--navy-light)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+      <div className="side-panel-260" style={{ background: 'var(--navy-light)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>🤖 EA Copilot</div>

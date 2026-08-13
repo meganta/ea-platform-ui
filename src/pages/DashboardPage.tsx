@@ -92,7 +92,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Governance KPIs */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
+            <div className="stat-grid-3" style={{ marginBottom: 16 }}>
               {[
                 { label: t('gov.total_reviews'), value: statsTotal, sub: statsComplete + ' completed', color: '#8baac8' },
                 { label: t('gov.avg_score'), value: statsAvgScore || '—', sub: scoreAvgs ? `C:${scoreAvgs.compliance} S:${scoreAvgs.strategic} R:${scoreAvgs.risk}` : '', color: statsAvgScore >= 70 ? '#2ecc71' : statsAvgScore >= 50 ? '#f39c12' : '#e74c3c' },

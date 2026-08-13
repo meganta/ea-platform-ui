@@ -71,6 +71,27 @@ button { cursor: pointer; font-family: var(--font-body) }
 @media (max-width: 600px) {
   .stat-grid-3, .stat-grid-4, .stat-grid-5, .stat-grid-6 { grid-template-columns:repeat(2,1fr) }
 }
+
+/* ── Responsive side panels (steps nav, architect list, properties panel) ── */
+/* These are fixed-width flex-shrink:0 sidebars alongside a main content
+   area - fine on desktop, but eating 200-260px of an already-narrow phone
+   viewport is a real problem. Below 768px they reflow to a full-width
+   panel stacked above/below the content instead, rather than staying
+   docked to the side. Width must live in the class (not inline) so the
+   media query can actually override it - inline styles beat class rules
+   regardless of media query specificity. */
+.side-panel-200, .side-panel-240, .side-panel-260 { flex-shrink: 0; }
+.side-panel-200 { width: 200px; }
+.side-panel-240 { width: 240px; }
+.side-panel-260 { width: 260px; }
+
+@media (max-width: 768px) {
+  .side-panel-200, .side-panel-240, .side-panel-260 {
+    width: 100%;
+    max-height: 220px;
+  }
+  .side-panel-parent { flex-direction: column; }
+}
 .page-header { padding:28px 32px 0; border-bottom:1px solid var(--border) }
 .page-title { font-family:var(--font-display); font-size:22px; font-weight:700 }
 .page-subtitle { font-size:12px; color:var(--text-dim); margin-top:2px; font-family:var(--font-mono) }

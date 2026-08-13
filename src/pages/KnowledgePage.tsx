@@ -126,7 +126,7 @@ export default function KnowledgePage() {
         {tab==='documents' && (
           docs.length===0
             ? <div className="empty"><div className="empty-title">{t('know.no_docs')}</div><button className="btn btn-primary mt-4" onClick={()=>fileRef.current?.click()}>{t('know.upload_first')}</button></div>
-            : <table>
+            : <div style={{ overflowX: 'auto' }}><table>
                 <thead><tr>
                   <th>{t('know.col_name')}</th>
                   <th>{t('know.col_type')}</th>
@@ -154,6 +154,7 @@ export default function KnowledgePage() {
                   </tr>
                 ))}</tbody>
               </table>
+            </div>
         )}
         {tab==='search' && (
           <div>

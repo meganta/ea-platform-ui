@@ -744,7 +744,7 @@ function MetaModelDesigner({ api }: { api: any }) {
   }
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 180px)', gap: 0 }}>
+    <div className="side-panel-parent" style={{ display: 'flex', height: 'calc(100vh - 180px)', gap: 0 }}>
       {/* Canvas */}
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 10 }}>
         {/* Toolbar */}
@@ -804,7 +804,7 @@ function MetaModelDesigner({ api }: { api: any }) {
       </div>
 
       {/* Properties panel */}
-      <div style={{ width: 240, background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 10, marginLeft: 12, padding: 16, overflowY: 'auto' as const, flexShrink: 0 }}>
+      <div className="side-panel-240" style={{ background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 10, marginLeft: 12, padding: 16, overflowY: 'auto' as const }}>
         {selected ? (
           <>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{selected.icon} {selected.name}</div>

@@ -363,6 +363,7 @@ export default function RepositoryPage() {
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
                   📁 {group} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} assets)</span>
                 </div>
+                <div style={{ overflowX: 'auto' }}>
                 <table>
                   <thead><tr>
                     <th>{t('repo.col_name')}</th>
@@ -381,6 +382,7 @@ export default function RepositoryPage() {
                     </tr>
                   ))}</tbody>
                 </table>
+                </div>
               </div>
             ))}
           </div>
@@ -392,6 +394,7 @@ export default function RepositoryPage() {
             <button className="btn btn-primary mt-4" onClick={() => setShowAdd(true)}>+ New Asset</button>
           </div>
         ) : (
+          <div style={{ overflowX: 'auto' }}>
           <table>
             <thead>
               <tr>
@@ -428,6 +431,7 @@ export default function RepositoryPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
