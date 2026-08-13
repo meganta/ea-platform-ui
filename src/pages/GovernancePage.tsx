@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
+import HelpTip from '../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -85,7 +86,7 @@ const INTELLIGENCE_ITEMS = [
 const SEV_COLOR: Record<string, string> = { CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71' }
 const DECISION_COLOR: Record<string, string> = { APPROVED: '#2ecc71', APPROVED_WITH_CONDITIONS: '#f39c12', REQUIRES_CHANGES: '#e67e22', REJECTED: '#e74c3c', PENDING: '#8baac8' }
 
-function ScoreCircle({ score, label, size = 72 }: { score: number, label: string, size?: number }) {
+function ScoreCircle({ score, label, size = 72, help }: { score: number, label: string, size?: number, help?: string }) {
   const color = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
   return (
     <div style={{ textAlign: 'center' }}>
@@ -93,7 +94,7 @@ function ScoreCircle({ score, label, size = 72 }: { score: number, label: string
         <div style={{ fontSize: size >= 72 ? 22 : 16, fontWeight: 700, color }}>{score}</div>
         <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}{help && <HelpTip text={help} />}</div>
     </div>
   )
 }
@@ -1785,7 +1786,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
       {/* Score Row — use rescoreResult when available for live updates */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12, marginBottom: 24 }}>
-        <ScoreCircle score={uScores.overall} label='Overall' />
+        <ScoreCircle score={uScores.overall} label='Overall' help="This is the big-picture health score for this review, combining everything below into one number. Green (75+) means things look solid; orange (60-74) means there are some things to fix; red (below 60) means significant issues need addressing before this can move forward." />
         <ScoreCircle score={(() => {
           // Strategic = weighted alignment % from tenant objectives
           const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
@@ -1804,12 +1805,12 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             wSum += av * w; wTot += w
           }
           return wTot > 0 ? Math.round(wSum / wTot) : 0
-        })()} label='Strategic' />
-        <ScoreCircle score={uScores.compliance} label='Compliance' />
-        <ScoreCircle score={uScores.risk} label='Risk' />
-        <ScoreCircle score={uScores.future} label='Future State' />
-        <ScoreCircle score={uScores.financial} label='Financial' />
-        <ScoreCircle score={uScores.domains} label='Domains' />
+        })()} label='Strategic' help="How well this solution connects to your organization's stated goals and priorities. A low score means the proposal doesn't clearly explain how it supports where the organization is heading." />
+        <ScoreCircle score={uScores.compliance} label='Compliance' help="How well this solution follows required standards, policies, and principles - both your organization's own rules and relevant national standards. A low score points to rules that may need to be addressed before approval." />
+        <ScoreCircle score={uScores.risk} label='Risk' help="How much this proposal could go wrong, and how well those risks have been thought through. A high score means risks are well understood and managed; a low score means there are unaddressed concerns." />
+        <ScoreCircle score={uScores.future} label='Future State' help="Whether this solution fits with the long-term technology direction the organization is heading toward, not just what works today." />
+        <ScoreCircle score={uScores.financial} label='Financial' help="Whether this proposal makes efficient use of money - for example, reusing something the organization already owns instead of buying something new and duplicating cost." />
+        <ScoreCircle score={uScores.domains} label='Domains' help="An average of how this solution scores across every architecture area it touches - things like security, data, business processes, and technology." />
       </div>
 
       {/* Score formula explainer — shows actual computed values */}
@@ -1892,6 +1893,24 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           <button key={t.key} onClick={() => setTab(t.key as any)} style={{ padding: '8px 14px', background: 'none', border: 'none', borderBottom: tab === t.key ? '2px solid var(--accent)' : '2px solid transparent', color: tab === t.key ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.key ? 600 : 400, whiteSpace: 'nowrap' }}>{t.label}</button>
         ))}
       </div>
+
+      {/* Contextual help for whichever tab is active */}
+      {(() => {
+        const TAB_HELP: Record<string, string> = {
+          summary: "A quick overview of the whole review: the decision, the key numbers, and a short written summary of what was found.",
+          domains: "Every specific issue found during the review, grouped by architecture area (like security or data). Click a finding to see more detail or mark it as resolved.",
+          strategic: "Shows how well this proposal connects to the organization's stated goals, and whether it clearly explains the value it will deliver.",
+          compliance: "Checks this proposal against required standards and policies - both your organization's own rules and relevant national standards - and flags anything that doesn't line up.",
+          risk: "Lists the things that could go wrong with this proposal, how serious each one is, and what's being done (or should be done) about it.",
+          future: "Checks whether this proposal fits with where the organization's technology is heading long-term, not just what works right now.",
+          financial: "Highlights ways this proposal could save money - for example, by reusing something the organization already owns instead of buying something new.",
+        }
+        return TAB_HELP[tab] ? (
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, display: 'flex', alignItems: 'center' }}>
+            <HelpTip text={TAB_HELP[tab]} />
+          </div>
+        ) : null
+      })()}
 
       {/* Summary Tab */}
       {tab === 'summary' && (
