@@ -10,9 +10,10 @@ beforeEach(() => {
 });
 
 function mockFetch(routes: Record<string, any>) {
+  const sortedPatterns = Object.keys(routes).sort((a, b) => b.length - a.length); // most specific first
   global.fetch = jest.fn().mockImplementation((url: string) => {
-    for (const [pattern, response] of Object.entries(routes)) {
-      if (url.includes(pattern)) return Promise.resolve({ ok: true, json: () => Promise.resolve(response) });
+    for (const pattern of sortedPatterns) {
+      if (url.includes(pattern)) return Promise.resolve({ ok: true, json: () => Promise.resolve(routes[pattern]) });
     }
     return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
   }) as any;
