@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
+import HelpTip from '../components/HelpTip'
 import { getToken } from '../lib/api'
 
 const GOV_API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
@@ -438,7 +439,7 @@ export default function ReportsPage() {
   return (
     <div dir={isAR ? 'rtl' : 'ltr'}>
       <div className='page-header' style={{ paddingBottom: 20 }}>
-        <div style={{ fontSize: 22, fontWeight: 700 }}>{isAR ? '📊 التقارير' : '📊 Reports'}</div>
+        <div style={{ fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center' }}>{isAR ? '📊 التقارير' : '📊 Reports'}{!isAR && <HelpTip text="A combined view across all your governance reviews - see patterns in findings, track compliance over time, and export summaries." />}</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 4 }}>
           {isAR ? 'تقارير الحوكمة والمتطلبات والامتثال' : 'Governance, compliance and requirements reports'}
         </div>

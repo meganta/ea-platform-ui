@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import { useBranding } from '../contexts/BrandingContext'
+import HelpTip from '../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -224,7 +225,7 @@ function GovernanceSettingsTab() {
 
   return (
     <div>
-      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>⚖ Governance Settings</div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4, display: 'flex', alignItems: 'center' }}>⚖ Governance Settings<HelpTip text="Controls who needs to approve changes to your organization's architecture before they become official, and how many reviewers are required." /></div>
       <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Configure architecture governance workflows and approval thresholds</div>
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -541,7 +542,7 @@ function BillingTab({ api, tenant }: { api: any, tenant: any }) {
   return (
     <div>
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="section-title">💳 Subscription & Usage</div>
+        <div className="section-title" style={{ display: 'flex', alignItems: 'center' }}>💳 Subscription & Usage<HelpTip text="Your subscription tier sets monthly limits on things like AI requests and document uploads. If you're getting close to a limit, you'll see it below - contact your administrator if you need a higher tier." /></div>
         <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
           {tiers.tiers.map((t: any) => (
             <div key={t.name} className="card" style={{ flex: 1, padding: 20, border: `1px solid ${tenant?.subscriptionTier === t.name ? 'var(--accent)' : 'var(--border)'}`, position: 'relative' }}>
@@ -1139,7 +1140,7 @@ export default function SettingsPage() {
         {/* ── AI Config ── */}
         {tab === 'ai' && (
           <div className="card">
-            <div className="section-title">🤖 AI Configuration</div>
+            <div className="section-title" style={{ display: 'flex', alignItems: 'center' }}>🤖 AI Configuration<HelpTip text="Controls which AI service powers features like governance reviews and the copilot. Unless you have a specific reason to change this, the default setting works well - this is mainly for administrators." /></div>
             <div className="form-group">
               <label className="form-label">AI Provider</label>
               <select className="form-input" value={ai.provider} onChange={e => setAi(a => ({ ...a, provider: e.target.value }))}>
