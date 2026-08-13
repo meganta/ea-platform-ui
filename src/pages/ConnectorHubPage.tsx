@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
 
@@ -6,13 +6,15 @@ const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-6936606805
 
 function useApi() {
   const { token } = useAuth() as any
-  const h = () => ({ Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' })
-  const get = (p: string) => fetch(`${API}${p}`, { headers: h() }).then(r => r.json())
-  const post = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
-  const put = (p: string, b: any) => fetch(`${API}${p}`, { method: 'PUT', headers: h(), body: JSON.stringify(b) }).then(r => r.json())
-  const del = (p: string) => fetch(`${API}${p}`, { method: 'DELETE', headers: h() }).then(r => r.ok)
-  const tok = token || localStorage.getItem('ea_token') || ''
-  return { get, post, put, del, tok }
+  return useMemo(() => {
+    const h = () => ({ Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' })
+    const get = (p: string) => fetch(`${API}${p}`, { headers: h() }).then(r => r.json())
+    const post = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
+    const put = (p: string, b: any) => fetch(`${API}${p}`, { method: 'PUT', headers: h(), body: JSON.stringify(b) }).then(r => r.json())
+    const del = (p: string) => fetch(`${API}${p}`, { method: 'DELETE', headers: h() }).then(r => r.ok)
+    const tok = token || localStorage.getItem('ea_token') || ''
+    return { get, post, put, del, tok }
+  }, [token])
 }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────

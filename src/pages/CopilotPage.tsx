@@ -1,15 +1,17 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
 function useApi() {
   const { token } = useAuth() as any
-  const h = () => ({ Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' })
-  const get = (p: string) => fetch(`${API}${p}`, { headers: h() }).then(r => r.json())
-  const post = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
-  const del = (p: string) => fetch(`${API}${p}`, { method: 'DELETE', headers: h() })
-  return { get, post, del, token: token || localStorage.getItem('ea_token') || '' }
+  return useMemo(() => {
+    const h = () => ({ Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' })
+    const get = (p: string) => fetch(`${API}${p}`, { headers: h() }).then(r => r.json())
+    const post = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
+    const del = (p: string) => fetch(`${API}${p}`, { method: 'DELETE', headers: h() })
+    return { get, post, del, token: token || localStorage.getItem('ea_token') || '' }
+  }, [token])
 }
 
 interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date }
