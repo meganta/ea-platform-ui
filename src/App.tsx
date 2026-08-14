@@ -22,6 +22,7 @@ import SetupAssistantPage from './pages/SetupAssistantPage'
 import StrategyPage from './pages/StrategyPage'
 import EaPlanningPage from './pages/EaPlanningPage'
 import GlossaryPage from './pages/GlossaryPage'
+import InnovationPage from './pages/InnovationPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -58,6 +59,7 @@ export default function App() {
               <Route path="strategy" element={<StrategyPage />} />
               <Route path="ea-planning" element={<EaPlanningPage />} />
               <Route path="glossary" element={<GlossaryPage />} />
+              <Route path="innovation" element={<InnovationPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
