@@ -49,21 +49,21 @@ function AssetModal({ asset, config, onClose, onSave, t }: any) {
         <div className="modal-title">{asset ? 'Edit Asset' : 'New EA Asset'}</div>
         <form onSubmit={submit}>
           <div className="grid-2" style={{ gap: 12 }}>
-            <div className="form-group"><label className="form-label">Name (English) *</label><input className="form-input" value={form.name} onChange={set('name')} required /></div>
-            <div className="form-group"><label className="form-label">Name (Arabic)</label><input className="form-input" value={form.nameAr || ''} onChange={set('nameAr')} dir="rtl" /></div>
+            <div className="form-group"><label className="form-label" htmlFor="asset-name">Name (English) *</label><input id="asset-name" className="form-input" value={form.name} onChange={set('name')} required /></div>
+            <div className="form-group"><label className="form-label" htmlFor="asset-name-ar">Name (Arabic)</label><input id="asset-name-ar" className="form-input" value={form.nameAr || ''} onChange={set('nameAr')} dir="rtl" /></div>
           </div>
-          <div className="form-group"><label className="form-label">Description</label><textarea className="form-input" value={form.description || ''} onChange={set('description')} rows={2} /></div>
+          <div className="form-group"><label className="form-label" htmlFor="asset-description">Description</label><textarea id="asset-description" className="form-input" value={form.description || ''} onChange={set('description')} rows={2} /></div>
           <div className="grid-2" style={{ gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Domain *</label>
-              <select className="form-input" value={form.domain} onChange={e => setForm((f: any) => ({ ...f, domain: e.target.value, assetType: '' }))} required>
+              <label className="form-label" htmlFor="asset-domain">Domain *</label>
+              <select id="asset-domain" className="form-input" value={form.domain} onChange={e => setForm((f: any) => ({ ...f, domain: e.target.value, assetType: '' }))} required>
                 <option value="">Select domain...</option>
                 {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Asset Type *</label>
-              <select className="form-input" value={form.assetType} onChange={set('assetType')} required disabled={!form.domain}>
+              <label className="form-label" htmlFor="asset-type">Asset Type *</label>
+              <select id="asset-type" className="form-input" value={form.assetType} onChange={set('assetType')} required disabled={!form.domain}>
                 <option value="">Select type...</option>
                 {assetTypes.map((t: string) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
               </select>
@@ -71,12 +71,12 @@ function AssetModal({ asset, config, onClose, onSave, t }: any) {
           </div>
           <div className="grid-2" style={{ gap: 12 }}>
             <div className="form-group">
-              <label className="form-label">Status</label>
-              <select className="form-input" value={form.status} onChange={set('status')}>
+              <label className="form-label" htmlFor="asset-status">Status</label>
+              <select id="asset-status" className="form-input" value={form.status} onChange={set('status')}>
                 {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
               </select>
             </div>
-            <div className="form-group"><label className="form-label">Owner</label><input className="form-input" value={form.owner || ''} onChange={set('owner')} /></div>
+            <div className="form-group"><label className="form-label" htmlFor="asset-owner">Owner</label><input id="asset-owner" className="form-input" value={form.owner || ''} onChange={set('owner')} /></div>
           </div>
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
@@ -273,6 +273,8 @@ export default function RepositoryPage() {
   const filtered = assets.filter(a => {
     if (selectedDomain !== 'ALL' && a.domain !== selectedDomain) return false
     if (selectedStatus !== 'ALL' && a.status !== selectedStatus) return false
+    if (selectedSource !== 'ALL' && a.source !== selectedSource) return false
+    if (selectedAssetType !== 'ALL' && a.assetType !== selectedAssetType) return false
     if (search && !a.name.toLowerCase().includes(search.toLowerCase()) && !(a.nameAr || '').includes(search)) return false
     return true
   })
