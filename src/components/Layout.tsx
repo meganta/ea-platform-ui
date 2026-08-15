@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import { useBranding } from '../contexts/BrandingContext'
 import SetupAssistantPage from '../pages/SetupAssistantPage'
+import NotificationBell from './NotificationBell'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -62,6 +63,7 @@ export default function Layout() {
           <NavLink to="/strategy" className={({isActive})=>`nav-item${isActive?' active':''}`}>🎯 Strategy</NavLink>
           <NavLink to="/ea-planning" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗓 EA Planning</NavLink>
           <NavLink to="/innovation" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔭 {t('nav.innovation')}</NavLink>
+          <NavLink to="/notifications" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔔 {t('nav.notifications')}</NavLink>
           <NavLink to="/meta-model" className={({isActive})=>`nav-item${isActive?' active':''}`}>🧩 Meta-Model</NavLink>
           <NavLink to="/ea-views" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗺 EA Views</NavLink>
           <NavLink to="/connector-hub" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔌 Connectors</NavLink>
@@ -90,6 +92,7 @@ export default function Layout() {
         </div>
       </div>
       <div className="main-content"><Outlet /></div>
+      <NotificationBell />
       {showSetupModal && <SetupAssistantPage modal onClose={() => setShowSetupModal(false)} />}
     </div>
   )
