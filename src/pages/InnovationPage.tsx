@@ -85,7 +85,7 @@ export default function InnovationPage() {
   const { t, isAR } = useLang()
   const { user } = useAuth() as any
   const isAdmin = user?.role === 'TENANT_ADMIN'
-  const [tab, setTab] = useState<'radar' | 'favorites' | 'ideas' | 'profile'>('radar')
+  const [tab, setTab] = useState<'radar' | 'favorites' | 'ideas' | 'studies' | 'profile'>('radar')
   const [selected, setSelected] = useState<any>(null)
 
   return (
@@ -105,12 +105,14 @@ export default function InnovationPage() {
         <button style={S.tab(tab === 'radar')} onClick={() => { setTab('radar'); setSelected(null) }}>{t('innov.tab_radar')}</button>
         <button style={S.tab(tab === 'favorites')} onClick={() => { setTab('favorites'); setSelected(null) }}>{t('innov.tab_favorites')}</button>
         <button style={S.tab(tab === 'ideas')} onClick={() => { setTab('ideas'); setSelected(null) }}>{t('innov.tab_ideas')}</button>
+        <button style={S.tab(tab === 'studies')} onClick={() => { setTab('studies'); setSelected(null) }}>{t('innov.tab_studies')}</button>
         <button style={S.tab(tab === 'profile')} onClick={() => { setTab('profile'); setSelected(null) }}>{t('innov.tab_profile')}</button>
       </div>
       <div style={S.content}>
         {tab === 'radar' && <RadarTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} />}
         {tab === 'favorites' && <FavoritesTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} />}
         {tab === 'ideas' && <IdeasTab api={api} isAR={isAR} t={t} userRole={user?.role} />}
+        {tab === 'studies' && <StudiesTab api={api} isAR={isAR} t={t} />}
         {tab === 'profile' && <ProfileTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} />}
       </div>
     </div>
@@ -530,6 +532,36 @@ const IDEA_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
 }
 const DECISION_ROLES = ['TENANT_ADMIN', 'REVIEWER']
 
+const STUDY_STATUS_COLOR: Record<string, string> = {
+  DRAFT: '#7f8c8d', AI_RESEARCH: '#f39c12', UNDER_REVIEW: '#3498db', REWORK: '#e67e22',
+  APPROVED: '#27ae60', RECOMMENDED: '#2ecc71', PILOT_INITIATIVE: '#9b59b6', IMPLEMENTED: '#16a085', CLOSED_ARCHIVED: '#7f8c8d',
+}
+const STUDY_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
+  DRAFT: { en: 'Draft', ar: 'مسودة' }, AI_RESEARCH: { en: 'AI Research…', ar: 'بحث الذكاء الاصطناعي…' },
+  UNDER_REVIEW: { en: 'Under Review', ar: 'قيد المراجعة' }, REWORK: { en: 'Rework', ar: 'إعادة عمل' },
+  APPROVED: { en: 'Approved', ar: 'معتمدة' }, RECOMMENDED: { en: 'Recommended', ar: 'موصى بها' },
+  PILOT_INITIATIVE: { en: 'Pilot / Initiative', ar: 'تجريبية / مبادرة' }, IMPLEMENTED: { en: 'Implemented', ar: 'منفَّذة' },
+  CLOSED_ARCHIVED: { en: 'Closed / Archived', ar: 'مغلقة / مؤرشفة' },
+}
+const RECOMMENDATION_LABEL: Record<string, { en: string; ar: string }> = {
+  PROCEED: { en: 'Proceed', ar: 'المضي قدمًا' }, PROCEED_WITH_CONDITIONS: { en: 'Proceed with Conditions', ar: 'المضي قدمًا بشروط' },
+  POC_FIRST: { en: 'PoC First', ar: 'إثبات مفهوم أولاً' }, PILOT: { en: 'Pilot', ar: 'تجريب' },
+  DEFER: { en: 'Defer', ar: 'تأجيل' }, WATCH: { en: 'Watch', ar: 'متابعة' }, REJECT: { en: 'Reject', ar: 'رفض' },
+}
+// Mirrors apps/api/src/innovation/study.service.ts's STUDY_SECTION_DEFS - keep in sync if that list changes.
+const STUDY_SECTIONS: { key: string; en: string; ar: string; shape: 'text' | 'list' | 'recommendation' }[] = [
+  { key: 'EXECUTIVE_SUMMARY', en: 'Executive Summary', ar: 'الملخص التنفيذي', shape: 'text' },
+  { key: 'BUSINESS_PROBLEM', en: 'Business Problem / Opportunity', ar: 'المشكلة/الفرصة التجارية', shape: 'text' },
+  { key: 'STRATEGIC_ALIGNMENT', en: 'Strategic Alignment', ar: 'التوافق الاستراتيجي', shape: 'text' },
+  { key: 'CAPABILITY_IMPACT', en: 'Business Capability Impact', ar: 'أثر القدرات المؤسسية', shape: 'list' },
+  { key: 'USE_CASES', en: 'Potential Use Cases', ar: 'حالات الاستخدام المحتملة', shape: 'list' },
+  { key: 'ARCHITECTURE_FIT', en: 'Architecture Fit Assessment', ar: 'تقييم توافق البنية', shape: 'text' },
+  { key: 'TECHNOLOGY_OPTIONS', en: 'Recommended Technology Options', ar: 'خيارات التقنية الموصى بها', shape: 'list' },
+  { key: 'RISKS_MITIGATION', en: 'Risks & Mitigation', ar: 'المخاطر والتخفيف', shape: 'list' },
+  { key: 'FINANCIAL_ASSESSMENT', en: 'Financial Assessment', ar: 'التقييم المالي', shape: 'text' },
+  { key: 'RECOMMENDATION', en: 'Recommendation', ar: 'التوصية', shape: 'recommendation' },
+]
+
 function ScoreRing({ score, label }: { score: number | null; label: string }) {
   const color = score == null ? '#7f8c8d' : score >= 70 ? '#2ecc71' : score >= 50 ? '#f39c12' : '#e74c3c'
   return (
@@ -736,6 +768,288 @@ function IdeaDetail({ api, idea, isAR, t, userRole, radarItems, onBack, onRefres
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Studies Tab (Innovation-P3) ─────────────────────────────────────────────
+
+function StudiesTab({ api, isAR, t }: any) {
+  const [studies, setStudies] = useState<any[]>([])
+  const [statusFilter, setStatusFilter] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    api.get(`/innovation/studies${statusFilter ? `?status=${statusFilter}` : ''}`).then((d: any) => setStudies(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+  }, [api, statusFilter])
+  useEffect(() => { load() }, [load])
+
+  if (selectedId) return <StudyDetail api={api} studyId={selectedId} isAR={isAR} t={t} onBack={() => { setSelectedId(null); load() }} />
+
+  return (
+    <div>
+      <div style={{ ...S.row, marginBottom: 16, flexWrap: 'wrap' as const }}>
+        <select style={{ ...S.input, marginBottom: 0, width: 200 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">{t('innov.all_statuses')}</option>
+          {Object.keys(STUDY_STATUS_LABEL).map(s => <option key={s} value={s}>{isAR ? STUDY_STATUS_LABEL[s].ar : STUDY_STATUS_LABEL[s].en}</option>)}
+        </select>
+        <div style={{ flex: 1 }} />
+        <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('innov.new_study')}</button>
+      </div>
+
+      {creating && <StudyCreateForm api={api} isAR={isAR} t={t} onDone={(id: string) => { setCreating(false); setSelectedId(id) }} onCancel={() => setCreating(false)} />}
+
+      {loading ? (
+        <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
+      ) : studies.length === 0 ? (
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('innov.no_studies')}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {studies.map((s: any) => (
+            <div key={s.id} style={{ ...S.card, padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }} onClick={() => setSelectedId(s.id)}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{isAR && s.titleAr ? s.titleAr : s.title}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{s.objective}</div>
+              </div>
+              {s.qualityScore != null && <div style={{ fontSize: 15, fontWeight: 700 }}>{s.qualityScore}</div>}
+              {s.recommendation && <span style={S.badge('#3498db')}>{isAR ? RECOMMENDATION_LABEL[s.recommendation]?.ar : RECOMMENDATION_LABEL[s.recommendation]?.en}</span>}
+              <span style={S.badge(STUDY_STATUS_COLOR[s.status])}>{isAR ? STUDY_STATUS_LABEL[s.status]?.ar : STUDY_STATUS_LABEL[s.status]?.en}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StudyCreateForm({ api, isAR, t, onDone, onCancel }: any) {
+  const [form, setForm] = useState({ title: '', titleAr: '', objective: '', originType: 'MANUAL', originRadarItemId: '', originIdeaId: '', originDescription: '', scope: 'STANDARD' })
+  const [radarItems, setRadarItems] = useState<any[]>([])
+  const [ideas, setIdeas] = useState<any[]>([])
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    if (form.originType === 'RADAR_ITEM' && radarItems.length === 0) api.get('/innovation/radar').then((d: any) => setRadarItems(Array.isArray(d) ? d : []))
+    if (form.originType === 'IDEA' && ideas.length === 0) api.get('/innovation/ideas').then((d: any) => setIdeas(Array.isArray(d) ? d : []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.originType])
+
+  const create = async () => {
+    if (!form.title || !form.objective) return alert(isAR ? 'العنوان والهدف مطلوبان' : 'Title and objective are required')
+    if (form.originType === 'RADAR_ITEM' && !form.originRadarItemId) return alert(isAR ? 'يرجى اختيار تقنية' : 'Please select a technology')
+    if (form.originType === 'IDEA' && !form.originIdeaId) return alert(isAR ? 'يرجى اختيار فكرة' : 'Please select an idea')
+    setSaving(true)
+    try {
+      const created = await api.post('/innovation/studies', {
+        title: form.title, titleAr: form.titleAr || undefined, objective: form.objective, originType: form.originType, scope: form.scope,
+        originRadarItemId: form.originType === 'RADAR_ITEM' ? form.originRadarItemId : undefined,
+        originIdeaId: form.originType === 'IDEA' ? form.originIdeaId : undefined,
+        originDescription: form.originType !== 'RADAR_ITEM' && form.originType !== 'IDEA' ? form.originDescription : undefined,
+      })
+      onDone(created.id)
+    } catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+
+  return (
+    <div style={{ ...S.card, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div><div style={S.label}>{t('innov.study_title')} *</div><input style={S.input} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+        <div><div style={S.label}>{t('innov.study_title_ar')}</div><input style={S.input} dir="rtl" value={form.titleAr} onChange={e => setForm(f => ({ ...f, titleAr: e.target.value }))} /></div>
+      </div>
+      <div style={S.label}>{t('innov.objective')} *</div>
+      <textarea style={{ ...S.input, minHeight: 60, resize: 'vertical' as const, fontFamily: 'inherit' }} value={form.objective} onChange={e => setForm(f => ({ ...f, objective: e.target.value }))} />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div>
+          <div style={S.label}>{t('innov.origin_type')}</div>
+          <select style={S.input} value={form.originType} onChange={e => setForm(f => ({ ...f, originType: e.target.value }))}>
+            <option value="MANUAL">{t('innov.origin_manual')}</option>
+            <option value="RADAR_ITEM">{t('innov.origin_radar')}</option>
+            <option value="IDEA">{t('innov.origin_idea')}</option>
+            <option value="BUSINESS_PROBLEM">{t('innov.origin_business_problem')}</option>
+            <option value="EA_RECOMMENDATION">{t('innov.origin_ea_recommendation')}</option>
+            <option value="ARCHITECTURE_GAP">{t('innov.origin_architecture_gap')}</option>
+          </select>
+        </div>
+        <div>
+          <div style={S.label}>{t('innov.scope')}</div>
+          <select style={S.input} value={form.scope} onChange={e => setForm(f => ({ ...f, scope: e.target.value }))}>
+            <option value="STANDARD">{t('innov.scope_standard')}</option>
+            <option value="EXECUTIVE">{t('innov.scope_executive')}</option>
+            <option value="DETAILED">{t('innov.scope_detailed')}</option>
+          </select>
+        </div>
+      </div>
+      {form.originType === 'RADAR_ITEM' && (
+        <><div style={S.label}>{t('innov.origin_radar')}</div>
+        <select style={S.input} value={form.originRadarItemId} onChange={e => setForm(f => ({ ...f, originRadarItemId: e.target.value }))}>
+          <option value="">{t('innov.select_radar_item')}</option>
+          {radarItems.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select></>
+      )}
+      {form.originType === 'IDEA' && (
+        <><div style={S.label}>{t('innov.origin_idea')}</div>
+        <select style={S.input} value={form.originIdeaId} onChange={e => setForm(f => ({ ...f, originIdeaId: e.target.value }))}>
+          <option value="">{t('innov.select_idea')}</option>
+          {ideas.map((i: any) => <option key={i.id} value={i.id}>{i.title}</option>)}
+        </select></>
+      )}
+      {form.originType !== 'RADAR_ITEM' && form.originType !== 'IDEA' && (
+        <><div style={S.label}>{t('innov.origin_description')}</div>
+        <textarea style={{ ...S.input, minHeight: 60, resize: 'vertical' as const, fontFamily: 'inherit' }} value={form.originDescription} onChange={e => setForm(f => ({ ...f, originDescription: e.target.value }))} /></>
+      )}
+      <div style={S.row}>
+        <button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? t('innov.saving') : t('innov.create_study')}</button>
+        <button style={S.btn()} onClick={onCancel}>{t('innov.cancel')}</button>
+      </div>
+    </div>
+  )
+}
+
+function StudySectionCard({ section, isAR }: any) {
+  const def = STUDY_SECTIONS.find(d => d.key === section.sectionKey)
+  const title = def ? (isAR ? def.ar : def.en) : section.title
+  const content = section.content
+
+  return (
+    <div style={{ ...S.card, marginBottom: 12 }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>{title}</div>
+      {content == null ? (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لم يتم إنشاء هذا القسم بعد' : 'Not yet generated'}</div>
+      ) : def?.shape === 'text' ? (
+        <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' as const }}>{content}</div>
+      ) : def?.shape === 'recommendation' ? (
+        <div>
+          <span style={S.badge('#2ecc71')}>{isAR ? RECOMMENDATION_LABEL[content.recommendation]?.ar : RECOMMENDATION_LABEL[content.recommendation]?.en}</span>
+          <div style={{ fontSize: 13, lineHeight: 1.7, marginTop: 10 }}>{content.rationale}</div>
+        </div>
+      ) : Array.isArray(content) ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {content.map((item: any, i: number) => (
+            <div key={i} style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+              {Object.entries(item).map(([k, v]) => (
+                <div key={k} style={{ fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>{k}: </span>
+                  <span>{String(v)}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 13 }}>{JSON.stringify(content)}</div>
+      )}
+    </div>
+  )
+}
+
+function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
+  const [study, setStudy] = useState<any>(null)
+  const [generating, setGenerating] = useState(false)
+  const [genError, setGenError] = useState('')
+  const [addingAssumption, setAddingAssumption] = useState(false)
+  const [assumptionForm, setAssumptionForm] = useState({ label: '', value: '' })
+
+  const load = useCallback(() => { api.get(`/innovation/studies/${studyId}`).then(setStudy) }, [api, studyId])
+  useEffect(() => { load() }, [load])
+
+  const generate = async () => {
+    setGenerating(true); setGenError('')
+    try { await api.post(`/innovation/studies/${studyId}/generate`); await load() }
+    catch (e: any) { setGenError(e.message); await load() }
+    finally { setGenerating(false) }
+  }
+
+  const moveTo = async (status: string) => { await api.put(`/innovation/studies/${studyId}/status`, { status }); await load() }
+
+  const deleteStudy = async () => {
+    if (!window.confirm(t('innov.confirm_delete_study'))) return
+    await api.post(`/innovation/studies/${studyId}/delete`); onBack()
+  }
+
+  const addAssumption = async () => {
+    if (!assumptionForm.label || !assumptionForm.value) return
+    await api.post(`/innovation/studies/${studyId}/assumptions`, assumptionForm)
+    setAssumptionForm({ label: '', value: '' }); setAddingAssumption(false); await load()
+  }
+
+  if (!study) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
+
+  const title = isAR && study.titleAr ? study.titleAr : study.title
+  const hasGeneratedContent = (study.sections || []).some((s: any) => s.content != null)
+  const sortedSections = [...(study.sections || [])].sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+
+  return (
+    <div>
+      <div style={{ ...S.row, marginBottom: 16, flexWrap: 'wrap' as const }}>
+        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{t('innov.back_to_studies')}</button>
+        <div style={{ flex: 1, fontSize: 18, fontWeight: 700 }}>{title}</div>
+        <span style={S.badge(STUDY_STATUS_COLOR[study.status])}>{isAR ? STUDY_STATUS_LABEL[study.status]?.ar : STUDY_STATUS_LABEL[study.status]?.en}</span>
+      </div>
+
+      <div style={{ ...S.card, marginBottom: 16 }}>
+        <div style={S.label}>{t('innov.objective')}</div>
+        <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>{study.objective}</div>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' as const, alignItems: 'center' }}>
+          {study.qualityScore != null && <div style={{ fontSize: 13 }}><span style={{ color: 'var(--text-dim)' }}>{t('innov.quality_score')}: </span><b>{study.qualityScore}</b></div>}
+          {study.recommendation && <div style={{ fontSize: 13 }}><span style={{ color: 'var(--text-dim)' }}>{t('innov.recommendation')}: </span><span style={S.badge('#2ecc71')}>{isAR ? RECOMMENDATION_LABEL[study.recommendation]?.ar : RECOMMENDATION_LABEL[study.recommendation]?.en}</span></div>}
+          <div style={{ flex: 1 }} />
+          <button style={S.btn('primary')} onClick={generate} disabled={generating || study.status === 'AI_RESEARCH'}>
+            {generating || study.status === 'AI_RESEARCH' ? t('innov.generating') : hasGeneratedContent ? t('innov.regenerate_study') : t('innov.generate_study')}
+          </button>
+        </div>
+        {genError && <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 10 }}>{t('innov.generation_failed')}: {genError}</div>}
+      </div>
+
+      {!hasGeneratedContent && !generating && study.status !== 'AI_RESEARCH' && (
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 30, marginBottom: 16 }}>{t('innov.not_generated_yet')}</div>
+      )}
+
+      {hasGeneratedContent && sortedSections.map((s: any) => <StudySectionCard key={s.id} section={s} isAR={isAR} />)}
+
+      <div style={{ ...S.card, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ flex: 1, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+            {t('innov.assumptions')}
+            <HelpTip text={isAR
+              ? 'سجّل الافتراضات الأساسية التي استندت إليها الدراسة (مثل عدد المستخدمين المتوقع أو مدة التنفيذ)، حتى يمكن مراجعتها لاحقًا إذا تغيّرت.'
+              : 'Record the key assumptions this study relies on (e.g. expected user count, implementation duration), so they can be revisited later if they change.'} />
+          </div>
+          <button style={S.btn()} onClick={() => setAddingAssumption(true)}>{t('innov.add_assumption')}</button>
+        </div>
+        {addingAssumption && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' as const }}>
+            <input style={{ ...S.input, marginBottom: 0, flex: 1 }} placeholder={t('innov.assumption_label')} value={assumptionForm.label} onChange={e => setAssumptionForm(f => ({ ...f, label: e.target.value }))} />
+            <input style={{ ...S.input, marginBottom: 0, flex: 1 }} placeholder={t('innov.assumption_value')} value={assumptionForm.value} onChange={e => setAssumptionForm(f => ({ ...f, value: e.target.value }))} />
+            <button style={S.btn('primary')} onClick={addAssumption}>{t('innov.submit')}</button>
+            <button style={S.btn()} onClick={() => setAddingAssumption(false)}>{t('innov.cancel')}</button>
+          </div>
+        )}
+        {(study.assumptions || []).length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('innov.no_assumptions')}</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {study.assumptions.map((a: any) => (
+              <div key={a.id} style={{ fontSize: 12, display: 'flex', gap: 8 }}>
+                <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>{a.label}:</span><span>{a.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={S.card}>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>{t('innov.study_status')}</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
+          {study.status === 'UNDER_REVIEW' && <button style={S.btn('primary')} onClick={() => moveTo('APPROVED')}>{t('innov.approve_study')}</button>}
+          {study.status === 'UNDER_REVIEW' && <button style={S.btn()} onClick={() => moveTo('REWORK')}>{t('innov.request_rework')}</button>}
+          {study.status === 'DRAFT' && hasGeneratedContent && <button style={S.btn('primary')} onClick={() => moveTo('UNDER_REVIEW')}>{t('innov.move_to_review')}</button>}
+          <div style={{ flex: 1 }} />
+          <button style={S.btn('danger')} onClick={deleteStudy}>{t('innov.delete_study')}</button>
+        </div>
+      </div>
     </div>
   )
 }

@@ -401,3 +401,179 @@ describe('InnovationPage - Ideas tab: detail, qualification, decisions', () => {
     expect(screen.queryByText('innov.decision')).not.toBeInTheDocument();
   });
 });
+
+const STUDY = {
+  id: 'study-1', title: 'AI Chatbot Consultation Study', titleAr: null,
+  objective: 'Should we adopt AI chatbots for citizen services?', originType: 'MANUAL',
+  originDescription: 'AI chatbots for citizen services', scope: 'STANDARD', status: 'DRAFT',
+  recommendation: null, recommendationRationale: null, qualityScore: null,
+  sections: [
+    { id: 'sec-1', sectionKey: 'EXECUTIVE_SUMMARY', title: 'Executive Summary', orderIndex: 0, content: null, status: 'PENDING' },
+    { id: 'sec-2', sectionKey: 'BUSINESS_PROBLEM', title: 'Business Problem', orderIndex: 1, content: null, status: 'PENDING' },
+  ],
+  assumptions: [],
+};
+
+const GENERATED_STUDY = {
+  ...STUDY, status: 'UNDER_REVIEW', recommendation: 'PILOT', recommendationRationale: 'Worth testing first', qualityScore: 85,
+  sections: [
+    { id: 'sec-1', sectionKey: 'EXECUTIVE_SUMMARY', title: 'Executive Summary', orderIndex: 0, content: 'This is the summary.', status: 'AI_DRAFT' },
+    { id: 'sec-2', sectionKey: 'USE_CASES', title: 'Potential Use Cases', orderIndex: 1, content: [{ useCase: 'Chatbot triage', priority: 'HIGH' }], status: 'AI_DRAFT' },
+    { id: 'sec-3', sectionKey: 'RECOMMENDATION', title: 'Recommendation', orderIndex: 2, content: { recommendation: 'PILOT', rationale: 'Worth testing first' }, status: 'AI_DRAFT' },
+  ],
+};
+
+describe('InnovationPage - Studies tab: list and creation', () => {
+  it('loads and displays studies', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [STUDY] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    expect(await screen.findByText('AI Chatbot Consultation Study')).toBeInTheDocument();
+  });
+
+  it('shows the empty state when there are no studies', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    expect(await screen.findByText('innov.no_studies')).toBeInTheDocument();
+  });
+
+  it('requires title and objective before creating', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [] });
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('innov.new_study'));
+    fireEvent.click(screen.getByText('innov.create_study'));
+    expect(alertSpy).toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('creates a MANUAL-origin study with the entered form data and opens its detail view', async () => {
+    mockFetch({
+      '/innovation/radar': [], '/innovation/studies': (opts: any) => opts?.method === 'POST' ? { id: 'new-study-1' } : [],
+      '/innovation/studies/new-study-1': STUDY,
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('innov.new_study'));
+
+    const textboxes = screen.getAllByRole('textbox');
+    fireEvent.change(textboxes[0], { target: { value: 'New Study Title' } });
+    fireEvent.change(textboxes[2], { target: { value: 'What should we decide?' } }); // index 1 is titleAr
+    fireEvent.click(screen.getByText('innov.create_study'));
+
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/innovation/studies') && !c[0].includes('/generate'));
+      expect(postCall).toBeDefined();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.title).toBe('New Study Title');
+      expect(body.originType).toBe('MANUAL');
+    });
+  });
+
+  it('shows a radar item dropdown when origin type is switched to RADAR_ITEM', async () => {
+    mockFetch({ '/innovation/radar': [{ id: 'tech-1', name: 'Agentic AI' }], '/innovation/studies': [] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('innov.new_study'));
+    expect(screen.queryByText('innov.select_radar_item')).not.toBeInTheDocument(); // not shown by default (MANUAL)
+
+    const selects = screen.getAllByRole('combobox');
+    fireEvent.change(selects[1], { target: { value: 'RADAR_ITEM' } }); // selects[0] is the list's own status filter, still rendered alongside the form
+    expect(await screen.findByText('innov.select_radar_item')).toBeInTheDocument();
+  });
+});
+
+describe('InnovationPage - Studies tab: detail and generation', () => {
+  it('shows the not-yet-generated state and a Generate button for a fresh DRAFT study', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies/study-1': STUDY, '/innovation/studies': [STUDY] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    expect(await screen.findByText('innov.not_generated_yet')).toBeInTheDocument();
+    expect(screen.getByText('innov.generate_study')).toBeInTheDocument();
+  });
+
+  it('triggers generation and reloads the study on success', async () => {
+    let generated = false;
+    mockFetch({
+      '/innovation/radar': [], '/innovation/studies': [STUDY],
+      '/innovation/studies/study-1/generate': () => { generated = true; return {}; },
+      '/innovation/studies/study-1': () => generated ? GENERATED_STUDY : STUDY,
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findByText('innov.not_generated_yet');
+    fireEvent.click(screen.getByText('innov.generate_study'));
+
+    await waitFor(() => {
+      const genCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/generate'));
+      expect(genCall).toBeDefined();
+      expect(genCall[1].method).toBe('POST');
+    });
+  });
+
+  it('renders generated sections with the correct shape per section - text, list, and recommendation', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_STUDY], '/innovation/studies/study-1': GENERATED_STUDY });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    expect(await screen.findByText('This is the summary.')).toBeInTheDocument(); // text shape
+    expect(screen.getByText(/Chatbot triage/)).toBeInTheDocument(); // list shape - key:value rendering
+    expect(screen.getByText('Worth testing first')).toBeInTheDocument(); // recommendation shape
+  });
+
+  it('shows the quality score and recommendation badge for a generated study', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_STUDY], '/innovation/studies/study-1': GENERATED_STUDY });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    expect(await screen.findByText('85')).toBeInTheDocument();
+  });
+
+  it('adds an assumption and reloads the study', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/studies/study-1': STUDY, '/innovation/studies/study-1/assumptions': {} });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    fireEvent.click(await screen.findByText('innov.add_assumption'));
+    fireEvent.change(screen.getByPlaceholderText('innov.assumption_label'), { target: { value: 'Expected users' } });
+    fireEvent.change(screen.getByPlaceholderText('innov.assumption_value'), { target: { value: '500' } });
+    fireEvent.click(screen.getByText('innov.submit'));
+
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/assumptions') && c[1]?.method === 'POST');
+      expect(postCall).toBeDefined();
+      expect(JSON.parse(postCall[1].body)).toEqual({ label: 'Expected users', value: '500' });
+    });
+  });
+
+  it('moves a generated DRAFT study to UNDER_REVIEW', async () => {
+    const generatedDraft = { ...GENERATED_STUDY, status: 'DRAFT' };
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [generatedDraft], '/innovation/studies/study-1': generatedDraft });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    fireEvent.click(await screen.findByText('innov.move_to_review'));
+
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/status'));
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(putCall[1].body).status).toBe('UNDER_REVIEW');
+    });
+  });
+
+  it('does not delete a study when the confirmation dialog is cancelled', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/studies/study-1': STUDY });
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
+    fireEvent.click(await screen.findByText('innov.delete_study'));
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
+    confirmSpy.mockRestore();
+  });
+});
