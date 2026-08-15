@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
 import { api, setToken, clearToken, getToken } from '../lib/api'
-interface User { userId: string; email: string; role: string; tenantId: string; tenantSlug?: string }
+interface User { userId: string; email: string; role: string; tenantId: string; tenantSlug?: string; isPlatformAdmin?: boolean }
 interface AuthCtx { user: User | null; loading: boolean; login: (e: string, p: string, t: string) => Promise<void>; logout: () => void }
 const Ctx = createContext<AuthCtx>({} as AuthCtx)
 export const useAuth = () => useContext(Ctx)

@@ -64,6 +64,7 @@ export default function Layout() {
           <NavLink to="/ea-planning" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗓 EA Planning</NavLink>
           <NavLink to="/innovation" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔭 {t('nav.innovation')}</NavLink>
           <NavLink to="/notifications" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔔 {t('nav.notifications')}</NavLink>
+          <NavLink to="/billing" className={({isActive})=>`nav-item${isActive?' active':''}`}>💳 {t('nav.billing')}</NavLink>
           <NavLink to="/meta-model" className={({isActive})=>`nav-item${isActive?' active':''}`}>🧩 Meta-Model</NavLink>
           <NavLink to="/ea-views" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗺 EA Views</NavLink>
           <NavLink to="/connector-hub" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔌 Connectors</NavLink>
