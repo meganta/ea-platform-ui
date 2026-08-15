@@ -85,7 +85,7 @@ export default function InnovationPage() {
   const { t, isAR } = useLang()
   const { user } = useAuth() as any
   const isAdmin = user?.role === 'TENANT_ADMIN'
-  const [tab, setTab] = useState<'radar' | 'favorites' | 'profile'>('radar')
+  const [tab, setTab] = useState<'radar' | 'favorites' | 'ideas' | 'profile'>('radar')
   const [selected, setSelected] = useState<any>(null)
 
   return (
@@ -104,11 +104,13 @@ export default function InnovationPage() {
       <div style={S.tabs}>
         <button style={S.tab(tab === 'radar')} onClick={() => { setTab('radar'); setSelected(null) }}>{t('innov.tab_radar')}</button>
         <button style={S.tab(tab === 'favorites')} onClick={() => { setTab('favorites'); setSelected(null) }}>{t('innov.tab_favorites')}</button>
+        <button style={S.tab(tab === 'ideas')} onClick={() => { setTab('ideas'); setSelected(null) }}>{t('innov.tab_ideas')}</button>
         <button style={S.tab(tab === 'profile')} onClick={() => { setTab('profile'); setSelected(null) }}>{t('innov.tab_profile')}</button>
       </div>
       <div style={S.content}>
         {tab === 'radar' && <RadarTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} />}
         {tab === 'favorites' && <FavoritesTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} />}
+        {tab === 'ideas' && <IdeasTab api={api} isAR={isAR} t={t} userRole={user?.role} />}
         {tab === 'profile' && <ProfileTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} />}
       </div>
     </div>
@@ -512,6 +514,228 @@ function ProfileTab({ api, isAdmin, isAR, t }: any) {
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── Ideas Tab (Innovation-P2) ─────────────────────────────────────────────────
+const IDEA_STATUS_COLOR: Record<string, string> = {
+  SUBMITTED: '#7f8c8d', QUALIFYING: '#f39c12', QUALIFIED: '#2ecc71', IN_REVIEW: '#3498db',
+  APPROVED: '#27ae60', REJECTED: '#e74c3c', ARCHIVED: '#7f8c8d',
+}
+const IDEA_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
+  SUBMITTED: { en: 'Submitted', ar: 'مُقدَّمة' }, QUALIFYING: { en: 'Qualifying…', ar: 'قيد التقييم…' },
+  QUALIFIED: { en: 'Qualified', ar: 'مؤهّلة' }, IN_REVIEW: { en: 'In Review', ar: 'قيد المراجعة' },
+  APPROVED: { en: 'Approved', ar: 'معتمدة' }, REJECTED: { en: 'Rejected', ar: 'مرفوضة' }, ARCHIVED: { en: 'Archived', ar: 'مؤرشفة' },
+}
+const DECISION_ROLES = ['TENANT_ADMIN', 'REVIEWER']
+
+function ScoreRing({ score, label }: { score: number | null; label: string }) {
+  const color = score == null ? '#7f8c8d' : score >= 70 ? '#2ecc71' : score >= 50 ? '#f39c12' : '#e74c3c'
+  return (
+    <div style={{ textAlign: 'center' as const }}>
+      <div style={{ width: 56, height: 56, borderRadius: '50%', border: `3px solid ${color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, margin: '0 auto' }}>
+        {score == null ? '—' : score}
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{label}</div>
+    </div>
+  )
+}
+
+function IdeasTab({ api, isAR, t, userRole }: any) {
+  const [ideas, setIdeas] = useState<any[]>([])
+  const [radarItems, setRadarItems] = useState<any[]>([])
+  const [statusFilter, setStatusFilter] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [selected, setSelected] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    api.get(`/innovation/ideas${statusFilter ? `?status=${statusFilter}` : ''}`).then((d: any) => setIdeas(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+  }, [api, statusFilter])
+  useEffect(() => { load() }, [load])
+  useEffect(() => { api.get('/innovation/radar').then((d: any) => setRadarItems(Array.isArray(d) ? d : [])) }, [api])
+
+  const openIdea = async (id: string) => { const full = await api.get(`/innovation/ideas/${id}`); setSelected(full) }
+  const refreshSelected = async () => { if (selected) await openIdea(selected.id) }
+
+  if (selected) return <IdeaDetail api={api} idea={selected} isAR={isAR} t={t} userRole={userRole} radarItems={radarItems} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} />
+
+  return (
+    <div>
+      <div style={{ ...S.row, marginBottom: 16, flexWrap: 'wrap' as const }}>
+        <select style={{ ...S.input, marginBottom: 0, width: 200 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">{t('innov.all_statuses')}</option>
+          {Object.keys(IDEA_STATUS_LABEL).map(s => <option key={s} value={s}>{isAR ? IDEA_STATUS_LABEL[s].ar : IDEA_STATUS_LABEL[s].en}</option>)}
+        </select>
+        <div style={{ flex: 1 }} />
+        <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('innov.submit_idea')}</button>
+      </div>
+
+      {creating && <IdeaCreateForm api={api} isAR={isAR} t={t} radarItems={radarItems} onDone={() => { setCreating(false); load() }} onCancel={() => setCreating(false)} />}
+
+      {loading ? (
+        <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
+      ) : ideas.length === 0 ? (
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('innov.no_ideas')}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {ideas.map((idea: any) => (
+            <div key={idea.id} style={{ ...S.card, padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }} onClick={() => openIdea(idea.id)}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{isAR && idea.titleAr ? idea.titleAr : idea.title}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{idea.category && categoryLabel(idea.category, isAR)}</div>
+              </div>
+              {idea.overallScore != null && <div style={{ fontSize: 15, fontWeight: 700 }}>{idea.overallScore}</div>}
+              <span style={S.badge(IDEA_STATUS_COLOR[idea.status])}>{isAR ? IDEA_STATUS_LABEL[idea.status]?.ar : IDEA_STATUS_LABEL[idea.status]?.en}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IdeaCreateForm({ api, isAR, t, radarItems, onDone, onCancel }: any) {
+  const [form, setForm] = useState({ title: '', titleAr: '', description: '', descriptionAr: '', category: '', tags: '', relatedRadarItemId: '' })
+  const [saving, setSaving] = useState(false)
+
+  const create = async () => {
+    if (!form.title || !form.description) return alert(isAR ? 'العنوان والوصف مطلوبان' : 'Title and description are required')
+    setSaving(true)
+    try {
+      await api.post('/innovation/ideas', { ...form, tags: form.tags.split(',').map((s: string) => s.trim()).filter(Boolean), relatedRadarItemId: form.relatedRadarItemId || undefined })
+      onDone()
+    } catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+
+  return (
+    <div style={{ ...S.card, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div><div style={S.label}>{t('innov.idea_title')} *</div><input style={S.input} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} /></div>
+        <div><div style={S.label}>{t('innov.idea_title_ar')}</div><input style={S.input} dir="rtl" value={form.titleAr} onChange={e => setForm(f => ({ ...f, titleAr: e.target.value }))} /></div>
+        <div>
+          <div style={S.label}>{t('innov.filter_category')}</div>
+          <select style={S.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
+            <option value="">—</option>
+            {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{categoryLabel(c, isAR)}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={S.label}>{t('innov.related_tech')}</div>
+          <select style={S.input} value={form.relatedRadarItemId} onChange={e => setForm(f => ({ ...f, relatedRadarItemId: e.target.value }))}>
+            <option value="">{t('innov.none')}</option>
+            {radarItems.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={S.label}>{t('innov.idea_description')} *</div>
+      <textarea style={{ ...S.input, minHeight: 80, resize: 'vertical' as const, fontFamily: 'inherit' }} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+      <div style={S.label}>{t('innov.tags')}</div>
+      <input style={S.input} value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} />
+      <div style={S.row}>
+        <button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? t('innov.saving') : t('innov.submit')}</button>
+        <button style={S.btn()} onClick={onCancel}>{t('innov.cancel')}</button>
+      </div>
+    </div>
+  )
+}
+
+function IdeaDetail({ api, idea, isAR, t, userRole, radarItems, onBack, onRefresh }: any) {
+  const [qualifying, setQualifying] = useState(false)
+  const [decisionNotes, setDecisionNotes] = useState('')
+  const [transitioning, setTransitioning] = useState(false)
+  const canDecide = DECISION_ROLES.includes(userRole)
+  const relatedTech = idea.relatedRadarItemId ? radarItems.find((r: any) => r.id === idea.relatedRadarItemId) : null
+
+  const qualify = async () => {
+    setQualifying(true)
+    try { await api.post(`/innovation/ideas/${idea.id}/qualify`); await onRefresh() }
+    catch (e: any) { alert(e.message); await onRefresh() }
+    finally { setQualifying(false) }
+  }
+
+  const moveTo = async (status: string) => {
+    setTransitioning(true)
+    try { await api.put(`/innovation/ideas/${idea.id}/status`, { status, decisionNotes: decisionNotes || undefined }); await onRefresh() }
+    catch (e: any) { alert(e.message) } finally { setTransitioning(false) }
+  }
+
+  const title = isAR && idea.titleAr ? idea.titleAr : idea.title
+  const description = isAR && idea.descriptionAr ? idea.descriptionAr : idea.description
+  const rationale = isAR && idea.qualificationRationaleAr ? idea.qualificationRationaleAr : idea.qualificationRationale
+
+  return (
+    <div>
+      <div style={{ ...S.row, marginBottom: 16 }}>
+        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{t('innov.back_to_ideas')}</button>
+        <div style={{ flex: 1, fontSize: 18, fontWeight: 700 }}>{title}</div>
+        <span style={S.badge(IDEA_STATUS_COLOR[idea.status])}>{isAR ? IDEA_STATUS_LABEL[idea.status]?.ar : IDEA_STATUS_LABEL[idea.status]?.en}</span>
+      </div>
+
+      <div style={{ ...S.card, marginBottom: 16 }}>
+        <div style={S.label}>{t('innov.idea_description')}</div>
+        <div style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>{description}</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
+          {idea.category && <span style={S.badge('#7f8c8d')}>{categoryLabel(idea.category, isAR)}</span>}
+          {(idea.tags || []).map((tag: string) => <span key={tag} style={S.badge('#3498db')}>{tag}</span>)}
+        </div>
+        {relatedTech && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 10 }}>{t('innov.related_tech')}: {relatedTech.name}</div>}
+      </div>
+
+      <div style={{ ...S.card, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ flex: 1, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+            {t('innov.ai_qualification')}
+            <HelpTip text={isAR
+              ? 'يقيّم الذكاء الاصطناعي الفكرة من حيث قابلية التنفيذ والأثر ومدى توافقها مع سياق مؤسستك، ثم يوصي بحالة تالية. القرار النهائي يبقى بيد فريقك.'
+              : 'AI scores the idea for feasibility, impact, and fit with your organization\'s context, then recommends a next status. The final call stays with your team.'} />
+          </div>
+          {idea.status !== 'QUALIFYING' && (
+            <button style={S.btn('primary')} onClick={qualify} disabled={qualifying}>{qualifying ? t('innov.qualifying') : idea.qualifiedAt ? t('innov.requalify') : t('innov.qualify')}</button>
+          )}
+        </div>
+
+        {idea.status === 'QUALIFYING' || qualifying ? (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('innov.qualifying')}</div>
+        ) : idea.qualifiedAt ? (
+          <>
+            <div style={{ display: 'flex', gap: 24, justifyContent: 'center', marginBottom: 16 }}>
+              <ScoreRing score={idea.feasibilityScore} label={t('innov.feasibility')} />
+              <ScoreRing score={idea.impactScore} label={t('innov.impact')} />
+              <ScoreRing score={idea.alignmentScore} label={t('innov.alignment')} />
+              <ScoreRing score={idea.overallScore} label={t('innov.overall')} />
+            </div>
+            <div style={S.label}>{t('innov.rationale')}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{rationale}</div>
+          </>
+        ) : (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('innov.not_qualified_yet')}</div>
+        )}
+      </div>
+
+      {idea.status !== 'APPROVED' && idea.status !== 'REJECTED' && idea.status !== 'ARCHIVED' && (
+        <div style={S.card}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>{t('innov.decision')}</div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, marginBottom: 12 }}>
+            {idea.status !== 'IN_REVIEW' && <button style={S.btn()} onClick={() => moveTo('IN_REVIEW')} disabled={transitioning}>{t('innov.move_in_review')}</button>}
+          </div>
+          {canDecide ? (
+            <>
+              <div style={S.label}>{t('innov.decision_notes')}</div>
+              <input style={S.input} value={decisionNotes} onChange={e => setDecisionNotes(e.target.value)} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button style={S.btn('primary')} onClick={() => moveTo('APPROVED')} disabled={transitioning}>{t('innov.approve')}</button>
+                <button style={S.btn('danger')} onClick={() => moveTo('REJECTED')} disabled={transitioning}>{t('innov.reject')}</button>
+                <button style={S.btn()} onClick={() => moveTo('ARCHIVED')} disabled={transitioning}>{t('innov.archive')}</button>
+              </div>
+            </>
+          ) : (
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t('innov.decision_restricted')}</div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -240,3 +240,164 @@ describe('InnovationPage - Organization Profile tab', () => {
     expect(screen.queryByText('innov.save_profile')).not.toBeInTheDocument();
   });
 });
+
+const IDEA = {
+  id: 'idea-1', title: 'Automate invoice matching', titleAr: 'أتمتة مطابقة الفواتير',
+  description: 'Use AI to match invoices to POs automatically.', category: 'AUTOMATION', tags: ['finance'],
+  status: 'SUBMITTED', relatedRadarItemId: null, overallScore: null, qualifiedAt: null,
+};
+
+describe('InnovationPage - Ideas tab: list and submission', () => {
+  it('loads and displays submitted ideas', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [IDEA] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    expect(await screen.findByText('Automate invoice matching')).toBeInTheDocument();
+  });
+
+  it('shows the empty state when there are no ideas', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    expect(await screen.findByText('innov.no_ideas')).toBeInTheDocument();
+  });
+
+  it('re-fetches with a status query param when the filter changes', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [IDEA] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    await screen.findByText('Automate invoice matching');
+    const select = screen.getAllByRole('combobox')[0];
+    fireEvent.change(select, { target: { value: 'QUALIFIED' } });
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('status=QUALIFIED'));
+      expect(call).toBeDefined();
+    });
+  });
+
+  it('submits a new idea', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('innov.submit_idea'));
+    await screen.findByText('innov.idea_title_ar');
+
+    const textboxes = screen.getAllByRole('textbox');
+    fireEvent.change(textboxes[0], { target: { value: 'New idea title' } }); // title
+    const textarea = document.querySelector('textarea')!;
+    fireEvent.change(textarea, { target: { value: 'A description of the idea.' } });
+
+    fireEvent.click(screen.getByText('innov.submit'));
+
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].endsWith('/innovation/ideas'));
+      expect(postCall).toBeDefined();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.title).toBe('New idea title');
+      expect(body.description).toBe('A description of the idea.');
+    });
+  });
+
+  it('does not submit when required fields are missing', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [] });
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('innov.submit_idea'));
+    await screen.findByText('innov.idea_title_ar');
+    const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
+    fireEvent.click(screen.getByText('innov.submit'));
+    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
+    expect(alertSpy).toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+});
+
+describe('InnovationPage - Ideas tab: detail, qualification, decisions', () => {
+  it('opens the detail view and shows the not-yet-qualified state', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [IDEA], '/innovation/ideas/idea-1': IDEA });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('Automate invoice matching'));
+    expect(await screen.findByText('innov.not_qualified_yet')).toBeInTheDocument();
+    expect(screen.getByText('innov.qualify')).toBeInTheDocument();
+  });
+
+  it('displays scores and rationale for an already-qualified idea', async () => {
+    const qualified = { ...IDEA, status: 'QUALIFIED', feasibilityScore: 70, impactScore: 60, alignmentScore: 80, overallScore: 70, qualificationRationale: 'Solid fit', qualifiedAt: '2026-08-01T00:00:00Z' };
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [qualified], '/innovation/ideas/idea-1': qualified });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('Automate invoice matching'));
+    expect(await screen.findByText('Solid fit')).toBeInTheDocument();
+    expect(screen.getAllByText('70').length).toBeGreaterThan(0);
+  });
+
+  it('runs AI qualification when the qualify button is clicked', async () => {
+    mockFetch({
+      '/innovation/radar': [], '/innovation/ideas': [IDEA],
+      '/innovation/ideas/idea-1/qualify': {},
+      '/innovation/ideas/idea-1': IDEA,
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('Automate invoice matching'));
+    await screen.findByText('innov.qualify');
+    fireEvent.click(screen.getByText('innov.qualify'));
+
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/innovation/ideas/idea-1/qualify'));
+      expect(postCall).toBeDefined();
+    });
+  });
+
+  it('allows any user to move an idea to In Review', async () => {
+    mockRole = 'ARCHITECT';
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [IDEA], '/innovation/ideas/idea-1': IDEA, '/innovation/ideas/idea-1/status': {} });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('Automate invoice matching'));
+    fireEvent.click(await screen.findByText('innov.move_in_review'));
+
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/innovation/ideas/idea-1/status'));
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(putCall[1].body).status).toBe('IN_REVIEW');
+    });
+  });
+
+  it('shows the decision-restricted notice instead of approve/reject/archive for a non-decision role', async () => {
+    mockRole = 'ARCHITECT';
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [IDEA], '/innovation/ideas/idea-1': IDEA });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('Automate invoice matching'));
+    await screen.findByText('innov.decision_restricted');
+    expect(screen.queryByText('innov.approve')).not.toBeInTheDocument();
+  });
+
+  it('shows approve/reject/archive actions for a TENANT_ADMIN and submits a decision', async () => {
+    mockRole = 'TENANT_ADMIN';
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [IDEA], '/innovation/ideas/idea-1': IDEA, '/innovation/ideas/idea-1/status': {} });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('Automate invoice matching'));
+    fireEvent.click(await screen.findByText('innov.approve'));
+
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/innovation/ideas/idea-1/status'));
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(putCall[1].body).status).toBe('APPROVED');
+    });
+  });
+
+  it('hides the decision section entirely once an idea reaches a terminal status', async () => {
+    const approved = { ...IDEA, status: 'APPROVED' };
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [approved], '/innovation/ideas/idea-1': approved });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('Automate invoice matching'));
+    await screen.findByText('innov.not_qualified_yet');
+    expect(screen.queryByText('innov.decision')).not.toBeInTheDocument();
+  });
+});
