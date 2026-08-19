@@ -3,6 +3,7 @@ import { useLang } from '../contexts/LangContext'
 import ReactMarkdown from 'react-markdown'
 import { DiagramViewer } from '../components/DiagramViewer'
 import { Phase7Workspace } from '../components/Phase7Workspace'
+import HelpTip from '../components/HelpTip'
 function DiagramBlock({ chart }: { chart: string }) {
   // Parse mermaid-style text into a readable styled block
   return (
@@ -1091,11 +1092,11 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
         {loading ? (
           <div className="loading-screen" style={{ height: 300 }}><div className="spinner" /></div>
         ) : (
-          <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          <div className="side-panel-parent" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
             {/* Steps sidebar */}
             {steps.length > 1 && (
-              <div style={{ width: 200, borderRight: '1px solid var(--border)', padding: '16px 12px', overflowY: 'auto', flexShrink: 0 }}>
+              <div className="side-panel-200" style={{ borderRight: '1px solid var(--border)', padding: '16px 12px', overflowY: 'auto' }}>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, letterSpacing: '0.08em' }}>STEPS</div>
                 {steps.map((step: any) => {
                   const stepOuts = phaseOutputs.filter(o => step.outputs.some((def: any) => def.key === o.outputKey))
@@ -1652,7 +1653,10 @@ export default function AdmPage() {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <div className="page-title">{t('adm.title')}</div>
+            <div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>
+              {t('adm.title')}
+              <HelpTip text="An ADM cycle is a structured, step-by-step process for planning and documenting your organization's architecture - moving through phases like defining the vision, understanding the current state, and designing the target state. Each phase produces specific deliverables." />
+            </div>
             <div className="page-subtitle">
               {selected ? `${selected.frameworkType} FRAMEWORK · ${selected.name}` : t('adm.subtitle')}
             </div>

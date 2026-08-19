@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { LangProvider } from './contexts/LangContext'
+import { BrandingProvider } from './contexts/BrandingContext'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import Layout from './components/Layout'
@@ -11,7 +12,19 @@ import RepositoryPage from './pages/RepositoryPage'
 import KnowledgePage from './pages/KnowledgePage'
 import SettingsPage from './pages/SettingsPage'
 import GovernancePage from './pages/GovernancePage'
-import EAPlanningPage from './pages/EAPlanningPage'
+import MetaModelPage from './pages/MetaModelPage'
+import EaViewsPage from './pages/EaViewsPage'
+import ConnectorHubPage from './pages/ConnectorHubPage'
+import ReportsPage from './pages/ReportsPage'
+import SharedViewPage from './pages/SharedViewPage'
+import AccessGovernancePage from './pages/AccessGovernancePage'
+import SetupAssistantPage from './pages/SetupAssistantPage'
+import StrategyPage from './pages/StrategyPage'
+import EaPlanningPage from './pages/EaPlanningPage'
+import GlossaryPage from './pages/GlossaryPage'
+import InnovationPage from './pages/InnovationPage'
+import NotificationsPage from './pages/NotificationsPage'
+import BillingPage from './pages/BillingPage'
 import './styles.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -25,10 +38,12 @@ export default function App() {
   return (
     <LangProvider>
       <AuthProvider>
+        <BrandingProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/shared/:token" element={<SharedViewPage />} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<DashboardPage />} />
               <Route path="adm" element={<AdmPage />} />
@@ -37,11 +52,24 @@ export default function App() {
               <Route path="knowledge" element={<KnowledgePage />} />
               <Route path="settings" element={<SettingsPage />} />
               <Route path="governance" element={<GovernancePage />} />
-              <Route path="ea-planning" element={<EAPlanningPage />} />
+              <Route path="meta-model" element={<MetaModelPage />} />
+              <Route path="ea-views" element={<EaViewsPage />} />
+              <Route path="connector-hub" element={<ConnectorHubPage />} />
+              <Route path="reports" element={<ReportsPage />} />
+              <Route path="access-governance" element={<AccessGovernancePage />} />
+              <Route path="setup" element={<SetupAssistantPage />} />
+              <Route path="strategy" element={<StrategyPage />} />
+              <Route path="ea-planning" element={<EaPlanningPage />} />
+              <Route path="glossary" element={<GlossaryPage />} />
+              <Route path="innovation" element={<InnovationPage />} />
+              <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="billing" element={<BillingPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
+        </BrandingProvider>
       </AuthProvider>
     </LangProvider>
   )
 }
+

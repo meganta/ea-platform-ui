@@ -133,17 +133,17 @@ export default function RegisterPage() {
               {isAR?'معلومات المنظمة':'Organization Details'}
             </div>
             <div className="form-group">
-              <label className="form-label">{isAR?'اسم المنظمة':'Organization Name'} *</label>
-              <input className="form-input" value={org.name} onChange={handleNameChange} placeholder={isAR?'وزارة الصحة':'Ministry of Health'} required/>
+              <label className="form-label" htmlFor="org-name">{isAR?'اسم المنظمة':'Organization Name'} *</label>
+              <input id="org-name" className="form-input" value={org.name} onChange={handleNameChange} placeholder={isAR?'وزارة الصحة':'Ministry of Health'} required/>
             </div>
             <div className="form-group">
-              <label className="form-label">{isAR?'الاسم بالعربية':'Arabic Name'}</label>
-              <input className="form-input" value={org.nameAr} onChange={setO('nameAr')} dir="rtl" placeholder="وزارة الصحة"/>
+              <label className="form-label" htmlFor="org-name-ar">{isAR?'الاسم بالعربية':'Arabic Name'}</label>
+              <input id="org-name-ar" className="form-input" value={org.nameAr} onChange={setO('nameAr')} dir="rtl" placeholder="وزارة الصحة"/>
             </div>
             <div className="form-group">
-              <label className="form-label">{isAR?'معرف المنظمة':'Organization ID'} *</label>
+              <label className="form-label" htmlFor="org-slug">{isAR?'معرف المنظمة':'Organization ID'} *</label>
               <div style={{display:'flex',gap:8}}>
-                <input className="form-input" value={org.slug} onChange={e=>{setO('slug')(e);setSlugStatus('idle')}} onBlur={checkSlug} placeholder="ministry-of-health" style={{flex:1}} required/>
+                <input id="org-slug" className="form-input" value={org.slug} onChange={e=>{setO('slug')(e);setSlugStatus('idle')}} onBlur={checkSlug} placeholder="ministry-of-health" style={{flex:1}} required/>
                 <button type="button" onClick={checkSlug} className="btn btn-secondary btn-sm" style={{flexShrink:0}}>
                   {isAR?'تحقق':'Check'}
                 </button>
@@ -155,15 +155,15 @@ export default function RegisterPage() {
             </div>
             <div className="grid-2" style={{gap:12}}>
               <div className="form-group">
-                <label className="form-label">{isAR?'اللغة الافتراضية':'Default Language'}</label>
-                <select className="form-input" value={org.locale} onChange={setO('locale')}>
+                <label className="form-label" htmlFor="org-locale">{isAR?'اللغة الافتراضية':'Default Language'}</label>
+                <select id="org-locale" className="form-input" value={org.locale} onChange={setO('locale')}>
                   <option value="EN">English</option>
                   <option value="AR">العربية</option>
                 </select>
               </div>
               <div className="form-group">
-                <label className="form-label">{isAR?'الإطار المرجعي':'EA Framework'}</label>
-                <select className="form-input" value={org.frameworkType} onChange={setO('frameworkType')}>
+                <label className="form-label" htmlFor="org-framework">{isAR?'الإطار المرجعي':'EA Framework'}</label>
+                <select id="org-framework" className="form-input" value={org.frameworkType} onChange={setO('frameworkType')}>
                   <option value="NORA">NORA</option>
                   <option value="CUSTOM">{isAR?'مخصص':'Custom'}</option>
                 </select>
@@ -187,25 +187,25 @@ export default function RegisterPage() {
             </div>
             <div className="grid-2" style={{gap:12}}>
               <div className="form-group">
-                <label className="form-label">{isAR?'الاسم الكامل':'Full Name'} *</label>
-                <input className="form-input" value={admin.fullName} onChange={setA('fullName')} placeholder="Ahmed Al-Rashid" required/>
+                <label className="form-label" htmlFor="admin-fullname">{isAR?'الاسم الكامل':'Full Name'} *</label>
+                <input id="admin-fullname" className="form-input" value={admin.fullName} onChange={setA('fullName')} placeholder="Ahmed Al-Rashid" required/>
               </div>
               <div className="form-group">
-                <label className="form-label">{isAR?'الاسم بالعربية':'Arabic Name'}</label>
-                <input className="form-input" value={admin.fullNameAr} onChange={setA('fullNameAr')} dir="rtl" placeholder="أحمد الراشد"/>
+                <label className="form-label" htmlFor="admin-fullname-ar">{isAR?'الاسم بالعربية':'Arabic Name'}</label>
+                <input id="admin-fullname-ar" className="form-input" value={admin.fullNameAr} onChange={setA('fullNameAr')} dir="rtl" placeholder="أحمد الراشد"/>
               </div>
             </div>
             <div className="form-group">
-              <label className="form-label">{isAR?'البريد الإلكتروني':'Email Address'} *</label>
-              <input className="form-input" type="email" value={admin.email} onChange={setA('email')} placeholder="admin@organization.gov" required/>
+              <label className="form-label" htmlFor="admin-email">{isAR?'البريد الإلكتروني':'Email Address'} *</label>
+              <input id="admin-email" className="form-input" type="email" value={admin.email} onChange={setA('email')} placeholder="admin@organization.gov" required/>
             </div>
             <div className="form-group">
-              <label className="form-label">{isAR?'كلمة المرور':'Password'} *</label>
-              <input className="form-input" type="password" value={admin.password} onChange={setA('password')} placeholder="••••••••" required/>
+              <label className="form-label" htmlFor="admin-password">{isAR?'كلمة المرور':'Password'} *</label>
+              <input id="admin-password" className="form-input" type="password" value={admin.password} onChange={setA('password')} placeholder="••••••••" required/>
             </div>
             <div className="form-group">
-              <label className="form-label">{isAR?'تأكيد كلمة المرور':'Confirm Password'} *</label>
-              <input className="form-input" type="password" value={admin.confirmPassword} onChange={setA('confirmPassword')} placeholder="••••••••" required/>
+              <label className="form-label" htmlFor="admin-confirm-password">{isAR?'تأكيد كلمة المرور':'Confirm Password'} *</label>
+              <input id="admin-confirm-password" className="form-input" type="password" value={admin.confirmPassword} onChange={setA('confirmPassword')} placeholder="••••••••" required/>
             </div>
             <div style={{display:'flex',gap:10,marginTop:8}}>
               <button type="button" className="btn btn-secondary" style={{flex:1,justifyContent:'center'}} onClick={()=>{setStep('org');setError('')}}>

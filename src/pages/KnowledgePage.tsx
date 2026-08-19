@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useLang } from '../contexts/LangContext'
 import { api } from '../lib/api'
+import HelpTip from '../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -86,7 +87,7 @@ export default function KnowledgePage() {
     <div>
       <div className="page-header">
         <div className="flex items-center justify-between">
-          <div><div className="page-title">{t('know.title')}</div><div className="page-subtitle">{t('know.subtitle')}</div></div>
+          <div><div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>{t('know.title')}<HelpTip text="Upload documents here (like policies, past reviews, or strategy papers) so the AI can reference them when answering questions or reviewing new proposals - instead of only relying on general knowledge." /></div><div className="page-subtitle">{t('know.subtitle')}</div></div>
           <div style={{position:'relative',display:'inline-block'}}>
             <button className="btn btn-primary" disabled={uploading} onClick={()=>setShowTypeSelect(s=>!s)}>
               ⬆ {uploading ? t('know.uploading') : t('know.upload')} ▾
@@ -125,7 +126,7 @@ export default function KnowledgePage() {
         {tab==='documents' && (
           docs.length===0
             ? <div className="empty"><div className="empty-title">{t('know.no_docs')}</div><button className="btn btn-primary mt-4" onClick={()=>fileRef.current?.click()}>{t('know.upload_first')}</button></div>
-            : <table>
+            : <div style={{ overflowX: 'auto' }}><table>
                 <thead><tr>
                   <th>{t('know.col_name')}</th>
                   <th>{t('know.col_type')}</th>
@@ -153,6 +154,7 @@ export default function KnowledgePage() {
                   </tr>
                 ))}</tbody>
               </table>
+            </div>
         )}
         {tab==='search' && (
           <div>
