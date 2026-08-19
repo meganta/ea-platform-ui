@@ -71,6 +71,19 @@ const AGGRESSIVENESS_CARDS = [
   },
 ]
 
+const INTELLIGENCE_ITEMS = [
+  { key: 'strategies', label: 'Strategic Objectives & Initiatives', icon: '🎯', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
+  { key: 'ea_assets', label: 'EA Assets & Applications Inventory', icon: '🏗️', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
+  { key: 'capabilities', label: 'Business Capabilities', icon: '⚡', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
+  { key: 'standards', label: 'EA Standards & Principles', icon: '📐', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
+  { key: 'reference_architectures', label: 'Reference Architectures', icon: '🗂️', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
+  { key: 'target_architectures', label: 'Target-State Architectures', icon: '🎯', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
+  { key: 'technology_catalog', label: 'Approved Technology Catalog', icon: '💻', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
+  { key: 'arch_decisions', label: 'Previous Architecture Decisions', icon: '📋', source: 'kb', enrichUrl: '/knowledge', enrichLabel: 'Upload to Knowledge Base' },
+  { key: 'security_standards', label: 'Security Standards & Controls', icon: '🔒', source: 'kb', enrichUrl: '/knowledge', enrichLabel: 'Upload to Knowledge Base' },
+  { key: 'similar_reviews', label: 'Similar Previous Reviews', icon: '🔍', source: 'auto', enrichUrl: '', enrichLabel: '' },
+]
+
 const REVIEW_PURPOSE_OPTIONS = [
   { value: 'architecture_approval', label: 'Architecture Approval' },
   { value: 'procurement_support', label: 'Procurement Support' },
@@ -677,7 +690,7 @@ export default function GovernancePage() {
   const [tab, setTab] = useState<'summary' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
-  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD', reviewPurpose: '' })
+  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
   const [inputs, setInputs] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
   const [extractedMeta, setExtractedMeta] = useState<any>(null)
@@ -782,7 +795,6 @@ export default function GovernancePage() {
 
   useEffect(() => {
     loadReviews()
-    api.get('/governance/repository/warnings').then((d: any) => setRepoWarnings(d?.warnings ?? [])).catch(() => {})
   }, [])
 
   // Reset to page 1 whenever filters change
@@ -844,17 +856,18 @@ export default function GovernancePage() {
   }, [location.state, reviews])
 
   const openReview = async (r: any) => {
-    setReview(r); setView('detail'); setStep(4)
+    setReview(r)
     const [f, rpt] = await Promise.all([
       api.get('/governance/reviews/' + r.id + '/findings').catch(() => []),
       api.get('/governance/reviews/' + r.id + '/report').catch(() => null),
     ])
     setFindings(Array.isArray(f) ? f : [])
     setReport(rpt)
+    setView('report')
   }
 
   // ── Step 1: Create review ─────────────────────────────
-  const createReview = async () => {
+  const createAndStart = async () => {
     if (!form.title) { setError('Title is required'); return }
     if (inputs.length === 0) { setError('Please upload at least one document'); return }
     setLoading(true); setError(''); setUploadStatus('')
@@ -939,6 +952,14 @@ export default function GovernancePage() {
   }
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
+  const handleFileSelect = (files: FileList | null) => {
+    if (!files) return
+    const newInputs = Array.from(files).map(f => ({ label: f.name, _file: f }))
+    setInputs(i => [...i, ...newInputs])
+  }
+
+  const removeInput = (idx: number) => setInputs(i => i.filter((_, j) => j !== idx))
 
   // ── Reviews list ──────────────────────────────────────
   if (view === 'list') return (
