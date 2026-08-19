@@ -16,7 +16,9 @@ function useApi() {
 }
 
 const REVIEW_TYPES = [
-  { value: 'SOLUTION_DESIGN', label: 'Architecture Solution Review (HLD/LLD)' },
+  { value: 'HLD_REVIEW', label: 'High-Level Design Review (HLD)' },
+  { value: 'LLD_REVIEW', label: 'Low-Level Design Review (LLD)' },
+  { value: 'SOLUTION_DESIGN', label: 'Solution Design Review' },
   { value: 'NEW_PROJECT', label: 'New Project Review' },
   { value: 'RFP_SOW', label: 'RFP / Scope of Work Review' },
   { value: 'CHANGE_REQUEST', label: 'Change Request Review' },
