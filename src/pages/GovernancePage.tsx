@@ -1503,6 +1503,8 @@ export default function GovernancePage() {
       {!report && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Report not available yet</div>}
     </div>
   )
+
+  return null
 }
 
 function ReportView({ review, report, findings, tab, setTab }: { review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
