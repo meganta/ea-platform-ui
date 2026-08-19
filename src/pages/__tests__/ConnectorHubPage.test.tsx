@@ -134,6 +134,85 @@ describe('ConnectorHubPage - NewConnector', () => {
       expect(body.name).toBe('My Ardoq');
     });
   });
+
+  it('shows ManageEngine OpManager in the type picker and submits MANAGEENGINE_CMDB on create', async () => {
+    mockFetch({ '/connectors/stats': {}, '/connectors': { id: 'new-2', name: 'My OpManager' } });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('+ Add'));
+    await screen.findByText('Choose Connector Type');
+    expect(screen.getByText('ManageEngine OpManager')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('ManageEngine OpManager'));
+    expect(await screen.findByText('Sync Direction')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Connector' }));
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST');
+      expect(JSON.parse(postCall[1].body).connectorType).toBe('MANAGEENGINE_CMDB');
+    });
+  });
+
+  it('shows Informatica Axon in the type picker and submits INFORMATICA_AXON on create', async () => {
+    mockFetch({ '/connectors/stats': {}, '/connectors': { id: 'new-3', name: 'My Axon' } });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('+ Add'));
+    await screen.findByText('Choose Connector Type');
+    expect(screen.getByText('Informatica Axon')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Informatica Axon'));
+    expect(await screen.findByText('Sync Direction')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Connector' }));
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST');
+      expect(JSON.parse(postCall[1].body).connectorType).toBe('INFORMATICA_AXON');
+    });
+  });
+});
+
+describe('ConnectorHubPage - ManageEngine connector detail', () => {
+  const MANAGEENGINE_CONNECTOR = {
+    id: 'me-1', name: 'OpManager Prod', connectorType: 'MANAGEENGINE_CMDB', direction: 'IMPORT',
+    status: 'ACTIVE', config: {}, _count: { syncJobs: 0 },
+  };
+
+  it('shows an API Key credential field and no structured config editor (category list is server-side, not tenant-configured)', async () => {
+    mockFetch({ '/connectors/stats': {}, '/connectors': [MANAGEENGINE_CONNECTOR] });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('OpManager Prod'));
+    fireEvent.click(await screen.findByText('🔐 Credentials'));
+    expect(await screen.findByText(/API Key \(Settings > Basic Settings > REST API\)/)).toBeInTheDocument();
+    expect(screen.queryByText('⚙ Connector Configuration')).not.toBeInTheDocument();
+  });
+});
+
+describe('ConnectorHubPage - Informatica Axon connector detail', () => {
+  const AXON_CONNECTOR = {
+    id: 'ax-1', name: 'Axon Governance', connectorType: 'INFORMATICA_AXON', direction: 'IMPORT',
+    status: 'ACTIVE', config: {}, _count: { syncJobs: 0 },
+  };
+
+  it('shows Username/Password credential fields and the login_check notice', async () => {
+    mockFetch({ '/connectors/stats': {}, '/connectors': [AXON_CONNECTOR] });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('Axon Governance'));
+    fireEvent.click(await screen.findByText('🔐 Credentials'));
+    expect(await screen.findByText('Username')).toBeInTheDocument();
+    expect(screen.getByText('Password')).toBeInTheDocument();
+    expect(screen.getByText(/login_check/)).toBeInTheDocument();
+  });
+
+  it('shows the structured object-types config editor and can add a DataDomain entry', async () => {
+    mockFetch({ '/connectors/stats': {}, '/connectors': [AXON_CONNECTOR] });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('Axon Governance'));
+    fireEvent.click(await screen.findByText('🔐 Credentials'));
+    expect(await screen.findByText('⚙ Connector Configuration')).toBeInTheDocument();
+    const keyInput = screen.getByPlaceholderText('New object type key, e.g. DataDomain');
+    fireEvent.change(keyInput, { target: { value: 'DataDomain' } });
+    fireEvent.click(screen.getByText('+ Add Object Type'));
+    expect(screen.getAllByText('DataDomain').length).toBeGreaterThan(0);
+    expect(screen.getByPlaceholderText('Query path, e.g. /api/DataDomain')).toBeInTheDocument();
+  });
 });
 
 describe('ConnectorHubPage - ConflictsPanel', () => {

@@ -44,6 +44,7 @@ const CONNECTOR_TYPES = [
   { code: 'LEANIX',          name: 'LeanIX',            icon: '🔷', color: '#0070d2', desc: 'Bidirectional sync via LeanIX REST API', fileOnly: false },
   { code: 'ARDOQ',           name: 'Ardoq',             icon: '🔶', color: '#f39c12', desc: 'Bidirectional sync via Ardoq REST API', fileOnly: false },
   { code: 'SERVICENOW_CMDB', name: 'ServiceNow CMDB',   icon: '🖥', color: '#81b5a1', desc: 'Import CI records from ServiceNow CMDB', fileOnly: false },
+  { code: 'MANAGEENGINE_CMDB', name: 'ManageEngine OpManager', icon: '🖧', color: '#e8622c', desc: 'Server & infrastructure discovery via OpManager device inventory', fileOnly: false },
   { code: 'MEGA_HOPEX',      name: 'MEGA HOPEX',        icon: '⬡', color: '#e74c3c', desc: 'Export/import via MEGA API or file', fileOnly: false },
   { code: 'BIZZDESIGN',      name: 'Bizzdesign Horizzon', icon: '🔷', color: '#2ecc71', desc: 'Import/export via Bizzdesign API', fileOnly: false },
   { code: 'GENERIC_CSV',     name: 'Generic CSV',       icon: '📊', color: '#7f8c8d', desc: 'Import any CSV file with column mapping', fileOnly: true },
@@ -53,6 +54,7 @@ const CONNECTOR_TYPES = [
   { code: 'CLOUD_PROVIDER',  name: 'Cloud Provider',    icon: '☁️', color: '#f39c12', desc: 'Cloud resource inventory (AWS/Azure/GCP)', fileOnly: false, comingSoon: true },
   { code: 'API_MANAGEMENT',  name: 'API Management',    icon: '🔌', color: '#8e44ad', desc: 'API gateway/management platform catalog discovery (requires endpoint configuration)', fileOnly: false },
   { code: 'DATA_CATALOG',    name: 'Data Catalog',      icon: '📚', color: '#16a085', desc: 'Data governance/catalog platform asset discovery (requires endpoint configuration)', fileOnly: false },
+  { code: 'INFORMATICA_AXON', name: 'Informatica Axon',  icon: '🗃', color: '#ff4f1f', desc: 'Data Domain and governance objects via Axon Data Governance (requires object type configuration)', fileOnly: false },
   { code: 'PPM_TOOL',        name: 'PPM Tool',          icon: '📅', color: '#2980b9', desc: 'Project & portfolio management tool initiative data (requires endpoint configuration)', fileOnly: false },
   { code: 'ZOOM_MEETINGS',   name: 'Zoom Meetings',     icon: '📹', color: '#2d8cff', desc: 'Auto-analyze Zoom meetings via webhook + recording transcript', fileOnly: false },
   { code: 'TEAMS_MEETINGS',  name: 'Microsoft Teams Meetings', icon: '💬', color: '#5059c9', desc: 'Auto-analyze Teams meetings via Graph webhook + transcript', fileOnly: false },
@@ -194,7 +196,7 @@ function NewConnector({ api, onCreated, onCancel }: { api: any, onCreated: (c: a
                 </div>
                 <div><label style={S.label}>API Base URL</label>
                   <input style={S.input} value={form.baseUrl} onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))}
-                    placeholder={selectedType.code === 'LEANIX' ? 'https://app.leanix.net' : selectedType.code === 'ARDOQ' ? 'https://app.ardoq.com' : 'https://'} />
+                    placeholder={selectedType.code === 'LEANIX' ? 'https://app.leanix.net' : selectedType.code === 'ARDOQ' ? 'https://app.ardoq.com' : selectedType.code === 'MANAGEENGINE_CMDB' ? 'http://opmanager-host:8060' : selectedType.code === 'INFORMATICA_AXON' ? 'https://axon.mycompany.com' : 'https://'} />
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <input type="checkbox" id="autoSync" checked={form.autoSync} onChange={e => setForm(f => ({ ...f, autoSync: e.target.checked }))} />
@@ -280,12 +282,14 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
     LEANIX: [{ label: 'API Token', key: 'apiToken', type: 'password' }],
     ARDOQ: [{ label: 'API Key', key: 'apiKey', type: 'password' }, { label: 'Organization Key', key: 'orgKey' }],
     SERVICENOW_CMDB: [{ label: 'Username', key: 'username' }, { label: 'Password', key: 'password', type: 'password' }],
+    MANAGEENGINE_CMDB: [{ label: 'API Key (Settings > Basic Settings > REST API)', key: 'apiKey', type: 'password' }],
     MEGA_HOPEX: [{ label: 'API Key', key: 'apiKey', type: 'password' }, { label: 'API Secret', key: 'apiSecret', type: 'password' }],
     BIZZDESIGN: [{ label: 'Username', key: 'username' }, { label: 'Password', key: 'password', type: 'password' }],
     ENTRA_ID: [{ label: 'App Client ID', key: 'clientId' }, { label: 'Client Secret', key: 'clientSecret', type: 'password' }],
     GENERIC_CMDB: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
     API_MANAGEMENT: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
     DATA_CATALOG: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
+    INFORMATICA_AXON: [{ label: 'Username', key: 'username' }, { label: 'Password', key: 'password', type: 'password' }],
     PPM_TOOL: [{ label: 'Bearer Token / API Key / Password', key: 'token' }, { label: 'API Key (if authType=apiKey)', key: 'apiKey', type: 'password' }, { label: 'Username (if authType=basic)', key: 'username' }, { label: 'Password (if authType=basic)', key: 'password', type: 'password' }],
     ZOOM_MEETINGS: [
       { label: 'Webhook Secret Token (from Zoom App > Feature > Event Subscriptions)', key: 'webhookSecretToken', type: 'password' },
@@ -398,6 +402,11 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
                   ⚠️ This connector also requires your Entra ID tenant (directory) ID — configure it in the Connector Configuration panel below. The app registration needs application-level Graph API permissions (User.Read.All, Group.Read.All, Application.Read.All) with admin consent granted.
                 </div>
               )}
+              {connector.connectorType === 'INFORMATICA_AXON' && (
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(255,79,31,0.08)', borderRadius: 8 }}>
+                  ⚠️ Username/password are exchanged for a bearer token automatically via Axon's <code>/api/login_check</code>. You also need to configure at least one object type (e.g. <code>DataDomain</code>) below with the real query path from your Axon instance's REST API Guide — this varies by Axon version and isn't guessed at.
+                </div>
+              )}
               {connector.connectorType === 'ZOOM_MEETINGS' && (
                 <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(45,140,255,0.08)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <div>⚠️ After saving credentials, paste this URL into your Zoom App's <b>Event Subscriptions</b> settings (Feature tab), and subscribe to <code>meeting.ended</code> and <code>recording.completed</code>. Zoom will send a one-time validation request to this URL, which is handled automatically.</div>
@@ -426,7 +435,7 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
               <button style={S.btn('primary')} onClick={saveCreds} disabled={saving}>{saving ? 'Saving...' : '🔐 Save Credentials'}</button>
             </div>
           )}
-          {['GENERIC_CMDB', 'API_MANAGEMENT', 'DATA_CATALOG', 'PPM_TOOL', 'ENTRA_ID', 'MEGA_HOPEX'].includes(connector.connectorType) && (
+          {['GENERIC_CMDB', 'API_MANAGEMENT', 'DATA_CATALOG', 'PPM_TOOL', 'ENTRA_ID', 'MEGA_HOPEX', 'INFORMATICA_AXON'].includes(connector.connectorType) && (
             <ConnectorConfigEditor api={api} connector={connector} onSaved={onRefresh} />
           )}
         </div>
@@ -711,7 +720,8 @@ function ConnectorConfigEditor({ api, connector, onSaved }: { api: any, connecto
   const isGenericRest = ['GENERIC_CMDB', 'API_MANAGEMENT', 'DATA_CATALOG', 'PPM_TOOL'].includes(connector.connectorType)
   const isEntraId = connector.connectorType === 'ENTRA_ID'
   const isMegaHopex = connector.connectorType === 'MEGA_HOPEX'
-  const hasStructuredForm = isGenericRest || isEntraId || isMegaHopex
+  const isInformaticaAxon = connector.connectorType === 'INFORMATICA_AXON'
+  const hasStructuredForm = isGenericRest || isEntraId || isMegaHopex || isInformaticaAxon
 
   const save = async (dataToSave: any) => {
     setSaving(true)
@@ -744,6 +754,29 @@ function ConnectorConfigEditor({ api, connector, onSaved }: { api: any, connecto
   }
   const removeResource = (key: string) => {
     setConfig((c: any) => { const r = { ...(c.resources || {}) }; delete r[key]; return { ...c, resources: r } })
+  }
+
+  // ── Informatica Axon objectTypes builder ────────────────────────────────
+  // Same idea as the generic-rest resources builder above, but matching
+  // InformaticaAxonAdapter's config.objectTypes shape (path/method/body/
+  // idField/listField/label) - kept as its own block rather than merged
+  // into the generic-rest one since Axon's query model additionally needs
+  // a method (GET/POST) and an optional POST body, which plain REST
+  // resources don't.
+  const objectTypes = config.objectTypes || {}
+  const objectTypeKeys = Object.keys(objectTypes)
+  const [newObjectTypeKey, setNewObjectTypeKey] = useState('')
+
+  const addObjectType = () => {
+    if (!newObjectTypeKey.trim()) return
+    setConfig((c: any) => ({ ...c, objectTypes: { ...(c.objectTypes || {}), [newObjectTypeKey.trim()]: { path: '', method: 'GET', idField: 'id' } } }))
+    setNewObjectTypeKey('')
+  }
+  const updateObjectType = (key: string, patch: any) => {
+    setConfig((c: any) => ({ ...c, objectTypes: { ...(c.objectTypes || {}), [key]: { ...(c.objectTypes?.[key] || {}), ...patch } } }))
+  }
+  const removeObjectType = (key: string) => {
+    setConfig((c: any) => { const o = { ...(c.objectTypes || {}) }; delete o[key]; return { ...c, objectTypes: o } })
   }
 
   return (
@@ -807,6 +840,46 @@ function ConnectorConfigEditor({ api, connector, onSaved }: { api: any, connecto
               <div style={{ display: 'flex', gap: 8 }}>
                 <input style={{ ...S.input, marginBottom: 0, flex: 1 }} placeholder="New object type key, e.g. APPLICATION" value={newResourceKey} onChange={e => setNewResourceKey(e.target.value)} />
                 <button style={S.btn()} onClick={addResource}>+ Add Resource</button>
+              </div>
+            </div>
+          )}
+          {isInformaticaAxon && (
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+                Axon's Data Domain query syntax varies by version and isn't guessed at here — get the real path/method/body for your instance from its REST API Guide (or a REST client trace), then configure it below. Name the key <code>DataDomain</code> to get ArchMind's matching NORA 2.0 meta-model suggestion during Discover.
+              </div>
+              {objectTypeKeys.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>No object types configured yet.</div>}
+              {objectTypeKeys.map(key => (
+                <div key={key} style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <div style={{ fontWeight: 600, fontSize: 12, flex: 1 }}>{key}</div>
+                    <button style={{ ...S.btn('danger'), fontSize: 10, padding: '3px 8px' }} onClick={() => removeObjectType(key)}>Remove</button>
+                  </div>
+                  <div style={S.grid2}>
+                    <input style={{ ...S.input, marginBottom: 6 }} placeholder="Query path, e.g. /api/DataDomain" value={objectTypes[key].path || ''} onChange={e => updateObjectType(key, { path: e.target.value })} />
+                    <select style={{ ...S.input, marginBottom: 6 }} value={objectTypes[key].method || 'GET'} onChange={e => updateObjectType(key, { method: e.target.value })}>
+                      <option value="GET">GET</option>
+                      <option value="POST">POST (Axon searchGroups/facetID query)</option>
+                    </select>
+                    <input style={{ ...S.input, marginBottom: 6 }} placeholder="ID field (default: id)" value={objectTypes[key].idField || ''} onChange={e => updateObjectType(key, { idField: e.target.value })} />
+                    <input style={{ ...S.input, marginBottom: 6 }} placeholder="Response envelope field (optional)" value={objectTypes[key].listField || ''} onChange={e => updateObjectType(key, { listField: e.target.value })} />
+                    <input style={{ ...S.input, marginBottom: 6 }} placeholder="Display label (optional)" value={objectTypes[key].label || ''} onChange={e => updateObjectType(key, { label: e.target.value })} />
+                  </div>
+                  {objectTypes[key].method === 'POST' && (
+                    <textarea style={{ ...S.input, marginTop: 6, minHeight: 80, fontFamily: 'monospace', fontSize: 11 }}
+                      placeholder='POST body JSON, e.g. { "searchGroups": [{ "facetID": "DataDomain" }] }'
+                      value={objectTypes[key].bodyRaw ?? JSON.stringify(objectTypes[key].body || {}, null, 2)}
+                      onChange={e => {
+                        const text = e.target.value
+                        try { updateObjectType(key, { body: JSON.parse(text), bodyRaw: undefined }) }
+                        catch { updateObjectType(key, { bodyRaw: text }) }
+                      }} />
+                  )}
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} placeholder="New object type key, e.g. DataDomain" value={newObjectTypeKey} onChange={e => setNewObjectTypeKey(e.target.value)} />
+                <button style={S.btn()} onClick={addObjectType}>+ Add Object Type</button>
               </div>
             </div>
           )}
