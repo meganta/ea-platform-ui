@@ -774,6 +774,39 @@ function IdeaDetail({ api, idea, isAR, t, userRole, radarItems, onBack, onRefres
 
 // ── Studies Tab (Innovation-P3) ─────────────────────────────────────────────
 
+function PortfolioSummary({ api, isAR, t }: any) {
+  const [portfolio, setPortfolio] = useState<any>(null)
+
+  useEffect(() => { api.get('/innovation/portfolio').then(setPortfolio) }, [api])
+
+  if (!portfolio || !portfolio.funnel) return null
+
+  return (
+    <div className="stat-grid-5" style={{ marginBottom: 20 }}>
+      <div style={S.card}>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{t('innov.funnel_submitted')}</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{portfolio.funnel.ideasSubmitted}</div>
+      </div>
+      <div style={S.card}>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{t('innov.funnel_qualified')}</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{portfolio.funnel.ideasQualified}</div>
+      </div>
+      <div style={S.card}>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{t('innov.funnel_studies')}</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{portfolio.funnel.studiesGenerated}</div>
+      </div>
+      <div style={S.card}>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{t('innov.funnel_approved')}</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{portfolio.funnel.studiesApproved}</div>
+      </div>
+      <div style={S.card}>
+        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{t('innov.funnel_initiatives')}</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{portfolio.funnel.convertedToInitiative}</div>
+      </div>
+    </div>
+  )
+}
+
 function StudiesTab({ api, isAR, t }: any) {
   const [studies, setStudies] = useState<any[]>([])
   const [statusFilter, setStatusFilter] = useState('')
@@ -791,6 +824,7 @@ function StudiesTab({ api, isAR, t }: any) {
 
   return (
     <div>
+      <PortfolioSummary api={api} isAR={isAR} t={t} />
       <div style={{ ...S.row, marginBottom: 16, flexWrap: 'wrap' as const }}>
         <select style={{ ...S.input, marginBottom: 0, width: 200 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
           <option value="">{t('innov.all_statuses')}</option>
@@ -949,6 +983,8 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
   const [study, setStudy] = useState<any>(null)
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState('')
+  const [exporting, setExporting] = useState(false)
+  const [converting, setConverting] = useState(false)
   const [addingAssumption, setAddingAssumption] = useState(false)
   const [assumptionForm, setAssumptionForm] = useState({ label: '', value: '' })
 
@@ -975,6 +1011,39 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
     setAssumptionForm({ label: '', value: '' }); setAddingAssumption(false); await load()
   }
 
+  const exportDocx = async () => {
+    setExporting(true)
+    try {
+      const token = localStorage.getItem('ea_token')
+      const res = await fetch(`${API}/innovation/studies/${studyId}/export/docx`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `study-${studyId}.docx`
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (e: any) {
+      alert(t('innov.export_failed'))
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const convertToInitiative = async () => {
+    if (!window.confirm(t('innov.convert_confirm'))) return
+    setConverting(true)
+    try {
+      await api.post(`/innovation/studies/${studyId}/convert-to-initiative`, {})
+      alert(t('innov.convert_success'))
+      await load()
+    } catch (e: any) {
+      alert(`${t('innov.convert_failed')} ${e.message || ''}`)
+    } finally {
+      setConverting(false)
+    }
+  }
+
   if (!study) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
 
   const title = isAR && study.titleAr ? study.titleAr : study.title
@@ -987,6 +1056,12 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
         <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{t('innov.back_to_studies')}</button>
         <div style={{ flex: 1, fontSize: 18, fontWeight: 700 }}>{title}</div>
         <span style={S.badge(STUDY_STATUS_COLOR[study.status])}>{isAR ? STUDY_STATUS_LABEL[study.status]?.ar : STUDY_STATUS_LABEL[study.status]?.en}</span>
+        {hasGeneratedContent && (
+          <button style={S.btn()} onClick={exportDocx} disabled={exporting}>{exporting ? t('innov.exporting') : t('innov.export_docx')}</button>
+        )}
+        {hasGeneratedContent && study.status !== 'PILOT_INITIATIVE' && study.status !== 'IMPLEMENTED' && (
+          <button style={S.btn('primary')} onClick={convertToInitiative} disabled={converting}>{converting ? t('innov.converting') : t('innov.convert_to_initiative')}</button>
+        )}
       </div>
 
       <div style={{ ...S.card, marginBottom: 16 }}>
@@ -1040,6 +1115,8 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
         )}
       </div>
 
+      <RelatedObjectsPanel api={api} studyId={studyId} isAR={isAR} t={t} />
+
       <div style={S.card}>
         <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12 }}>{t('innov.study_status')}</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
@@ -1050,6 +1127,101 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
           <button style={S.btn('danger')} onClick={deleteStudy}>{t('innov.delete_study')}</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Related EA Objects (Innovation-P5 traceability) ─────────────────────────
+
+const RELATED_OBJECT_TYPE_LABEL: Record<string, { en: string; ar: string }> = {
+  EA_ASSET: { en: 'EA Asset', ar: 'أصل بنية مؤسسية' },
+  ADM_CYCLE: { en: 'ADM Cycle', ar: 'دورة تطوير البنية' },
+  GOVERNANCE_REVIEW: { en: 'Governance Review', ar: 'مراجعة الحوكمة' },
+  EA_PLAN: { en: 'EA Plan', ar: 'خطة البنية المؤسسية' },
+  STRATEGY: { en: 'Strategy', ar: 'استراتيجية' },
+}
+
+function RelatedObjectsPanel({ api, studyId, isAR, t }: any) {
+  const [relationships, setRelationships] = useState<any[]>([])
+  const [linking, setLinking] = useState(false)
+  const [form, setForm] = useState({ relatedObjectType: 'EA_ASSET', relatedObjectId: '', notes: '' })
+  const [assets, setAssets] = useState<any[]>([])
+  const [error, setError] = useState('')
+
+  const load = useCallback(() => { api.get(`/innovation/studies/${studyId}/relationships`).then((d: any) => setRelationships(Array.isArray(d) ? d : [])) }, [api, studyId])
+  useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (form.relatedObjectType === 'EA_ASSET' && assets.length === 0) api.get('/ea-repository/assets').then((d: any) => setAssets(Array.isArray(d) ? d : []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.relatedObjectType])
+
+  const link = async () => {
+    if (!form.relatedObjectId) return
+    setError('')
+    try {
+      await api.post(`/innovation/studies/${studyId}/relationships`, form)
+      setForm({ relatedObjectType: 'EA_ASSET', relatedObjectId: '', notes: '' })
+      setLinking(false); await load()
+    } catch (e: any) { setError(e.message) }
+  }
+
+  const unlink = async (relationshipId: string) => {
+    if (!window.confirm(t('innov.confirm_unlink'))) return
+    await api.post(`/innovation/studies/${studyId}/relationships/${relationshipId}/delete`); await load()
+  }
+
+  return (
+    <div style={{ ...S.card, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ flex: 1, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+          {t('innov.related_objects')}
+          <HelpTip text={isAR
+            ? 'اربط هذه الدراسة بكائنات حقيقية في البنية المؤسسية (قدرات، تطبيقات، تقنيات، دورات، مراجعات، خطط، استراتيجيات) لمعرفة أي الدراسات تؤثر على أي جزء من البنية.'
+            : 'Link this study to real EA repository objects (capabilities, applications, technologies, ADM cycles, reviews, plans, strategies) so it\'s traceable which studies affect which part of the architecture.'} />
+        </div>
+        <button style={S.btn()} onClick={() => setLinking(true)}>{t('innov.link_object')}</button>
+      </div>
+
+      {linking && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12, padding: 12, background: 'var(--navy)', borderRadius: 8 }}>
+          <select style={S.input} value={form.relatedObjectType} onChange={e => setForm(f => ({ ...f, relatedObjectType: e.target.value, relatedObjectId: '' }))}>
+            <option value="EA_ASSET">{t('innov.related_ea_asset')}</option>
+            <option value="ADM_CYCLE">{t('innov.related_adm_cycle')}</option>
+            <option value="GOVERNANCE_REVIEW">{t('innov.related_review')}</option>
+            <option value="EA_PLAN">{t('innov.related_plan')}</option>
+            <option value="STRATEGY">{t('innov.related_strategy')}</option>
+          </select>
+          {form.relatedObjectType === 'EA_ASSET' ? (
+            <select style={S.input} value={form.relatedObjectId} onChange={e => setForm(f => ({ ...f, relatedObjectId: e.target.value }))}>
+              <option value="">{t('innov.select_ea_asset')}</option>
+              {assets.map((a: any) => <option key={a.id} value={a.id}>{a.name} [{a.assetType}]</option>)}
+            </select>
+          ) : (
+            <input style={S.input} placeholder={t('innov.object_id')} value={form.relatedObjectId} onChange={e => setForm(f => ({ ...f, relatedObjectId: e.target.value }))} />
+          )}
+          {error && <div style={{ fontSize: 11, color: '#e74c3c' }}>{error}</div>}
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={link}>{t('innov.link')}</button>
+            <button style={S.btn()} onClick={() => { setLinking(false); setError('') }}>{t('innov.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {relationships.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('innov.no_relationships')}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {relationships.map((r: any) => (
+            <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+              <span style={S.badge('#8e44ad')}>{isAR ? RELATED_OBJECT_TYPE_LABEL[r.relatedObjectType]?.ar : RELATED_OBJECT_TYPE_LABEL[r.relatedObjectType]?.en}</span>
+              <span style={{ flex: 1, fontFamily: 'monospace', color: 'var(--text-dim)' }}>{r.relatedObjectId}</span>
+              <span style={{ color: 'var(--text-dim)' }}>{r.relationshipType}</span>
+              <button style={{ ...S.btn('danger'), padding: '2px 8px', fontSize: 11 }} onClick={() => unlink(r.id)}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

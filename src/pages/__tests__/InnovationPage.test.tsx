@@ -571,9 +571,167 @@ describe('InnovationPage - Studies tab: detail and generation', () => {
     render(<InnovationPage />);
     fireEvent.click(await screen.findByText('innov.tab_studies'));
     fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
-    const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
-    fireEvent.click(await screen.findByText('innov.delete_study'));
-    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
+    await screen.findByText('innov.delete_study');
+    fireEvent.click(screen.getByText('innov.delete_study'));
+    // Checking for the absence of a delete call specifically, rather than
+    // an unchanged raw total fetch count - RelatedObjectsPanel and
+    // PortfolioSummary both fetch independently on mount/render, which
+    // makes a raw call-count assertion fragile as more panels get added
+    // to this page over time; what this test actually cares about is that
+    // no delete request happened.
+    await new Promise(resolve => setTimeout(resolve, 0)); // let any pending microtasks settle
+    const deleteCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/studies/study-1/delete'));
+    expect(deleteCall).toBeUndefined();
+    confirmSpy.mockRestore();
+  });
+});
+
+const PORTFOLIO = {
+  ideas: { total: 5, byStatus: { SUBMITTED: 3, QUALIFIED: 2 } },
+  studies: { total: 3, byStatus: { APPROVED: 1, DRAFT: 2 }, byRecommendation: { PILOT: 1 }, avgQualityScore: 82 },
+  radar: { total: 4, byTenantStatus: { WATCH: 4 } },
+  funnel: { ideasSubmitted: 5, ideasQualified: 2, studiesGenerated: 1, studiesApproved: 1, convertedToInitiative: 0 },
+};
+
+describe('InnovationPage - Studies tab: Portfolio dashboard (Innovation-P5)', () => {
+  it('displays the innovation funnel counts', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/portfolio': PORTFOLIO });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    expect(await screen.findByText('5')).toBeInTheDocument(); // ideasSubmitted
+    expect(screen.getByText('innov.funnel_submitted')).toBeInTheDocument();
+  });
+
+  it('does not render the portfolio summary before the fetch resolves, and does not crash if it never resolves usefully', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [] }); // no /innovation/portfolio route configured - falls through to the default {} mock
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    expect(await screen.findByText('innov.no_studies')).toBeInTheDocument(); // the rest of the tab still renders fine
+    expect(screen.queryByText('innov.funnel_submitted')).not.toBeInTheDocument();
+  });
+});
+
+describe('InnovationPage - Studies tab: Export & Convert to Initiative (Innovation-P5)', () => {
+  const GENERATED_APPROVED_STUDY = { ...GENERATED_STUDY, status: 'APPROVED' };
+
+  it('shows Export and Convert to Initiative buttons only once the study has generated content', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/studies/study-1': STUDY });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findByText('innov.not_generated_yet');
+    expect(screen.queryByText('innov.export_docx')).not.toBeInTheDocument();
+    expect(screen.queryByText('innov.convert_to_initiative')).not.toBeInTheDocument();
+  });
+
+  it('shows Export and Convert to Initiative buttons for a generated study', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_APPROVED_STUDY], '/innovation/studies/study-1': GENERATED_APPROVED_STUDY });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    expect(await screen.findByText('innov.export_docx')).toBeInTheDocument();
+    expect(screen.getByText('innov.convert_to_initiative')).toBeInTheDocument();
+  });
+
+  it('hides the Convert to Initiative button once a study is already PILOT_INITIATIVE', async () => {
+    const converted = { ...GENERATED_APPROVED_STUDY, status: 'PILOT_INITIATIVE' };
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [converted], '/innovation/studies/study-1': converted });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findByText('innov.export_docx');
+    expect(screen.queryByText('innov.convert_to_initiative')).not.toBeInTheDocument();
+  });
+
+  it('calls convert-to-initiative and shows a success message after confirmation', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_APPROVED_STUDY], '/innovation/studies/study-1': GENERATED_APPROVED_STUDY, '/innovation/studies/study-1/convert-to-initiative': { id: 'new-plan-1' } });
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    fireEvent.click(await screen.findByText('innov.convert_to_initiative'));
+
+    await waitFor(() => {
+      const convertCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/convert-to-initiative'));
+      expect(convertCall).toBeDefined();
+      expect(convertCall[1].method).toBe('POST');
+    });
+    expect(alertSpy).toHaveBeenCalledWith('innov.convert_success');
+    confirmSpy.mockRestore(); alertSpy.mockRestore();
+  });
+
+  it('does not call convert-to-initiative when the confirmation dialog is cancelled', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_APPROVED_STUDY], '/innovation/studies/study-1': GENERATED_APPROVED_STUDY });
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    fireEvent.click(await screen.findByText('innov.convert_to_initiative'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const convertCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/convert-to-initiative'));
+    expect(convertCall).toBeUndefined();
+    confirmSpy.mockRestore();
+  });
+});
+
+describe('InnovationPage - Studies tab: Related EA Objects (Innovation-P5 traceability)', () => {
+  it('shows the empty state when a study has no linked objects', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/studies/study-1': STUDY, '/innovation/studies/study-1/relationships': [] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    expect(await screen.findByText('innov.no_relationships')).toBeInTheDocument();
+  });
+
+  it('lists existing relationships', async () => {
+    mockFetch({
+      '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/studies/study-1': STUDY,
+      '/innovation/studies/study-1/relationships': [{ id: 'rel-1', relatedObjectType: 'EA_ASSET', relatedObjectId: 'asset-123', relationshipType: 'RELATED_TO' }],
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    expect(await screen.findByText('asset-123')).toBeInTheDocument();
+  });
+
+  it('fetches EA assets when EA_ASSET origin type is selected in the link form (default), and submits the link with the real payload', async () => {
+    mockFetch({
+      '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/studies/study-1': STUDY,
+      '/innovation/studies/study-1/relationships': [], '/ea-repository/assets': [{ id: 'asset-1', name: 'Core Banking', assetType: 'APPLICATION' }],
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    fireEvent.click(await screen.findByText('innov.link_object'));
+
+    const assetSelect = await screen.findByText('innov.select_ea_asset');
+    fireEvent.change(assetSelect.closest('select')!, { target: { value: 'asset-1' } });
+    fireEvent.click(screen.getByText('innov.link'));
+
+    await waitFor(() => {
+      const linkCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/relationships'));
+      expect(linkCall).toBeDefined();
+      const body = JSON.parse(linkCall[1].body);
+      expect(body.relatedObjectType).toBe('EA_ASSET');
+      expect(body.relatedObjectId).toBe('asset-1');
+    });
+  });
+
+  it('does not unlink when the confirmation dialog is cancelled', async () => {
+    mockFetch({
+      '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/studies/study-1': STUDY,
+      '/innovation/studies/study-1/relationships': [{ id: 'rel-1', relatedObjectType: 'EA_ASSET', relatedObjectId: 'asset-123', relationshipType: 'RELATED_TO' }],
+    });
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findByText('asset-123');
+    fireEvent.click(screen.getByText('✕'));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const unlinkCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/relationships/rel-1/delete'));
+    expect(unlinkCall).toBeUndefined();
     confirmSpy.mockRestore();
   });
 });
