@@ -16,12 +16,12 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          REACT_APP_API_URL: https://ea-platform-api-693660680541.me-central1.run.app/api/v1
+          REACT_APP_API_URL: https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1
       - uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
       - uses: google-github-actions/setup-gcloud@v2
-      - name: Deploy to Cloud Run (dev sizing — do not change without team approval)
+      - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ea-platform-ui \
             --source . \
@@ -29,15 +29,6 @@ jobs:
             --allow-unauthenticated \
             --port 8080 \
             --cpu 1 \
-            --memory 256Mi \
-            --min-instances 0 \
-            --max-instances 1 \
+            --memory 512Mi \
             --project ${{ secrets.GCP_PROJECT_ID }} \
             --quiet
-      - name: Show live URL
-        run: |
-          URL=$(gcloud run services describe ea-platform-ui \
-            --region=me-central1 \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --format="value(status.url)")
-          echo "🚀 Live at: ${URL}"
