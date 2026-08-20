@@ -114,7 +114,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
             </div>
           </div>
           {hasTranscript && !hasAnalyses && (
-            <button onClick={startAnalysis} disabled={analyzing} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'#0B1929', border:'none', cursor:analyzing?'default':'pointer', fontSize:13, fontWeight:600 }}>
+            <button onClick={startAnalysis} disabled={analyzing} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'var(--navy)', border:'none', cursor:analyzing?'default':'pointer', fontSize:13, fontWeight:600 }}>
               {analyzing ? '⏳ Analyzing...' : '▶ Analyze with Architects'}
             </button>
           )}
@@ -142,8 +142,8 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
           ) : (
             <div>
               <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-                <button onClick={()=>setUploadMode('text')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='text'?'var(--accent)':'var(--border)'}`, background:uploadMode==='text'?'rgba(0,180,216,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>📝 Paste Text</button>
-                <button onClick={()=>setUploadMode('audio')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='audio'?'var(--accent)':'var(--border)'}`, background:uploadMode==='audio'?'rgba(0,180,216,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>🎵 Upload Audio</button>
+                <button onClick={()=>setUploadMode('text')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='text'?'var(--accent)':'var(--border)'}`, background:uploadMode==='text'?'rgba(3,105,161,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>📝 Paste Text</button>
+                <button onClick={()=>setUploadMode('audio')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='audio'?'var(--accent)':'var(--border)'}`, background:uploadMode==='audio'?'rgba(3,105,161,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>🎵 Upload Audio</button>
               </div>
               <div style={{ marginBottom:10, display:'flex', gap:8, alignItems:'center' }}>
                 <label style={{ fontSize:12, color:'var(--text-dim)' }}>Language:</label>
@@ -157,7 +157,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
                   <textarea value={transcriptText} onChange={e=>setTranscriptText(e.target.value)}
                     style={{ width:'100%', minHeight:140, padding:'10px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:12, resize:'vertical', fontFamily:'monospace', lineHeight:1.6 }}
                     placeholder="Paste meeting transcript here...&#10;&#10;You can include speaker names like:&#10;John: Let's discuss the API architecture...&#10;Sarah: I have concerns about the data model..." />
-                  <button onClick={ingestText} disabled={!transcriptText.trim()} style={{ marginTop:8, padding:'8px 16px', borderRadius:8, background:transcriptText.trim()?'var(--accent)':'var(--navy-mid)', color:transcriptText.trim()?'#0B1929':'var(--text-dim)', border:'none', cursor:transcriptText.trim()?'pointer':'default', fontSize:13, fontWeight:600 }}>
+                  <button onClick={ingestText} disabled={!transcriptText.trim()} style={{ marginTop:8, padding:'8px 16px', borderRadius:8, background:transcriptText.trim()?'var(--accent)':'var(--navy-mid)', color:transcriptText.trim()?'var(--navy)':'var(--text-dim)', border:'none', cursor:transcriptText.trim()?'pointer':'default', fontSize:13, fontWeight:600 }}>
                     Upload Transcript
                   </button>
                 </div>
@@ -222,7 +222,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
         )}
 
         {!hasTranscript && !hasAnalyses && (
-          <div style={{ background:'rgba(0,180,216,0.05)', border:'1px solid var(--border)', borderRadius:10, padding:24, textAlign:'center', color:'var(--text-dim)', fontSize:13 }}>
+          <div style={{ background:'rgba(3,105,161,0.05)', border:'1px solid var(--border)', borderRadius:10, padding:24, textAlign:'center', color:'var(--text-dim)', fontSize:13 }}>
             Upload a transcript above, then click "Analyze with Architects"
           </div>
         )}
@@ -251,7 +251,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
             })}
           </div>
         </div>
-        <button onClick={createMeeting} disabled={!form.title} style={{ padding:'10px 0', borderRadius:8, background:form.title?'var(--accent)':'var(--navy-mid)', color:form.title?'#0B1929':'var(--text-dim)', border:'none', cursor:form.title?'pointer':'default', fontSize:13, fontWeight:600 }}>
+        <button onClick={createMeeting} disabled={!form.title} style={{ padding:'10px 0', borderRadius:8, background:form.title?'var(--accent)':'var(--navy-mid)', color:form.title?'var(--navy)':'var(--text-dim)', border:'none', cursor:form.title?'pointer':'default', fontSize:13, fontWeight:600 }}>
           Create Meeting
         </button>
       </div>
@@ -268,7 +268,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
               <div style={{ fontSize:18, fontWeight:700 }}>📋 Meeting Assistant</div>
               <div style={{ fontSize:13, color:'var(--text-dim)' }}>Upload meeting transcripts and get domain-specific architect analyses</div>
             </div>
-            <button onClick={()=>setView('create')} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'#0B1929', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>+ New Meeting</button>
+            <button onClick={()=>setView('create')} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'var(--navy)', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>+ New Meeting</button>
           </div>
 
           {loading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:40 }}>Loading...</div> : meetings.length === 0 ? (
@@ -276,7 +276,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
               <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
               <div style={{ fontSize:15, fontWeight:600, marginBottom:8 }}>No meetings yet</div>
               <div style={{ fontSize:13, color:'var(--text-dim)', marginBottom:16 }}>Create a meeting, upload its transcript, and get analysis from multiple EA architects</div>
-              <button onClick={()=>setView('create')} style={{ padding:'8px 20px', borderRadius:8, background:'var(--accent)', color:'#0B1929', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>Create First Meeting</button>
+              <button onClick={()=>setView('create')} style={{ padding:'8px 20px', borderRadius:8, background:'var(--accent)', color:'var(--navy)', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>Create First Meeting</button>
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column' as const, gap:8 }}>
@@ -285,7 +285,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
                   style={{ background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, padding:'12px 16px', cursor:'pointer', display:'flex', alignItems:'center', gap:14, transition:'all 0.15s' }}
                   onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--accent)')}
                   onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}>
-                  <div style={{ width:40, height:40, borderRadius:10, background:'rgba(0,180,216,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>📋</div>
+                  <div style={{ width:40, height:40, borderRadius:10, background:'rgba(3,105,161,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, flexShrink:0 }}>📋</div>
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontWeight:600 }}>{m.title}</div>
                     <div style={{ fontSize:12, color:'var(--text-dim)', display:'flex', gap:8, marginTop:2 }}>
@@ -539,7 +539,7 @@ export default function CopilotPage() {
         {/* Header */}
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>🤖 EA Copilot</div>
-          <button onClick={newConversation} style={{ width: '100%', padding: '7px 0', borderRadius: 8, background: 'var(--accent)', color: '#0B1929', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>+ New Conversation</button>
+          <button onClick={newConversation} style={{ width: '100%', padding: '7px 0', borderRadius: 8, background: 'var(--accent)', color: 'var(--navy)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>+ New Conversation</button>
         </div>
 
         {/* Sidebar tabs */}
@@ -556,8 +556,8 @@ export default function CopilotPage() {
             <>
               {/* Mode selector */}
               <div style={{ display: 'flex', gap: 4, marginBottom: 10, background: 'var(--navy)', borderRadius: 8, padding: 3 }}>
-                <button onClick={() => setMode('single')} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: mode === 'single' ? 600 : 400, background: mode === 'single' ? 'var(--accent)' : 'none', color: mode === 'single' ? '#0B1929' : 'var(--text-dim)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Single</button>
-                <button onClick={() => setMode('consult')} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: mode === 'consult' ? 600 : 400, background: mode === 'consult' ? 'var(--accent)' : 'none', color: mode === 'consult' ? '#0B1929' : 'var(--text-dim)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Consult</button>
+                <button onClick={() => setMode('single')} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: mode === 'single' ? 600 : 400, background: mode === 'single' ? 'var(--accent)' : 'none', color: mode === 'single' ? 'var(--navy)' : 'var(--text-dim)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Single</button>
+                <button onClick={() => setMode('consult')} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: mode === 'consult' ? 600 : 400, background: mode === 'consult' ? 'var(--accent)' : 'none', color: mode === 'consult' ? 'var(--navy)' : 'var(--text-dim)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Consult</button>
               </div>
 
               {/* Architect list */}
@@ -596,8 +596,8 @@ export default function CopilotPage() {
             <>
               {conversations.length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: 12, textAlign: 'center', padding: 20 }}>No conversations yet</div>}
               {conversations.map(c => (
-                <div key={c.id} onClick={() => loadConversation(c.id)} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', background: activeConvId === c.id ? 'rgba(0,180,216,0.1)' : 'none', border: `1px solid ${activeConvId === c.id ? 'var(--accent)44' : 'transparent'}` }}
-                  onMouseEnter={e => { if (activeConvId !== c.id) e.currentTarget.style.background = 'rgba(255,255,255,0.03)' }}
+                <div key={c.id} onClick={() => loadConversation(c.id)} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', background: activeConvId === c.id ? 'rgba(3,105,161,0.1)' : 'none', border: `1px solid ${activeConvId === c.id ? 'var(--accent)44' : 'transparent'}` }}
+                  onMouseEnter={e => { if (activeConvId !== c.id) e.currentTarget.style.background = 'rgba(15,23,42,0.04)' }}
                   onMouseLeave={e => { if (activeConvId !== c.id) e.currentTarget.style.background = 'none' }}>
                   <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Untitled'}</div>
                   <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{c.messageCount} messages · {new Date(c.updatedAt).toLocaleDateString()}</div>
@@ -669,7 +669,7 @@ export default function CopilotPage() {
                 {m.role !== 'user' && m.architectName && (
                   <div style={{ fontSize: 11, fontWeight: 600, color: archColor(m.architectCode), marginBottom: 4 }}>{m.architectName}</div>
                 )}
-                <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', background: m.role === 'user' ? 'var(--accent)' : 'var(--navy-light)', color: m.role === 'user' ? '#0B1929' : 'var(--text)', fontSize: 13, lineHeight: 1.7, border: m.role !== 'user' ? `1px solid ${archColor(m.architectCode)}33` : 'none', whiteSpace: 'pre-wrap' }}>
+                <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', background: m.role === 'user' ? 'var(--accent)' : 'var(--navy-light)', color: m.role === 'user' ? 'var(--navy)' : 'var(--text)', fontSize: 13, lineHeight: 1.7, border: m.role !== 'user' ? `1px solid ${archColor(m.architectCode)}33` : 'none', whiteSpace: 'pre-wrap' }}>
                   {m.content || <span style={{ opacity: 0.5 }}><span className="typing-dot" style={{ animation: 'blink 1s infinite' }}>•</span><span style={{ animationDelay: '0.2s', animation: 'blink 1s infinite' }}> •</span><span style={{ animationDelay: '0.4s', animation: 'blink 1s infinite' }}> •</span></span>}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>
@@ -681,7 +681,7 @@ export default function CopilotPage() {
 
           {loading && messages[messages.length-1]?.role !== 'architect' && (
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(0,180,216,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🤖</div>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(3,105,161,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🤖</div>
               <div style={{ padding: '10px 14px', borderRadius: '4px 12px 12px 12px', background: 'var(--navy-light)', border: '1px solid var(--border)', fontSize: 13 }}>
                 <span style={{ color: 'var(--text-dim)' }}>Thinking...</span>
               </div>
@@ -702,7 +702,7 @@ export default function CopilotPage() {
             🎤
           </button>
           <button onClick={send} disabled={loading || !input.trim()}
-              style={{ padding: '10px 20px', borderRadius: 10, background: loading || !input.trim() ? 'var(--navy-mid)' : 'var(--accent)', color: loading || !input.trim() ? 'var(--text-dim)' : '#0B1929', border: 'none', cursor: loading || !input.trim() ? 'default' : 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>
+              style={{ padding: '10px 20px', borderRadius: 10, background: loading || !input.trim() ? 'var(--navy-mid)' : 'var(--accent)', color: loading || !input.trim() ? 'var(--text-dim)' : 'var(--navy)', border: 'none', cursor: loading || !input.trim() ? 'default' : 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>
               {loading ? '...' : 'Send ↵'}
             </button>
           </div>
@@ -718,7 +718,7 @@ export default function CopilotPage() {
               onTouchStart={e => { e.preventDefault(); startRecording() }}
               onTouchEnd={e => { e.preventDefault(); stopRecording() }}
               disabled={voiceLoading}
-              style={{ width: 56, height: 56, borderRadius: '50%', border: 'none', background: recording ? '#e74c3c' : voiceLoading ? 'var(--navy-mid)' : 'var(--accent)', color: recording ? '#fff' : '#0B1929', cursor: voiceLoading ? 'default' : 'pointer', fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', boxShadow: recording ? '0 0 0 8px #e74c3c33' : 'none', flexShrink: 0 }}>
+              style={{ width: 56, height: 56, borderRadius: '50%', border: 'none', background: recording ? '#e74c3c' : voiceLoading ? 'var(--navy-mid)' : 'var(--accent)', color: recording ? '#fff' : 'var(--navy)', cursor: voiceLoading ? 'default' : 'pointer', fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', boxShadow: recording ? '0 0 0 8px #e74c3c33' : 'none', flexShrink: 0 }}>
               {voiceLoading ? '⏳' : recording ? '⏹' : '🎤'}
             </button>
             <div style={{ flex: 1 }}>

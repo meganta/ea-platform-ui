@@ -28,17 +28,17 @@ function useApi() {
 }
 
 const SOURCE_COLORS: Record<string, string> = {
-  PREVIOUS_PHASE: 'rgba(0,180,216,0.15)',
+  PREVIOUS_PHASE: 'rgba(3,105,161,0.15)',
   EXTERNAL: 'rgba(201,168,76,0.15)',
   GOVERNANCE: 'rgba(155,89,182,0.15)',
 }
 const SOURCE_BORDER: Record<string, string> = {
-  PREVIOUS_PHASE: 'rgba(0,180,216,0.4)',
+  PREVIOUS_PHASE: 'rgba(3,105,161,0.4)',
   EXTERNAL: 'rgba(201,168,76,0.4)',
   GOVERNANCE: 'rgba(155,89,182,0.4)',
 }
 const OUTPUT_STATUS_COLOR: Record<string, string> = {
-  PENDING: '#8baac8',
+  PENDING: '#64748B',
   GENERATING: '#f39c12',
   AI_DRAFT: '#9b59b6',
   APPROVED: '#2ecc71',
@@ -107,7 +107,7 @@ function ScopeSelector({ cycle, onScopeSet }: any) {
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {domains.map((d: string) => (
-          <button key={d} onClick={() => toggle(d)} style={{ padding: '6px 14px', borderRadius: 'var(--radius)', fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', border: `1px solid ${selected.includes(d) ? 'var(--accent)' : 'var(--border)'}`, background: selected.includes(d) ? 'rgba(0,180,216,0.15)' : 'transparent', color: selected.includes(d) ? 'var(--accent)' : 'var(--text-dim)', transition: 'all 0.15s' }}>
+          <button key={d} onClick={() => toggle(d)} style={{ padding: '6px 14px', borderRadius: 'var(--radius)', fontSize: 11, fontFamily: 'var(--font-mono)', cursor: 'pointer', border: `1px solid ${selected.includes(d) ? 'var(--accent)' : 'var(--border)'}`, background: selected.includes(d) ? 'rgba(3,105,161,0.15)' : 'transparent', color: selected.includes(d) ? 'var(--accent)' : 'var(--text-dim)', transition: 'all 0.15s' }}>
             {selected.includes(d) ? '✓ ' : ''}{d.replace(/_/g, ' ')}
           </button>
         ))}
@@ -390,7 +390,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
             {showRepoSearch && (
               <div>
                 {/* Cycle scope toggle */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '4px 8px', background: 'rgba(0,180,216,0.06)', borderRadius: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '4px 8px', background: 'rgba(3,105,161,0.06)', borderRadius: 4 }}>
                   <div style={{ fontSize: 10, color: 'var(--accent)' }}>
                     {repoSourceFilter === 'CYCLE' ? t('adm.cycle_assets_only') : t('adm.all_repo_assets')}
                   </div>
@@ -441,10 +441,10 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
                               {a.nameAr && <div style={{ fontSize: 10, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}
                               <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2, display: 'flex', gap: 4 }}>
                                 <span>{(a.domain||'').replace(/_/g,' ')} / {(a.assetType||'').replace(/_/g,' ')}</span>
-                                <span style={{ padding: '0 3px', borderRadius: 2, background: a.source === 'ADM_OUTPUT' ? 'rgba(155,89,182,0.15)' : 'rgba(0,180,216,0.1)', color: a.source === 'ADM_OUTPUT' ? '#9b59b6' : 'var(--accent)' }}>
+                                <span style={{ padding: '0 3px', borderRadius: 2, background: a.source === 'ADM_OUTPUT' ? 'rgba(155,89,182,0.15)' : 'rgba(3,105,161,0.1)', color: a.source === 'ADM_OUTPUT' ? '#9b59b6' : 'var(--accent)' }}>
                                   {(a.source||'').replace(/_/g,' ')}
                                 </span>
-                                {a.status === 'APPROVED' && <span style={{ padding: '0 3px', borderRadius: 2, background: 'rgba(46,204,113,0.1)', color: 'var(--success)' }}>✓</span>}
+                                {a.status === 'APPROVED' && <span style={{ padding: '0 3px', borderRadius: 2, background: 'rgba(22,163,74,0.1)', color: 'var(--success)' }}>✓</span>}
                               </div>
                             </div>
                             <span style={{ fontSize: 10, color: 'var(--accent)', flexShrink: 0, marginLeft: 6 }}>+ Use</span>
@@ -537,19 +537,19 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const isFilled = !!outputId  // outputId means AI_DRAFT or APPROVED with content
 
   return (
-    <div style={{ marginTop: 8, padding: '10px 12px', background: isFilled ? 'rgba(46,204,113,0.06)' : 'rgba(201,168,76,0.06)', border: `1px solid ${isFilled ? 'rgba(46,204,113,0.3)' : 'rgba(201,168,76,0.25)'}`, borderRadius: 'var(--radius)' }}>
+    <div style={{ marginTop: 8, padding: '10px 12px', background: isFilled ? 'rgba(22,163,74,0.06)' : 'rgba(201,168,76,0.06)', border: `1px solid ${isFilled ? 'rgba(22,163,74,0.3)' : 'rgba(201,168,76,0.25)'}`, borderRadius: 'var(--radius)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: isFilled ? 'var(--success)' : 'var(--gold)' }}>
           {isFilled ? '✅' : '📋'} {isAR ? mapping.outputNameAr : (mapping.outputNameEn || mapping.outputNameAr)}
         </span>
-        {isFilled && <span style={{ fontSize: 9, padding: '1px 6px', background: 'rgba(46,204,113,0.15)', color: 'var(--success)', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>AI CONTENT READY</span>}
+        {isFilled && <span style={{ fontSize: 9, padding: '1px 6px', background: 'rgba(22,163,74,0.15)', color: 'var(--success)', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>AI CONTENT READY</span>}
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? (mapping.purposeAr || mapping.purposeEn) : (mapping.purposeEn || mapping.purposeAr)}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(46,204,113,0.4)' } : {}) }} disabled={loading} onClick={() => download('docx')}>
+        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(22,163,74,0.4)' } : {}) }} disabled={loading} onClick={() => download('docx')}>
           📄 {loading ? '...' : isFilled ? t('adm.download_word') : t('adm.word_template')}
         </button>
-        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(46,204,113,0.4)' } : {}) }} disabled={loading} onClick={() => download('pptx')}>
+        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(22,163,74,0.4)' } : {}) }} disabled={loading} onClick={() => download('pptx')}>
           📊 {loading ? '...' : isFilled ? t('adm.download_ppt') : t('adm.ppt_template')}
         </button>
       </div>
@@ -790,7 +790,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
             </div>
             {showRepoSearch && (
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '4px 8px', background: 'rgba(0,180,216,0.06)', borderRadius: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, padding: '4px 8px', background: 'rgba(3,105,161,0.06)', borderRadius: 4 }}>
                   <div style={{ fontSize: 10, color: 'var(--accent)' }}>
                     {repoSourceFilter === 'CYCLE' ? t('adm.cycle_assets_only') : t('adm.all_repo_assets')}
                   </div>
@@ -1104,7 +1104,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                   const hasAiDraft = stepOuts.some(o => o.status === 'AI_DRAFT')
                   return (
                     <button key={step.key} onClick={() => handleStepClick(step.key)}
-                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === step.key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === step.key ? 'rgba(0,180,216,0.12)' : 'transparent', cursor: 'pointer' }}>
+                      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === step.key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === step.key ? 'rgba(3,105,161,0.12)' : 'transparent', cursor: 'pointer' }}>
                       <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginBottom: 2 }}>{step.key}</div>
                       <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>{isAR ? (step.titleAr || step.title) : (step.title || step.titleAr)}</div>
                       <div style={{ marginTop: 4 }}>
@@ -1120,7 +1120,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
             {/* Main content */}
             <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
               {currentStep && (
-                <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(0,180,216,0.06)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
+                <div style={{ marginBottom: 16, padding: '10px 14px', background: 'rgba(3,105,161,0.06)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{isAR ? (currentStep.titleAr || currentStep.title) : (currentStep.title || currentStep.titleAr)}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? currentStep.title : (currentStep.titleAr || '')}</div>
                 </div>
@@ -1152,10 +1152,10 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                           <div style={{ fontSize: 12, fontWeight: 500 }}>{isAR ? (inp.titleAr || inp.title) : (inp.title || inp.titleAr)}</div>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                             {inp.providedBy?.startsWith('AUTO_ADM:') && (
-                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(46,204,113,0.15)', color: '#2ecc71', border: '1px solid rgba(46,204,113,0.3)' }}>{t('adm.auto_adm')}</span>
+                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(22,163,74,0.15)', color: '#2ecc71', border: '1px solid rgba(22,163,74,0.3)' }}>{t('adm.auto_adm')}</span>
                             )}
                             {inp.providedBy?.startsWith('AUTO_REPO:') && (
-                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(243,156,18,0.15)', color: 'var(--gold)', border: '1px solid rgba(243,156,18,0.3)' }}>{t('adm.auto_repo')}</span>
+                              <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 2, background: 'rgba(217,119,6,0.15)', color: 'var(--gold)', border: '1px solid rgba(217,119,6,0.3)' }}>{t('adm.auto_repo')}</span>
                             )}
                             <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: 'rgba(0,0,0,0.2)', color: 'var(--text-dim)' }}>{def?.source?.replace('_', ' ')}</span>
                             <span className={`badge ${inp.source === 'PROVIDED' ? 'badge-approved' : 'badge-draft'}`} style={{ fontSize: 9 }}>{inp.source}</span>
@@ -1188,7 +1188,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                     <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>No outputs for this step</div>
                   ) : stepOutputs.map(out => {
                     const def = currentStep?.outputs.find((d: any) => d.key === out.outputKey)
-                    const statusColor = OUTPUT_STATUS_COLOR[out.status] || '#8baac8'
+                    const statusColor = OUTPUT_STATUS_COLOR[out.status] || '#64748B'
                     const isExpanded = expandedOutputs.has(out.id)
                     return (
                       <div key={out.id} style={{ marginBottom: 6, background: 'var(--navy)', border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)', overflow: 'hidden', transition: 'border-color 0.15s' }}>
@@ -1241,7 +1241,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                           {(out.status === 'GENERATING' || generating === out.id) && <SectionProgress outputId={out.id} />}
                           {/* Discovery post-generation guidance */}
                           {def?.behaviorType === 'DISCOVERY' && out.status === 'AI_DRAFT' && out.content && (
-                            <div style={{ fontSize: 11, padding: '8px 10px', background: 'rgba(243,156,18,0.08)', border: '1px solid rgba(243,156,18,0.25)', borderRadius: 4, marginBottom: 6, lineHeight: 1.6 }}>
+                            <div style={{ fontSize: 11, padding: '8px 10px', background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.25)', borderRadius: 4, marginBottom: 6, lineHeight: 1.6 }}>
                               <div style={{ color: '#f39c12', fontWeight: 600, marginBottom: 4 }}>🔍 Architecture Evidence Structured</div>
                               <div style={{ color: 'var(--text-dim)' }}>The AI has organized and structured your collected architecture data. Review the output, make corrections if needed, then <strong style={{ color: 'var(--text)' }}>Approve</strong> to make it available as input to the next step.</div>
                             </div>
@@ -1276,7 +1276,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                             )
                           })()}
                           {out.content && out.status !== 'APPROVED' && (
-                            <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, color: '#2ecc71', borderColor: 'rgba(46,204,113,0.4)' }} onClick={() => approveOutput(out.id)}>✓ Approve</button>
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, color: '#2ecc71', borderColor: 'rgba(22,163,74,0.4)' }} onClick={() => approveOutput(out.id)}>✓ Approve</button>
                           )}
                           {out.content && (
                             <>
@@ -1349,7 +1349,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                                       if (lang === 'mermaid' || text.match(/^(graph|flowchart|sequenceDiagram|classDiagram|quadrantChart|mindmap|gitGraph|timeline)/)) {
                                         return <DiagramBlock chart={text} />
                                       }
-                                      return <code style={{background:'rgba(0,180,216,0.1)',padding:'1px 5px',borderRadius:3,fontSize:11,fontFamily:'var(--font-mono)',color:'var(--accent)'}}>{children}</code>
+                                      return <code style={{background:'rgba(3,105,161,0.1)',padding:'1px 5px',borderRadius:3,fontSize:11,fontFamily:'var(--font-mono)',color:'var(--accent)'}}>{children}</code>
                                     },
                                     blockquote: ({children}) => <blockquote style={{borderLeft:'3px solid var(--accent)',paddingLeft:12,marginLeft:0,color:'var(--text-dim)',fontStyle:'italic'}}>{children}</blockquote>,
                                   }}>{part.content}</ReactMarkdown>
@@ -1566,14 +1566,14 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
                 {Object.entries(phaseData.steps || {}).map(([stepKey, stepData]: any) => (
                   <div key={stepKey} style={{ borderTop: '1px solid var(--border)' }}>
                     {stepData.stepId && (
-                      <div style={{ padding: '5px 12px', background: 'rgba(0,180,216,0.04)', fontSize: 10, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
+                      <div style={{ padding: '5px 12px', background: 'rgba(3,105,161,0.04)', fontSize: 10, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>
                         {stepData.stepId} — {stepData.stepName || ''}
                       </div>
                     )}
                     {stepData.artifacts.map((a: any) => {
                       const typeInfo = ARTIFACT_TYPE_LABELS[a.artifactType] || { icon: '📄', label: a.artifactType, color: 'var(--text-dim)' }
                       return (
-                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px', borderTop: '1px solid rgba(255,255,255,0.03)', fontSize: 11 }}>
+                        <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 14px', borderTop: '1px solid rgba(15,23,42,0.04)', fontSize: 11 }}>
                           <span style={{ fontSize: 13, flexShrink: 0 }}>{typeInfo.icon}</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isAR ? (a.titleAr || a.title) : (a.title || a.titleAr)}</div>
@@ -1684,8 +1684,8 @@ export default function AdmPage() {
                   <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>{c.name}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span className={`badge badge-${c.status?.toLowerCase()}`}>{c.status}</span>
-                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: c.frameworkType === 'NORA' ? 'var(--gold)' : 'var(--accent)', background: c.frameworkType === 'NORA' ? 'rgba(201,168,76,0.1)' : 'rgba(0,180,216,0.1)', padding: '1px 6px', borderRadius: 2 }}>{c.frameworkType}</span>
-                    <button onClick={e => { e.stopPropagation(); deleteCycle(c.id) }} style={{ marginLeft: 'auto', background: 'none', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '1px 6px', fontSize: 10, cursor: 'pointer' }}>🗑</button>
+                    <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: c.frameworkType === 'NORA' ? 'var(--gold)' : 'var(--accent)', background: c.frameworkType === 'NORA' ? 'rgba(201,168,76,0.1)' : 'rgba(3,105,161,0.1)', padding: '1px 6px', borderRadius: 2 }}>{c.frameworkType}</span>
+                    <button onClick={e => { e.stopPropagation(); deleteCycle(c.id) }} style={{ marginLeft: 'auto', background: 'none', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '1px 6px', fontSize: 10, cursor: 'pointer' }}>🗑</button>
                   </div>
                   {c.scopeDomains?.length > 0 && (
                     <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
@@ -1703,7 +1703,7 @@ export default function AdmPage() {
                 <div style={{ display: 'flex', gap: 6, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
                   {[['phases', t('adm.phases_tab')], ['repository', t('adm.cycle_repo')]].map(([k, l]) => (
                     <button key={k} onClick={() => setCycleView(k as any)}
-                      style={{ fontSize: 11, padding: '5px 12px', borderRadius: 'var(--radius)', border: `1px solid ${cycleView === k ? 'var(--accent)' : 'var(--border)'}`, background: cycleView === k ? 'rgba(0,180,216,0.12)' : 'transparent', color: cycleView === k ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer' }}>
+                      style={{ fontSize: 11, padding: '5px 12px', borderRadius: 'var(--radius)', border: `1px solid ${cycleView === k ? 'var(--accent)' : 'var(--border)'}`, background: cycleView === k ? 'rgba(3,105,161,0.12)' : 'transparent', color: cycleView === k ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer' }}>
                       {l}
                     </button>
                   ))}

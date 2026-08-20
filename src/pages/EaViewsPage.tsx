@@ -21,7 +21,7 @@ const S = {
   tab: (a: boolean) => ({ padding: '10px 18px', fontSize: 13, fontWeight: a ? 600 : 400, color: a ? 'var(--accent)' : 'var(--text-dim)', borderBottom: a ? '2px solid var(--accent)' : '2px solid transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', background: 'none' }),
   content: { flex: 1, overflow: 'auto', padding: '24px 28px' },
   card: { background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 10, padding: 20 },
-  btn: (v: 'primary'|'secondary'|'danger' = 'secondary') => ({ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: v === 'primary' ? 'var(--accent)' : v === 'danger' ? '#e74c3c22' : 'var(--navy-mid)', color: v === 'primary' ? '#0B1929' : v === 'danger' ? '#e74c3c' : 'var(--text)' }),
+  btn: (v: 'primary'|'secondary'|'danger' = 'secondary') => ({ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: v === 'primary' ? 'var(--accent)' : v === 'danger' ? '#e74c3c22' : 'var(--navy-mid)', color: v === 'primary' ? 'var(--navy)' : v === 'danger' ? '#e74c3c' : 'var(--text)' }),
   input: { width: '100%', padding: '8px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' },
   label: { fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 4, display: 'block' },
   badge: (c: string) => ({ padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: c + '22', color: c }),
@@ -32,7 +32,7 @@ const S = {
 }
 
 const VIZ_ICONS: Record<string,string> = { GRAPH:'🕸', MATRIX:'⊞', HEATMAP:'🔥', CAPABILITY_MAP:'⬛', TABLE:'≡', ROADMAP:'🗺', LANDSCAPE:'🗾', DASHBOARD:'📊' }
-const CATEGORY_COLOR: Record<string,string> = { Business:'#3498db', Application:'#e67e22', Data:'#1abc9c', Technology:'#e74c3c', Security:'#9b59b6', 'Cross-Domain':'#f39c12', Strategic:'#2ecc71', Governance:'#7f8c8d', Custom:'#8baac8' }
+const CATEGORY_COLOR: Record<string,string> = { Business:'#3498db', Application:'#e67e22', Data:'#1abc9c', Technology:'#e74c3c', Security:'#9b59b6', 'Cross-Domain':'#f39c12', Strategic:'#2ecc71', Governance:'#7f8c8d', Custom:'#64748B' }
 const STATE_COLOR: Record<string,string> = { CURRENT:'#2ecc71', TARGET:'#3498db', TRANSITION:'#f39c12', BASELINE:'#7f8c8d', PLANNED:'#9b59b6' }
 const STATUS_COLOR: Record<string,string> = { DRAFT:'#f39c12', PUBLISHED:'#2ecc71', ARCHIVED:'#7f8c8d' }
 const DOMAIN_COLOR: Record<string,string> = { BUSINESS:'#3498db', APPLICATION:'#e67e22', DATA:'#1abc9c', TECHNOLOGY:'#e74c3c', SECURITY:'#9b59b6', STRATEGIC:'#2ecc71', BENEFICIARY_EXPERIENCE:'#16a085', CROSS_CUTTING:'#7f8c8d' }
@@ -62,7 +62,7 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' as const }}>
-        <button style={{ ...S.btn(), background: !filterCat ? 'var(--accent)' : undefined, color: !filterCat ? '#0B1929' : undefined }} onClick={() => setFilterCat('')}>All</button>
+        <button style={{ ...S.btn(), background: !filterCat ? 'var(--accent)' : undefined, color: !filterCat ? 'var(--navy)' : undefined }} onClick={() => setFilterCat('')}>All</button>
         {categories.map(c => <button key={c} style={{ ...S.btn(), background: filterCat === c ? CATEGORY_COLOR[c] : undefined, color: filterCat === c ? '#fff' : undefined }} onClick={() => setFilterCat(c)}>{c}</button>)}
       </div>
 
@@ -373,7 +373,7 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
                   const hasRel = data?.edges?.some((e: any) => (e.sourceId===src.id&&e.targetId===tgt.id)||(e.sourceId===tgt.id&&e.targetId===src.id))
                   const sameDomain = src.domain === tgt.domain
                   return (
-                    <td key={tgt.id} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', background: hasRel ? 'rgba(0,180,216,0.12)' : sameDomain ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                    <td key={tgt.id} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', background: hasRel ? 'rgba(3,105,161,0.12)' : sameDomain ? 'rgba(15,23,42,0.03)' : 'transparent' }}>
                       {hasRel && <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--accent)', margin: '0 auto' }} />}
                     </td>
                   )
@@ -398,7 +398,7 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
         <tbody>
           {filteredNodes.map((n: any, i: number) => (
             <tr key={n.id} onClick={() => setSelected(n)} style={{ cursor: 'pointer', background: i%2===0?'var(--navy-light)':'transparent' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,180,216,0.05)')}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.05)')}
               onMouseLeave={e => (e.currentTarget.style.background = i%2===0?'var(--navy-light)':'transparent')}>
               <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontWeight: 500 }}>{n.name}</td>
               <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}><span style={S.badge(TYPE_COLOR[n.assetType]||'#7f8c8d')}>{n.assetType.replace(/_/g,' ')}</span></td>
@@ -427,11 +427,11 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
         {loading ? <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-dim)' }}>Loading view data...</div> : (
           <svg style={{ width:'100%', height:'100%', cursor: panStart?'grabbing':dragging?'grabbing':'grab' }}
             onMouseDown={onSvgMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}>
-            <defs><marker id="arrow2" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(0,180,216,0.4)" /></marker></defs>
+            <defs><marker id="arrow2" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(3,105,161,0.4)" /></marker></defs>
             <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
               {(data?.edges||[]).filter((e: any) => filteredNodes.find((n: any)=>n.id===e.sourceId) && filteredNodes.find((n: any)=>n.id===e.targetId)).map((e: any) => (
                 <g key={e.id}>
-                  <path d={getEdgePath(e)} stroke="rgba(0,180,216,0.25)" strokeWidth={1.5} fill="none" markerEnd="url(#arrow2)" />
+                  <path d={getEdgePath(e)} stroke="rgba(3,105,161,0.25)" strokeWidth={1.5} fill="none" markerEnd="url(#arrow2)" />
                 </g>
               ))}
               {filteredNodes.map((n: any) => {
@@ -443,7 +443,7 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
                     <rect width={160} height={44} rx={8} fill="var(--navy-light)" stroke={isSel?'var(--accent)':dc+'55'} strokeWidth={isSel?2:1.5} />
                     <rect width={5} height={44} rx={2} fill={dc} />
                     <text x={16} y={18} fontSize={11} fontWeight={600} fill="var(--text)">{n.name.length>17?n.name.slice(0,16)+'…':n.name}</text>
-                    <text x={16} y={32} fontSize={9} fill="rgba(139,170,200,0.7)">{n.assetType.replace(/_/g,' ')} · {n.domain}</text>
+                    <text x={16} y={32} fontSize={9} fill="rgba(100,116,139,0.7)">{n.assetType.replace(/_/g,' ')} · {n.domain}</text>
                     <circle cx={148} cy={10} r={5} fill={HEATMAP_STATUS[n.status]||'#7f8c8d'} />
                   </g>
                 )
@@ -490,7 +490,7 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
       {/* Viz mode selector */}
       <div style={{ display:'flex', gap:2, background:'var(--navy-light)', borderRadius:8, padding:3, marginBottom:16, width:'fit-content' }}>
         {['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TABLE'].map(m => (
-          <button key={m} style={{ ...S.btn(), padding:'5px 12px', fontSize:12, background:vizMode===m?'var(--accent)':'none', color:vizMode===m?'#0B1929':'var(--text-dim)' }} onClick={()=>setVizMode(m)}>
+          <button key={m} style={{ ...S.btn(), padding:'5px 12px', fontSize:12, background:vizMode===m?'var(--accent)':'none', color:vizMode===m?'var(--navy)':'var(--text-dim)' }} onClick={()=>setVizMode(m)}>
             {VIZ_ICONS[m]} {m.replace(/_/g,' ')}
           </button>
         ))}
@@ -610,7 +610,7 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
             <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Visualization</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
               {VIZS.map(v=>(
-                <div key={v} onClick={()=>setForm(f=>({...f,visualization:v}))} style={{ padding:'10px 12px', borderRadius:8, border:`2px solid ${form.visualization===v?'var(--accent)':'var(--border)'}`, cursor:'pointer', textAlign:'center', background:form.visualization===v?'rgba(0,180,216,0.08)':'transparent' }}>
+                <div key={v} onClick={()=>setForm(f=>({...f,visualization:v}))} style={{ padding:'10px 12px', borderRadius:8, border:`2px solid ${form.visualization===v?'var(--accent)':'var(--border)'}`, cursor:'pointer', textAlign:'center', background:form.visualization===v?'rgba(3,105,161,0.08)':'transparent' }}>
                   <div style={{ fontSize:20 }}>{VIZ_ICONS[v]}</div>
                   <div style={{ fontSize:11, fontWeight:500, marginTop:4 }}>{v.replace(/_/g,' ')}</div>
                 </div>
@@ -694,7 +694,7 @@ function SnapshotsPanel({ api }: { api: any }) {
         : snapshots.length === 0 && selectedView ? <div style={{ ...S.card, textAlign:'center', color:'var(--text-dim)', padding:40 }}>No snapshots for this view yet. Open the view and click 📸 Snapshot.</div>
         : snapshots.map(s => (
           <div key={s.id} style={{ ...S.card, marginBottom:8, display:'flex', alignItems:'center', gap:16 }}>
-            <div style={{ width:40, height:40, borderRadius:8, background:'rgba(0,180,216,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>📸</div>
+            <div style={{ width:40, height:40, borderRadius:8, background:'rgba(3,105,161,0.12)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>📸</div>
             <div style={{ flex:1 }}>
               <div style={{ fontWeight:600 }}>{s.name}</div>
               <div style={{ fontSize:12, color:'var(--text-dim)' }}>{s.objectCount} objects · {s.relationshipCount} relationships · {new Date(s.takenAt).toLocaleString()}</div>

@@ -14,12 +14,12 @@ async function govGet(path: string) {
 
 const SEV_COLOR: Record<string, string> = {
   CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#f39c12', LOW: '#3498db',
-  APPROVED: '#2ecc71', OPEN: '#8baac8', REJECTED: '#e74c3c', ACCEPTED: '#3498db',
+  APPROVED: '#2ecc71', OPEN: '#64748B', REJECTED: '#e74c3c', ACCEPTED: '#3498db',
 }
 
 const STATUS_COLOR: Record<string, string> = {
   COMPLIANT: '#2ecc71', PARTIALLY_COMPLIANT: '#f39c12',
-  NON_COMPLIANT: '#e74c3c', REQUIRES_EXCEPTION: '#e67e22', NOT_APPLICABLE: '#8baac8',
+  NON_COMPLIANT: '#e74c3c', REQUIRES_EXCEPTION: '#e67e22', NOT_APPLICABLE: '#64748B',
 }
 
 function ExportBtn({ url, label }: { url: string; label: string }) {
@@ -102,7 +102,7 @@ function SavingsReport() {
       {data && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
           {[
-            ['Total Opportunities', data.total, '#8baac8'],
+            ['Total Opportunities', data.total, '#64748B'],
             ['Total Annual Savings', `SAR ${(data.totalAnnual || 0).toLocaleString()}`, '#2ecc71'],
             ['Total One-time Savings', `SAR ${(data.totalOneTime || 0).toLocaleString()}`, '#3498db'],
           ].map(([l, v, c]: any) => (
@@ -150,8 +150,8 @@ function SavingsReport() {
                           items: prev.items.map((i: any) => i.id === item.id ? { ...i, status: newStatus } : i)
                         }))
                       }}
-                      style={{ padding: '2px 6px', borderRadius: 8, border: '1px solid ' + (SEV_COLOR[item.status]||'#8baac8') + '66',
-                        background: (SEV_COLOR[item.status]||'#8baac8') + '18', color: SEV_COLOR[item.status]||'#8baac8',
+                      style={{ padding: '2px 6px', borderRadius: 8, border: '1px solid ' + (SEV_COLOR[item.status]||'#64748B') + '66',
+                        background: (SEV_COLOR[item.status]||'#64748B') + '18', color: SEV_COLOR[item.status]||'#64748B',
                         fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                     >
                       <option value='OPEN'>OPEN</option>
@@ -248,7 +248,7 @@ function ComplianceReport() {
       {data && (
         <div className="stat-grid-4" style={{ marginBottom: 16 }}>
           {[
-            ['Total', data.total, '#8baac8'],
+            ['Total', data.total, '#64748B'],
             ['Non-Compliant', data.nonCompliantCount, '#e74c3c'],
             ['Partial', data.partialCount, '#f39c12'],
             ['Compliant', data.compliantCount, '#2ecc71'],
@@ -280,7 +280,7 @@ function ComplianceReport() {
                   <td style={{ padding: '8px 12px', maxWidth: 200 }}>{item.principleOrStandard}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11 }}>{item.category?.replace(/_/g,' ')}</td>
                   <td style={{ padding: '8px 12px' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: (STATUS_COLOR[item.complianceStatus]||'#8baac8')+'22', color: STATUS_COLOR[item.complianceStatus]||'#8baac8', whiteSpace: 'nowrap' }}>
+                    <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: (STATUS_COLOR[item.complianceStatus]||'#64748B')+'22', color: STATUS_COLOR[item.complianceStatus]||'#64748B', whiteSpace: 'nowrap' }}>
                       {item.complianceStatus?.replace(/_/g,' ')}
                     </span>
                   </td>
@@ -366,7 +366,7 @@ function RequirementsTracker() {
       {data && (
         <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
           {[
-            ['Total', data.total, '#8baac8'],
+            ['Total', data.total, '#64748B'],
             ['From ADM', data.admCount, '#3498db'],
             ['From Governance', data.governanceCount, '#9b59b6'],
           ].map(([l, v, c]: any) => (
@@ -399,10 +399,10 @@ function RequirementsTracker() {
                   <td style={{ padding: '8px 12px', fontSize: 11 }}>{item.type?.replace(/_/g,' ')}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11 }}>{item.domain?.replace(/_/g,' ')}</td>
                   <td style={{ padding: '8px 12px' }}>
-                    <span style={{ padding: '2px 6px', borderRadius: 6, fontSize: 11, background: (SEV_COLOR[item.priority]||'#8baac8')+'22', color: SEV_COLOR[item.priority]||'#8baac8' }}>{item.priority}</span>
+                    <span style={{ padding: '2px 6px', borderRadius: 6, fontSize: 11, background: (SEV_COLOR[item.priority]||'#64748B')+'22', color: SEV_COLOR[item.priority]||'#64748B' }}>{item.priority}</span>
                   </td>
                   <td style={{ padding: '8px 12px' }}>
-                    <span style={{ padding: '2px 6px', borderRadius: 6, fontSize: 11, background: (SEV_COLOR[item.status]||'#8baac8')+'22', color: SEV_COLOR[item.status]||'#8baac8' }}>{item.status}</span>
+                    <span style={{ padding: '2px 6px', borderRadius: 6, fontSize: 11, background: (SEV_COLOR[item.status]||'#64748B')+'22', color: SEV_COLOR[item.status]||'#64748B' }}>{item.status}</span>
                   </td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)', maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.reviewName}</td>
                   <td style={{ padding: '8px 12px', fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}</td>

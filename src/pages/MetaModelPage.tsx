@@ -25,7 +25,7 @@ const S = {
   btn: (variant: 'primary'|'secondary'|'danger' = 'secondary') => ({
     padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
     background: variant === 'primary' ? 'var(--accent)' : variant === 'danger' ? '#e74c3c22' : 'var(--navy-mid)',
-    color: variant === 'primary' ? '#0B1929' : variant === 'danger' ? '#e74c3c' : 'var(--text)',
+    color: variant === 'primary' ? 'var(--navy)' : variant === 'danger' ? '#e74c3c' : 'var(--text)',
     transition: 'all 0.15s',
   }),
   input: { width: '100%', padding: '8px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' },
@@ -86,7 +86,7 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', gap: 12 }}>
             {(frameworks.length ? frameworks : [{ code: 'TOGAF', name: 'TOGAF 9.2' }, { code: 'NORA_2_0', name: 'NORA 2.0' }]).map((fw: any) => (
-              <div key={fw.code} onClick={() => setSelected(fw.code)} style={{ flex: 1, padding: '14px 16px', borderRadius: 10, border: `2px solid ${selected === fw.code ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', textAlign: 'center', background: selected === fw.code ? 'rgba(0,180,216,0.08)' : 'var(--navy)' }}>
+              <div key={fw.code} onClick={() => setSelected(fw.code)} style={{ flex: 1, padding: '14px 16px', borderRadius: 10, border: `2px solid ${selected === fw.code ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', textAlign: 'center', background: selected === fw.code ? 'rgba(3,105,161,0.08)' : 'var(--navy)' }}>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{fw.name}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fw.versions?.[0]?.description || 'EA Framework'}</div>
               </div>
@@ -124,7 +124,7 @@ function Dashboard({ stats, onTab }: { stats: any, onTab: (t: string) => void })
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Meta-model info */}
       <div style={{ ...S.card, display: 'flex', alignItems: 'center', gap: 20 }}>
-        <div style={{ width: 56, height: 56, borderRadius: 12, background: 'rgba(0,180,216,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>🏛</div>
+        <div style={{ width: 56, height: 56, borderRadius: 12, background: 'rgba(3,105,161,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>🏛</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{model?.name || 'EA Meta-Model'}</div>
           <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{model?.description || 'No description'}</div>
@@ -235,7 +235,7 @@ function DomainsManager({ api }: { api: any }) {
           <div style={{ marginTop: 12 }}>
             <label style={S.label}>Icon</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-              {ICONS.map(ic => <span key={ic} onClick={() => setForm(f => ({ ...f, icon: ic }))} style={{ fontSize: 22, cursor: 'pointer', padding: 4, borderRadius: 6, background: form.icon === ic ? 'rgba(0,180,216,0.2)' : 'transparent', border: `1px solid ${form.icon === ic ? 'var(--accent)' : 'transparent'}` }}>{ic}</span>)}
+              {ICONS.map(ic => <span key={ic} onClick={() => setForm(f => ({ ...f, icon: ic }))} style={{ fontSize: 22, cursor: 'pointer', padding: 4, borderRadius: 6, background: form.icon === ic ? 'rgba(3,105,161,0.2)' : 'transparent', border: `1px solid ${form.icon === ic ? 'var(--accent)' : 'transparent'}` }}>{ic}</span>)}
             </div>
           </div>
           <div style={{ marginTop: 12 }}>
@@ -354,7 +354,7 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
           <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
             <label style={S.label}>Icon</label>
             <div style={{ display: 'flex', gap: 6 }}>
-              {ICONS.map(ic => <span key={ic} onClick={() => setForm(f => ({ ...f, icon: ic }))} style={{ fontSize: 18, cursor: 'pointer', padding: 3, borderRadius: 4, background: form.icon === ic ? 'rgba(0,180,216,0.2)' : 'transparent', border: `1px solid ${form.icon === ic ? 'var(--accent)' : 'transparent'}` }}>{ic}</span>)}
+              {ICONS.map(ic => <span key={ic} onClick={() => setForm(f => ({ ...f, icon: ic }))} style={{ fontSize: 18, cursor: 'pointer', padding: 3, borderRadius: 4, background: form.icon === ic ? 'rgba(3,105,161,0.2)' : 'transparent', border: `1px solid ${form.icon === ic ? 'var(--accent)' : 'transparent'}` }}>{ic}</span>)}
             </div>
             <label style={{ ...S.label, marginLeft: 12 }}>Allow Hierarchy</label>
             <input type="checkbox" checked={form.allowHierarchy} onChange={e => setForm(f => ({ ...f, allowHierarchy: e.target.checked }))} style={{ width: 16, height: 16 }} />
@@ -579,7 +579,7 @@ function RelationshipsManager({ api }: { api: any }) {
         </div>
         <div style={S.row}>
           <div style={{ display: 'flex', gap: 2, background: 'var(--navy-light)', borderRadius: 8, padding: 2 }}>
-            {(['list','matrix'] as const).map(m => <button key={m} style={{ ...S.btn(), padding: '5px 12px', background: viewMode === m ? 'var(--accent)' : 'none', color: viewMode === m ? '#0B1929' : 'var(--text-dim)' }} onClick={() => setViewMode(m)}>{m === 'list' ? '☰ List' : '⊞ Matrix'}</button>)}
+            {(['list','matrix'] as const).map(m => <button key={m} style={{ ...S.btn(), padding: '5px 12px', background: viewMode === m ? 'var(--accent)' : 'none', color: viewMode === m ? 'var(--navy)' : 'var(--text-dim)' }} onClick={() => setViewMode(m)}>{m === 'list' ? '☰ List' : '⊞ Matrix'}</button>)}
           </div>
           <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ Add Relationship</button>
         </div>
@@ -660,9 +660,9 @@ function RelationshipsManager({ api }: { api: any }) {
                     {matrix.objectTypes?.map((target: any) => {
                       const rels2 = matrix.matrix?.[source.id]?.[target.id] || []
                       return (
-                        <td key={target.id} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)', background: rels2.length > 0 ? 'rgba(0,180,216,0.08)' : 'transparent', textAlign: 'center', verticalAlign: 'top' }}>
+                        <td key={target.id} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)', background: rels2.length > 0 ? 'rgba(3,105,161,0.08)' : 'transparent', textAlign: 'center', verticalAlign: 'top' }}>
                           {rels2.map((r: any) => (
-                            <div key={r.id} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(0,180,216,0.2)', color: 'var(--accent)', marginBottom: 2, whiteSpace: 'nowrap' }}>{r.label}</div>
+                            <div key={r.id} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 4, background: 'rgba(3,105,161,0.2)', color: 'var(--accent)', marginBottom: 2, whiteSpace: 'nowrap' }}>{r.label}</div>
                           ))}
                         </td>
                       )
@@ -765,7 +765,7 @@ function MetaModelDesigner({ api }: { api: any }) {
             onMouseDown={onSvgMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}>
             <defs>
               <marker id="arrow" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto">
-                <path d="M0,0 L0,6 L8,3 z" fill="rgba(0,180,216,0.5)" />
+                <path d="M0,0 L0,6 L8,3 z" fill="rgba(3,105,161,0.5)" />
               </marker>
             </defs>
             <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
@@ -777,8 +777,8 @@ function MetaModelDesigner({ api }: { api: any }) {
                 const mx = s && t ? (s.x + 80 + t.x) / 2 : 0; const my = s && t ? (s.y + 20 + t.y + 20) / 2 : 0
                 return (
                   <g key={e.id}>
-                    <path d={path} stroke="rgba(0,180,216,0.3)" strokeWidth={1.5} fill="none" markerEnd="url(#arrow)" />
-                    <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fill="rgba(139,170,200,0.8)">{e.label}</text>
+                    <path d={path} stroke="rgba(3,105,161,0.3)" strokeWidth={1.5} fill="none" markerEnd="url(#arrow)" />
+                    <text x={mx} y={my - 4} textAnchor="middle" fontSize={9} fill="rgba(100,116,139,0.8)">{e.label}</text>
                   </g>
                 )
               })}
@@ -793,7 +793,7 @@ function MetaModelDesigner({ api }: { api: any }) {
                     <rect width={4} height={40} rx={2} fill={domColor} />
                     <text x={24} y={15} fontSize={16}>{n.icon}</text>
                     <text x={48} y={16} fontSize={11} fontWeight={600} fill="var(--text)">{n.name.length > 16 ? n.name.slice(0,15) + '…' : n.name}</text>
-                    <text x={48} y={30} fontSize={9} fill="rgba(139,170,200,0.7)">{n.domain || 'No domain'}</text>
+                    <text x={48} y={30} fontSize={9} fill="rgba(100,116,139,0.7)">{n.domain || 'No domain'}</text>
                     {n.allowHierarchy && <text x={148} y={14} fontSize={10}>🌳</text>}
                   </g>
                 )
@@ -1091,7 +1091,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
         {['Upload', 'Validate', 'Preview', 'Confirm', 'Done'].map((s, i) => (
           <React.Fragment key={s}>
             <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4 }}>
-              <div style={{ width: 28, height: 28, borderRadius: '50%', background: i <= stepIdx ? 'var(--accent)' : 'var(--navy-mid)', color: i <= stepIdx ? '#0B1929' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{i < stepIdx ? '✓' : i + 1}</div>
+              <div style={{ width: 28, height: 28, borderRadius: '50%', background: i <= stepIdx ? 'var(--accent)' : 'var(--navy-mid)', color: i <= stepIdx ? 'var(--navy)' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{i < stepIdx ? '✓' : i + 1}</div>
               <div style={{ fontSize: 10, color: i === stepIdx ? 'var(--accent)' : 'var(--text-dim)' }}>{s}</div>
             </div>
             {i < 4 && <div style={{ flex: 1, height: 2, background: i < stepIdx ? 'var(--accent)' : 'var(--navy-mid)', margin: '0 4px', marginBottom: 16 }} />}
@@ -1121,7 +1121,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
               <button style={{ ...S.btn('danger'), fontSize: 12 }} onClick={() => setFile(null)}>✕</button>
             </div>
           )}
-          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(0,180,216,0.06)', borderRadius: 8, fontSize: 12, color: 'var(--text-dim)' }}>
+          <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(3,105,161,0.06)', borderRadius: 8, fontSize: 12, color: 'var(--text-dim)' }}>
             <strong>JSON format:</strong> {`{ "metaModel": { "name": "...", "domains": [...], "objectTypes": [...], "relationships": [...] } }`}
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
@@ -1174,7 +1174,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
             <div style={S.label}>Import Mode</div>
             <div style={{ display: 'flex', gap: 10 }}>
               {(['MERGE', 'REPLACE'] as const).map(m => (
-                <div key={m} onClick={() => setMode(m)} style={{ flex: 1, padding: '12px 16px', borderRadius: 8, border: `2px solid ${mode === m ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', background: mode === m ? 'rgba(0,180,216,0.08)' : 'transparent' }}>
+                <div key={m} onClick={() => setMode(m)} style={{ flex: 1, padding: '12px 16px', borderRadius: 8, border: `2px solid ${mode === m ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', background: mode === m ? 'rgba(3,105,161,0.08)' : 'transparent' }}>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>{m === 'MERGE' ? '🔀 Merge' : '🔄 Replace'}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{m === 'MERGE' ? 'Add new items, skip existing codes' : 'Clear draft and replace all content'}</div>
                 </div>
@@ -1191,7 +1191,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
       {step === 'confirm' && (
         <div style={S.card}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Confirm Import</div>
-          <div style={{ padding: '14px 16px', background: mode === 'REPLACE' ? '#e74c3c11' : 'rgba(0,180,216,0.06)', borderRadius: 8, borderLeft: `3px solid ${mode === 'REPLACE' ? '#e74c3c' : 'var(--accent)'}`, marginBottom: 16, fontSize: 13 }}>
+          <div style={{ padding: '14px 16px', background: mode === 'REPLACE' ? '#e74c3c11' : 'rgba(3,105,161,0.06)', borderRadius: 8, borderLeft: `3px solid ${mode === 'REPLACE' ? '#e74c3c' : 'var(--accent)'}`, marginBottom: 16, fontSize: 13 }}>
             {mode === 'REPLACE' ? '⚠ REPLACE mode will clear all existing content in the draft version before importing.' : '✅ MERGE mode will add new items without affecting existing ones.'}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
@@ -1234,7 +1234,7 @@ function ExportPanel({ api }: { api: any }) {
         ].map(opt => (
           <div key={opt.fmt} style={S.card}>
             <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
-              <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(0,180,216,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{opt.icon}</div>
+              <div style={{ width: 48, height: 48, borderRadius: 10, background: 'rgba(3,105,161,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24 }}>{opt.icon}</div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 15 }}>{opt.title}</div>
                 <span style={S.badge('#3498db')}>{opt.badge}</span>
