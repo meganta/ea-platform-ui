@@ -7,9 +7,17 @@ const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-6936606805
 function useMetaApi() {
   const { token } = useAuth() as any
   const authHeader = { Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' }
-  const get = (path: string) => fetch(`${API}${path}`, { headers: authHeader }).then(r => r.json())
-  const post = (path: string, body?: any) => fetch(`${API}${path}`, { method: 'POST', headers: authHeader, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
-  const put = (path: string, body: any) => fetch(`${API}${path}`, { method: 'PUT', headers: authHeader, body: JSON.stringify(body) }).then(r => r.json())
+  const handle = async (res: Response) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.message || `HTTP ${res.status}`)
+    }
+    if (res.status === 204) return null
+    return res.json()
+  }
+  const get = (path: string) => fetch(`${API}${path}`, { headers: authHeader }).then(handle)
+  const post = (path: string, body?: any) => fetch(`${API}${path}`, { method: 'POST', headers: authHeader, body: body ? JSON.stringify(body) : undefined }).then(handle)
+  const put = (path: string, body: any) => fetch(`${API}${path}`, { method: 'PUT', headers: authHeader, body: JSON.stringify(body) }).then(handle)
   const del = (path: string) => fetch(`${API}${path}`, { method: 'DELETE', headers: authHeader }).then(r => r.ok)
   return { get, post, put, del }
 }
@@ -1498,11 +1506,15 @@ export default function MetaModelPage() {
   const api = useMetaApi()
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [tab, setTab] = useState('dashboard')
   const [selectedObjectType, setSelectedObjectType] = useState<any>(null)
 
   const loadStats = useCallback(() => {
-    api.get('/meta-model/stats').then((s: any) => { setStats(s); setLoading(false) })
+    setLoadError(null)
+    api.get('/meta-model/stats')
+      .then((s: any) => { setStats(s); setLoading(false) })
+      .catch((e: any) => { setLoadError(e.message || 'Failed to load meta-model'); setLoading(false) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadStats() }, [loadStats])
@@ -1524,6 +1536,15 @@ export default function MetaModelPage() {
   ]
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>Loading...</div>
+
+  if (loadError) return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: 20, textAlign: 'center' }}>
+      <div style={{ fontSize: 32 }}>⚠️</div>
+      <div style={{ fontSize: 14, fontWeight: 600 }}>Couldn't load the meta-model</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', maxWidth: 400 }}>{loadError}</div>
+      <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => { setLoading(true); loadStats() }}>Retry</button>
+    </div>
+  )
 
   if (!stats?.model) return (
     <div style={S.page}>
