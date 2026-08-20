@@ -7,9 +7,15 @@ const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-6936606805
 function useMetaApi() {
   const { token } = useAuth() as any
   const authHeader = { Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' }
-  const get = (path: string) => fetch(`${API}${path}`, { headers: authHeader }).then(r => r.json())
-  const post = (path: string, body?: any) => fetch(`${API}${path}`, { method: 'POST', headers: authHeader, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
-  const put = (path: string, body: any) => fetch(`${API}${path}`, { method: 'PUT', headers: authHeader, body: JSON.stringify(body) }).then(r => r.json())
+  // Some endpoints legitimately return an empty body (e.g. a controller
+  // returning null/undefined — NestJS sends no body rather than literal
+  // "null"). Parsing that with r.json() throws "Unexpected end of JSON
+  // input" and, since callers had no .catch(), left loading spinners
+  // stuck forever. Read as text first and only parse if non-empty.
+  const parse = (r: Response) => r.text().then(t => t ? JSON.parse(t) : null)
+  const get = (path: string) => fetch(`${API}${path}`, { headers: authHeader }).then(parse)
+  const post = (path: string, body?: any) => fetch(`${API}${path}`, { method: 'POST', headers: authHeader, body: body ? JSON.stringify(body) : undefined }).then(parse)
+  const put = (path: string, body: any) => fetch(`${API}${path}`, { method: 'PUT', headers: authHeader, body: JSON.stringify(body) }).then(parse)
   const del = (path: string) => fetch(`${API}${path}`, { method: 'DELETE', headers: authHeader }).then(r => r.ok)
   return { get, post, put, del }
 }
@@ -1500,7 +1506,7 @@ export default function MetaModelPage() {
   const [selectedObjectType, setSelectedObjectType] = useState<any>(null)
 
   const loadStats = useCallback(() => {
-    api.get('/meta-model/stats').then((s: any) => { setStats(s); setLoading(false) })
+    api.get('/meta-model/stats').then((s: any) => { setStats(s); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
   useEffect(() => { loadStats() }, [loadStats])
