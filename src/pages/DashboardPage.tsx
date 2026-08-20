@@ -11,7 +11,7 @@ const DECISION_COLOR: Record<string, string> = {
   REQUIRES_CHANGES: '#e67e22',
   REJECTED: '#e74c3c',
   REQUIRES_EXCEPTION: '#9b59b6',
-  PENDING: '#8baac8',
+  PENDING: '#64748B',
 }
 
 export default function DashboardPage() {
@@ -94,7 +94,7 @@ export default function DashboardPage() {
             {/* Governance KPIs */}
             <div className="stat-grid-3" style={{ marginBottom: 16 }}>
               {[
-                { label: t('gov.total_reviews'), value: statsTotal, sub: statsComplete + ' completed', color: '#8baac8' },
+                { label: t('gov.total_reviews'), value: statsTotal, sub: statsComplete + ' completed', color: '#64748B' },
                 { label: t('gov.avg_score'), value: statsAvgScore || '—', sub: scoreAvgs ? `C:${scoreAvgs.compliance} S:${scoreAvgs.strategic} R:${scoreAvgs.risk}` : '', color: statsAvgScore >= 70 ? '#2ecc71' : statsAvgScore >= 50 ? '#f39c12' : '#e74c3c' },
                 { label: 'Open Findings', value: statsOpenFindings, sub: statsCriticalOpen > 0 ? statsCriticalOpen + ' critical' : 'none critical', color: statsCriticalOpen > 0 ? '#e74c3c' : '#2ecc71' },
               ].map((s: any) => (
@@ -126,7 +126,7 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 64 }}>
                   {monthlyTrend.map((m: any, i: number) => {
                     const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any)=>x.count), 1)) * 48))
-                    const scoreColor = m.avgScore >= 70 ? '#2ecc71' : m.avgScore >= 50 ? '#f39c12' : m.avgScore ? '#e74c3c' : '#8baac8'
+                    const scoreColor = m.avgScore >= 70 ? '#2ecc71' : m.avgScore >= 50 ? '#f39c12' : m.avgScore ? '#e74c3c' : '#64748B'
                     return (
                       <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                         {m.avgScore && <div style={{ fontSize: 9, color: scoreColor, fontWeight: 600 }}>{m.avgScore}</div>}
@@ -147,9 +147,9 @@ export default function DashboardPage() {
                   {Object.entries(decisionCounts).map(([d, n]: any) => (
                     <div key={d} style={{
                       padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                      background: (DECISION_COLOR[d] || '#8baac8') + '22',
-                      color: DECISION_COLOR[d] || '#8baac8',
-                      border: '1px solid ' + (DECISION_COLOR[d] || '#8baac8') + '44'
+                      background: (DECISION_COLOR[d] || '#64748B') + '22',
+                      color: DECISION_COLOR[d] || '#64748B',
+                      border: '1px solid ' + (DECISION_COLOR[d] || '#64748B') + '44'
                     }}>{n} {d.replace(/_/g, ' ')}</div>
                   ))}
                 </div>
@@ -163,7 +163,7 @@ export default function DashboardPage() {
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 60 }}>
                   {monthlyTrend.map((m: any, i: number) => {
                     const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any) => x.count), 1)) * 48))
-                    const color = m.avgScore >= 70 ? '#2ecc71' : m.avgScore >= 50 ? '#f39c12' : m.avgScore ? '#e74c3c' : '#8baac8'
+                    const color = m.avgScore >= 70 ? '#2ecc71' : m.avgScore >= 50 ? '#f39c12' : m.avgScore ? '#e74c3c' : '#64748B'
                     return (
                       <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
                         {m.avgScore && <div style={{ fontSize: 9, color, fontWeight: 600 }}>{m.avgScore}</div>}

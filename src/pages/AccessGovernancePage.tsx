@@ -23,7 +23,7 @@ const S = {
   tab: (a: boolean) => ({ padding: '10px 16px', fontSize: 13, fontWeight: a ? 600 : 400, color: a ? 'var(--accent)' : 'var(--text-dim)', borderBottom: a ? '2px solid var(--accent)' : '2px solid transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', background: 'none' }),
   content: { flex: 1, overflow: 'auto', padding: '24px 28px' },
   card: { background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 10, padding: 20, marginBottom: 16 },
-  btn: (v: 'primary'|'secondary'|'danger' = 'secondary') => ({ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: v === 'primary' ? 'var(--accent)' : v === 'danger' ? '#e74c3c22' : 'var(--navy-mid)', color: v === 'primary' ? '#0B1929' : v === 'danger' ? '#e74c3c' : 'var(--text)' }),
+  btn: (v: 'primary'|'secondary'|'danger' = 'secondary') => ({ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: v === 'primary' ? 'var(--accent)' : v === 'danger' ? '#e74c3c22' : 'var(--navy-mid)', color: v === 'primary' ? 'var(--navy)' : v === 'danger' ? '#e74c3c' : 'var(--text)' }),
   input: { width: '100%', padding: '8px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', marginBottom: 10 },
   label: { fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 4, display: 'block' },
   badge: (c: string) => ({ padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: c + '22', color: c }),
@@ -35,8 +35,8 @@ const S = {
   td: { fontSize: 13, padding: '8px 10px', borderBottom: '1px solid var(--border)' },
 }
 
-const RISK_COLORS: Record<string, string> = { NORMAL: '#8baac8', SENSITIVE: '#f39c12', PRIVILEGED: '#e67e22', CRITICAL: '#e74c3c' }
-const STATUS_COLORS: Record<string, string> = { PENDING: '#f39c12', APPROVED: '#27ae60', REJECTED: '#e74c3c', CANCELLED: '#8baac8', ACTIVE: '#00b4d8', COMPLETED: '#27ae60' }
+const RISK_COLORS: Record<string, string> = { NORMAL: '#64748B', SENSITIVE: '#f39c12', PRIVILEGED: '#e67e22', CRITICAL: '#e74c3c' }
+const STATUS_COLORS: Record<string, string> = { PENDING: '#f39c12', APPROVED: '#27ae60', REJECTED: '#e74c3c', CANCELLED: '#64748B', ACTIVE: '#00b4d8', COMPLETED: '#27ae60' }
 
 export default function AccessGovernancePage() {
   const api = useApi()
@@ -185,7 +185,7 @@ function RolesTab({ api, isAdmin }: any) {
         <div style={{ ...S.card, marginTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>{selected.name}{selected.isSystemRole && <span style={{ ...S.badge('#8baac8'), marginLeft: 8 }}>System Template</span>}{selected.isPrivileged && <span style={{ ...S.badge('#e67e22'), marginLeft: 6 }}>Privileged</span>}</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{selected.name}{selected.isSystemRole && <span style={{ ...S.badge('#64748B'), marginLeft: 8 }}>System Template</span>}{selected.isPrivileged && <span style={{ ...S.badge('#e67e22'), marginLeft: 6 }}>Privileged</span>}</div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{selected.description}</div>
             </div>
             {isAdmin && <button style={S.btn('primary')} disabled={saving} onClick={savePermissions}>{saving ? 'Saving…' : 'Save Permissions'}</button>}
@@ -240,7 +240,7 @@ function RolesTab({ api, isAdmin }: any) {
               <td style={S.td}><span style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => openRole(r)}>{r.name}</span></td>
               <td style={S.td}>{r.rolePermissions?.length || 0}</td>
               <td style={S.td}>{r._count?.assignments || 0}</td>
-              <td style={S.td}>{r.isSystemRole ? <span style={S.badge('#8baac8')}>System</span> : <span style={S.badge('#00b4d8')}>Custom</span>}{r.isPrivileged && <span style={{ ...S.badge('#e67e22'), marginLeft: 4 }}>Privileged</span>}</td>
+              <td style={S.td}>{r.isSystemRole ? <span style={S.badge('#64748B')}>System</span> : <span style={S.badge('#00b4d8')}>Custom</span>}{r.isPrivileged && <span style={{ ...S.badge('#e67e22'), marginLeft: 4 }}>Privileged</span>}</td>
               <td style={S.td}>
                 {isAdmin && <>
                   <button style={{ ...S.btn(), fontSize: 11, padding: '4px 8px', marginRight: 6 }} onClick={() => cloneRole(r)}>Clone</button>

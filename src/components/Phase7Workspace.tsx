@@ -29,7 +29,7 @@ const REQUIREMENT_STATUSES = [
 const PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
 
 const STATUS_COLOR: Record<string, string> = {
-  DRAFT: '#8baac8',
+  DRAFT: '#64748B',
   PROPOSED: '#f39c12',
   UNDER_REVIEW: '#3498db',
   APPROVED: '#2ecc71',
@@ -204,8 +204,8 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
   const [actioning, setActioning] = useState(false)
 
   const title = isAR ? (req.titleAr || req.title) : req.title
-  const statusColor = STATUS_COLOR[req.status] || '#8baac8'
-  const priorityColor = PRIORITY_COLOR[req.priority] || '#8baac8'
+  const statusColor = STATUS_COLOR[req.status] || '#64748B'
+  const priorityColor = PRIORITY_COLOR[req.priority] || '#64748B'
   const typeColor = TYPE_COLOR[req.requirementType] || 'var(--accent)'
 
   const handleApprove = async () => {
@@ -255,13 +255,13 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             {showApprovalActions && req.approvalStatus !== 'APPROVED' && (
               <button disabled={actioning} onClick={handleApprove}
-                style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid rgba(46,204,113,0.4)', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', cursor: 'pointer' }}>
+                style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid rgba(22,163,74,0.4)', background: 'rgba(22,163,74,0.1)', color: '#2ecc71', cursor: 'pointer' }}>
                 ✓ {isAR ? 'اعتماد' : 'Approve'}
               </button>
             )}
             {showApprovalActions && req.approvalStatus !== 'REJECTED' && req.approvalStatus !== 'APPROVED' && (
               <button disabled={actioning} onClick={handleReject}
-                style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid rgba(231,76,60,0.4)', background: 'rgba(231,76,60,0.1)', color: '#e74c3c', cursor: 'pointer' }}>
+                style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid rgba(220,38,38,0.4)', background: 'rgba(220,38,38,0.1)', color: '#e74c3c', cursor: 'pointer' }}>
                 ✗ {isAR ? 'رفض' : 'Reject'}
               </button>
             )}
@@ -345,7 +345,7 @@ function Step71({ admCycleId }: { admCycleId: string }) {
       </div>
 
       {/* Human governance notice */}
-      <div style={{ padding: '10px 14px', marginBottom: 14, background: 'rgba(243,156,18,0.08)', border: '1px solid rgba(243,156,18,0.3)', borderRadius: 'var(--radius)', fontSize: 11, color: '#f39c12', lineHeight: 1.6 }}>
+      <div style={{ padding: '10px 14px', marginBottom: 14, background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.3)', borderRadius: 'var(--radius)', fontSize: 11, color: '#f39c12', lineHeight: 1.6 }}>
         ⚠ {isAR
           ? 'متطلبات الذكاء الاصطناعي لا تُعتمد تلقائياً. يجب على المراجع البشري اعتماد أو رفض كل متطلب قبل أن يصبح جزءاً من مستودع المتطلبات المعتمدة.'
           : 'AI-suggested requirements are never auto-approved. A human reviewer must explicitly approve or reject each requirement before it enters the approved repository.'}
@@ -481,7 +481,7 @@ function Step72({ admCycleId }: { admCycleId: string }) {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <select value={filterApproval} onChange={e => setFilterApproval(e.target.value)}
-          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 'var(--radius)', border: `1px solid ${filterApproval === 'APPROVED' ? 'rgba(46,204,113,0.4)' : 'var(--border)'}`, background: 'var(--navy)', color: filterApproval === 'APPROVED' ? '#2ecc71' : 'var(--text)' }}>
+          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 'var(--radius)', border: `1px solid ${filterApproval === 'APPROVED' ? 'rgba(22,163,74,0.4)' : 'var(--border)'}`, background: 'var(--navy)', color: filterApproval === 'APPROVED' ? '#2ecc71' : 'var(--text)' }}>
           <option value="APPROVED">{isAR ? 'معتمدة فقط' : 'Approved only'}</option>
           <option value="PENDING">{isAR ? 'قيد الانتظار' : 'Pending'}</option>
           <option value="REJECTED">{isAR ? 'مرفوضة' : 'Rejected'}</option>
@@ -639,7 +639,7 @@ function Step73({ admCycleId }: { admCycleId: string }) {
           </div>
 
           {selectedReq && (
-            <div style={{ padding: '10px 12px', background: 'rgba(0,180,216,0.06)', border: '1px solid rgba(0,180,216,0.2)', borderRadius: 'var(--radius)', fontSize: 11 }}>
+            <div style={{ padding: '10px 12px', background: 'rgba(3,105,161,0.06)', border: '1px solid rgba(3,105,161,0.2)', borderRadius: 'var(--radius)', fontSize: 11 }}>
               <div style={{ fontWeight: 600, marginBottom: 4 }}>{selectedReq.title}</div>
               <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{selectedReq.description}</div>
               <div style={{ marginTop: 6 }}>
@@ -679,7 +679,7 @@ function Step73({ admCycleId }: { admCycleId: string }) {
             <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
               {(['impact', 'traceability'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
-                  style={{ padding: '5px 14px', fontSize: 11, borderRadius: 'var(--radius)', border: `1px solid ${activeTab === tab ? 'var(--accent)' : 'var(--border)'}`, background: activeTab === tab ? 'rgba(0,180,216,0.12)' : 'none', color: activeTab === tab ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer' }}>
+                  style={{ padding: '5px 14px', fontSize: 11, borderRadius: 'var(--radius)', border: `1px solid ${activeTab === tab ? 'var(--accent)' : 'var(--border)'}`, background: activeTab === tab ? 'rgba(3,105,161,0.12)' : 'none', color: activeTab === tab ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer' }}>
                   {tab === 'impact' ? (isAR ? 'تحليل الأثر' : 'Impact Analysis') : (isAR ? 'التتبع' : 'Traceability')}
                 </button>
               ))}
@@ -731,7 +731,7 @@ function Step73({ admCycleId }: { admCycleId: string }) {
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>⟳ {isAR ? 'يحلل الذكاء الاصطناعي الأثر...' : 'AI is analyzing the impact...'}</div>
                 )}
                 {result?.error && (
-                  <div style={{ fontSize: 12, color: '#e74c3c', padding: 12, background: 'rgba(231,76,60,0.08)', borderRadius: 'var(--radius)' }}>Error: {result.error}</div>
+                  <div style={{ fontSize: 12, color: '#e74c3c', padding: 12, background: 'rgba(220,38,38,0.08)', borderRadius: 'var(--radius)' }}>Error: {result.error}</div>
                 )}
                 {result?.analysis && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -743,7 +743,7 @@ function Step73({ admCycleId }: { admCycleId: string }) {
                       </span>
                     </div>
                     {/* Summary */}
-                    <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--text)', padding: '10px 12px', background: 'rgba(0,180,216,0.05)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
+                    <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--text)', padding: '10px 12px', background: 'rgba(3,105,161,0.05)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
                       {result.analysis.summary}
                     </div>
                     {/* Sections */}
@@ -816,7 +816,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700 }}>
                 {t('adm.phase')} 7 — {isAR ? 'إدارة المتطلبات' : 'Requirements Management'}
               </div>
-              <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 2, background: 'rgba(0,180,216,0.15)', color: 'var(--accent)', border: '1px solid rgba(0,180,216,0.3)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 2, background: 'rgba(3,105,161,0.15)', color: 'var(--accent)', border: '1px solid rgba(3,105,161,0.3)', fontFamily: 'var(--font-mono)' }}>
                 CONTINUOUS
               </span>
             </div>
@@ -837,7 +837,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
               const meta = STEP_META[key]
               return (
                 <button key={key} onClick={() => setActiveStep(key)}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 10px', marginBottom: 6, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === key ? 'rgba(0,180,216,0.12)' : 'transparent', cursor: 'pointer' }}>
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 10px', marginBottom: 6, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === key ? 'rgba(3,105,161,0.12)' : 'transparent', cursor: 'pointer' }}>
                   <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginBottom: 3 }}>{key}</div>
                   <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.35 }}>
                     {isAR ? meta.labelAr : meta.label}
@@ -846,7 +846,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
               )
             })}
 
-            <div style={{ marginTop: 16, padding: '10px 10px', background: 'rgba(0,180,216,0.05)', border: '1px solid rgba(0,180,216,0.15)', borderRadius: 'var(--radius)' }}>
+            <div style={{ marginTop: 16, padding: '10px 10px', background: 'rgba(3,105,161,0.05)', border: '1px solid rgba(3,105,161,0.15)', borderRadius: 'var(--radius)' }}>
               <div style={{ fontSize: 9, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>NORA 2.0</div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
                 {isAR ? 'إدارة المتطلبات كطبقة حوكمة مستمرة لدورة تطوير البنية المؤسسية' : 'Requirements managed as a continuous governance layer per NORA ADM methodology'}
@@ -857,7 +857,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
           {/* Main content */}
           <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
             {/* Step header */}
-            <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(0,180,216,0.06)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
+            <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(3,105,161,0.06)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{isAR ? STEP_META[activeStep].labelAr : STEP_META[activeStep].label}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{isAR ? STEP_META[activeStep].descAr : STEP_META[activeStep].desc}</div>
             </div>

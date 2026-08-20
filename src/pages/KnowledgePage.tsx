@@ -114,8 +114,8 @@ export default function KnowledgePage() {
       <div className="page-body">
         {uploadMsg && (
           <div style={{padding:'10px 16px',borderRadius:'var(--radius)',marginBottom:16,fontSize:13,
-            background: uploadMsg.type==='success'?'rgba(46,204,113,0.1)':'rgba(231,76,60,0.1)',
-            border: `1px solid ${uploadMsg.type==='success'?'rgba(46,204,113,0.3)':'rgba(231,76,60,0.3)'}`,
+            background: uploadMsg.type==='success'?'rgba(22,163,74,0.1)':'rgba(220,38,38,0.1)',
+            border: `1px solid ${uploadMsg.type==='success'?'rgba(22,163,74,0.3)':'rgba(220,38,38,0.3)'}`,
             color: uploadMsg.type==='success'?'var(--success)':'var(--danger)',
             display:'flex',justifyContent:'space-between',alignItems:'center',
           }}>
@@ -146,7 +146,7 @@ export default function KnowledgePage() {
                       <button
                         onClick={()=>deleteDoc(d.id, displayName(d.name))}
                         disabled={deleting===d.id}
-                        style={{background:'none',border:'1px solid rgba(231,76,60,0.3)',borderRadius:'var(--radius)',color:'var(--danger)',padding:'3px 8px',fontSize:11,cursor:'pointer',opacity:deleting===d.id?0.5:1}}
+                        style={{background:'none',border:'1px solid rgba(220,38,38,0.3)',borderRadius:'var(--radius)',color:'var(--danger)',padding:'3px 8px',fontSize:11,cursor:'pointer',opacity:deleting===d.id?0.5:1}}
                       >
                         {deleting===d.id?'...':'🗑'}
                       </button>
