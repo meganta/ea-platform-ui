@@ -540,11 +540,11 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
     <div style={{ marginTop: 8, padding: '10px 12px', background: isFilled ? 'rgba(46,204,113,0.06)' : 'rgba(201,168,76,0.06)', border: `1px solid ${isFilled ? 'rgba(46,204,113,0.3)' : 'rgba(201,168,76,0.25)'}`, borderRadius: 'var(--radius)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
         <span style={{ fontSize: 11, fontWeight: 600, color: isFilled ? 'var(--success)' : 'var(--gold)' }}>
-          {isFilled ? '✅' : '📋'} {mapping.outputNameAr}
+          {isFilled ? '✅' : '📋'} {isAR ? mapping.outputNameAr : (mapping.outputNameEn || mapping.outputNameAr)}
         </span>
         {isFilled && <span style={{ fontSize: 9, padding: '1px 6px', background: 'rgba(46,204,113,0.15)', color: 'var(--success)', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>AI CONTENT READY</span>}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{mapping.purposeAr || mapping.purposeEn}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? (mapping.purposeAr || mapping.purposeEn) : (mapping.purposeEn || mapping.purposeAr)}</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(46,204,113,0.4)' } : {}) }} disabled={loading} onClick={() => download('docx')}>
           📄 {loading ? '...' : isFilled ? t('adm.download_word') : t('adm.word_template')}
@@ -957,6 +957,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const [outputContent, setOutputContent] = useState('')
   const [activeStep, setActiveStep] = useState<string | null>(null)
 
+
   useEffect(() => {
     setLoading(true)
     Promise.all([
@@ -976,6 +977,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     }).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycle.id, phase])
+
 
   const saveInput = async (inputId: string) => {
     await api.put(`/adm-intelligence/inputs/${inputId}`, { content: inputContent, source: 'PROVIDED' })
@@ -1009,6 +1011,13 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
               setGenerating(null)
               // Reload full phase data to get latest content
               setPhaseOutputs(prev => prev.map(o => o.id === outputId ? { ...o, ...updated } : o))
+              // Re-fetch inputs so next step gets auto-populated immediately
+              setTimeout(async () => {
+                try {
+                  const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
+                  if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
+                } catch (_) {}
+              }, 1500)
             }
           } catch(e) { clearInterval(pollInterval); setGenerating(null) }
         }, 2000)
@@ -1021,6 +1030,13 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const approveOutput = async (outputId: string) => {
     const result = await api.put(`/adm-intelligence/outputs/${outputId}`, { status: 'APPROVED' })
     setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
+    // Re-fetch inputs so next step gets auto-populated immediately
+    setTimeout(async () => {
+      try {
+        const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
+        if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
+      } catch (_) {}
+    }, 1500)
   }
 
   const saveOutputEdit = async (outputId: string) => {
@@ -1039,15 +1055,23 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, inKnowledgeBase: true } : o))
   }
 
+  const handleStepClick = async (stepKey: string) => {
+    setActiveStep(stepKey)
+    try {
+      const inp = await api.get(`/adm-intelligence/cycles/${cycle.id}/phases/${phase}/inputs`)
+      if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
+    } catch (_) {}
+  }
+
   const steps = phaseDef?.steps || []
   const currentStep = steps.find((s: any) => s.key === activeStep)
 
   // Get inputs/outputs for current step
   const stepInputs = currentStep
-    ? phaseInputs.filter(i => currentStep.inputs.some((def: any) => def.key === i.inputKey))
+    ? phaseInputs.filter(i => (currentStep.inputs || []).some((def: any) => def.key === i.inputKey))
     : phaseInputs
   const stepOutputs = currentStep
-    ? phaseOutputs.filter(o => currentStep.outputs.some((def: any) => def.key === o.outputKey))
+    ? phaseOutputs.filter(o => (currentStep.outputs || []).some((def: any) => def.key === o.outputKey))
     : phaseOutputs
 
   return (
@@ -1079,7 +1103,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                   const hasApproved = stepOuts.some(o => o.status === 'APPROVED')
                   const hasAiDraft = stepOuts.some(o => o.status === 'AI_DRAFT')
                   return (
-                    <button key={step.key} onClick={() => setActiveStep(step.key)}
+                    <button key={step.key} onClick={() => handleStepClick(step.key)}
                       style={{ display: 'block', width: '100%', textAlign: 'left', padding: '8px 10px', marginBottom: 4, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === step.key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === step.key ? 'rgba(0,180,216,0.12)' : 'transparent', cursor: 'pointer' }}>
                       <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginBottom: 2 }}>{step.key}</div>
                       <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.4 }}>{isAR ? (step.titleAr || step.title) : (step.title || step.titleAr)}</div>
@@ -1262,8 +1286,8 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                           )}
                         </div>
 
-                        {/* Promote */}
-                        {out.content && (
+                        {/* Promote — hidden from UI, restore by removing {false && ...} wrapper */}
+                        {false && out.content && (
                           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: 9, opacity: out.inRepository ? 0.5 : 1 }} disabled={out.inRepository} onClick={() => promoteToRepo(out.id)}>
                               {out.inRepository ? t('adm.in_repo') : t('adm.to_repo')}

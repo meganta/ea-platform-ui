@@ -16,8 +16,9 @@ function useApi() {
 }
 
 const REVIEW_TYPES = [
-  { value: 'HLD_REVIEW', label: 'High-Level Design (HLD) Review' },
-  { value: 'LLD_REVIEW', label: 'Low-Level Design (LLD) Review' },
+  { value: 'HLD_REVIEW', label: 'High-Level Design Review (HLD)' },
+  { value: 'LLD_REVIEW', label: 'Low-Level Design Review (LLD)' },
+  { value: 'SOLUTION_DESIGN', label: 'Solution Design Review' },
   { value: 'NEW_PROJECT', label: 'New Project Review' },
   { value: 'RFP_SOW', label: 'RFP / Scope of Work Review' },
   { value: 'CHANGE_REQUEST', label: 'Change Request Review' },
@@ -83,15 +84,56 @@ const INTELLIGENCE_ITEMS = [
   { key: 'similar_reviews', label: 'Similar Previous Reviews', icon: '🔍', source: 'auto', enrichUrl: '', enrichLabel: '' },
 ]
 
-const SEV_COLOR: Record<string, string> = { CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71' }
-const DECISION_COLOR: Record<string, string> = { APPROVED: '#2ecc71', APPROVED_WITH_CONDITIONS: '#f39c12', REQUIRES_CHANGES: '#e67e22', REJECTED: '#e74c3c', PENDING: '#8baac8' }
+const REVIEW_PURPOSE_OPTIONS = [
+  { value: 'architecture_approval', label: 'Architecture Approval' },
+  { value: 'procurement_support', label: 'Procurement Support' },
+  { value: 'design_validation', label: 'Design Validation' },
+  { value: 'risk_assessment', label: 'Risk Assessment' },
+  { value: 'compliance_assessment', label: 'Compliance Assessment' },
+  { value: 'cab_support', label: 'CAB Support' },
+  { value: 'executive_review', label: 'Executive Review' },
+  { value: 'exception_evaluation', label: 'Exception Evaluation' },
+]
 
+const SEV_COLOR: Record<string, string> = {
+  CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71',
+}
+
+const DECISION_COLOR: Record<string, string> = {
+  APPROVED: '#2ecc71',
+  APPROVED_WITH_CONDITIONS: '#f39c12',
+  REQUIRES_CHANGES: '#e67e22',
+  REJECTED: '#e74c3c',
+  PENDING: '#8baac8',
+}
+
+// ── Step indicator ────────────────────────────────────────
+function Steps({ current }: { current: number }) {
+  const steps = ['Review Type', 'Upload Inputs', 'Gap Check', 'AI Review', 'Report']
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', marginBottom: 28 }}>
+      {steps.map((s, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < steps.length - 1 ? 1 : 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 64 }}>
+            <div style={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 600, background: i < current ? 'var(--accent)' : i === current ? 'var(--accent)' : 'var(--navy-mid)', color: i <= current ? '#fff' : 'var(--text-muted)', border: i === current ? '2px solid var(--accent)' : '2px solid transparent' }}>
+              {i < current ? '✓' : i + 1}
+            </div>
+            <div style={{ fontSize: 11, color: i === current ? 'var(--accent)' : 'var(--text-muted)', marginTop: 4, whiteSpace: 'nowrap' }}>{s}</div>
+          </div>
+          {i < steps.length - 1 && <div style={{ flex: 1, height: 2, background: i < current ? 'var(--accent)' : 'var(--navy-mid)', margin: '0 4px', marginBottom: 20 }} />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Score circle ──────────────────────────────────────────
 function ScoreCircle({ score, label, size = 72, help }: { score: number, label: string, size?: number, help?: string }) {
   const color = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ width: size, height: size, borderRadius: '50%', border: '3px solid ' + color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px' }}>
-        <div style={{ fontSize: size >= 72 ? 22 : 16, fontWeight: 700, color }}>{score}</div>
+      <div style={{ width: 72, height: 72, borderRadius: '50%', border: `3px solid ${color}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px' }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color }}>{score}</div>
         <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}{help && <HelpTip text={help} />}</div>
@@ -313,8 +355,6 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
           <div style={{ marginBottom: 8 }}><span style={{ color: 'var(--text-muted)' }}>Description: </span>{f.description}</div>
           <div style={{ marginBottom: 8, color: 'var(--accent)' }}><span style={{ color: 'var(--text-muted)' }}>Recommendation: </span>{f.recommendation}</div>
           {f.businessImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Business Impact: </span>{f.businessImpact}</div>}
-          {f.technicalImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Technical Impact: </span>{f.technicalImpact}</div>}
-          {f.relatedPrinciple && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Principle: </span>{f.relatedPrinciple}</div>}
           {f.relatedStandard && <div><span style={{ color: 'var(--text-muted)' }}>Standard: </span>{f.relatedStandard}</div>}
         </div>
       )}
@@ -644,12 +684,13 @@ export default function GovernancePage() {
   const [page, setPage] = useState(1)
   const [filterSearch, setFilterSearch] = useState('')
   const [review, setReview] = useState<any>(null)
+  const [step, setStep] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [tab, setTab] = useState<'summary' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
-  const [form, setForm] = useState({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
+  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
   const [inputs, setInputs] = useState<any[]>([])
   const [uploading, setUploading] = useState(false)
   const [extractedMeta, setExtractedMeta] = useState<any>(null)
@@ -748,10 +789,13 @@ export default function GovernancePage() {
     } catch { alert('Failed to re-run review') }
   }
   const fileRef = useRef<HTMLInputElement>(null)
+  const pollRef = useRef<any>(null)
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  useEffect(() => { loadReviews() }, [])
+  useEffect(() => {
+    loadReviews()
+  }, [])
 
   // Reset to page 1 whenever filters change
   React.useEffect(() => { setPage(1) }, [filterStatus, filterDecision, filterType, filterSearch, filterAgg, filterScoreMin])
@@ -822,6 +866,7 @@ export default function GovernancePage() {
     setView('report')
   }
 
+  // ── Step 1: Create review ─────────────────────────────
   const createAndStart = async () => {
     if (!form.title) { setError('Title is required'); return }
     if (inputs.length === 0) { setError('Please upload at least one document'); return }
@@ -890,7 +935,23 @@ export default function GovernancePage() {
     finally { setLoading(false) }
   }
 
+  const pollStatus = () => {
+    pollRef.current = setInterval(async () => {
+      const r = await api.get('/governance/reviews/' + review.id).catch(() => null)
+      if (r?.status === 'COMPLETED') {
+        clearInterval(pollRef.current)
+        setReview(r)
+        const [f, rpt] = await Promise.all([
+          api.get('/governance/reviews/' + review.id + '/findings').catch(() => []),
+          api.get('/governance/reviews/' + review.id + '/report').catch(() => null),
+        ])
+        setFindings(Array.isArray(f) ? f : [])
+        setReport(rpt)
+      }
+    }, 3000)
+  }
 
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return
@@ -898,18 +959,9 @@ export default function GovernancePage() {
     setInputs(i => [...i, ...newInputs])
   }
 
-  const fetchExtractedMetadata = async (reviewId: string) => {
-    try {
-      const meta = await api.get('/governance/reviews/' + reviewId + '/inputs/metadata')
-      if (meta && Object.keys(meta).length > 0) {
-        setExtractedMeta(meta)
-        setShowMeta(true)
-      }
-    } catch {}
-  }
-
   const removeInput = (idx: number) => setInputs(i => i.filter((_, j) => j !== idx))
 
+  // ── Reviews list ──────────────────────────────────────
   if (view === 'list') return (
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -997,7 +1049,7 @@ export default function GovernancePage() {
           <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label || r.reviewType} · {r.framework?.replace(/_/g, ' ')} · {r.aggressiveness || 'STANDARD'} · {new Date(r.createdAt).toLocaleDateString()}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
             </div>
             {r.overallScore != null && <ScoreCircle score={Math.round(r.overallScore)} label='Score' />}
             <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[r.decision] + '22', color: DECISION_COLOR[r.decision] }}>{r.decision?.replace(/_/g, ' ')}</div>
@@ -1888,7 +1940,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--navy-light)', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--navy-light)' }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)} style={{ padding: '8px 14px', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: tab === t.key ? '2px solid var(--accent)' : '2px solid transparent', color: tab === t.key ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.key ? 600 : 400, whiteSpace: 'nowrap' }}>{t.label}</button>
         ))}
