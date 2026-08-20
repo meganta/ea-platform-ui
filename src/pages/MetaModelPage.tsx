@@ -61,9 +61,11 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
 
   useEffect(() => { api.get('/meta-model/frameworks').then((d: any) => setFrameworks(Array.isArray(d) ? d : [])) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [error, setError] = useState('')
+
   const create = async () => {
     if (!name.trim()) return
-    setLoading(true)
+    setLoading(true); setError('')
     try {
       if (step === 'framework') {
         await api.post('/meta-model/create-from-framework', { frameworkCode: selected, name, description })
@@ -71,6 +73,8 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
         await api.post('/meta-model/create-blank', { name, description })
       }
       onCreated()
+    } catch (e: any) {
+      setError(e.message || 'Failed to create meta-model')
     } finally { setLoading(false) }
   }
 
@@ -107,6 +111,7 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
           </div>
           <div><label style={S.label}>Meta-Model Name *</label><input style={S.input} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. HRDF Enterprise Architecture Meta-Model" /></div>
           <div><label style={S.label}>Description</label><input style={S.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" /></div>
+          {error && <div style={{ padding: '10px 14px', borderRadius: 8, background: '#e74c3c22', color: '#e74c3c', fontSize: 13 }}>{error}</div>}
           <div style={{ display: 'flex', gap: 10 }}>
             <button style={S.btn()} onClick={() => setStep('choose')}>← Back</button>
             <button style={{ ...S.btn('primary'), flex: 1 }} onClick={create} disabled={!name || !selected || loading}>{loading ? 'Creating...' : 'Create from Framework'}</button>
@@ -118,6 +123,7 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div><label style={S.label}>Meta-Model Name *</label><input style={S.input} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Custom EA Meta-Model" /></div>
           <div><label style={S.label}>Description</label><input style={S.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" /></div>
+          {error && <div style={{ padding: '10px 14px', borderRadius: 8, background: '#e74c3c22', color: '#e74c3c', fontSize: 13 }}>{error}</div>}
           <div style={{ display: 'flex', gap: 10 }}>
             <button style={S.btn()} onClick={() => setStep('choose')}>← Back</button>
             <button style={{ ...S.btn('primary'), flex: 1 }} onClick={create} disabled={!name || loading}>{loading ? 'Creating...' : 'Create Blank Meta-Model'}</button>
