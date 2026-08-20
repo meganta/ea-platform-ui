@@ -67,7 +67,7 @@ const DIRECTION_LABEL: Record<string, string> = { IMPORT: '⬇ Import', EXPORT: 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function ConnectorDashboard({ api, stats, onTab, onOpen }: { api: any, stats: any, onTab: (t: string) => void, onOpen: (c: any) => void }) {
   const [connectors, setConnectors] = useState<any[]>([])
-  useEffect(() => { api.get('/connectors').then((d: any) => setConnectors(Array.isArray(d) ? d : [])) }, [])
+  useEffect(() => { api.get('/connectors').then((d: any) => setConnectors(Array.isArray(d) ? d : [])) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -223,7 +223,6 @@ function NewConnector({ api, onCreated, onCancel }: { api: any, onCreated: (c: a
 
 // ── Connector Detail ──────────────────────────────────────────────────────────
 function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, connector: any, onBack: () => void, onRefresh: () => void }) {
-  const [detail, setDetail] = useState<any>(connector)
   const [tab, setTab] = useState<'overview' | 'credentials' | 'mappings' | 'staging' | 'jobs'>('overview')
   const [creds, setCreds] = useState<any>({})
   const [saving, setSaving] = useState(false)
@@ -235,7 +234,7 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
   const ct = CONNECTOR_TYPES.find(t => t.code === connector.connectorType)
 
   const loadJobs = () => api.get(`/connectors/${connector.id}/jobs`).then((d: any) => setJobs(Array.isArray(d) ? d : []))
-  useEffect(() => { if (tab === 'jobs') loadJobs() }, [tab])
+  useEffect(() => { if (tab === 'jobs') loadJobs() }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveCreds = async () => {
     setSaving(true)
@@ -933,6 +932,7 @@ function ArchiMatePanel({ api }: { api: any }) {
       setConnectors(arch)
       if (arch.length === 1) setSelectedId(arch[0].id)
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const createDefaultConnector = async () => {
@@ -1296,7 +1296,7 @@ export default function ConnectorHubPage() {
   const [stats, setStats] = useState<any>(null)
   const [selectedConnector, setSelectedConnector] = useState<any>(null)
 
-  const loadStats = useCallback(() => { api.get('/connectors/stats').then(setStats) }, [])
+  const loadStats = useCallback(() => { api.get('/connectors/stats').then(setStats) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadStats() }, [loadStats])
 
   const TABS = [
@@ -1360,6 +1360,7 @@ function ConnectorsList({ api, onOpen }: { api: any, onOpen: (c: any) => void })
 
   useEffect(() => {
     api.get('/connectors').then((d: any) => { setConnectors(Array.isArray(d) ? d : []); setLoading(false) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

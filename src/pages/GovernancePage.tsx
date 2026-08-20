@@ -126,7 +126,6 @@ const DOMAIN_LABEL: Record<string, string> = {
 }
 
 function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onFindingUpdate, onFindingDelete, onRescore }: { findings: any[], report: any, isAR: boolean, resolveText: (s: string) => string, reviewId?: string, onFindingUpdate?: (id: string, data: any) => void, onFindingDelete?: (id: string) => void, onRescore?: () => void }) {
-  const { t } = useLang()
   const [filterSev, setFilterSev] = React.useState<string[]>([])
   // collapsed state: null = all expanded by default
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({})
@@ -372,6 +371,7 @@ function IntelligenceAdvisor({ reviewType, onReady }: { reviewType: string; onRe
       if (onReady) onReady()
     }
     check()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewType])
 
   if (!checked) return (
@@ -437,6 +437,7 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
       clearInterval(pollRef.current)
       clearInterval(engineTimerRef.current)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const [pipelineError, setPipelineError] = React.useState<string | null>(null)
@@ -444,7 +445,7 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
 
   const attemptRun = async (attempt: number = 1): Promise<boolean> => {
     try {
-      const res = await api.post('/governance/reviews/' + review.id + '/run')
+      await api.post('/governance/reviews/' + review.id + '/run')
       return true
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Unknown error'
@@ -660,9 +661,8 @@ export default function GovernancePage() {
   const [report, setReport] = useState<any>(null)
   const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
   const [inputs, setInputs] = useState<any[]>([])
-  const [uploading, setUploading] = useState(false)
   const [extractedMeta, setExtractedMeta] = useState<any>(null)
-  const [showMeta, setShowMeta] = useState(false)
+  const [, setShowMeta] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
   const [advisorReady, setAdvisorReady] = useState(false)
   const [uploadStatus, setUploadStatus] = useState('')
@@ -762,6 +762,7 @@ export default function GovernancePage() {
 
   useEffect(() => {
     loadReviews()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Reset to page 1 whenever filters change
@@ -820,6 +821,7 @@ export default function GovernancePage() {
       }).catch(() => {})
       window.history.replaceState({}, '')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, reviews])
 
   const openReview = async (r: any) => {
@@ -1480,13 +1482,10 @@ export default function GovernancePage() {
 function ReportView({ review, report, findings, tab, setTab }: { review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
   const [riskFilterSev, setRiskFilterSev] = React.useState<string[]>([])
   const [riskFilterCat, setRiskFilterCat] = React.useState<string>('')
-  const [editingFinding, setEditingFinding] = React.useState<string | null>(null)
   const [editingReport, setEditingReport] = React.useState<string | null>(null) // field name
   const [editDraft, setEditDraft] = React.useState<any>({})
   const [saving, setSaving] = React.useState(false)
   const extScores = (report.domainSummaries?._extendedScores) || {}
-  const archQualityScore = extScores.architectureQualityScore || 0
-  const secScore = extScores.securityScore || 0
   const futureScore = extScores.futureStateScore || 0
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
@@ -1494,17 +1493,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   // ── Edit helpers ──────────────────────────────────────────────────────────
   const apiUrl = (process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1')
   const token = () => localStorage.getItem('ea_token') || ''
-
-  const saveFinding = async (findingId: string, data: any) => {
-    setSaving(true)
-    try {
-      await fetch(`${apiUrl}/governance/reviews/${review.id}/findings/${findingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(data),
-      })
-    } finally { setSaving(false); setEditingFinding(null); setEditDraft({}) }
-  }
 
   const saveReportField = async (fieldPath: string, value: any) => {
     setSaving(true)
@@ -1518,7 +1506,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     } finally { setSaving(false); setEditingReport(null); setEditDraft({}) }
   }
 
-  const startEditFinding = (f: any) => { setEditingFinding(f.id); setEditDraft({ ...f }) }
   const startEditReport = (field: string, value: any) => { setEditingReport(field); setEditDraft({ value }) }
 
   // Edit toolbar component (inline)
@@ -1611,9 +1598,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   }
 
   // Local report state for optimistic updates
-  const [localReport, setLocalReport] = React.useState(report)
-  React.useEffect(() => { setLocalReport(report) }, [report])
-  const updateLocalReport = (field: string, value: any) => setLocalReport((prev: any) => ({ ...prev, [field]: value }))
 
   // Compliance local state
   const [localCompliance, setLocalCompliance] = React.useState<any[]>(

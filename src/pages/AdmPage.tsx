@@ -148,7 +148,7 @@ function extractDiagrams(text: string): Array<{type: 'text'|'diagram', content: 
 
 // Section Progress Component
 function SectionProgress({ outputId }: { outputId: string }) {
-  const { isAR, t } = useLang()
+  const { isAR } = useLang()
   const [sections, setSections] = useState<any[]>([])
   const token = () => localStorage.getItem('ea_token')
   const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
@@ -874,7 +874,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
 }
 
 function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; cycleId: string; onEvidenceSaved: (evidence: any) => void }) {
-  const { isAR, t } = useLang()
+  const { t } = useLang()
   const [fields, setFields] = useState<any[]>([])
   const [evidence, setEvidence] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)

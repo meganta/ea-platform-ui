@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
 
@@ -49,6 +49,7 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
       setViewpoints(Array.isArray(vps) ? vps : [])
       setLoading(false)
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const categories = Array.from(new Set(viewpoints.map(v => v.category)))
@@ -218,14 +219,15 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
         const pos: Record<string,{x:number,y:number}> = {}
         let colX = 60
         for (const [,ns] of Object.entries(domGroups)) {
-          ns.forEach((n,i) => { pos[n.id] = {x:colX, y:60+i*80} })
+          const x = colX
+          ns.forEach((n,i) => { pos[n.id] = {x, y:60+i*80} })
           colX += 220
         }
         setPositions(pos)
       }
       setLoading(false)
     })
-  }, [view.id])
+  }, [view.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load() }, [load])
 
@@ -672,11 +674,12 @@ function SnapshotsPanel({ api }: { api: any }) {
   const [selectedView, setSelectedView] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => { api.get('/ea-views').then((d: any) => setViews(Array.isArray(d)?d:[])) }, [])
+  useEffect(() => { api.get('/ea-views').then((d: any) => setViews(Array.isArray(d)?d:[])) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!selectedView) return
     setLoading(true)
     api.get(`/ea-views/${selectedView}/snapshots`).then((d: any) => { setSnapshots(Array.isArray(d)?d:[]); setLoading(false) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedView])
 
   return (
@@ -796,9 +799,9 @@ export default function EaViewsPage() {
   const [stats, setStats] = useState<any>(null)
   const [activeView, setActiveView] = useState<any>(null)
   const [selectedViewpoint, setSelectedViewpoint] = useState<any>(null)
-  const [showBuilder, setShowBuilder] = useState(false)
+  const [, setShowBuilder] = useState(false)
 
-  const loadStats = useCallback(() => { api.get('/ea-views/stats').then(setStats) }, [])
+  const loadStats = useCallback(() => { api.get('/ea-views/stats').then(setStats) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadStats() }, [loadStats])
 
   const openView = (v: any) => { setActiveView(v); setTab('viewer') }

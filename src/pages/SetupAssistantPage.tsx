@@ -358,7 +358,7 @@ function Step3Repo({ onNext }: any) {
 
 // ── Step 4: Readiness ─────────────────────────────────────────────────────────
 function Step4Readiness({ onNext }: any) {
-  const { isAR } = useLang()
+  
   const [r, setR] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => { authFetch('/setup/readiness').then(setR).finally(() => setLoading(false)) }, [])
@@ -390,7 +390,7 @@ function Step4Readiness({ onNext }: any) {
 
 // ── Step 5: Next Actions ──────────────────────────────────────────────────────
 function Step5Actions({ onComplete }: any) {
-  const { isAR } = useLang()
+  
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => { authFetch('/setup/actions').then(setData).finally(() => setLoading(false)) }, [])

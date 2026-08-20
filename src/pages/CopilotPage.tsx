@@ -345,6 +345,7 @@ export default function CopilotPage() {
       if (chief) setSelectedArchitect(chief)
     })
     api.get('/copilot/conversations').then((d: any) => setConversations(Array.isArray(d) ? d : []))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadConversation = async (convId: string) => {

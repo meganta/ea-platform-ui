@@ -46,7 +46,7 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
 
-  useEffect(() => { api.get('/meta-model/frameworks').then((d: any) => setFrameworks(Array.isArray(d) ? d : [])) }, [])
+  useEffect(() => { api.get('/meta-model/frameworks').then((d: any) => setFrameworks(Array.isArray(d) ? d : [])) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = async () => {
     if (!name.trim()) return
@@ -404,6 +404,7 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
 
   useEffect(() => {
     api.get(`/meta-model/object-types/${objectType.id}`).then(setDetail)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [objectType.id])
 
   const addAttr = async () => {
@@ -701,7 +702,8 @@ function MetaModelDesigner({ api }: { api: any }) {
         const pos: Record<string, { x: number; y: number }> = {}
         let colX = 80
         for (const [, nodes] of Object.entries(domainGroups)) {
-          nodes.forEach((n, i) => { pos[n.id] = { x: colX, y: 80 + i * 90 } })
+          const x = colX
+          nodes.forEach((n, i) => { pos[n.id] = { x, y: 80 + i * 90 } })
           colX += 200
         }
         setPositions(pos)
@@ -965,7 +967,7 @@ function VersionsManager({ api }: { api: any }) {
   const [impact, setImpact] = useState<any>(null)
 
   const load = () => { setLoading(true); api.get('/meta-model/versions').then((v: any) => { setVersions(Array.isArray(v) ? v : []); setLoading(false) }) }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const create = async () => {
     if (!form.version) return
@@ -1370,7 +1372,7 @@ function EnumDesigner({ api }: { api: any }) {
 // ── Shared Attribute Library ──────────────────────────────────────────────────
 function SharedAttributeLibrary({ api }: { api: any }) {
   const [attrs, setAttrs] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('')
 
@@ -1501,7 +1503,7 @@ export default function MetaModelPage() {
 
   const loadStats = useCallback(() => {
     api.get('/meta-model/stats').then((s: any) => { setStats(s); setLoading(false) })
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadStats() }, [loadStats])
 
