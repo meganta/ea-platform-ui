@@ -2112,6 +2112,28 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             )
           })()}
 
+          {/* Governance Review V2 (spec section 14): why any conditional
+              sections were omitted — previously a hidden section gave no
+              indication of whether it was not applicable to this review
+              type at all, or applicable but lacking evidence. Gated on
+              report.sectionDecisions existing (only V2-eligible reviews
+              set it, phase 24) and only shown for the ones actually
+              hidden. */}
+          {Array.isArray((report as any).sectionDecisions) && (() => {
+            const hidden = (report as any).sectionDecisions.filter((d: any) => !d.show)
+            if (hidden.length === 0) return null
+            const SECTION_LABEL: Record<string, string> = {
+              strategicAlignment: 'Strategic Alignment', futureStateAlignment: 'Future-State Alignment',
+              financialAssessment: 'Financial Assessment', implementationRoadmap: 'Implementation Roadmap',
+              rfpRequirementQuality: 'RFP Requirement Quality',
+            }
+            return (
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, padding: '8px 12px', background: 'var(--navy-mid)', borderRadius: 8 }}>
+                {hidden.map((d: any) => `${SECTION_LABEL[d.key] || d.key}: ${d.reason}`).join(' ')}
+              </div>
+            )
+          })()}
+
           {/* 2. Finding severity snapshot */}
           {(() => {
             const crit = findings.filter(f => f.severity === 'CRITICAL')
