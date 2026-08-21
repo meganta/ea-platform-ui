@@ -15,10 +15,10 @@ function mockFetch(routes: Record<string, any>) {
     for (const pattern of sortedPatterns) {
       if (url.includes(pattern)) {
         const value = typeof routes[pattern] === 'function' ? routes[pattern](options) : routes[pattern];
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(value) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(value), text: () => Promise.resolve(JSON.stringify(value)) });
       }
     }
-    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}), text: () => Promise.resolve('{}') });
   }) as any;
 }
 
