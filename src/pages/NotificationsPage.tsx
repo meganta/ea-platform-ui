@@ -25,7 +25,7 @@ const S = {
   tab: (a: boolean) => ({ padding: '10px 16px', fontSize: 13, fontWeight: a ? 600 : 400, color: a ? 'var(--accent)' : 'var(--text-dim)', borderBottom: a ? '2px solid var(--accent)' : '2px solid transparent', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer', background: 'none' }),
   content: { flex: 1, overflow: 'auto', padding: '24px 28px' },
   card: { background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 10, padding: 20 },
-  btn: (v: 'primary' | 'secondary' | 'danger' = 'secondary') => ({ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: v === 'primary' ? 'var(--accent)' : v === 'danger' ? '#e74c3c22' : 'var(--navy-mid)', color: v === 'primary' ? '#0B1929' : v === 'danger' ? '#e74c3c' : 'var(--text)' }),
+  btn: (v: 'primary' | 'secondary' | 'danger' = 'secondary') => ({ padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none', background: v === 'primary' ? 'var(--accent)' : v === 'danger' ? '#e74c3c22' : 'var(--navy-mid)', color: v === 'primary' ? 'var(--navy)' : v === 'danger' ? '#e74c3c' : 'var(--text)' }),
   input: { width: '100%', padding: '8px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none', marginBottom: 10 },
   label: { fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 4, display: 'block' },
   badge: (c: string) => ({ padding: '2px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: c + '22', color: c }),
@@ -115,7 +115,7 @@ function InboxTab({ api, isAR, t }: any) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {items.map((n: any) => (
-            <div key={n.id} onClick={() => !n.isRead && markRead(n.id)} style={{ ...S.card, padding: '12px 16px', display: 'flex', gap: 12, cursor: n.isRead ? 'default' : 'pointer', background: n.isRead ? S.card.background : 'rgba(0,180,216,0.06)' }}>
+            <div key={n.id} onClick={() => !n.isRead && markRead(n.id)} style={{ ...S.card, padding: '12px 16px', display: 'flex', gap: 12, cursor: n.isRead ? 'default' : 'pointer', background: n.isRead ? S.card.background : 'rgba(3,105,161,0.06)' }}>
               <span style={S.badge(SEVERITY_COLOR[n.severity] || '#7f8c8d')}>{isAR ? SEVERITY_LABEL[n.severity]?.ar : SEVERITY_LABEL[n.severity]?.en}</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 13, fontWeight: n.isRead ? 400 : 600 }}>{n.title}</div>

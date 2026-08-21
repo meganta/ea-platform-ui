@@ -1,8 +1,13 @@
 name: EA Platform UI — Deploy
 
+# Auto-deploy-on-push disabled — this team currently deploys the frontend
+# manually via `gcloud run deploy` from Cloud Shell (see repo docs / team
+# runbook). Switched to workflow_dispatch so this stays available to run
+# by hand from the Actions tab without racing the manual deploy on every
+# push to master. Re-enable the `push` trigger if/when the team moves to
+# CI-driven deploys.
 on:
-  push:
-    branches: [master]
+  workflow_dispatch:
 
 jobs:
   deploy:

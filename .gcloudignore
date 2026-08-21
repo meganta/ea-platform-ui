@@ -1,0 +1,12 @@
+# Controls what gets uploaded to Cloud Build for `gcloud run deploy --source .`
+# This is deliberately separate from .gitignore: .gitignore keeps compiled
+# output out of version control, but the Dockerfile's `COPY build/ ...` step
+# needs the freshly-built build/ directory to be part of the Cloud Build
+# upload. Do not add build/ here.
+
+.git
+.gitignore
+.gcloudignore
+node_modules/
+.env*
+coverage/

@@ -59,21 +59,21 @@ export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps)
   if (diagrams.length === 0) return null
 
   return (
-    <div style={{ marginTop: 12, border: '1px solid rgba(0,180,216,0.3)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+    <div style={{ marginTop: 12, border: '1px solid rgba(3,105,161,0.3)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ background: 'var(--navy-mid)', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>📊 Diagrams ({diagrams.length})</span>
           {diagrams.length > 1 && diagrams.map((d, i) => (
             <button key={d.id} onClick={() => setSelected(d)}
-              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: `1px solid ${selected?.id === d.id ? 'var(--accent)' : 'var(--border)'}`, background: selected?.id === d.id ? 'rgba(0,180,216,0.15)' : 'transparent', color: selected?.id === d.id ? 'var(--accent)' : 'var(--text-dim)' }}>
+              style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: `1px solid ${selected?.id === d.id ? 'var(--accent)' : 'var(--border)'}`, background: selected?.id === d.id ? 'rgba(3,105,161,0.15)' : 'transparent', color: selected?.id === d.id ? 'var(--accent)' : 'var(--text-dim)' }}>
               {i + 1}
             </button>
           ))}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => setCollapsed(c => !c)}
-            style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: '1px solid var(--accent)', background: collapsed ? 'transparent' : 'rgba(0,180,216,0.1)', color: 'var(--accent)' }}>
+            style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: '1px solid var(--accent)', background: collapsed ? 'transparent' : 'rgba(3,105,161,0.1)', color: 'var(--accent)' }}>
             {collapsed ? '▼ View' : '▲ Hide'}
           </button>
           {!collapsed && <button onClick={() => setMode(m => m === 'visual' ? 'source' : 'visual')}

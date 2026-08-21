@@ -160,7 +160,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
         {asset.tags?.length > 0 && (
           <div style={{ marginBottom: 16, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {asset.tags.map((tag: string) => (
-              <span key={tag} style={{ padding: '2px 8px', background: 'rgba(0,180,216,0.1)', border: '1px solid rgba(0,180,216,0.2)', borderRadius: 2, fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{tag}</span>
+              <span key={tag} style={{ padding: '2px 8px', background: 'rgba(3,105,161,0.1)', border: '1px solid rgba(3,105,161,0.2)', borderRadius: 2, fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{tag}</span>
             ))}
           </div>
         )}
@@ -187,7 +187,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
                 </div>
               </div>
               <div className="flex gap-2 items-center">
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: a.inKnowledgeBase ? 'rgba(46,204,113,0.15)' : 'rgba(139,170,200,0.1)', color: a.inKnowledgeBase ? 'var(--success)' : 'var(--text-dim)', border: `1px solid ${a.inKnowledgeBase ? 'rgba(46,204,113,0.3)' : 'var(--border)'}` }}>
+                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: a.inKnowledgeBase ? 'rgba(22,163,74,0.15)' : 'rgba(100,116,139,0.1)', color: a.inKnowledgeBase ? 'var(--success)' : 'var(--text-dim)', border: `1px solid ${a.inKnowledgeBase ? 'rgba(22,163,74,0.3)' : 'var(--border)'}` }}>
                   {a.inKnowledgeBase ? '📚 IN KB' : '📚 NOT IN KB'}
                 </span>
                 <button
@@ -208,7 +208,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
                   {a.inKnowledgeBase ? '− Remove from KB' : '+ Add to KB'}
                 </button>
                 <button className="btn btn-secondary btn-sm" onClick={() => downloadAttachment(a.id, a.name)}>⬇</button>
-                <button onClick={() => deleteAttachment(a.id)} style={{ background: 'none', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
+                <button onClick={() => deleteAttachment(a.id)} style={{ background: 'none', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
               </div>
             </div>
           </div>
@@ -417,7 +417,7 @@ export default function RepositoryPage() {
                     <div style={{ fontWeight: 500 }}>{a.name}</div>
                     {a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}
                   </td>
-                  <td><span style={{ fontSize: 11, padding: '2px 8px', background: 'rgba(0,180,216,0.08)', borderRadius: 2, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{a.domain}</span></td>
+                  <td><span style={{ fontSize: 11, padding: '2px 8px', background: 'rgba(3,105,161,0.08)', borderRadius: 2, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{a.domain}</span></td>
                   <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.assetType?.replace(/_/g, ' ')}</td>
                   <td><span className={`badge ${STATUS_COLORS[a.status] || 'badge-draft'}`}>{a.status.replace(/_/g, ' ')}</span></td>
                   <td><span className={`badge ${SOURCE_COLORS[a.source] || 'badge-draft'}`}>{a.source.replace(/_/g, ' ')}</span></td>
@@ -426,7 +426,7 @@ export default function RepositoryPage() {
                   <td onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
                       <button className="btn btn-secondary btn-sm" onClick={() => setEditAsset(a)}>✏</button>
-                      <button onClick={() => deleteAsset(a.id)} style={{ background: 'none', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
+                      <button onClick={() => deleteAsset(a.id)} style={{ background: 'none', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
                     </div>
                   </td>
                 </tr>

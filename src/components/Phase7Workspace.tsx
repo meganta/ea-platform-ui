@@ -6,6 +6,7 @@ const token = () => localStorage.getItem('ea_token')
 const authFetch = (path: string, opts: any = {}) =>
   fetch(`${API_URL}${path}`, {
     ...opts,
+    cache: 'no-store',
     headers: {
       Authorization: `Bearer ${token()}`,
       'Content-Type': 'application/json',
@@ -28,7 +29,7 @@ const REQUIREMENT_STATUSES = [
 const PRIORITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
 
 const STATUS_COLOR: Record<string, string> = {
-  DRAFT: '#8baac8',
+  DRAFT: '#64748B',
   PROPOSED: '#f39c12',
   UNDER_REVIEW: '#3498db',
   APPROVED: '#2ecc71',
@@ -203,8 +204,8 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
   const [actioning, setActioning] = useState(false)
 
   const title = isAR ? (req.titleAr || req.title) : req.title
-  const statusColor = STATUS_COLOR[req.status] || '#8baac8'
-  const priorityColor = PRIORITY_COLOR[req.priority] || '#8baac8'
+  const statusColor = STATUS_COLOR[req.status] || '#64748B'
+  const priorityColor = PRIORITY_COLOR[req.priority] || '#64748B'
   const typeColor = TYPE_COLOR[req.requirementType] || 'var(--accent)'
 
   const handleApprove = async () => {
@@ -254,13 +255,13 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
             {showApprovalActions && req.approvalStatus !== 'APPROVED' && (
               <button disabled={actioning} onClick={handleApprove}
-                style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid rgba(46,204,113,0.4)', background: 'rgba(46,204,113,0.1)', color: '#2ecc71', cursor: 'pointer' }}>
+                style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid rgba(22,163,74,0.4)', background: 'rgba(22,163,74,0.1)', color: '#2ecc71', cursor: 'pointer' }}>
                 ✓ {isAR ? 'اعتماد' : 'Approve'}
               </button>
             )}
             {showApprovalActions && req.approvalStatus !== 'REJECTED' && req.approvalStatus !== 'APPROVED' && (
               <button disabled={actioning} onClick={handleReject}
-                style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid rgba(231,76,60,0.4)', background: 'rgba(231,76,60,0.1)', color: '#e74c3c', cursor: 'pointer' }}>
+                style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid rgba(220,38,38,0.4)', background: 'rgba(220,38,38,0.1)', color: '#e74c3c', cursor: 'pointer' }}>
                 ✗ {isAR ? 'رفض' : 'Reject'}
               </button>
             )}
@@ -344,7 +345,7 @@ function Step71({ admCycleId }: { admCycleId: string }) {
       </div>
 
       {/* Human governance notice */}
-      <div style={{ padding: '10px 14px', marginBottom: 14, background: 'rgba(243,156,18,0.08)', border: '1px solid rgba(243,156,18,0.3)', borderRadius: 'var(--radius)', fontSize: 11, color: '#f39c12', lineHeight: 1.6 }}>
+      <div style={{ padding: '10px 14px', marginBottom: 14, background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.3)', borderRadius: 'var(--radius)', fontSize: 11, color: '#f39c12', lineHeight: 1.6 }}>
         ⚠ {isAR
           ? 'متطلبات الذكاء الاصطناعي لا تُعتمد تلقائياً. يجب على المراجع البشري اعتماد أو رفض كل متطلب قبل أن يصبح جزءاً من مستودع المتطلبات المعتمدة.'
           : 'AI-suggested requirements are never auto-approved. A human reviewer must explicitly approve or reject each requirement before it enters the approved repository.'}
@@ -480,7 +481,7 @@ function Step72({ admCycleId }: { admCycleId: string }) {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <select value={filterApproval} onChange={e => setFilterApproval(e.target.value)}
-          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 'var(--radius)', border: `1px solid ${filterApproval === 'APPROVED' ? 'rgba(46,204,113,0.4)' : 'var(--border)'}`, background: 'var(--navy)', color: filterApproval === 'APPROVED' ? '#2ecc71' : 'var(--text)' }}>
+          style={{ fontSize: 11, padding: '4px 8px', borderRadius: 'var(--radius)', border: `1px solid ${filterApproval === 'APPROVED' ? 'rgba(22,163,74,0.4)' : 'var(--border)'}`, background: 'var(--navy)', color: filterApproval === 'APPROVED' ? '#2ecc71' : 'var(--text)' }}>
           <option value="APPROVED">{isAR ? 'معتمدة فقط' : 'Approved only'}</option>
           <option value="PENDING">{isAR ? 'قيد الانتظار' : 'Pending'}</option>
           <option value="REJECTED">{isAR ? 'مرفوضة' : 'Rejected'}</option>
@@ -497,8 +498,26 @@ function Step72({ admCycleId }: { admCycleId: string }) {
             {f.opts.slice(1).map((o: string) => <option key={o} value={o}>{o.replace(/_/g, ' ')}</option>)}
           </select>
         ))}
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', marginLeft: 'auto' }}>
-          {items.length} {isAR ? 'متطلب' : 'requirements'}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{items.length} {isAR ? 'متطلب' : 'requirements'}</span>
+          <button onClick={async () => {
+            const params = new URLSearchParams({ admCycleId })
+            if (filterApproval !== 'ALL') params.set('approvalStatus', filterApproval)
+            if (filterType !== 'ALL') params.set('requirementType', filterType)
+            if (filterPhase !== 'ALL') params.set('sourcePhase', filterPhase)
+            const res = await fetch(`${API_URL}/requirements/export/csv?${params}`, {
+              cache: 'no-store',
+              headers: { Authorization: `Bearer ${token()}` },
+            })
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url; a.download = `requirements-${admCycleId}.csv`; a.click()
+            URL.revokeObjectURL(url)
+          }}
+            style={{ fontSize: 10, padding: '4px 10px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}>
+            ⬇ {isAR ? 'تصدير CSV' : 'Export CSV'}
+          </button>
         </div>
       </div>
 
@@ -532,93 +551,225 @@ function Step72({ admCycleId }: { admCycleId: string }) {
 
 // ─── Step 7.3 — Impact Analysis ───────────────────────────────────────────────
 
+const IMPACT_COLOR: Record<string, string> = { HIGH: '#e74c3c', MEDIUM: '#f39c12', LOW: '#2ecc71' }
+
 function Step73({ admCycleId }: { admCycleId: string }) {
   const { isAR } = useLang()
   const [requirements, setRequirements] = useState<any[]>([])
   const [selected, setSelected] = useState('')
+  const [selectedReq, setSelectedReq] = useState<any>(null)
   const [changeDesc, setChangeDesc] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
-  const [result, setResult] = useState<string | null>(null)
+  const [result, setResult] = useState<any>(null)
+  const [traceability, setTraceability] = useState<any>(null)
+  const [loadingTrace, setLoadingTrace] = useState(false)
+  const [activeTab, setActiveTab] = useState<'impact' | 'traceability'>('impact')
 
   useEffect(() => {
-    authFetch(`/requirements?admCycleId=${admCycleId}&status=APPROVED&limit=100`)
+    authFetch(`/requirements?admCycleId=${admCycleId}&approvalStatus=APPROVED&limit=100`)
       .then(res => setRequirements(res.data || []))
   }, [admCycleId])
+
+  const selectReq = async (id: string) => {
+    setSelected(id)
+    setResult(null)
+    setTraceability(null)
+    if (!id) { setSelectedReq(null); return }
+    const req = requirements.find(r => r.id === id)
+    setSelectedReq(req)
+    // Load traceability immediately on select
+    setLoadingTrace(true)
+    try {
+      const t = await authFetch(`/requirements/${id}/traceability`)
+      setTraceability(t)
+    } finally { setLoadingTrace(false) }
+  }
 
   const analyze = async () => {
     if (!selected || !changeDesc.trim()) return
     setAnalyzing(true)
     setResult(null)
+    setActiveTab('impact')
     try {
       const res = await authFetch(`/requirements/${selected}/impact-analysis`, {
         method: 'POST',
         body: JSON.stringify({ changeDescription: changeDesc }),
       })
-      setResult(res.analysis || res.message || JSON.stringify(res, null, 2))
+      setResult(res)
     } catch (e: any) {
-      setResult('Error: ' + e.message)
+      setResult({ error: e.message })
     } finally { setAnalyzing(false) }
   }
 
   const inputStyle = { width: '100%', padding: '8px 10px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', color: 'var(--text)', fontSize: 12, boxSizing: 'border-box' as const }
+  const sectionLabel = { fontSize: 10, color: 'var(--accent)', fontFamily: 'var(--font-mono)', letterSpacing: '0.06em', marginBottom: 6, display: 'block' as const }
+  const chip = (text: string, color = 'var(--accent)') => (
+    <span key={text} style={{ fontSize: 10, padding: '2px 8px', borderRadius: 2, background: `${color}18`, color, border: `1px solid ${color}33`, marginRight: 4, marginBottom: 4, display: 'inline-block' }}>{text}</span>
+  )
 
   return (
-    <div>
-      <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
-          {isAR ? '🔍 تحليل أثر تغيير المتطلبات' : '🔍 Requirement Change Impact Analysis'}
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      {/* Left panel — select + input */}
+      <div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)' }}>
+            {isAR ? '🔍 تحليل أثر تغيير المتطلبات' : '🔍 Requirement Change Impact Analysis'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
+            {isAR ? 'اختر متطلباً وصف التغيير ليحلل الذكاء الاصطناعي أثره المعماري' : 'Select a requirement, describe the change, AI analyzes the architectural impact'}
+          </div>
         </div>
-        <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-          {isAR ? 'اختر متطلباً وصف التغيير المقترح ليحلل الذكاء الاصطناعي أثره على البنية المعمارية.' : 'Select a requirement, describe the proposed change, and AI will analyze the impact on the architecture.'}
-        </div>
-      </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 640 }}>
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4, display: 'block' }}>
-            {isAR ? 'المتطلب المعني' : 'Select Requirement'}
-          </label>
-          <select value={selected} onChange={e => setSelected(e.target.value)} style={inputStyle}>
-            <option value="">{isAR ? '-- اختر متطلباً --' : '-- Select a requirement --'}</option>
-            {requirements.map(r => (
-              <option key={r.id} value={r.id}>{r.title} ({r.requirementType})</option>
-            ))}
-          </select>
-          {requirements.length === 0 && (
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
-              {isAR ? 'لا توجد متطلبات معتمدة. اعتمد المتطلبات في 7.1 و7.2 أولاً.' : 'No approved requirements yet. Approve requirements in 7.1 and 7.2 first.'}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4, display: 'block' }}>
+              {isAR ? 'المتطلب' : 'Requirement'}
+            </label>
+            <select value={selected} onChange={e => selectReq(e.target.value)} style={inputStyle}>
+              <option value="">{isAR ? '-- اختر متطلباً --' : '-- Select --'}</option>
+              {requirements.map(r => (
+                <option key={r.id} value={r.id}>{r.title} [{r.requirementType}]</option>
+              ))}
+            </select>
+            {requirements.length === 0 && (
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+                {isAR ? 'لا توجد متطلبات معتمدة.' : 'No approved requirements yet. Approve in 7.1 first.'}
+              </div>
+            )}
+          </div>
+
+          {selectedReq && (
+            <div style={{ padding: '10px 12px', background: 'rgba(3,105,161,0.06)', border: '1px solid rgba(3,105,161,0.2)', borderRadius: 'var(--radius)', fontSize: 11 }}>
+              <div style={{ fontWeight: 600, marginBottom: 4 }}>{selectedReq.title}</div>
+              <div style={{ color: 'var(--text-dim)', lineHeight: 1.5 }}>{selectedReq.description}</div>
+              <div style={{ marginTop: 6 }}>
+                {selectedReq.affectedDomains?.map((d: string) => chip(d))}
+              </div>
             </div>
           )}
-        </div>
 
-        <div>
-          <label style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4, display: 'block' }}>
-            {isAR ? 'وصف التغيير المقترح' : 'Describe the Proposed Change'}
-          </label>
-          <textarea
-            value={changeDesc}
-            onChange={e => setChangeDesc(e.target.value)}
-            placeholder={isAR ? 'مثال: نريد تعديل نطاق هذا المتطلب ليشمل متطلبات الأداء للبنية التحتية السحابية...' : 'e.g. We want to expand this requirement to include cloud infrastructure performance thresholds...'}
-            style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }}
-          />
-        </div>
+          <div>
+            <label style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4, display: 'block' }}>
+              {isAR ? 'وصف التغيير المقترح' : 'Proposed Change Description'}
+            </label>
+            <textarea
+              value={changeDesc}
+              onChange={e => setChangeDesc(e.target.value)}
+              placeholder={isAR ? 'صف التغيير المقترح على هذا المتطلب...' : 'Describe the proposed change to this requirement...'}
+              style={{ ...inputStyle, minHeight: 90, resize: 'vertical' }}
+            />
+          </div>
 
-        <button
-          onClick={analyze}
-          disabled={!selected || !changeDesc.trim() || analyzing}
-          style={{ padding: '9px 20px', background: analyzing ? 'var(--navy-mid)' : 'var(--accent)', border: 'none', borderRadius: 'var(--radius)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600, alignSelf: 'flex-start' }}>
-          {analyzing ? `⟳ ${isAR ? 'جارٍ التحليل...' : 'Analyzing...'}` : `🔍 ${isAR ? 'تحليل الأثر' : 'Analyze Impact'}`}
-        </button>
+          <button onClick={analyze} disabled={!selected || !changeDesc.trim() || analyzing}
+            style={{ padding: '9px 20px', background: analyzing ? 'var(--navy-mid)' : 'var(--accent)', border: 'none', borderRadius: 'var(--radius)', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+            {analyzing ? `⟳ ${isAR ? 'جارٍ التحليل...' : 'Analyzing...'}` : `🔍 ${isAR ? 'تحليل الأثر' : 'Analyze Impact'}`}
+          </button>
+        </div>
       </div>
 
-      {result && (
-        <div style={{ marginTop: 20, padding: 16, background: 'rgba(0,180,216,0.06)', border: '1px solid rgba(0,180,216,0.25)', borderRadius: 'var(--radius)', fontSize: 12, lineHeight: 1.8, whiteSpace: 'pre-wrap', color: 'var(--text)' }}>
-          <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 10 }}>
-            {isAR ? '📊 نتيجة تحليل الأثر' : '📊 Impact Analysis Result'}
+      {/* Right panel — results */}
+      <div>
+        {!selected ? (
+          <div style={{ padding: 32, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--text-dim)', marginTop: 36 }}>
+            {isAR ? 'اختر متطلباً لعرض بيانات التتبع وتحليل الأثر' : 'Select a requirement to view traceability and analyze impact'}
           </div>
-          {result}
-        </div>
-      )}
+        ) : (
+          <div>
+            {/* Tabs */}
+            <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              {(['impact', 'traceability'] as const).map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)}
+                  style={{ padding: '5px 14px', fontSize: 11, borderRadius: 'var(--radius)', border: `1px solid ${activeTab === tab ? 'var(--accent)' : 'var(--border)'}`, background: activeTab === tab ? 'rgba(3,105,161,0.12)' : 'none', color: activeTab === tab ? 'var(--accent)' : 'var(--text-dim)', cursor: 'pointer' }}>
+                  {tab === 'impact' ? (isAR ? 'تحليل الأثر' : 'Impact Analysis') : (isAR ? 'التتبع' : 'Traceability')}
+                </button>
+              ))}
+            </div>
+
+            {/* Traceability tab */}
+            {activeTab === 'traceability' && (
+              <div>
+                {loadingTrace ? (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Loading traceability...</div>
+                ) : traceability ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {[
+                      { label: isAR ? 'المرحلة المصدر' : 'Source Phase', value: traceability.traceability.sourcePhase ? `Phase ${traceability.traceability.sourcePhase}` : '—' },
+                      { label: isAR ? 'مخرج المصدر' : 'Source Output', value: traceability.traceability.sourceOutput?.replace(/_/g, ' ') || '—' },
+                      { label: isAR ? 'المجالات المتأثرة' : 'Affected Domains', value: traceability.traceability.affectedDomains?.join(', ') || '—' },
+                      { label: isAR ? 'مرجع الامتثال' : 'Compliance Ref', value: traceability.traceability.complianceReference || '—' },
+                    ].map(row => (
+                      <div key={row.label} style={{ display: 'flex', gap: 12, fontSize: 11 }}>
+                        <span style={{ color: 'var(--text-dim)', minWidth: 130 }}>{row.label}</span>
+                        <span style={{ color: 'var(--text)' }}>{row.value}</span>
+                      </div>
+                    ))}
+                    {traceability.relatedRequirements?.length > 0 && (
+                      <div>
+                        <span style={sectionLabel}>{isAR ? 'متطلبات ذات صلة' : 'RELATED REQUIREMENTS'}</span>
+                        {traceability.relatedRequirements.map((r: any) => (
+                          <div key={r.id} style={{ fontSize: 11, padding: '4px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>{r.title}</span>
+                            <span style={{ color: STATUS_COLOR[r.status] || 'var(--text-dim)', fontSize: 10 }}>{r.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            )}
+
+            {/* Impact tab */}
+            {activeTab === 'impact' && (
+              <div>
+                {!result && !analyzing && (
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', padding: '12px 0' }}>
+                    {isAR ? 'أدخل وصف التغيير واضغط "تحليل الأثر"' : 'Enter a change description and click Analyze Impact'}
+                  </div>
+                )}
+                {analyzing && (
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>⟳ {isAR ? 'يحلل الذكاء الاصطناعي الأثر...' : 'AI is analyzing the impact...'}</div>
+                )}
+                {result?.error && (
+                  <div style={{ fontSize: 12, color: '#e74c3c', padding: 12, background: 'rgba(220,38,38,0.08)', borderRadius: 'var(--radius)' }}>Error: {result.error}</div>
+                )}
+                {result?.analysis && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {/* Impact level */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isAR ? 'مستوى الأثر' : 'Impact Level'}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: IMPACT_COLOR[result.analysis.impactLevel] || 'var(--accent)' }}>
+                        {result.analysis.impactLevel}
+                      </span>
+                    </div>
+                    {/* Summary */}
+                    <div style={{ fontSize: 12, lineHeight: 1.7, color: 'var(--text)', padding: '10px 12px', background: 'rgba(3,105,161,0.05)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
+                      {result.analysis.summary}
+                    </div>
+                    {/* Sections */}
+                    {[
+                      { key: 'affectedArchitectureDomains', label: isAR ? 'المجالات المتأثرة' : 'AFFECTED DOMAINS', color: '#3498db' },
+                      { key: 'risks', label: isAR ? 'المخاطر المعمارية' : 'ARCHITECTURAL RISKS', color: '#e74c3c' },
+                      { key: 'recommendations', label: isAR ? 'التوصيات' : 'RECOMMENDATIONS', color: '#2ecc71' },
+                      { key: 'flaggedUpdates', label: isAR ? 'التحديثات المطلوبة' : 'FLAGGED UPDATES', color: '#f39c12' },
+                      { key: 'affectedRequirements', label: isAR ? 'متطلبات متأثرة' : 'AFFECTED REQUIREMENTS', color: '#9b59b6' },
+                    ].map(s => result.analysis[s.key]?.length > 0 && (
+                      <div key={s.key}>
+                        <span style={{ ...sectionLabel, color: s.color }}>{s.label}</span>
+                        {result.analysis[s.key].map((item: string) => (
+                          <div key={item} style={{ fontSize: 11, padding: '3px 0 3px 10px', borderLeft: `2px solid ${s.color}33`, marginBottom: 3, color: 'var(--text)' }}>
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -665,7 +816,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 700 }}>
                 {t('adm.phase')} 7 — {isAR ? 'إدارة المتطلبات' : 'Requirements Management'}
               </div>
-              <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 2, background: 'rgba(0,180,216,0.15)', color: 'var(--accent)', border: '1px solid rgba(0,180,216,0.3)', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 2, background: 'rgba(3,105,161,0.15)', color: 'var(--accent)', border: '1px solid rgba(3,105,161,0.3)', fontFamily: 'var(--font-mono)' }}>
                 CONTINUOUS
               </span>
             </div>
@@ -686,7 +837,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
               const meta = STEP_META[key]
               return (
                 <button key={key} onClick={() => setActiveStep(key)}
-                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 10px', marginBottom: 6, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === key ? 'rgba(0,180,216,0.12)' : 'transparent', cursor: 'pointer' }}>
+                  style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 10px', marginBottom: 6, borderRadius: 'var(--radius)', border: `1px solid ${activeStep === key ? 'var(--accent)' : 'var(--border)'}`, background: activeStep === key ? 'rgba(3,105,161,0.12)' : 'transparent', cursor: 'pointer' }}>
                   <div style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--accent)', marginBottom: 3 }}>{key}</div>
                   <div style={{ fontSize: 11, color: 'var(--text)', lineHeight: 1.35 }}>
                     {isAR ? meta.labelAr : meta.label}
@@ -695,7 +846,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
               )
             })}
 
-            <div style={{ marginTop: 16, padding: '10px 10px', background: 'rgba(0,180,216,0.05)', border: '1px solid rgba(0,180,216,0.15)', borderRadius: 'var(--radius)' }}>
+            <div style={{ marginTop: 16, padding: '10px 10px', background: 'rgba(3,105,161,0.05)', border: '1px solid rgba(3,105,161,0.15)', borderRadius: 'var(--radius)' }}>
               <div style={{ fontSize: 9, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>NORA 2.0</div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
                 {isAR ? 'إدارة المتطلبات كطبقة حوكمة مستمرة لدورة تطوير البنية المؤسسية' : 'Requirements managed as a continuous governance layer per NORA ADM methodology'}
@@ -706,7 +857,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
           {/* Main content */}
           <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
             {/* Step header */}
-            <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(0,180,216,0.06)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
+            <div style={{ marginBottom: 20, padding: '12px 16px', background: 'rgba(3,105,161,0.06)', borderRadius: 'var(--radius)', borderLeft: '3px solid var(--accent)' }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{isAR ? STEP_META[activeStep].labelAr : STEP_META[activeStep].label}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{isAR ? STEP_META[activeStep].descAr : STEP_META[activeStep].desc}</div>
             </div>

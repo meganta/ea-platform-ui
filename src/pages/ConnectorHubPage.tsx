@@ -28,7 +28,7 @@ const S = {
   btn: (v: 'primary' | 'secondary' | 'danger' | 'success' = 'secondary') => ({
     padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: 'none',
     background: v === 'primary' ? 'var(--accent)' : v === 'danger' ? '#e74c3c22' : v === 'success' ? '#2ecc7122' : 'var(--navy-mid)',
-    color: v === 'primary' ? '#0B1929' : v === 'danger' ? '#e74c3c' : v === 'success' ? '#2ecc71' : 'var(--text)',
+    color: v === 'primary' ? 'var(--navy)' : v === 'danger' ? '#e74c3c' : v === 'success' ? '#2ecc71' : 'var(--text)',
   }),
   input: { width: '100%', padding: '8px 12px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', fontSize: 13, outline: 'none' },
   label: { fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, marginBottom: 4, display: 'block' },
@@ -67,7 +67,7 @@ const DIRECTION_LABEL: Record<string, string> = { IMPORT: '⬇ Import', EXPORT: 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function ConnectorDashboard({ api, stats, onTab, onOpen }: { api: any, stats: any, onTab: (t: string) => void, onOpen: (c: any) => void }) {
   const [connectors, setConnectors] = useState<any[]>([])
-  useEffect(() => { api.get('/connectors').then((d: any) => setConnectors(Array.isArray(d) ? d : [])) }, [])
+  useEffect(() => { api.get('/connectors').then((d: any) => setConnectors(Array.isArray(d) ? d : [])) }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
@@ -223,7 +223,6 @@ function NewConnector({ api, onCreated, onCancel }: { api: any, onCreated: (c: a
 
 // ── Connector Detail ──────────────────────────────────────────────────────────
 function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, connector: any, onBack: () => void, onRefresh: () => void }) {
-  const [detail, setDetail] = useState<any>(connector)
   const [tab, setTab] = useState<'overview' | 'credentials' | 'mappings' | 'staging' | 'jobs'>('overview')
   const [creds, setCreds] = useState<any>({})
   const [saving, setSaving] = useState(false)
@@ -235,7 +234,7 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
   const ct = CONNECTOR_TYPES.find(t => t.code === connector.connectorType)
 
   const loadJobs = () => api.get(`/connectors/${connector.id}/jobs`).then((d: any) => setJobs(Array.isArray(d) ? d : []))
-  useEffect(() => { if (tab === 'jobs') loadJobs() }, [tab])
+  useEffect(() => { if (tab === 'jobs') loadJobs() }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveCreds = async () => {
     setSaving(true)
@@ -389,16 +388,16 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
             </div>
           ) : (
             <div style={{ ...S.card, display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(0,180,216,0.06)', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(3,105,161,0.06)', borderRadius: 8 }}>
                 🔒 Credentials are encrypted with AES-256-GCM before storage. They are never stored in plaintext.
               </div>
               {isGenericRestType && (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(243,156,18,0.08)', borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(217,119,6,0.08)', borderRadius: 8 }}>
                   ⚠️ This connector type also requires <code>authType</code> and <code>resources</code> (per-object-type endpoint paths and field names) — configure these in the Connector Configuration panel below.
                 </div>
               )}
               {connector.connectorType === 'ENTRA_ID' && (
-                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(243,156,18,0.08)', borderRadius: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '8px 12px', background: 'rgba(217,119,6,0.08)', borderRadius: 8 }}>
                   ⚠️ This connector also requires your Entra ID tenant (directory) ID — configure it in the Connector Configuration panel below. The app registration needs application-level Graph API permissions (User.Read.All, Group.Read.All, Application.Read.All) with admin consent granted.
                 </div>
               )}
@@ -933,6 +932,7 @@ function ArchiMatePanel({ api }: { api: any }) {
       setConnectors(arch)
       if (arch.length === 1) setSelectedId(arch[0].id)
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const createDefaultConnector = async () => {
@@ -1116,11 +1116,11 @@ function ConflictsPanel({ api }: { api: any }) {
                   </div>
                 </div>
                 <div style={S.grid2}>
-                  <div style={{ padding: '10px 12px', background: 'rgba(0,180,216,0.08)', borderRadius: 8, border: '1px solid rgba(0,180,216,0.3)' }}>
+                  <div style={{ padding: '10px 12px', background: 'rgba(3,105,161,0.08)', borderRadius: 8, border: '1px solid rgba(3,105,161,0.3)' }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)', marginBottom: 6 }}>ArchMind Version</div>
                     <div style={{ fontSize: 12 }}>{JSON.stringify(cf.archimindData, null, 2).slice(0, 200)}</div>
                   </div>
-                  <div style={{ padding: '10px 12px', background: 'rgba(243,156,18,0.08)', borderRadius: 8, border: '1px solid rgba(243,156,18,0.3)' }}>
+                  <div style={{ padding: '10px 12px', background: 'rgba(217,119,6,0.08)', borderRadius: 8, border: '1px solid rgba(217,119,6,0.3)' }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: '#f39c12', marginBottom: 6 }}>External Version</div>
                     <div style={{ fontSize: 12 }}>{JSON.stringify(cf.externalData, null, 2).slice(0, 200)}</div>
                   </div>
@@ -1200,7 +1200,7 @@ function PopulationStrategyTab({ api }: { api: any }) {
             <label style={S.label}>Population Mode</label>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6 }}>
               {POPULATION_MODES.map(m => (
-                <label key={m.code} style={{ display: 'flex', gap: 10, padding: 10, borderRadius: 8, background: editing.populationMode === m.code ? 'rgba(0,180,216,0.08)' : 'var(--navy)', border: `1px solid ${editing.populationMode === m.code ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer' }}>
+                <label key={m.code} style={{ display: 'flex', gap: 10, padding: 10, borderRadius: 8, background: editing.populationMode === m.code ? 'rgba(3,105,161,0.08)' : 'var(--navy)', border: `1px solid ${editing.populationMode === m.code ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer' }}>
                   <input type="radio" checked={editing.populationMode === m.code} onChange={() => setEditing((e: any) => ({ ...e, populationMode: m.code }))} style={{ marginTop: 2 }} />
                   <div>
                     <div style={{ fontSize: 13, fontWeight: 600 }}>{m.label}</div>
@@ -1296,7 +1296,7 @@ export default function ConnectorHubPage() {
   const [stats, setStats] = useState<any>(null)
   const [selectedConnector, setSelectedConnector] = useState<any>(null)
 
-  const loadStats = useCallback(() => { api.get('/connectors/stats').then(setStats) }, [])
+  const loadStats = useCallback(() => { api.get('/connectors/stats').then(setStats) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadStats() }, [loadStats])
 
   const TABS = [
@@ -1360,6 +1360,7 @@ function ConnectorsList({ api, onOpen }: { api: any, onOpen: (c: any) => void })
 
   useEffect(() => {
     api.get('/connectors').then((d: any) => { setConnectors(Array.isArray(d) ? d : []); setLoading(false) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

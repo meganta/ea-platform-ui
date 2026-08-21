@@ -16,8 +16,9 @@ function useApi() {
 }
 
 const REVIEW_TYPES = [
-  { value: 'HLD_REVIEW', label: 'High-Level Design (HLD) Review' },
-  { value: 'LLD_REVIEW', label: 'Low-Level Design (LLD) Review' },
+  { value: 'HLD_REVIEW', label: 'High-Level Design Review (HLD)' },
+  { value: 'LLD_REVIEW', label: 'Low-Level Design Review (LLD)' },
+  { value: 'SOLUTION_DESIGN', label: 'Solution Design Review' },
   { value: 'NEW_PROJECT', label: 'New Project Review' },
   { value: 'RFP_SOW', label: 'RFP / Scope of Work Review' },
   { value: 'CHANGE_REQUEST', label: 'Change Request Review' },
@@ -83,15 +84,25 @@ const INTELLIGENCE_ITEMS = [
   { key: 'similar_reviews', label: 'Similar Previous Reviews', icon: '🔍', source: 'auto', enrichUrl: '', enrichLabel: '' },
 ]
 
-const SEV_COLOR: Record<string, string> = { CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71' }
-const DECISION_COLOR: Record<string, string> = { APPROVED: '#2ecc71', APPROVED_WITH_CONDITIONS: '#f39c12', REQUIRES_CHANGES: '#e67e22', REJECTED: '#e74c3c', PENDING: '#8baac8' }
+const SEV_COLOR: Record<string, string> = {
+  CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71',
+}
 
+const DECISION_COLOR: Record<string, string> = {
+  APPROVED: '#2ecc71',
+  APPROVED_WITH_CONDITIONS: '#f39c12',
+  REQUIRES_CHANGES: '#e67e22',
+  REJECTED: '#e74c3c',
+  PENDING: '#64748B',
+}
+
+// ── Score circle ──────────────────────────────────────────
 function ScoreCircle({ score, label, size = 72, help }: { score: number, label: string, size?: number, help?: string }) {
   const color = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ width: size, height: size, borderRadius: '50%', border: '3px solid ' + color, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px' }}>
-        <div style={{ fontSize: size >= 72 ? 22 : 16, fontWeight: 700, color }}>{score}</div>
+      <div style={{ width: 72, height: 72, borderRadius: '50%', border: `3px solid ${color}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px' }}>
+        <div style={{ fontSize: 22, fontWeight: 700, color }}>{score}</div>
         <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}{help && <HelpTip text={help} />}</div>
@@ -115,7 +126,6 @@ const DOMAIN_LABEL: Record<string, string> = {
 }
 
 function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onFindingUpdate, onFindingDelete, onRescore }: { findings: any[], report: any, isAR: boolean, resolveText: (s: string) => string, reviewId?: string, onFindingUpdate?: (id: string, data: any) => void, onFindingDelete?: (id: string) => void, onRescore?: () => void }) {
-  const { t } = useLang()
   const [filterSev, setFilterSev] = React.useState<string[]>([])
   // collapsed state: null = all expanded by default
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({})
@@ -259,6 +269,30 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<any>({})
   const [saving, setSaving] = useState(false)
+  // Governance Review V2 (spec section 15) — evidence for this finding is
+  // fetched lazily, only when the user actually opens the evidence panel,
+  // not on every card render. isV2Finding gates the whole V2 metadata
+  // block: a V1-engine finding never has criterionId set, so this section
+  // simply doesn't render for it rather than showing empty placeholders.
+  const isV2Finding = !!f.criterionId
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [evidence, setEvidence] = useState<any[] | null>(null)
+  const [evidenceLoading, setEvidenceLoading] = useState(false)
+
+  const loadEvidence = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (evidence !== null) { setEvidenceOpen(o => !o); return }
+    if (!reviewId) return
+    setEvidenceLoading(true)
+    try {
+      const token = localStorage.getItem('ea_token') || ''
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+      const res = await fetch(`${apiUrl}/governance/reviews/${reviewId}/evidence?findingId=${f.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json().catch(() => [])
+      setEvidence(Array.isArray(data) ? data : [])
+      setEvidenceOpen(true)
+    } catch { setEvidence([]) } finally { setEvidenceLoading(false) }
+  }
 
   const startEdit = (e: React.MouseEvent) => { e.stopPropagation(); setDraft({ title: f.title, description: f.description, recommendation: f.recommendation, severity: f.severity, businessImpact: f.businessImpact || '', technicalImpact: f.technicalImpact || '' }); setEditing(true); setOpen(true) }
 
@@ -313,9 +347,38 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
           <div style={{ marginBottom: 8 }}><span style={{ color: 'var(--text-muted)' }}>Description: </span>{f.description}</div>
           <div style={{ marginBottom: 8, color: 'var(--accent)' }}><span style={{ color: 'var(--text-muted)' }}>Recommendation: </span>{f.recommendation}</div>
           {f.businessImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Business Impact: </span>{f.businessImpact}</div>}
-          {f.technicalImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Technical Impact: </span>{f.technicalImpact}</div>}
-          {f.relatedPrinciple && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Principle: </span>{f.relatedPrinciple}</div>}
           {f.relatedStandard && <div><span style={{ color: 'var(--text-muted)' }}>Standard: </span>{f.relatedStandard}</div>}
+          {isV2Finding && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--navy-mid)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {f.basisType && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>{f.basisType.replace(/_/g, ' ')}</span>}
+                {f.criterionId && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>Criterion: {f.criterionId}</span>}
+                {typeof f.confidenceScore === 'number' && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>Confidence: {Math.round(f.confidenceScore * 100)}%</span>}
+                {f.validationStatus && f.validationStatus !== 'PENDING' && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: f.validationStatus === 'REJECTED' ? '#e74c3c22' : 'var(--navy-mid)', color: f.validationStatus === 'REJECTED' ? '#e74c3c' : 'var(--text-dim)' }}>{f.validationStatus}</span>}
+              </div>
+              {Array.isArray(f.crossDomainImpacts) && f.crossDomainImpacts.length > 0 && (
+                <div style={{ marginBottom: 8, fontSize: 12 }}><span style={{ color: 'var(--text-dim)' }}>Also affects: </span>{f.crossDomainImpacts.join(', ')}</div>
+              )}
+              <button onClick={loadEvidence} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--accent)44', background: 'none', color: 'var(--accent)', cursor: 'pointer' }}>
+                {evidenceLoading ? 'Loading…' : evidenceOpen ? '▲ Hide evidence' : '📄 View evidence'}
+              </button>
+              {evidenceOpen && evidence && (
+                <div style={{ marginTop: 8 }}>
+                  {evidence.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No evidence records found — the underlying schema may not be synced yet, or this finding predates evidence tracking.</div>}
+                  {evidence.map((ev: any) => (
+                    <div key={ev.id} style={{ padding: '8px 10px', marginBottom: 6, borderRadius: 6, background: 'var(--navy-mid)', fontSize: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{ev.sourceType === 'DOCUMENT' ? '📄 Document' : ev.sourceType === 'TENANT_REPOSITORY' ? '🏛 Tenant Repository' : '📋 Regulatory'}</span>
+                        {ev.sourceType === 'DOCUMENT' && ev.fileName && <span style={{ color: 'var(--text-muted)' }}>{ev.fileName}{ev.pageNumber ? ` (p.${ev.pageNumber})` : ''}</span>}
+                        {ev.sourceType === 'TENANT_REPOSITORY' && ev.tenantObjectName && <span style={{ color: 'var(--text-muted)' }}>{ev.tenantObjectName}</span>}
+                      </div>
+                      <div style={{ color: 'var(--text)' }}>{ev.extractedTextSnippet || ev.tenantObjectSnippet || ev.regulatorySource || '(no snippet available)'}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       {editing && (
@@ -363,6 +426,7 @@ function IntelligenceAdvisor({ reviewType, onReady }: { reviewType: string; onRe
       if (onReady) onReady()
     }
     check()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewType])
 
   if (!checked) return (
@@ -428,6 +492,7 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
       clearInterval(pollRef.current)
       clearInterval(engineTimerRef.current)
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const [pipelineError, setPipelineError] = React.useState<string | null>(null)
@@ -435,7 +500,7 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
 
   const attemptRun = async (attempt: number = 1): Promise<boolean> => {
     try {
-      const res = await api.post('/governance/reviews/' + review.id + '/run')
+      await api.post('/governance/reviews/' + review.id + '/run')
       return true
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Unknown error'
@@ -649,11 +714,10 @@ export default function GovernancePage() {
   const [tab, setTab] = useState<'summary' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
-  const [form, setForm] = useState({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
+  const [form, setForm] = useState({ title: '', description: '', reviewType: 'SOLUTION_DESIGN', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' })
   const [inputs, setInputs] = useState<any[]>([])
-  const [uploading, setUploading] = useState(false)
   const [extractedMeta, setExtractedMeta] = useState<any>(null)
-  const [showMeta, setShowMeta] = useState(false)
+  const [, setShowMeta] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
   const [advisorReady, setAdvisorReady] = useState(false)
   const [uploadStatus, setUploadStatus] = useState('')
@@ -751,7 +815,10 @@ export default function GovernancePage() {
 
   const set = (k: string) => (e: any) => setForm(f => ({ ...f, [k]: e.target.value }))
 
-  useEffect(() => { loadReviews() }, [])
+  useEffect(() => {
+    loadReviews()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Reset to page 1 whenever filters change
   React.useEffect(() => { setPage(1) }, [filterStatus, filterDecision, filterType, filterSearch, filterAgg, filterScoreMin])
@@ -809,6 +876,7 @@ export default function GovernancePage() {
       }).catch(() => {})
       window.history.replaceState({}, '')
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, reviews])
 
   const openReview = async (r: any) => {
@@ -822,6 +890,7 @@ export default function GovernancePage() {
     setView('report')
   }
 
+  // ── Step 1: Create review ─────────────────────────────
   const createAndStart = async () => {
     if (!form.title) { setError('Title is required'); return }
     if (inputs.length === 0) { setError('Please upload at least one document'); return }
@@ -854,7 +923,17 @@ export default function GovernancePage() {
           // 90s timeout per file — large DOCX files via Docling can take a while
           const uploadPromise = api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd)
           const timeoutPromise = new Promise(res => setTimeout(res, 90000))
-          await Promise.race([uploadPromise, timeoutPromise]).catch(() => {})
+          const uploadResult: any = await Promise.race([uploadPromise, timeoutPromise]).catch(() => null)
+          // Governance Review V2 (spec section 15): capture the real
+          // extraction-state classification the upload response now
+          // carries (backend persists it since the extractionState fix),
+          // instead of discarding the response entirely — previously this
+          // result was raced against a timeout and thrown away either way,
+          // so every uploaded file just showed a static "Ready" label
+          // regardless of whether extraction actually succeeded.
+          if (uploadResult && uploadResult.id) {
+            setInputs(prev => prev.map(existing => existing._file === inp._file ? { ...existing, id: uploadResult.id, extractionState: uploadResult.extractionState, extractionStateReason: uploadResult.extractionStateReason } : existing))
+          }
 
           clearInterval(simTimer)
           setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: 100 })
@@ -890,26 +969,15 @@ export default function GovernancePage() {
     finally { setLoading(false) }
   }
 
-
-
   const handleFileSelect = (files: FileList | null) => {
     if (!files) return
     const newInputs = Array.from(files).map(f => ({ label: f.name, _file: f }))
     setInputs(i => [...i, ...newInputs])
   }
 
-  const fetchExtractedMetadata = async (reviewId: string) => {
-    try {
-      const meta = await api.get('/governance/reviews/' + reviewId + '/inputs/metadata')
-      if (meta && Object.keys(meta).length > 0) {
-        setExtractedMeta(meta)
-        setShowMeta(true)
-      }
-    } catch {}
-  }
-
   const removeInput = (idx: number) => setInputs(i => i.filter((_, j) => j !== idx))
 
+  // ── Reviews list ──────────────────────────────────────
   if (view === 'list') return (
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
@@ -997,7 +1065,7 @@ export default function GovernancePage() {
           <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label || r.reviewType} · {r.framework?.replace(/_/g, ' ')} · {r.aggressiveness || 'STANDARD'} · {new Date(r.createdAt).toLocaleDateString()}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
             </div>
             {r.overallScore != null && <ScoreCircle score={Math.round(r.overallScore)} label='Score' />}
             <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[r.decision] + '22', color: DECISION_COLOR[r.decision] }}>{r.decision?.replace(/_/g, ' ')}</div>
@@ -1161,14 +1229,31 @@ export default function GovernancePage() {
 
           {inputs.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              {inputs.map((inp, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, marginBottom: 6 }}>
-                  <span style={{ fontSize: 18 }}>📄</span>
-                  <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{inp.label}</span>
-                  <span style={{ fontSize: 11, color: '#2ecc71' }}>Ready</span>
-                  <button onClick={() => removeInput(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
-                </div>
-              ))}
+              {inputs.map((inp: any, i) => {
+                // Governance Review V2 (spec section 15): reflect the
+                // actual extraction-state classification when available
+                // (set on the input after upload resolves in time — see
+                // handleCreate above), falling back to the generic "Ready"
+                // label when the state genuinely isn't known yet (upload
+                // still in flight, or timed out before resolving) rather
+                // than ever claiming a state that wasn't confirmed.
+                const stateLabel: Record<string, { text: string; color: string }> = {
+                  READY: { text: 'Ready', color: '#2ecc71' },
+                  PARTIAL: { text: 'Partial extraction', color: '#f39c12' },
+                  NEEDS_OCR: { text: 'Needs OCR', color: '#e74c3c' },
+                  FAILED: { text: 'Extraction failed', color: '#e74c3c' },
+                  UNSUPPORTED_STRUCTURE: { text: 'Unsupported format', color: '#e74c3c' },
+                }
+                const state = inp.extractionState ? stateLabel[inp.extractionState] : null
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, marginBottom: 6 }} title={inp.extractionStateReason || undefined}>
+                    <span style={{ fontSize: 18 }}>📄</span>
+                    <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{inp.label}</span>
+                    <span style={{ fontSize: 11, color: state ? state.color : '#2ecc71' }}>{state ? state.text : 'Ready'}</span>
+                    <button onClick={() => removeInput(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+                  </div>
+                )
+              })}
               <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: '1px dashed var(--accent)55', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', marginTop: 4 }}>+ Add more files</button>
             </div>
           )}
@@ -1479,13 +1564,10 @@ export default function GovernancePage() {
 function ReportView({ review, report, findings, tab, setTab }: { review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
   const [riskFilterSev, setRiskFilterSev] = React.useState<string[]>([])
   const [riskFilterCat, setRiskFilterCat] = React.useState<string>('')
-  const [editingFinding, setEditingFinding] = React.useState<string | null>(null)
   const [editingReport, setEditingReport] = React.useState<string | null>(null) // field name
   const [editDraft, setEditDraft] = React.useState<any>({})
   const [saving, setSaving] = React.useState(false)
   const extScores = (report.domainSummaries?._extendedScores) || {}
-  const archQualityScore = extScores.architectureQualityScore || 0
-  const secScore = extScores.securityScore || 0
   const futureScore = extScores.futureStateScore || 0
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
@@ -1493,17 +1575,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   // ── Edit helpers ──────────────────────────────────────────────────────────
   const apiUrl = (process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1')
   const token = () => localStorage.getItem('ea_token') || ''
-
-  const saveFinding = async (findingId: string, data: any) => {
-    setSaving(true)
-    try {
-      await fetch(`${apiUrl}/governance/reviews/${review.id}/findings/${findingId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
-        body: JSON.stringify(data),
-      })
-    } finally { setSaving(false); setEditingFinding(null); setEditDraft({}) }
-  }
 
   const saveReportField = async (fieldPath: string, value: any) => {
     setSaving(true)
@@ -1517,7 +1588,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     } finally { setSaving(false); setEditingReport(null); setEditDraft({}) }
   }
 
-  const startEditFinding = (f: any) => { setEditingFinding(f.id); setEditDraft({ ...f }) }
   const startEditReport = (field: string, value: any) => { setEditingReport(field); setEditDraft({ value }) }
 
   // Edit toolbar component (inline)
@@ -1610,9 +1680,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   }
 
   // Local report state for optimistic updates
-  const [localReport, setLocalReport] = React.useState(report)
-  React.useEffect(() => { setLocalReport(report) }, [report])
-  const updateLocalReport = (field: string, value: any) => setLocalReport((prev: any) => ({ ...prev, [field]: value }))
 
   // Compliance local state
   const [localCompliance, setLocalCompliance] = React.useState<any[]>(
@@ -1882,13 +1949,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       })()}
 
       {/* Decision Box */}
-      <div style={{ background: (DECISION_COLOR[report.decision] || '#8baac8') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#8baac8'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#8baac8', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
+      <div style={{ background: (DECISION_COLOR[report.decision] || '#64748B') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#64748B'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#64748B', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
         <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{isAR ? resolveText(report.decisionRationale) : report.decisionRationale}</div>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, marginBottom: 20, borderBottom: '1px solid var(--navy-light)', overflowX: 'auto' }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--navy-light)' }}>
         {tabs.map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)} style={{ padding: '8px 14px', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: tab === t.key ? '2px solid var(--accent)' : '2px solid transparent', color: tab === t.key ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.key ? 600 : 400, whiteSpace: 'nowrap' }}>{t.label}</button>
         ))}
@@ -1915,6 +1982,25 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Summary Tab */}
       {tab === 'summary' && (
         <div>
+          {/* Governance Review V2 (spec section 15): evidence coverage and
+              extraction quality, shown only when this review actually ran
+              through the V2 pipeline (rubricId is only ever set by
+              runV2DomainAssessment) - a V1-pipeline review simply doesn't
+              show this row rather than displaying misleading zeros. */}
+          {review.rubricId && (
+            <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12, color: 'var(--text-dim)' }}>
+              <span>Rubric: {review.rubricId} v{review.rubricVersion || 1}</span>
+              {typeof review.evidenceCoverage === 'number' && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  Evidence coverage:
+                  <span style={{
+                    fontWeight: 600,
+                    color: review.evidenceCoverage >= 0.8 ? 'var(--success)' : review.evidenceCoverage >= 0.5 ? 'var(--warning)' : 'var(--danger)',
+                  }}>{Math.round(review.evidenceCoverage * 100)}%</span>
+                </span>
+              )}
+            </div>
+          )}
           {/* 1. Executive Summary FIRST */}
           <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -2139,6 +2225,43 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             ))}
           </div>
 
+          {/* Governance Review V2 (spec section 15): "applicable versus
+              not-assessed sections". A domain simply has no entry in
+              domainSummaries when the rubric excluded it (no criteria
+              applicable to this document's facts) - previously invisible;
+              this makes the exclusion explicit rather than silent, only
+              for reviews that actually ran the V2 pipeline.
+
+              RUBRIC_DOMAIN_SET reflects each review type's actual rubric
+              domain list (ea-platform's governance-rubrics.ts) - NOT
+              always all 6. NEW_PROJECT/BUSINESS_DEMAND/CAB_REVIEW/
+              DIGITAL_INITIATIVE structurally never cover certain domains
+              at all (a rubric-design decision, not a per-document
+              exclusion) - conflating "never part of this review type's
+              rubric" with "excluded for this specific document" would be
+              actively misleading, so this list is checked before showing
+              anything, not assumed to always be the full six. */}
+          {review.rubricId && (() => {
+            const allSix = ['BUSINESS_ARCHITECTURE', 'BENEFICIARY_EXPERIENCE', 'APPLICATION_INTEGRATION', 'DATA_ARCHITECTURE', 'INFRASTRUCTURE', 'SECURITY_ARCHITECTURE']
+            const RUBRIC_DOMAIN_SET: Record<string, string[]> = {
+              SOLUTION_DESIGN: allSix, RFP_SOW: allSix, HLD_REVIEW: allSix, LLD_REVIEW: allSix,
+              CHANGE_REQUEST: allSix, TECHNICAL_PROPOSAL: allSix,
+              NEW_PROJECT: ['BUSINESS_ARCHITECTURE', 'DATA_ARCHITECTURE'],
+              BUSINESS_DEMAND: ['BUSINESS_ARCHITECTURE'],
+              CAB_REVIEW: ['BUSINESS_ARCHITECTURE'],
+              DIGITAL_INITIATIVE: ['BUSINESS_ARCHITECTURE', 'APPLICATION_INTEGRATION'],
+            }
+            const rubricDomains = RUBRIC_DOMAIN_SET[review.reviewType] || allSix
+            const assessedDomains = Object.keys(report.domainSummaries || {}).filter(k => !k.startsWith('_') && typeof (report.domainSummaries as any)[k] === 'object' && (report.domainSummaries as any)[k] !== null && 'score' in (report.domainSummaries as any)[k])
+            const excludedDomains = rubricDomains.filter(d => !assessedDomains.includes(d))
+            if (excludedDomains.length === 0) return null
+            return (
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, padding: '8px 12px', background: 'var(--navy-mid)', borderRadius: 8 }}>
+                {assessedDomains.length} of {rubricDomains.length} applicable domain(s) assessed. Excluded for this document: {excludedDomains.map(d => DOMAIN_LABEL[d] || d).join(', ')}.
+              </div>
+            )
+          })()}
+
           {Object.entries(report.domainSummaries || {}).filter(([k, v]) => !k.startsWith('_') && typeof v === 'object' && v !== null && 'score' in v).map(([domain, ds]: [string, any]) => {
             const domainFindings = findings.filter(f => f.domain === domain)
             const crit = domainFindings.filter(f => f.severity === 'CRITICAL').length
@@ -2155,6 +2278,12 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{domain.replace(/_/g, ' ')}</div>
                     {ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 2 }}>✗ {isAR ? resolveText(ds.keyWeaknesses) : ds.keyWeaknesses}</div>}
                     {ds.keyStrengths && !ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#2ecc71', marginTop: 2 }}>✓ {isAR ? resolveText(ds.keyStrengths) : ds.keyStrengths}</div>}
+                    {/* Fallback to ds.summary when neither keyStrengths nor
+                        keyWeaknesses is set — both V1 and V2 always compute
+                        summary, but this UI previously only ever rendered
+                        the other two, silently dropping it for any domain
+                        (V1 or V2) that didn't happen to populate them. */}
+                    {!ds.keyWeaknesses && !ds.keyStrengths && ds.summary && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{isAR ? resolveText(ds.summary) : ds.summary}</div>}
                   </div>
                   <ScoreCircle score={score} label='' size={52} />
                 </div>
@@ -2244,7 +2373,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
         const STATUS_COLOR: Record<string, string> = {
           FULLY_ALIGNED: '#2ecc71', PARTIALLY_ALIGNED: '#f39c12',
-          WEAKLY_ALIGNED: '#e67e22', NOT_ALIGNED: '#e74c3c', NOT_APPLICABLE: '#8baac8'
+          WEAKLY_ALIGNED: '#e67e22', NOT_ALIGNED: '#e74c3c', NOT_APPLICABLE: '#64748B'
         }
         const STATUS_ICON: Record<string, string> = {
           FULLY_ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', WEAKLY_ALIGNED: '🔶', NOT_ALIGNED: '❌', NOT_APPLICABLE: '—'
@@ -2304,15 +2433,15 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               return (
                 <div key={stratType} style={{ marginBottom: 20 }}>
                   {/* Strategy header */}
-                  <div style={{ background: (meta?.color || '#8baac8') + '18', border: '1px solid ' + (meta?.color || '#8baac8') + '44', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
+                  <div style={{ background: (meta?.color || '#64748B') + '18', border: '1px solid ' + (meta?.color || '#64748B') + '44', borderRadius: 10, padding: '10px 14px', marginBottom: 10 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: meta?.color || '#8baac8' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: meta?.color || '#64748B' }}>
                           {meta?.label || stratType.replace(/_/g,' ')}
                           {meta?.weight > 0 && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>[{meta.weight}% weight]</span>}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                          {objs.length} goals · {fullyAligned > 0 && <span style={{color:'#2ecc71'}}>{fullyAligned} aligned</span>}{fullyAligned > 0 && ' · '}{partialAligned > 0 && <span style={{color:'#f39c12'}}>{partialAligned} partial</span>}{partialAligned > 0 && ' · '}{notAligned > 0 && <span style={{color:'#e74c3c'}}>{notAligned} not aligned</span>}{notApplicable > 0 && ' · '}{notApplicable > 0 && <span style={{color:'#8baac8'}}>{notApplicable} N/A</span>}
+                          {objs.length} goals · {fullyAligned > 0 && <span style={{color:'#2ecc71'}}>{fullyAligned} aligned</span>}{fullyAligned > 0 && ' · '}{partialAligned > 0 && <span style={{color:'#f39c12'}}>{partialAligned} partial</span>}{partialAligned > 0 && ' · '}{notAligned > 0 && <span style={{color:'#e74c3c'}}>{notAligned} not aligned</span>}{notApplicable > 0 && ' · '}{notApplicable > 0 && <span style={{color:'#64748B'}}>{notApplicable} N/A</span>}
                         </div>
                       </div>
                       <div style={{ textAlign: 'center', minWidth: 52 }}>
@@ -2328,20 +2457,20 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
                   {/* Objective cards */}
                   {[...objs].sort((a:any,b:any) => (STATUS_ORDER[a.alignmentStatus]??5)-(STATUS_ORDER[b.alignmentStatus]??5)).map((obj: any, i: number) => {
-                    const statusColor = STATUS_COLOR[obj.alignmentStatus] || '#8baac8'
+                    const statusColor = STATUS_COLOR[obj.alignmentStatus] || '#64748B'
                     const pct = obj.alignmentPercentage || 0
                     return (
                       <div key={i} style={{ background: obj.alignmentStatus === 'NOT_APPLICABLE' ? 'var(--navy-dark)' : 'var(--navy-mid)', border: '1px solid ' + statusColor + (obj.alignmentStatus === 'NOT_APPLICABLE' ? '22' : '33'), borderRadius: 10, padding: 14, marginBottom: 8 }}>
                         {obj.alignmentStatus === 'NOT_APPLICABLE' ? (
                           // NOT_APPLICABLE — professional no-impact statement, no score bar
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                            <span style={{ fontSize: 14, marginTop: 2, color: '#8baac8' }}>○</span>
+                            <span style={{ fontSize: 14, marginTop: 2, color: '#64748B' }}>○</span>
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', flex: 1 }}>{isAR ? resolveText(obj.objectiveName) : obj.objectiveName}</div>
-                                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8', fontWeight: 600, whiteSpace: 'nowrap' }}>No Direct Impact</span>
+                                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#64748B22', color: '#64748B', fontWeight: 600, whiteSpace: 'nowrap' }}>No Direct Impact</span>
                               </div>
-                              <div style={{ fontSize: 12, color: '#8baac8', lineHeight: 1.6, fontStyle: 'italic' }}>
+                              <div style={{ fontSize: 12, color: '#64748B', lineHeight: 1.6, fontStyle: 'italic' }}>
                                 {obj.contributionDescription && obj.contributionDescription !== 'N/A' && obj.contributionDescription !== 'n/a'
                                   ? (isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription)
                                   : `This solution operates in a different functional domain and does not directly address "${obj.objectiveName}". The solution's scope, objectives, and technical design have no direct bearing on this strategic pillar. This does not constitute a gap — it reflects the solution's intended purpose and boundary.`
@@ -2349,7 +2478,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                               </div>
                               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6 }}>
                                 <select value={obj.alignmentStatus} onChange={async e => { await updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: e.target.value === 'NOT_APPLICABLE' ? 0 : obj.alignmentPercentage }) }}
-                                  style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #8baac844', background: '#8baac818', color: '#8baac8', cursor: 'pointer' }}>
+                                  style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #64748B44', background: '#64748B18', color: '#64748B', cursor: 'pointer' }}>
                                   {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
                                 </select>
                                 <button onClick={async () => { await removeObjective(localObjectives.indexOf(obj)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
@@ -2390,7 +2519,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                                 <select value={obj.alignmentStatus} onChange={async e => {
                                   const newPct = e.target.value === 'FULLY_ALIGNED' ? 100 : e.target.value === 'PARTIALLY_ALIGNED' ? 65 : e.target.value === 'WEAKLY_ALIGNED' ? 35 : 0
                                   await updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: newPct })
-                                }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (STATUS_COLOR[obj.alignmentStatus]||'#8baac8') + '44', background: (STATUS_COLOR[obj.alignmentStatus]||'#8baac8') + '18', color: STATUS_COLOR[obj.alignmentStatus]||'#8baac8', cursor: 'pointer' }}>
+                                }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (STATUS_COLOR[obj.alignmentStatus]||'#64748B') + '44', background: (STATUS_COLOR[obj.alignmentStatus]||'#64748B') + '18', color: STATUS_COLOR[obj.alignmentStatus]||'#64748B', cursor: 'pointer' }}>
                                   {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
                                 </select>
                                 <input type='number' min={0} max={100} value={obj.alignmentPercentage || 0}
@@ -2423,7 +2552,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 {/* Objectives */}
                 <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {nationalObjectives.map((o:any, i:number) => {
-                    const natColor = o.alignmentStatus === 'FULLY_ALIGNED' ? '#2ecc71' : o.alignmentStatus === 'PARTIALLY_ALIGNED' ? '#f39c12' : o.alignmentStatus === 'WEAKLY_ALIGNED' ? '#e67e22' : '#8baac8'
+                    const natColor = o.alignmentStatus === 'FULLY_ALIGNED' ? '#2ecc71' : o.alignmentStatus === 'PARTIALLY_ALIGNED' ? '#f39c12' : o.alignmentStatus === 'WEAKLY_ALIGNED' ? '#e67e22' : '#64748B'
                     const natIcon = o.alignmentStatus === 'FULLY_ALIGNED' ? '✅' : o.alignmentStatus === 'PARTIALLY_ALIGNED' ? '⚠️' : o.alignmentStatus === 'WEAKLY_ALIGNED' ? '🔶' : '○'
                     // Generate professional context statement when contribution is missing or for NOT_APPLICABLE
                     const contextStatement = o.contributionDescription && o.contributionDescription !== 'N/A' && o.contributionDescription.length > 10
@@ -2443,7 +2572,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                               <div style={{ fontSize: 12, fontWeight: 700, color: natColor }}>{o.alignmentPercentage || 0}%</div>
                             )}
                             {o.alignmentStatus === 'NOT_APPLICABLE' && (
-                              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#8baac822', color: '#8baac8', fontWeight: 600 }}>No Direct Impact</span>
+                              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#64748B22', color: '#64748B', fontWeight: 600 }}>No Direct Impact</span>
                             )}
                           </div>
                           <div style={{ fontSize: 11, color: '#f39c12', marginBottom: 6 }}>
@@ -2480,7 +2609,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {tab === 'compliance' && (() => {
         const items = report.complianceMatrix?.items || []
         const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE']
-        const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#8baac8', RECOMMENDED:'#3498db' }
+        const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#64748B', RECOMMENDED:'#3498db' }
         const statusLabel: Record<string,string> = { COMPLIANT:'✓ Compliant', PARTIALLY_COMPLIANT:'⚠ Partial', NON_COMPLIANT:'✗ Non-Compliant', REQUIRES_EXCEPTION:'⚡ Exception', NOT_APPLICABLE:'— N/A', RECOMMENDED:'💡 Recommended' }
         const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', NCA_STANDARD:'#1abc9c', NDMO_STANDARD:'#9b59b6', SDAIA_STANDARD:'#3498db', DGA_STANDARD:'#f39c12' }
         const catLabel: Record<string,string> = { TENANT_PRINCIPLE:'Tenant EA Principles', TENANT_STANDARD:'Tenant EA Standards', NCA_STANDARD:'NCA ECC Controls', NDMO_STANDARD:'NDMO Data Standards', SDAIA_STANDARD:'SDAIA Standards', DGA_STANDARD:'DGA Standards' }
@@ -2554,7 +2683,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             {cats.filter(c => grouped[c]?.length > 0).map(cat => (
               <div key={cat} style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: catColor[cat] || 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 3, height: 14, background: catColor[cat] || '#8baac8', borderRadius: 2 }} />
+                  <div style={{ width: 3, height: 14, background: catColor[cat] || '#64748B', borderRadius: 2 }} />
                   {catLabel[cat] || cat.replace(/_/g,' ')}
                   <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({grouped[cat].length})</span>
                   {(() => {
@@ -2572,7 +2701,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     : item.complianceStatus === 'NON_COMPLIANT' ? 0
                     : item.complianceStatus === 'REQUIRES_EXCEPTION' ? 25
                     : null // NOT_APPLICABLE and RECOMMENDED — excluded from scoring
-                  const scoreColor = itemScore === null ? '#8baac8' : itemScore >= 75 ? '#2ecc71' : itemScore >= 40 ? '#f39c12' : '#e74c3c'
+                  const scoreColor = itemScore === null ? '#64748B' : itemScore >= 75 ? '#2ecc71' : itemScore >= 40 ? '#f39c12' : '#e74c3c'
                   const borderColor = item.complianceStatus === 'NON_COMPLIANT' ? '#e74c3c33'
                     : item.complianceStatus === 'COMPLIANT' ? '#2ecc7133'
                     : item.complianceStatus === 'PARTIALLY_COMPLIANT' ? '#f39c1233'
@@ -2583,8 +2712,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         {/* Status badge */}
                         <div style={{ minWidth: 100, padding: '2px 8px', borderRadius: 10, fontSize: 10, fontWeight: 600, textAlign: 'center', marginTop: 1, flexShrink: 0,
-                          background: (statusColor[item.complianceStatus] || '#8baac8') + '22',
-                          color: statusColor[item.complianceStatus] || '#8baac8'
+                          background: (statusColor[item.complianceStatus] || '#64748B') + '22',
+                          color: statusColor[item.complianceStatus] || '#64748B'
                         }}>{statusLabel[item.complianceStatus] || item.complianceStatus}</div>
                         {/* Content */}
                         <div style={{ flex: 1 }}>
@@ -2633,7 +2762,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                               <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
                             </>
                           ) : (
-                            <div style={{ fontSize: 10, color: '#8baac8' }}>N/A</div>
+                            <div style={{ fontSize: 10, color: '#64748B' }}>N/A</div>
                           )}
                         </div>
                       </div>
@@ -2642,7 +2771,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                         <select
                           value={item.complianceStatus}
                           onChange={async e => { await updateComplianceItem(localCompliance.indexOf(item), { complianceStatus: e.target.value }) }}
-                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (statusColor[item.complianceStatus] || '#8baac8') + '44', background: (statusColor[item.complianceStatus] || '#8baac8') + '18', color: statusColor[item.complianceStatus] || '#8baac8', cursor: 'pointer' }}>
+                          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (statusColor[item.complianceStatus] || '#64748B') + '44', background: (statusColor[item.complianceStatus] || '#64748B') + '18', color: statusColor[item.complianceStatus] || '#64748B', cursor: 'pointer' }}>
                           {['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE'].map(s => (
                             <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
                           ))}
@@ -2680,7 +2809,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           <div>
             {/* Severity summary cards */}
             <div className="stat-grid-5" style={{ marginBottom: 16 }}>
-              {[['Total', allRisks.length, '#8baac8'], ['Critical', sevCount('CRITICAL'), '#e74c3c'], ['High', sevCount('HIGH'), '#e67e22'], ['Medium', sevCount('MEDIUM'), '#f39c12'], ['Low', sevCount('LOW'), '#3498db']].map(([l, v, c]: any) => (
+              {[['Total', allRisks.length, '#64748B'], ['Critical', sevCount('CRITICAL'), '#e74c3c'], ['High', sevCount('HIGH'), '#e67e22'], ['Medium', sevCount('MEDIUM'), '#f39c12'], ['Low', sevCount('LOW'), '#3498db']].map(([l, v, c]: any) => (
                 <div key={l} style={{ background: c + '18', border: '1px solid ' + c + '44', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: c }}>{v}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
@@ -2733,7 +2862,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
                 <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
                   <select value={risk.severity} onChange={async e => { await updateRisk(riskIdx, { severity: e.target.value }) }}
-                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (SEV_COLOR[risk.severity] || '#8baac8') + '44', background: (SEV_COLOR[risk.severity] || '#8baac8') + '18', color: SEV_COLOR[risk.severity] || '#8baac8', cursor: 'pointer' }}>
+                    style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (SEV_COLOR[risk.severity] || '#64748B') + '44', background: (SEV_COLOR[risk.severity] || '#64748B') + '18', color: SEV_COLOR[risk.severity] || '#64748B', cursor: 'pointer' }}>
                     {['CRITICAL','HIGH','MEDIUM','LOW'].map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                   <button onClick={async () => { await removeRisk(riskIdx) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
@@ -2759,7 +2888,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const pctColor = pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c'
         const AREA_STATUS_COLOR: Record<string,string> = {
           ALIGNED: '#2ecc71', PARTIALLY_ALIGNED: '#f39c12', GAP_IDENTIFIED: '#e67e22',
-          NOT_ALIGNED: '#e74c3c', FUTURE_REQUIREMENT: '#3498db', NOT_APPLICABLE: '#8baac8'
+          NOT_ALIGNED: '#e74c3c', FUTURE_REQUIREMENT: '#3498db', NOT_APPLICABLE: '#64748B'
         }
         const AREA_ICON: Record<string,string> = {
           ALIGNED: '✅', PARTIALLY_ALIGNED: '⚠️', GAP_IDENTIFIED: '🔶',
@@ -2801,7 +2930,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               .filter(s => areas.some((a:any) => a.status === s))
               .map(status => {
                 const statusAreas = areas.filter((a:any) => a.status === status)
-                const c = AREA_STATUS_COLOR[status] || '#8baac8'
+                const c = AREA_STATUS_COLOR[status] || '#64748B'
                 return (
                   <div key={status} style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: c, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -2922,7 +3051,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     {Object.entries(
                       opps.reduce((acc:any,o:any)=>{ const t=o.type||'OTHER'; acc[t]=(acc[t]||0)+(o.annualSaving||o.estimatedSaving||0); return acc },{})
                     ).sort((a:any,b:any)=>b[1]-a[1]).map(([type,val]:any) => (
-                      <div key={type} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: (TYPE_COLOR[type]||'#8baac8')+'22', color: TYPE_COLOR[type]||'#8baac8' }}>
+                      <div key={type} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: (TYPE_COLOR[type]||'#64748B')+'22', color: TYPE_COLOR[type]||'#64748B' }}>
                         {TYPE_ICON[type]||'•'} {type.replace(/_/g,' ')}: SAR {val.toLocaleString()}
                       </div>
                     ))}
@@ -2935,7 +3064,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
             {/* Opportunity cards — sorted by saving desc */}
             {[...localOpps].sort((a:any,b:any)=>((b.annualSaving||0)+(b.estimatedSaving||0))-((a.annualSaving||0)+(a.estimatedSaving||0))).map((o: any, i: number) => {
-              const oColor = TYPE_COLOR[o.type] || '#8baac8'
+              const oColor = TYPE_COLOR[o.type] || '#64748B'
               const oIcon = TYPE_ICON[o.type] || '💡'
               const oTotal = (o.annualSaving||0) + (o.estimatedSaving||0)
               const isEditing = editingOppIdx === i
@@ -2965,7 +3094,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <div style={{ fontSize: 14, fontWeight: 600 }}>{isAR ? resolveText(o.title||o.type?.replace(/_/g,' ')) : (o.title||o.type?.replace(/_/g,' '))}</div>
                         {o.confidenceLevel && (
-                          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: (CONF_COLOR[o.confidenceLevel]||'#8baac8')+'22', color: CONF_COLOR[o.confidenceLevel]||'#8baac8', fontWeight: 600 }}>
+                          <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: (CONF_COLOR[o.confidenceLevel]||'#64748B')+'22', color: CONF_COLOR[o.confidenceLevel]||'#64748B', fontWeight: 600 }}>
                             {o.confidenceLevel} confidence
                           </span>
                         )}

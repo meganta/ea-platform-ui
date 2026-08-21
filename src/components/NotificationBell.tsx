@@ -127,7 +127,7 @@ export default function NotificationBell() {
             ) : items.map((n: any) => (
               <div key={n.id} onClick={() => openItem(n)} style={{
                 padding: '10px 14px', display: 'flex', gap: 8, cursor: 'pointer',
-                borderBottom: '1px solid var(--border)', background: n.isRead ? 'transparent' : 'rgba(0,180,216,0.06)',
+                borderBottom: '1px solid var(--border)', background: n.isRead ? 'transparent' : 'rgba(3,105,161,0.06)',
               }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: SEVERITY_COLOR[n.severity] || '#7f8c8d', marginTop: 4, flexShrink: 0 }} />
                 <div style={{ flex: 1, minWidth: 0 }}>

@@ -671,17 +671,17 @@ function ApiKeysTab() {
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{p.desc}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 2, background: status?.[p.id]?.configured ? 'rgba(46,204,113,0.15)' : 'rgba(100,100,100,0.15)', color: status?.[p.id]?.configured ? '#2ecc71' : 'var(--text-dim)', border: `1px solid ${status?.[p.id]?.configured ? 'rgba(46,204,113,0.3)' : 'var(--border)'}` }}>
+                  <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 2, background: status?.[p.id]?.configured ? 'rgba(22,163,74,0.15)' : 'rgba(100,100,100,0.15)', color: status?.[p.id]?.configured ? '#2ecc71' : 'var(--text-dim)', border: `1px solid ${status?.[p.id]?.configured ? 'rgba(22,163,74,0.3)' : 'var(--border)'}` }}>
                     {status?.[p.id]?.configured ? '✓ Configured' : 'Using Platform Default'}
                   </span>
                 </div>
               </div>
 
               {status?.[p.id]?.configured && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 10px', background: 'rgba(0,180,216,0.06)', borderRadius: 4, fontSize: 11 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 10px', background: 'rgba(3,105,161,0.06)', borderRadius: 4, fontSize: 11 }}>
                   <span style={{ color: 'var(--text-dim)' }}>Current key:</span>
                   <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{status[p.id].maskedKey}</code>
-                  <button onClick={() => deleteKey(p.id)} disabled={saving === p.id} style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 8px', background: 'rgba(231,76,60,0.1)', border: '1px solid rgba(231,76,60,0.3)', borderRadius: 2, color: '#e74c3c', cursor: 'pointer' }}>
+                  <button onClick={() => deleteKey(p.id)} disabled={saving === p.id} style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 8px', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 2, color: '#e74c3c', cursor: 'pointer' }}>
                     {saving === p.id ? '...' : '🗑 Remove'}
                   </button>
                 </div>
@@ -711,7 +711,7 @@ function ApiKeysTab() {
         </div>
       )}
 
-      <div style={{ marginTop: 16, padding: 12, background: 'rgba(243,156,18,0.06)', border: '1px solid rgba(243,156,18,0.2)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)' }}>
+      <div style={{ marginTop: 16, padding: 12, background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.2)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)' }}>
         <strong style={{ color: 'var(--gold)' }}>⚠ Security note:</strong> API keys are encrypted with AES-256-GCM before storage. They are never returned in API responses or logs. Only the masked preview is shown after saving.
       </div>
     </div>
@@ -842,7 +842,7 @@ function UsersTab() {
                 )}
               </div>
               <div>
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 2, background: u.isActive ? 'rgba(46,204,113,0.1)' : 'rgba(255,0,0,0.1)', color: u.isActive ? '#2ecc71' : '#e74c3c' }}>
+                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 2, background: u.isActive ? 'rgba(22,163,74,0.1)' : 'rgba(255,0,0,0.1)', color: u.isActive ? '#2ecc71' : '#e74c3c' }}>
                   {u.isActive ? 'Active' : 'Inactive'}
                 </span>
                 {u.lastLoginAt && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>Last: {new Date(u.lastLoginAt).toLocaleDateString()}</div>}
@@ -1039,7 +1039,7 @@ function TerminologyTab() {
             </div>
             {filteredTerms.slice(0, 100).map(term => (
               <div key={`${term.termKey}-${term.category}-${term.tenantId || 'global'}`}
-                style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr 0.8fr 80px 80px', padding: '8px 12px', borderTop: '1px solid var(--border)', fontSize: 11, gap: 8, alignItems: 'center', background: term.tenantId ? 'rgba(0,180,216,0.04)' : 'transparent', opacity: term.isActive === false ? 0.4 : 1 }}>
+                style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr 0.8fr 80px 80px', padding: '8px 12px', borderTop: '1px solid var(--border)', fontSize: 11, gap: 8, alignItems: 'center', background: term.tenantId ? 'rgba(3,105,161,0.04)' : 'transparent', opacity: term.isActive === false ? 0.4 : 1 }}>
                 <div>
                   <div style={{ fontWeight: 500 }}>{term.english}</div>
                   <div style={{ fontSize: 9, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{term.termKey}</div>
@@ -1052,7 +1052,7 @@ function TerminologyTab() {
                   {term.isGlobal && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>◉ global</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                  {term.aiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(0,180,216,0.15)', color: 'var(--accent)' }}>AI</span>}
+                  {term.aiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(3,105,161,0.15)', color: 'var(--accent)' }}>AI</span>}
                   {term.uiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(100,200,100,0.15)', color: '#4caf50' }}>UI</span>}
                   {term.isActive === false && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(255,0,0,0.1)', color: '#f44' }}>OFF</span>}
                 </div>
@@ -1068,7 +1068,7 @@ function TerminologyTab() {
       )}
 
       {/* Resolution info */}
-      <div style={{ marginTop: 16, padding: 12, background: 'rgba(0,180,216,0.05)', border: '1px solid rgba(0,180,216,0.15)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)' }}>
+      <div style={{ marginTop: 16, padding: 12, background: 'rgba(3,105,161,0.05)', border: '1px solid rgba(3,105,161,0.15)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)' }}>
         <strong style={{ color: 'var(--text)' }}>Resolution order:</strong> Tenant override → Global NORA/DGA baseline → Raw key<br />
         <span style={{ color: 'var(--accent)' }}>● Tenant overrides</span> are shown with a blue indicator. They take precedence over global terms in AI generation and UI display.
       </div>
@@ -1133,7 +1133,7 @@ export default function SettingsPage() {
 
       <div className="page-body" style={{ maxWidth: 720 }}>
         {msg && (
-          <div style={{ padding: '10px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13, background: msg.type === 'success' ? 'rgba(46,204,113,0.1)' : 'rgba(231,76,60,0.1)', border: `1px solid ${msg.type === 'success' ? 'rgba(46,204,113,0.3)' : 'rgba(231,76,60,0.3)'}`, color: msg.type === 'success' ? 'var(--success)' : 'var(--danger)', display: 'flex', justifyContent: 'space-between' }}>
+          <div style={{ padding: '10px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13, background: msg.type === 'success' ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)', border: `1px solid ${msg.type === 'success' ? 'rgba(22,163,74,0.3)' : 'rgba(220,38,38,0.3)'}`, color: msg.type === 'success' ? 'var(--success)' : 'var(--danger)', display: 'flex', justifyContent: 'space-between' }}>
             <span>{msg.text}</span>
             <button onClick={() => setMsg(null)} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer' }}>×</button>
           </div>
