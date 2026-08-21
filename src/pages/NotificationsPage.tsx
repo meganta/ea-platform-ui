@@ -186,6 +186,60 @@ function PreferencesTab({ api, isAR, t }: any) {
 }
 
 // ── Rules ────────────────────────────────────────────────────────────────────
+function RuleTemplateLibrary({ api, isAR, t, onActivated }: any) {
+  const [templates, setTemplates] = useState<any[]>([])
+  const [activatingKey, setActivatingKey] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(true)
+
+  const load = useCallback(() => { api.get('/notifications/rule-templates').then((d: any) => setTemplates(Array.isArray(d) ? d : [])) }, [api])
+  useEffect(() => { load() }, [load])
+
+  const activate = async (key: string) => {
+    setActivatingKey(key)
+    try { await api.post(`/notifications/rule-templates/${key}/activate`, {}); await load(); onActivated() }
+    catch (e: any) { alert(e.message) } finally { setActivatingKey(null) }
+  }
+
+  if (templates.length === 0) return null
+
+  return (
+    <div style={{ ...S.card, marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setExpanded(v => !v)}>
+        <div style={{ flex: 1, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+          {t('notif.template_library')}
+          <HelpTip text={isAR
+            ? 'قوالب جاهزة لقواعد الإشعارات الشائعة في البنية المؤسسية. فعّل واحدًا بنقرة بدلًا من إعداد كل قاعدة من الصفر.'
+            : 'Ready-made templates for common EA notification rules. Activate one with a click instead of configuring every rule from scratch.'} />
+        </div>
+        <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{expanded ? '▲' : '▼'}</span>
+      </div>
+      {expanded && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+          {templates.map((tpl: any) => (
+            <div key={tpl.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--navy)', borderRadius: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{isAR ? tpl.nameAr : tpl.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{tpl.eventType}</div>
+              </div>
+              <span style={S.badge(SEVERITY_COLOR[tpl.severity])}>{isAR ? SEVERITY_LABEL[tpl.severity]?.ar : SEVERITY_LABEL[tpl.severity]?.en}</span>
+              {!tpl.hasLivePublisher && (
+                <span style={{ fontSize: 10, color: 'var(--text-dim)' }} title={t('notif.no_live_publisher_hint')}>{t('notif.no_live_publisher')}</span>
+              )}
+              {tpl.isActivated ? (
+                <span style={{ ...S.badge('#2ecc71'), fontSize: 11 }}>{t('notif.activated')}</span>
+              ) : (
+                <button style={{ ...S.btn('primary'), fontSize: 11 }} onClick={() => activate(tpl.key)} disabled={activatingKey === tpl.key}>
+                  {activatingKey === tpl.key ? t('notif.activating') : t('notif.activate')}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RulesTab({ api, isAR, t }: any) {
   const [rules, setRules] = useState<any[]>([])
   const [templates, setTemplates] = useState<any[]>([])
@@ -205,6 +259,7 @@ function RulesTab({ api, isAR, t }: any) {
 
   return (
     <div>
+      <RuleTemplateLibrary api={api} isAR={isAR} t={t} onActivated={load} />
       <button style={{ ...S.btn('primary'), marginBottom: 16 }} onClick={() => setCreating(true)}>{t('notif.new_rule')}</button>
       {creating && <RuleForm api={api} isAR={isAR} t={t} templates={templates} users={users} onDone={() => { setCreating(false); load() }} onCancel={() => setCreating(false)} />}
 
@@ -218,7 +273,7 @@ function RulesTab({ api, isAR, t }: any) {
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>{isAR && r.nameAr ? r.nameAr : r.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                    {r.eventType} → {r.recipientType === 'ROLE' ? r.recipientValue : userLabel(r.recipientValue)} · {r.channels.join(', ')}
+                    {r.eventType} → {r.recipientType === 'ROLE' ? r.recipientValue : r.recipientType === 'OBJECT_OWNER' ? t('notif.recipient_object_owner') : userLabel(r.recipientValue)} · {r.channels.join(', ')}
                   </div>
                 </div>
                 <span style={S.badge(SEVERITY_COLOR[r.severity])}>{isAR ? SEVERITY_LABEL[r.severity]?.ar : SEVERITY_LABEL[r.severity]?.en}</span>
@@ -246,7 +301,8 @@ function RuleForm({ api, isAR, t, templates, users, rule, onDone, onCancel }: an
   const toggleChannel = (ch: string) => setForm(f => ({ ...f, channels: f.channels.includes(ch) ? f.channels.filter((c: string) => c !== ch) : [...f.channels, ch] }))
 
   const save = async () => {
-    if (!form.name || !form.eventType || !form.recipientValue) return alert(isAR ? 'الاسم ونوع الحدث والمستلم مطلوبة' : 'Name, event type, and recipient are required')
+    if (!form.name || !form.eventType) return alert(isAR ? 'الاسم ونوع الحدث مطلوبان' : 'Name and event type are required')
+    if (form.recipientType !== 'OBJECT_OWNER' && !form.recipientValue) return alert(isAR ? 'المستلم مطلوب لهذا النوع' : 'A recipient is required for this recipient type')
     setSaving(true)
     try {
       const payload = { ...form, templateId: form.templateId || undefined }
@@ -273,17 +329,20 @@ function RuleForm({ api, isAR, t, templates, users, rule, onDone, onCancel }: an
         </div>
         <div>
           <div style={S.label}>{t('notif.recipient_type')}</div>
-          <select style={S.input} value={form.recipientType} onChange={e => setForm(f => ({ ...f, recipientType: e.target.value, recipientValue: e.target.value === 'ROLE' ? 'ARCHITECT' : (users[0]?.id || '') }))}>
+          <select style={S.input} value={form.recipientType} onChange={e => setForm(f => ({ ...f, recipientType: e.target.value, recipientValue: e.target.value === 'ROLE' ? 'ARCHITECT' : e.target.value === 'OBJECT_OWNER' ? '' : (users[0]?.id || '') }))}>
             <option value="ROLE">{t('notif.recipient_role')}</option>
             <option value="INDIVIDUAL">{t('notif.recipient_individual')}</option>
+            <option value="OBJECT_OWNER">{t('notif.recipient_object_owner')}</option>
           </select>
         </div>
       </div>
-      <div style={S.label}>{t('notif.recipient')} *</div>
+      <div style={S.label}>{t('notif.recipient')} {form.recipientType !== 'OBJECT_OWNER' && '*'}</div>
       {form.recipientType === 'ROLE' ? (
         <select style={S.input} value={form.recipientValue} onChange={e => setForm(f => ({ ...f, recipientValue: e.target.value }))}>
           {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
         </select>
+      ) : form.recipientType === 'OBJECT_OWNER' ? (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', background: 'var(--navy)', padding: 10, borderRadius: 8, marginBottom: 10 }}>{t('notif.object_owner_hint')}</div>
       ) : (
         <select style={S.input} value={form.recipientValue} onChange={e => setForm(f => ({ ...f, recipientValue: e.target.value }))}>
           <option value="">—</option>
