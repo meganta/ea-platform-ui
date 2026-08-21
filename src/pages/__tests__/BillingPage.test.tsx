@@ -84,6 +84,68 @@ describe('BillingPage - My Subscription tab', () => {
   });
 });
 
+describe('BillingPage - AI Usage tab (Commercial-Phase2)', () => {
+  const STATUS_NORMAL = { tenantId: 't1', periodStart: '2026-08-01T00:00:00Z', periodEnd: '2026-08-31T23:59:59Z', allowance: 5000, creditsUsed: 1200, creditsRemaining: 3800, percentUsed: 24, thresholdsFired: [] };
+
+  it('shows real usage/remaining/percentage, not just the allowance', async () => {
+    mockFetch({ '/commercial/my-entitlements': ENTITLEMENTS, '/commercial/my-subscription': SUBSCRIPTION, '/commercial/ai-usage/my-status': STATUS_NORMAL });
+    render(<BillingPage />);
+    fireEvent.click(await screen.findByText('bill.tab_ai_usage'));
+    expect(await screen.findByText('1200 / 5000 bill.ai_credits_label')).toBeInTheDocument();
+    expect(screen.getByText('24%')).toBeInTheDocument();
+    expect(screen.getByText(/3800/)).toBeInTheDocument();
+  });
+
+  it('shows the empty state when there is no AI usage status yet', async () => {
+    mockFetch({ '/commercial/my-entitlements': ENTITLEMENTS, '/commercial/my-subscription': SUBSCRIPTION, '/commercial/ai-usage/my-status': null });
+    render(<BillingPage />);
+    fireEvent.click(await screen.findByText('bill.tab_ai_usage'));
+    expect(await screen.findByText('bill.no_subscription')).toBeInTheDocument();
+  });
+
+  it('shows an "unlimited" display when allowance is null, without a percentage bar', async () => {
+    const unlimitedStatus = { ...STATUS_NORMAL, allowance: null, creditsRemaining: null, percentUsed: null };
+    mockFetch({ '/commercial/my-entitlements': ENTITLEMENTS, '/commercial/my-subscription': SUBSCRIPTION, '/commercial/ai-usage/my-status': unlimitedStatus });
+    render(<BillingPage />);
+    fireEvent.click(await screen.findByText('bill.tab_ai_usage'));
+    expect(await screen.findByText(/1200 bill.ai_credits_label bill.used_this_period \(bill.unlimited\)/)).toBeInTheDocument();
+  });
+
+  it('shows a warning banner at 70%+ usage but not below it', async () => {
+    mockFetch({ '/commercial/my-entitlements': ENTITLEMENTS, '/commercial/my-subscription': SUBSCRIPTION, '/commercial/ai-usage/my-status': { ...STATUS_NORMAL, percentUsed: 75 } });
+    render(<BillingPage />);
+    fireEvent.click(await screen.findByText('bill.tab_ai_usage'));
+    expect(await screen.findByText('bill.ai_allowance_warning')).toBeInTheDocument();
+    expect(screen.queryByText('bill.ai_allowance_exceeded')).not.toBeInTheDocument();
+  });
+
+  it('does not show a warning banner below the 70% threshold', async () => {
+    mockFetch({ '/commercial/my-entitlements': ENTITLEMENTS, '/commercial/my-subscription': SUBSCRIPTION, '/commercial/ai-usage/my-status': { ...STATUS_NORMAL, percentUsed: 40 } });
+    render(<BillingPage />);
+    fireEvent.click(await screen.findByText('bill.tab_ai_usage'));
+    await screen.findByText('40%');
+    expect(screen.queryByText('bill.ai_allowance_warning')).not.toBeInTheDocument();
+    expect(screen.queryByText('bill.ai_allowance_exceeded')).not.toBeInTheDocument();
+  });
+
+  it('shows the exceeded banner (not the warning banner) at 100% usage', async () => {
+    mockFetch({ '/commercial/my-entitlements': ENTITLEMENTS, '/commercial/my-subscription': SUBSCRIPTION, '/commercial/ai-usage/my-status': { ...STATUS_NORMAL, creditsUsed: 5000, creditsRemaining: 0, percentUsed: 100 } });
+    render(<BillingPage />);
+    fireEvent.click(await screen.findByText('bill.tab_ai_usage'));
+    expect(await screen.findByText('bill.ai_allowance_exceeded')).toBeInTheDocument();
+    expect(screen.queryByText('bill.ai_allowance_warning')).not.toBeInTheDocument();
+  });
+
+  it('displays the real period start/end dates', async () => {
+    mockFetch({ '/commercial/my-entitlements': ENTITLEMENTS, '/commercial/my-subscription': SUBSCRIPTION, '/commercial/ai-usage/my-status': STATUS_NORMAL });
+    render(<BillingPage />);
+    fireEvent.click(await screen.findByText('bill.tab_ai_usage'));
+    await screen.findByText('24%');
+    const dateText = new Date(STATUS_NORMAL.periodStart).toLocaleDateString('en');
+    expect(screen.getByText(new RegExp(dateText.replace(/\//g, '\\/')))).toBeInTheDocument();
+  });
+});
+
 describe('BillingPage - Plans tab', () => {
   it('lists plans with pricing and modules', async () => {
     mockFetch({

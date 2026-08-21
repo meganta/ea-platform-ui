@@ -59,6 +59,7 @@ export default function BillingPage() {
       </div>
       <div style={S.tabs}>
         <button style={S.tab(tab === 'subscription')} onClick={() => setTab('subscription')}>{t('bill.tab_subscription')}</button>
+        <button style={S.tab(tab === 'ai_usage')} onClick={() => setTab('ai_usage')}>{t('bill.tab_ai_usage')}</button>
         <button style={S.tab(tab === 'plans')} onClick={() => setTab('plans')}>{t('bill.tab_plans')}</button>
         <button style={S.tab(tab === 'invoices')} onClick={() => setTab('invoices')}>{t('bill.tab_invoices')}</button>
         <button style={S.tab(tab === 'payments')} onClick={() => setTab('payments')}>{t('bill.tab_payments')}</button>
@@ -71,6 +72,7 @@ export default function BillingPage() {
       </div>
       <div style={S.content}>
         {tab === 'subscription' && <SubscriptionTab api={api} isAR={isAR} t={t} />}
+        {tab === 'ai_usage' && <AiUsageTab api={api} isAR={isAR} t={t} />}
         {tab === 'plans' && <PlansTab api={api} isAR={isAR} t={t} />}
         {tab === 'invoices' && <InvoicesTab api={api} isAR={isAR} t={t} />}
         {tab === 'payments' && <PaymentsTab api={api} isAR={isAR} t={t} />}
@@ -146,6 +148,59 @@ function SubscriptionTab({ api, isAR, t }: any) {
 }
 
 // ── Tenant self-service: Plans (read-only) ────────────────────────────────────
+// ── Tenant self-service: AI Usage (Commercial-Phase2) ─────────────────────────
+function AiUsageTab({ api, isAR, t }: any) {
+  const [status, setStatus] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { api.get('/commercial/ai-usage/my-status').then(setStatus).finally(() => setLoading(false)) }, [api])
+
+  if (loading) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
+  if (!status) return <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('bill.no_subscription')}</div>
+
+  const unlimited = status.allowance == null
+  const barColor = unlimited ? '#3498db' : status.percentUsed >= 100 ? '#e74c3c' : status.percentUsed >= 85 ? '#e67e22' : status.percentUsed >= 70 ? '#f39c12' : '#2ecc71'
+
+  return (
+    <div style={{ maxWidth: 760 }}>
+      <div style={{ ...S.card, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+          <div style={{ flex: 1, fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center' }}>
+            {t('bill.ai_usage_period')}
+            <HelpTip text={isAR
+              ? 'يوضح هذا القسم استهلاك مؤسستك الفعلي من رصيد الذكاء الاصطناعي خلال الفترة الحالية، وليس الحد المسموح به فقط.'
+              : "This shows your organization's actual AI credit consumption for the current period, not just the allowed limit."} />
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
+            {new Date(status.periodStart).toLocaleDateString(isAR ? 'ar' : 'en')} – {new Date(status.periodEnd).toLocaleDateString(isAR ? 'ar' : 'en')}
+          </div>
+        </div>
+
+        {unlimited ? (
+          <div style={{ fontSize: 15, fontWeight: 600 }}>{status.creditsUsed} {t('bill.ai_credits_label')} {t('bill.used_this_period')} ({t('bill.unlimited')})</div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
+              <span>{status.creditsUsed} / {status.allowance} {t('bill.ai_credits_label')}</span>
+              <span style={{ fontWeight: 600 }}>{status.percentUsed}%</span>
+            </div>
+            <div style={{ height: 8, borderRadius: 4, background: 'var(--navy)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, status.percentUsed)}%`, background: barColor, transition: 'width 0.3s' }} />
+            </div>
+            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-dim)' }}>{status.creditsRemaining} {t('bill.ai_credits_remaining')}</div>
+          </>
+        )}
+
+        {!unlimited && status.percentUsed >= 70 && (
+          <div style={{ marginTop: 12, fontSize: 12, padding: '8px 12px', borderRadius: 8, background: status.percentUsed >= 100 ? 'rgba(231,76,60,0.15)' : 'rgba(243,156,18,0.15)', color: status.percentUsed >= 100 ? '#e74c3c' : '#f39c12' }}>
+            {status.percentUsed >= 100 ? t('bill.ai_allowance_exceeded') : t('bill.ai_allowance_warning')}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function PlansTab({ api, isAR, t }: any) {
   const [plans, setPlans] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

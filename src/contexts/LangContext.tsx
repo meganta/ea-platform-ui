@@ -691,6 +691,12 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'bill.cancel':            { EN: 'Cancel', AR: 'إلغاء' },
   'bill.filter_status':     { EN: 'Filter by status', AR: 'تصفية حسب الحالة' },
   'bill.all_statuses':      { EN: 'All statuses', AR: 'جميع الحالات' },
+  'bill.tab_ai_usage':      { EN: '🤖 AI Usage', AR: '🤖 استخدام الذكاء الاصطناعي' },
+  'bill.ai_usage_period':   { EN: 'AI Credit Usage — Current Period', AR: 'استخدام رصيد الذكاء الاصطناعي — الفترة الحالية' },
+  'bill.used_this_period':  { EN: 'used this period', AR: 'مستخدَم هذه الفترة' },
+  'bill.ai_credits_remaining': { EN: 'credits remaining', AR: 'رصيد متبقٍ' },
+  'bill.ai_allowance_warning': { EN: '⚠ Approaching your AI credit allowance for this period.', AR: '⚠ تقترب من الحد المسموح به من رصيد الذكاء الاصطناعي لهذه الفترة.' },
+  'bill.ai_allowance_exceeded': { EN: '⛔ AI credit allowance exceeded for this period. Contact your account team for additional credits.', AR: '⛔ تم تجاوز رصيد الذكاء الاصطناعي المسموح لهذه الفترة. يرجى التواصل مع فريق الحساب للحصول على رصيد إضافي.' },
 }
 
 // ── Missing key log (dev only) ───────────────────────────────────────────────
