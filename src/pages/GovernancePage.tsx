@@ -1955,6 +1955,25 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Summary Tab */}
       {tab === 'summary' && (
         <div>
+          {/* Governance Review V2 (spec section 15): evidence coverage and
+              extraction quality, shown only when this review actually ran
+              through the V2 pipeline (rubricId is only ever set by
+              runV2DomainAssessment) - a V1-pipeline review simply doesn't
+              show this row rather than displaying misleading zeros. */}
+          {review.rubricId && (
+            <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12, color: 'var(--text-dim)' }}>
+              <span>Rubric: {review.rubricId} v{review.rubricVersion || 1}</span>
+              {typeof review.evidenceCoverage === 'number' && (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  Evidence coverage:
+                  <span style={{
+                    fontWeight: 600,
+                    color: review.evidenceCoverage >= 0.8 ? 'var(--success)' : review.evidenceCoverage >= 0.5 ? 'var(--warning)' : 'var(--danger)',
+                  }}>{Math.round(review.evidenceCoverage * 100)}%</span>
+                </span>
+              )}
+            </div>
+          )}
           {/* 1. Executive Summary FIRST */}
           <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -2195,6 +2214,12 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{domain.replace(/_/g, ' ')}</div>
                     {ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 2 }}>✗ {isAR ? resolveText(ds.keyWeaknesses) : ds.keyWeaknesses}</div>}
                     {ds.keyStrengths && !ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#2ecc71', marginTop: 2 }}>✓ {isAR ? resolveText(ds.keyStrengths) : ds.keyStrengths}</div>}
+                    {/* Fallback to ds.summary when neither keyStrengths nor
+                        keyWeaknesses is set — both V1 and V2 always compute
+                        summary, but this UI previously only ever rendered
+                        the other two, silently dropping it for any domain
+                        (V1 or V2) that didn't happen to populate them. */}
+                    {!ds.keyWeaknesses && !ds.keyStrengths && ds.summary && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{isAR ? resolveText(ds.summary) : ds.summary}</div>}
                   </div>
                   <ScoreCircle score={score} label='' size={52} />
                 </div>
