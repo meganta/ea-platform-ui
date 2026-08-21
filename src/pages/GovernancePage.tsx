@@ -269,6 +269,30 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState<any>({})
   const [saving, setSaving] = useState(false)
+  // Governance Review V2 (spec section 15) — evidence for this finding is
+  // fetched lazily, only when the user actually opens the evidence panel,
+  // not on every card render. isV2Finding gates the whole V2 metadata
+  // block: a V1-engine finding never has criterionId set, so this section
+  // simply doesn't render for it rather than showing empty placeholders.
+  const isV2Finding = !!f.criterionId
+  const [evidenceOpen, setEvidenceOpen] = useState(false)
+  const [evidence, setEvidence] = useState<any[] | null>(null)
+  const [evidenceLoading, setEvidenceLoading] = useState(false)
+
+  const loadEvidence = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (evidence !== null) { setEvidenceOpen(o => !o); return }
+    if (!reviewId) return
+    setEvidenceLoading(true)
+    try {
+      const token = localStorage.getItem('ea_token') || ''
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+      const res = await fetch(`${apiUrl}/governance/reviews/${reviewId}/evidence?findingId=${f.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json().catch(() => [])
+      setEvidence(Array.isArray(data) ? data : [])
+      setEvidenceOpen(true)
+    } catch { setEvidence([]) } finally { setEvidenceLoading(false) }
+  }
 
   const startEdit = (e: React.MouseEvent) => { e.stopPropagation(); setDraft({ title: f.title, description: f.description, recommendation: f.recommendation, severity: f.severity, businessImpact: f.businessImpact || '', technicalImpact: f.technicalImpact || '' }); setEditing(true); setOpen(true) }
 
@@ -324,6 +348,37 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
           <div style={{ marginBottom: 8, color: 'var(--accent)' }}><span style={{ color: 'var(--text-muted)' }}>Recommendation: </span>{f.recommendation}</div>
           {f.businessImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Business Impact: </span>{f.businessImpact}</div>}
           {f.relatedStandard && <div><span style={{ color: 'var(--text-muted)' }}>Standard: </span>{f.relatedStandard}</div>}
+          {isV2Finding && (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--navy-mid)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+                {f.basisType && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>{f.basisType.replace(/_/g, ' ')}</span>}
+                {f.criterionId && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>Criterion: {f.criterionId}</span>}
+                {typeof f.confidenceScore === 'number' && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>Confidence: {Math.round(f.confidenceScore * 100)}%</span>}
+                {f.validationStatus && f.validationStatus !== 'PENDING' && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: f.validationStatus === 'REJECTED' ? '#e74c3c22' : 'var(--navy-mid)', color: f.validationStatus === 'REJECTED' ? '#e74c3c' : 'var(--text-dim)' }}>{f.validationStatus}</span>}
+              </div>
+              {Array.isArray(f.crossDomainImpacts) && f.crossDomainImpacts.length > 0 && (
+                <div style={{ marginBottom: 8, fontSize: 12 }}><span style={{ color: 'var(--text-dim)' }}>Also affects: </span>{f.crossDomainImpacts.join(', ')}</div>
+              )}
+              <button onClick={loadEvidence} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--accent)44', background: 'none', color: 'var(--accent)', cursor: 'pointer' }}>
+                {evidenceLoading ? 'Loading…' : evidenceOpen ? '▲ Hide evidence' : '📄 View evidence'}
+              </button>
+              {evidenceOpen && evidence && (
+                <div style={{ marginTop: 8 }}>
+                  {evidence.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No evidence records found — the underlying schema may not be synced yet, or this finding predates evidence tracking.</div>}
+                  {evidence.map((ev: any) => (
+                    <div key={ev.id} style={{ padding: '8px 10px', marginBottom: 6, borderRadius: 6, background: 'var(--navy-mid)', fontSize: 12 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{ev.sourceType === 'DOCUMENT' ? '📄 Document' : ev.sourceType === 'TENANT_REPOSITORY' ? '🏛 Tenant Repository' : '📋 Regulatory'}</span>
+                        {ev.sourceType === 'DOCUMENT' && ev.fileName && <span style={{ color: 'var(--text-muted)' }}>{ev.fileName}{ev.pageNumber ? ` (p.${ev.pageNumber})` : ''}</span>}
+                        {ev.sourceType === 'TENANT_REPOSITORY' && ev.tenantObjectName && <span style={{ color: 'var(--text-muted)' }}>{ev.tenantObjectName}</span>}
+                      </div>
+                      <div style={{ color: 'var(--text)' }}>{ev.extractedTextSnippet || ev.tenantObjectSnippet || ev.regulatorySource || '(no snippet available)'}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
       {editing && (
