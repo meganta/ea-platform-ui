@@ -923,7 +923,17 @@ export default function GovernancePage() {
           // 90s timeout per file — large DOCX files via Docling can take a while
           const uploadPromise = api.postFile('/governance/reviews/' + r.id + '/inputs/file', fd)
           const timeoutPromise = new Promise(res => setTimeout(res, 90000))
-          await Promise.race([uploadPromise, timeoutPromise]).catch(() => {})
+          const uploadResult: any = await Promise.race([uploadPromise, timeoutPromise]).catch(() => null)
+          // Governance Review V2 (spec section 15): capture the real
+          // extraction-state classification the upload response now
+          // carries (backend persists it since the extractionState fix),
+          // instead of discarding the response entirely — previously this
+          // result was raced against a timeout and thrown away either way,
+          // so every uploaded file just showed a static "Ready" label
+          // regardless of whether extraction actually succeeded.
+          if (uploadResult && uploadResult.id) {
+            setInputs(prev => prev.map(existing => existing._file === inp._file ? { ...existing, id: uploadResult.id, extractionState: uploadResult.extractionState, extractionStateReason: uploadResult.extractionStateReason } : existing))
+          }
 
           clearInterval(simTimer)
           setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: 100 })
@@ -1219,14 +1229,31 @@ export default function GovernancePage() {
 
           {inputs.length > 0 && (
             <div style={{ marginBottom: 16 }}>
-              {inputs.map((inp, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, marginBottom: 6 }}>
-                  <span style={{ fontSize: 18 }}>📄</span>
-                  <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{inp.label}</span>
-                  <span style={{ fontSize: 11, color: '#2ecc71' }}>Ready</span>
-                  <button onClick={() => removeInput(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
-                </div>
-              ))}
+              {inputs.map((inp: any, i) => {
+                // Governance Review V2 (spec section 15): reflect the
+                // actual extraction-state classification when available
+                // (set on the input after upload resolves in time — see
+                // handleCreate above), falling back to the generic "Ready"
+                // label when the state genuinely isn't known yet (upload
+                // still in flight, or timed out before resolving) rather
+                // than ever claiming a state that wasn't confirmed.
+                const stateLabel: Record<string, { text: string; color: string }> = {
+                  READY: { text: 'Ready', color: '#2ecc71' },
+                  PARTIAL: { text: 'Partial extraction', color: '#f39c12' },
+                  NEEDS_OCR: { text: 'Needs OCR', color: '#e74c3c' },
+                  FAILED: { text: 'Extraction failed', color: '#e74c3c' },
+                  UNSUPPORTED_STRUCTURE: { text: 'Unsupported format', color: '#e74c3c' },
+                }
+                const state = inp.extractionState ? stateLabel[inp.extractionState] : null
+                return (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, marginBottom: 6 }} title={inp.extractionStateReason || undefined}>
+                    <span style={{ fontSize: 18 }}>📄</span>
+                    <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{inp.label}</span>
+                    <span style={{ fontSize: 11, color: state ? state.color : '#2ecc71' }}>{state ? state.text : 'Ready'}</span>
+                    <button onClick={() => removeInput(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+                  </div>
+                )
+              })}
               <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: '1px dashed var(--accent)55', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', marginTop: 4 }}>+ Add more files</button>
             </div>
           )}
