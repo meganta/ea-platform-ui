@@ -2225,6 +2225,43 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             ))}
           </div>
 
+          {/* Governance Review V2 (spec section 15): "applicable versus
+              not-assessed sections". A domain simply has no entry in
+              domainSummaries when the rubric excluded it (no criteria
+              applicable to this document's facts) - previously invisible;
+              this makes the exclusion explicit rather than silent, only
+              for reviews that actually ran the V2 pipeline.
+
+              RUBRIC_DOMAIN_SET reflects each review type's actual rubric
+              domain list (ea-platform's governance-rubrics.ts) - NOT
+              always all 6. NEW_PROJECT/BUSINESS_DEMAND/CAB_REVIEW/
+              DIGITAL_INITIATIVE structurally never cover certain domains
+              at all (a rubric-design decision, not a per-document
+              exclusion) - conflating "never part of this review type's
+              rubric" with "excluded for this specific document" would be
+              actively misleading, so this list is checked before showing
+              anything, not assumed to always be the full six. */}
+          {review.rubricId && (() => {
+            const allSix = ['BUSINESS_ARCHITECTURE', 'BENEFICIARY_EXPERIENCE', 'APPLICATION_INTEGRATION', 'DATA_ARCHITECTURE', 'INFRASTRUCTURE', 'SECURITY_ARCHITECTURE']
+            const RUBRIC_DOMAIN_SET: Record<string, string[]> = {
+              SOLUTION_DESIGN: allSix, RFP_SOW: allSix, HLD_REVIEW: allSix, LLD_REVIEW: allSix,
+              CHANGE_REQUEST: allSix, TECHNICAL_PROPOSAL: allSix,
+              NEW_PROJECT: ['BUSINESS_ARCHITECTURE', 'DATA_ARCHITECTURE'],
+              BUSINESS_DEMAND: ['BUSINESS_ARCHITECTURE'],
+              CAB_REVIEW: ['BUSINESS_ARCHITECTURE'],
+              DIGITAL_INITIATIVE: ['BUSINESS_ARCHITECTURE', 'APPLICATION_INTEGRATION'],
+            }
+            const rubricDomains = RUBRIC_DOMAIN_SET[review.reviewType] || allSix
+            const assessedDomains = Object.keys(report.domainSummaries || {}).filter(k => !k.startsWith('_') && typeof (report.domainSummaries as any)[k] === 'object' && (report.domainSummaries as any)[k] !== null && 'score' in (report.domainSummaries as any)[k])
+            const excludedDomains = rubricDomains.filter(d => !assessedDomains.includes(d))
+            if (excludedDomains.length === 0) return null
+            return (
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, padding: '8px 12px', background: 'var(--navy-mid)', borderRadius: 8 }}>
+                {assessedDomains.length} of {rubricDomains.length} applicable domain(s) assessed. Excluded for this document: {excludedDomains.map(d => DOMAIN_LABEL[d] || d).join(', ')}.
+              </div>
+            )
+          })()}
+
           {Object.entries(report.domainSummaries || {}).filter(([k, v]) => !k.startsWith('_') && typeof v === 'object' && v !== null && 'score' in v).map(([domain, ds]: [string, any]) => {
             const domainFindings = findings.filter(f => f.domain === domain)
             const crit = domainFindings.filter(f => f.severity === 'CRITICAL').length
