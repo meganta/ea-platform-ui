@@ -286,7 +286,16 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
 
   // ── Capability Map ──────────────────────────────────────────────────────────
   const renderCapabilityMap = () => {
-    const caps = filteredNodes.filter((n: any) => n.assetType === 'CAPABILITY')
+    // Filters on semanticType (resolved server-side against the tenant's
+    // actual published meta-model, or the legacy generic-type fallback -
+    // see view-query.service.ts / semantic-type-resolver.ts) rather than
+    // a hardcoded assetType string like 'CAPABILITY'. Framework-typed
+    // capability data (e.g. NORA 2.0's GovCapability, TOGAF's Capability)
+    // and legacy generic-typed data both resolve to the same
+    // 'BusinessCapability' semanticType, so this works regardless of
+    // which framework the tenant has published or how the asset was
+    // created.
+    const caps = filteredNodes.filter((n: any) => n.semanticType === 'BusinessCapability')
     const l1 = caps.filter((c: any) => !c.metadata?.parentId || c.metadata?.level === 1)
     const l2 = caps.filter((c: any) => c.metadata?.parentId && c.metadata?.level !== 1)
 
