@@ -64,6 +64,25 @@ const STATUS_COLOR: Record<string, string> = { ACTIVE: '#2ecc71', INACTIVE: '#7f
 const JOB_COLOR: Record<string, string> = { COMPLETED: '#2ecc71', FAILED: '#e74c3c', RUNNING: '#f39c12', PENDING: '#7f8c8d', PARTIAL: '#e67e22' }
 const DIRECTION_LABEL: Record<string, string> = { IMPORT: '⬇ Import', EXPORT: '⬆ Export', BIDIRECTIONAL: '⇅ Bidirectional' }
 
+// Formats syncIntervalMin (stored as raw minutes, e.g. 129600 for a
+// genuine 90-day/quarterly cadence - see scripts/link-hrdf-connectors-
+// to-real-data.js) into something a human reads at a glance, rather than
+// a large, confusing raw minute count. 90/91/92 days (the real month-
+// length variance a calendar quarter has) all read as "Quarterly" since
+// that's the intent, not a coincidence to be pedantic about.
+function formatSyncInterval(minutes: number): string {
+  if (minutes >= 90 * 24 * 60 && minutes <= 92 * 24 * 60) return 'Quarterly (~90 days)'
+  if (minutes % (24 * 60) === 0 && minutes >= 24 * 60) {
+    const days = minutes / (24 * 60)
+    return `Every ${days} day${days === 1 ? '' : 's'}`
+  }
+  if (minutes % 60 === 0 && minutes >= 60) {
+    const hours = minutes / 60
+    return `Every ${hours} hour${hours === 1 ? '' : 's'}`
+  }
+  return `Every ${minutes} min`
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function ConnectorDashboard({ api, stats, onTab, onOpen }: { api: any, stats: any, onTab: (t: string) => void, onOpen: (c: any) => void }) {
   const [connectors, setConnectors] = useState<any[]>([])
@@ -360,7 +379,7 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
             { label: 'Type', value: ct?.name || connector.connectorType },
             { label: 'Direction', value: DIRECTION_LABEL[connector.direction] },
             { label: 'Status', value: connector.status },
-            { label: 'Auto Sync', value: connector.autoSync ? `Every ${connector.syncIntervalMin} min` : 'Disabled' },
+            { label: 'Auto Sync', value: connector.autoSync ? formatSyncInterval(connector.syncIntervalMin) : 'Disabled' },
             { label: 'Base URL', value: connector.baseUrl || '—' },
             { label: 'Last Sync', value: connector.lastSyncAt ? new Date(connector.lastSyncAt).toLocaleString() : 'Never' },
             { label: 'Last Status', value: connector.lastSyncStatus || '—' },

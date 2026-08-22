@@ -155,3 +155,73 @@ describe('RepositoryPage - CRUD', () => {
     confirmSpy.mockRestore();
   });
 });
+
+describe('RepositoryPage - connector provenance display (HRDF demo: ManageEngine/Informatica)', () => {
+  it('shows "ManageEngine OpManager" (not a raw INTEGRATION badge) for an asset synced via ManageEngine, inferred from its OPM- sourceRef prefix', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ source: 'INTEGRATION', sourceRef: 'OPM-DEV-00001', name: 'JADARAT-DB01' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('JADARAT-DB01');
+    expect(screen.getByText('ManageEngine OpManager')).toBeInTheDocument();
+    expect(screen.queryByText('INTEGRATION')).not.toBeInTheDocument();
+  });
+
+  it('shows "Informatica Axon" for an asset synced via Informatica, inferred from its AXON- sourceRef prefix', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ source: 'INTEGRATION', sourceRef: 'AXON-CDE-00001', name: 'Employer Subsidy Records' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Employer Subsidy Records');
+    expect(screen.getByText('Informatica Axon')).toBeInTheDocument();
+  });
+
+  it('falls back to a generic "Integration" label for an INTEGRATION-sourced asset with an unrecognized sourceRef prefix, rather than guessing wrong', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ source: 'INTEGRATION', sourceRef: 'SOME-OTHER-SYSTEM-01', name: 'Legacy Sync Asset' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Legacy Sync Asset');
+    expect(screen.getByText('Integration')).toBeInTheDocument();
+  });
+
+  it('shows the real synced attributes (CPU, memory, OS) in the asset detail view for a ManageEngine-sourced server', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ source: 'INTEGRATION', sourceRef: 'OPM-DEV-00001', name: 'JADARAT-DB01', metadata: { cpu: 8, memory: 32, operatingSystem: 'Linux', ipAddress: '10.128.4.24' } })],
+      '/ea-repository/assets/a1': asset({ source: 'INTEGRATION', sourceRef: 'OPM-DEV-00001', name: 'JADARAT-DB01', metadata: { cpu: 8, memory: 32, operatingSystem: 'Linux', ipAddress: '10.128.4.24' } }),
+    });
+    render(<RepositoryPage />);
+    fireEvent.click(await screen.findByText('JADARAT-DB01'));
+    expect(await screen.findByText(/SYNCED FROM MANAGEENGINE OPMANAGER/)).toBeInTheDocument();
+    expect(screen.getByText('8')).toBeInTheDocument();
+    expect(screen.getByText('32')).toBeInTheDocument();
+    expect(screen.getByText('Linux')).toBeInTheDocument();
+    expect(screen.getByText('10.128.4.24')).toBeInTheDocument();
+  });
+
+  it('shows no synced-attributes section for a MANUAL-sourced asset, even if it happens to have metadata', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ source: 'MANUAL', name: 'Manually Entered Server', metadata: { cpu: 4 } })],
+      '/ea-repository/assets/a1': asset({ source: 'MANUAL', name: 'Manually Entered Server', metadata: { cpu: 4 } }),
+    });
+    render(<RepositoryPage />);
+    fireEvent.click(await screen.findByText('Manually Entered Server'));
+    await waitFor(() => expect(screen.queryByText(/SYNCED FROM/)).not.toBeInTheDocument());
+  });
+
+  it('shows no synced-attributes section for an INTEGRATION-sourced asset with no recognized synced attributes in its metadata', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ source: 'INTEGRATION', sourceRef: 'OPM-DEV-00002', name: 'Bare Server', metadata: {} })],
+      '/ea-repository/assets/a1': asset({ source: 'INTEGRATION', sourceRef: 'OPM-DEV-00002', name: 'Bare Server', metadata: {} }),
+    });
+    render(<RepositoryPage />);
+    fireEvent.click(await screen.findByText('Bare Server'));
+    await waitFor(() => expect(screen.queryByText(/SYNCED FROM/)).not.toBeInTheDocument());
+  });
+});

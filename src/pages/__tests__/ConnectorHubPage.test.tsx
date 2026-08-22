@@ -259,3 +259,42 @@ describe('ConnectorHubPage - ConflictsPanel', () => {
     });
   });
 });
+
+describe('ConnectorHubPage - sync interval display (HRDF demo: quarterly cadence readability)', () => {
+  it('shows "Quarterly (~90 days)" for a 90-day syncIntervalMin, not a raw "Every 129600 min" figure', async () => {
+    const connector = {
+      id: 'me-1', name: 'OpManager Prod', connectorType: 'MANAGEENGINE_CMDB', direction: 'IMPORT',
+      status: 'ACTIVE', config: {}, autoSync: true, syncIntervalMin: 129600, _count: { syncJobs: 0 },
+    };
+    mockFetch({ '/connectors/stats': {}, '/connectors': [connector] });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('OpManager Prod'));
+    expect(await screen.findByText('Quarterly (~90 days)')).toBeInTheDocument();
+    expect(screen.queryByText(/129600 min/)).not.toBeInTheDocument();
+  });
+
+  it('shows a day-based figure for a non-quarterly, whole-day interval', async () => {
+    const connector = {
+      id: 'me-2', name: 'OpManager Weekly', connectorType: 'MANAGEENGINE_CMDB', direction: 'IMPORT',
+      status: 'ACTIVE', config: {}, autoSync: true, syncIntervalMin: 7 * 24 * 60, _count: { syncJobs: 0 },
+    };
+    mockFetch({ '/connectors/stats': {}, '/connectors': [connector] });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('OpManager Weekly'));
+    expect(await screen.findByText('Every 7 days')).toBeInTheDocument();
+  });
+
+  it('shows "Disabled" when autoSync is off, regardless of whatever syncIntervalMin happens to be stored', async () => {
+    const connector = {
+      id: 'me-3', name: 'OpManager Manual', connectorType: 'MANAGEENGINE_CMDB', direction: 'IMPORT',
+      status: 'ACTIVE', config: {}, autoSync: false, syncIntervalMin: 129600, _count: { syncJobs: 0 },
+    };
+    mockFetch({ '/connectors/stats': {}, '/connectors': [connector] });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('OpManager Manual'));
+    expect(await screen.findByText('Disabled')).toBeInTheDocument();
+  });
+});

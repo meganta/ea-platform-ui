@@ -18,6 +18,44 @@ const SOURCE_COLORS: Record<string, string> = {
   INTEGRATION: 'badge-ai-draft',
 }
 
+// Demo/display heuristic, not a true foreign-key trace: EaAsset has no
+// direct connectorId field (only source/sourceRef - the real link to a
+// specific sync run lives in SyncStagingRecord.matchedAssetId, which
+// would need a dedicated lookup this component doesn't have). For a
+// source:'INTEGRATION' asset, this infers which connector it likely came
+// from by the sourceRef's own prefix pattern (set by whichever script/
+// sync populated it - e.g. link-hrdf-connectors-to-real-data.js uses
+// 'OPM-' for ManageEngine and 'AXON-' for Informatica Axon). Good enough
+// to show a real, human-readable connector name in a demo; not a
+// substitute for a genuine traceability feature if that's ever needed
+// beyond display purposes.
+function getSourceLabel(asset: any): { label: string; detail?: string } {
+  if (asset.source === 'INTEGRATION') {
+    if (typeof asset.sourceRef === 'string') {
+      if (asset.sourceRef.startsWith('OPM-')) return { label: 'ManageEngine OpManager', detail: asset.sourceRef }
+      if (asset.sourceRef.startsWith('AXON-')) return { label: 'Informatica Axon', detail: asset.sourceRef }
+    }
+    return { label: 'Integration', detail: asset.sourceRef }
+  }
+  if (asset.source === 'ADM_OUTPUT') return { label: 'ADM Output', detail: asset.sourceRef ? `Cycle ${asset.sourceRef.slice(0, 8)}` : undefined }
+  if (asset.source === 'UPLOAD') return { label: 'Upload' }
+  return { label: 'Manual' }
+}
+
+// Object-type-specific attributes a connector field mapping might target
+// (confirmed against this tenant's real meta-model attribute definitions -
+// ITServer's cpu/memory/storage/operatingSystem/networkZone/ipAddress,
+// ConceptualDataEntity's dataFormat/dataCategory/canStoreOutsideKSA - see
+// scripts/link-hrdf-connectors-to-real-data.js). Anything else present in
+// metadata (e.g. leftover fields from a manual JSON edit) is intentionally
+// not shown here - this section is specifically "what a connector synced
+// onto this asset," not a raw metadata dump.
+const SYNCED_ATTRIBUTE_LABELS: Record<string, string> = {
+  ipAddress: 'IP Address', cpu: 'CPU (cores)', memory: 'Memory (GB)', storage: 'Storage (GB)',
+  operatingSystem: 'Operating System', networkZone: 'Network Zone',
+  dataFormat: 'Data Format', dataCategory: 'Data Category', canStoreOutsideKSA: 'Can Store Outside KSA',
+}
+
 function useApi() {
   const token = () => localStorage.getItem('ea_token')
   const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
@@ -139,7 +177,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
           </div>
           <div className="flex gap-2">
             <span className={`badge ${STATUS_COLORS[asset.status] || 'badge-draft'}`}>{asset.status}</span>
-            <span className={`badge ${SOURCE_COLORS[asset.source] || 'badge-draft'}`}>{asset.source}</span>
+            <span className={`badge ${SOURCE_COLORS[asset.source] || 'badge-draft'}`} title={getSourceLabel(asset).detail}>{getSourceLabel(asset).label}</span>
           </div>
         </div>
 
@@ -164,6 +202,28 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
             ))}
           </div>
         )}
+
+        {asset.source === 'INTEGRATION' && (() => {
+          const synced = Object.entries(SYNCED_ATTRIBUTE_LABELS)
+            .filter(([key]) => asset.metadata && asset.metadata[key] !== undefined && asset.metadata[key] !== null && asset.metadata[key] !== '')
+          if (synced.length === 0) return null
+          const sourceInfo = getSourceLabel(asset)
+          return (
+            <div style={{ marginBottom: 16, padding: 12, background: 'rgba(3,105,161,0.05)', border: '1px solid rgba(3,105,161,0.15)', borderRadius: 'var(--radius)' }}>
+              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>
+                🔗 SYNCED FROM {sourceInfo.label.toUpperCase()}{sourceInfo.detail ? ` (${sourceInfo.detail})` : ''}
+              </div>
+              <div className="grid-2" style={{ gap: 8 }}>
+                {synced.map(([key, label]) => (
+                  <div key={key}>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{label}</div>
+                    <div style={{ fontSize: 13 }}>{String(asset.metadata[key])}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        })()}
 
         <div className="divider" />
 
@@ -420,7 +480,7 @@ export default function RepositoryPage() {
                   <td><span style={{ fontSize: 11, padding: '2px 8px', background: 'rgba(3,105,161,0.08)', borderRadius: 2, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{a.domain}</span></td>
                   <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.assetType?.replace(/_/g, ' ')}</td>
                   <td><span className={`badge ${STATUS_COLORS[a.status] || 'badge-draft'}`}>{a.status.replace(/_/g, ' ')}</span></td>
-                  <td><span className={`badge ${SOURCE_COLORS[a.source] || 'badge-draft'}`}>{a.source.replace(/_/g, ' ')}</span></td>
+                  <td><span className={`badge ${SOURCE_COLORS[a.source] || 'badge-draft'}`} title={getSourceLabel(a).detail}>{getSourceLabel(a).label}</span></td>
                   <td style={{ fontSize: 12 }}>{a.owner || '—'}</td>
                   <td style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{a._count?.attachments || 0}</td>
                   <td onClick={e => e.stopPropagation()}>
