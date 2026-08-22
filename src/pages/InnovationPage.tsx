@@ -942,15 +942,158 @@ function StudyCreateForm({ api, isAR, t, onDone, onCancel }: any) {
   )
 }
 
-function StudySectionCard({ section, isAR }: any) {
+function StudySectionCard({ section, isAR, api, onUpdated }: any) {
   const def = STUDY_SECTIONS.find(d => d.key === section.sectionKey)
   const title = def ? (isAR ? def.ar : def.en) : section.title
   const content = section.content
 
+  // ── Innovation-P4: section-level edit / regenerate / approve / lock /
+  // comment, version history, cross-section impact preview ────────────────
+  const [editing, setEditing] = useState(false)
+  const [editDraft, setEditDraft] = useState<any>(null)
+  const [saving, setSaving] = useState(false)
+  const [revisiting, setRevisiting] = useState(false)
+  const [guidance, setGuidance] = useState('')
+  const [showGuidanceBox, setShowGuidanceBox] = useState(false)
+  const [showComments, setShowComments] = useState(false)
+  const [comments, setComments] = useState<any[]>([])
+  const [newComment, setNewComment] = useState('')
+  const [showVersions, setShowVersions] = useState(false)
+  const [versions, setVersions] = useState<any[]>([])
+  const [impactWarning, setImpactWarning] = useState<string[] | null>(null)
+  const [actionError, setActionError] = useState('')
+
+  const locked = !!section.locked
+  const approved = section.status === 'APPROVED'
+
+  const loadImpactPreview = async () => {
+    try {
+      const preview = await api.get(`/innovation/study-sections/impact-preview/${section.sectionKey}`)
+      setImpactWarning(preview?.potentiallyStaleSections?.length ? preview.potentiallyStaleSections : null)
+    } catch { setImpactWarning(null) }
+  }
+
+  const startEdit = async () => {
+    setActionError('')
+    await loadImpactPreview()
+    setEditDraft(def?.shape === 'recommendation' ? { ...content } : def?.shape === 'list' ? JSON.stringify(content, null, 2) : (content || ''))
+    setEditing(true)
+  }
+
+  const saveEdit = async () => {
+    setSaving(true); setActionError('')
+    try {
+      let payload = editDraft
+      if (def?.shape === 'list') {
+        try { payload = JSON.parse(editDraft) } catch { setActionError(isAR ? 'صيغة JSON غير صالحة' : 'Invalid JSON — check the structure before saving.'); setSaving(false); return }
+      }
+      await api.put(`/innovation/study-sections/${section.id}/content`, { content: payload })
+      setEditing(false)
+      onUpdated()
+    } catch (e: any) { setActionError(e.message || String(e)) } finally { setSaving(false) }
+  }
+
+  const revisitWithAI = async () => {
+    if (!guidance || guidance.trim().length < 5) { setActionError(isAR ? 'يرجى تقديم توجيه محدد' : 'Please provide specific guidance on what should change.'); return }
+    setRevisiting(true); setActionError('')
+    try {
+      await api.post(`/innovation/study-sections/${section.id}/revisit`, { guidance })
+      setShowGuidanceBox(false); setGuidance('')
+      onUpdated()
+    } catch (e: any) { setActionError(e.message || String(e)) } finally { setRevisiting(false) }
+  }
+
+  const approve = async () => { try { await api.post(`/innovation/study-sections/${section.id}/approve`); onUpdated() } catch (e: any) { setActionError(e.message || String(e)) } }
+  const toggleLock = async () => {
+    try { await api.post(`/innovation/study-sections/${section.id}/${locked ? 'unlock' : 'lock'}`); onUpdated() }
+    catch (e: any) { setActionError(e.message || String(e)) }
+  }
+
+  const loadComments = async () => {
+    const list = await api.get(`/innovation/study-sections/${section.id}/comments`)
+    setComments(Array.isArray(list) ? list : [])
+  }
+  const toggleComments = async () => { if (!showComments) await loadComments(); setShowComments(!showComments) }
+  const submitComment = async () => {
+    if (!newComment.trim()) return
+    await api.post(`/innovation/study-sections/${section.id}/comments`, { body: newComment })
+    setNewComment(''); await loadComments()
+  }
+  const resolveComment = async (commentId: string) => { await api.post(`/innovation/study-section-comments/${commentId}/resolve`); await loadComments() }
+
+  const loadVersions = async () => {
+    const list = await api.get(`/innovation/study-sections/${section.id}/versions`)
+    setVersions(Array.isArray(list) ? list : [])
+  }
+  const toggleVersions = async () => { if (!showVersions) await loadVersions(); setShowVersions(!showVersions) }
+
+  const STATUS_COLOR: Record<string, string> = { PENDING: '#64748B', GENERATING: '#f39c12', AI_DRAFT: '#3498db', UNDER_REVIEW: '#f39c12', APPROVED: '#2ecc71' }
+
   return (
     <div style={{ ...S.card, marginBottom: 12 }}>
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 10 }}>{title}</div>
-      {content == null ? (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' as const }}>
+        <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{title}</div>
+        <span style={S.badge(STATUS_COLOR[section.status] || '#64748B')}>{section.status?.replace(/_/g, ' ')}</span>
+        {locked && <span style={S.badge('#64748B')}>🔒 {isAR ? 'مقفل' : 'Locked'}</span>}
+        {content != null && !editing && (
+          <>
+            {!locked && <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 11 }} onClick={startEdit}>✏ {isAR ? 'تعديل' : 'Edit'}</button>}
+            {!locked && <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 11 }} onClick={async () => { await loadImpactPreview(); setShowGuidanceBox(true) }}>✨ {isAR ? 'إعادة النظر بالذكاء الاصطناعي' : 'Revisit with AI'}</button>}
+            {!approved && <button style={{ ...S.btn('primary'), padding: '4px 10px', fontSize: 11 }} onClick={approve}>✓ {isAR ? 'اعتماد' : 'Approve'}</button>}
+            <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 11 }} onClick={toggleLock}>{locked ? (isAR ? '🔓 فتح' : '🔓 Unlock') : (isAR ? '🔒 قفل' : '🔒 Lock')}</button>
+            <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 11 }} onClick={toggleComments}>💬 {isAR ? 'تعليقات' : 'Comments'}</button>
+            <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 11 }} onClick={toggleVersions}>🕘 {isAR ? 'السجل' : 'History'}</button>
+          </>
+        )}
+      </div>
+
+      {actionError && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 10 }}>{actionError}</div>}
+
+      {showGuidanceBox && (
+        <div style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+          <div style={S.label}>{isAR ? 'ما الذي يجب أن يتغير؟ (مطلوب)' : 'What should change? (required)'}</div>
+          {impactWarning && (
+            <div style={{ fontSize: 11, color: '#f39c12', marginBottom: 8 }}>
+              ⚠ {isAR ? 'قد تحتاج هذه الأقسام لمراجعة بعد هذا التغيير: ' : 'These sections may need re-review after this change: '}
+              {impactWarning.map(k => STUDY_SECTIONS.find(d => d.key === k)?.[isAR ? 'ar' : 'en'] || k).join(', ')}
+            </div>
+          )}
+          <textarea style={{ ...S.input, minHeight: 60, resize: 'vertical' as const, fontFamily: 'inherit' }} value={guidance} onChange={e => setGuidance(e.target.value)} placeholder={isAR ? 'مثال: اجعل تقدير التكلفة أكثر تحفظًا' : 'e.g. Make the cost estimate more conservative'} />
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={revisitWithAI} disabled={revisiting}>{revisiting ? (isAR ? 'جارٍ...' : 'Working...') : (isAR ? 'إرسال' : 'Submit')}</button>
+            <button style={S.btn()} onClick={() => { setShowGuidanceBox(false); setGuidance('') }}>{isAR ? 'إلغاء' : 'Cancel'}</button>
+          </div>
+        </div>
+      )}
+
+      {editing ? (
+        <div>
+          {impactWarning && (
+            <div style={{ fontSize: 11, color: '#f39c12', marginBottom: 8 }}>
+              ⚠ {isAR ? 'قد تحتاج هذه الأقسام لمراجعة بعد هذا التغيير: ' : 'These sections may need re-review after this change: '}
+              {impactWarning.map(k => STUDY_SECTIONS.find(d => d.key === k)?.[isAR ? 'ar' : 'en'] || k).join(', ')}
+            </div>
+          )}
+          {def?.shape === 'recommendation' ? (
+            <div>
+              <div style={S.label}>{isAR ? 'التوصية' : 'Recommendation'}</div>
+              <select style={S.input} value={editDraft?.recommendation || ''} onChange={e => setEditDraft((d: any) => ({ ...d, recommendation: e.target.value }))}>
+                {Object.keys(RECOMMENDATION_LABEL).map(k => <option key={k} value={k}>{isAR ? RECOMMENDATION_LABEL[k].ar : RECOMMENDATION_LABEL[k].en}</option>)}
+              </select>
+              <div style={S.label}>{isAR ? 'المبررات' : 'Rationale'}</div>
+              <textarea style={{ ...S.input, minHeight: 100, resize: 'vertical' as const, fontFamily: 'inherit' }} value={editDraft?.rationale || ''} onChange={e => setEditDraft((d: any) => ({ ...d, rationale: e.target.value }))} />
+            </div>
+          ) : def?.shape === 'list' ? (
+            <textarea style={{ ...S.input, minHeight: 160, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }} value={editDraft || ''} onChange={e => setEditDraft(e.target.value)} />
+          ) : (
+            <textarea style={{ ...S.input, minHeight: 120, resize: 'vertical' as const, fontFamily: 'inherit' }} value={editDraft || ''} onChange={e => setEditDraft(e.target.value)} />
+          )}
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={saveEdit} disabled={saving}>{saving ? (isAR ? 'جارٍ الحفظ...' : 'Saving...') : (isAR ? 'حفظ' : 'Save')}</button>
+            <button style={S.btn()} onClick={() => setEditing(false)}>{isAR ? 'إلغاء' : 'Cancel'}</button>
+          </div>
+        </div>
+      ) : content == null ? (
         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لم يتم إنشاء هذا القسم بعد' : 'Not yet generated'}</div>
       ) : def?.shape === 'text' ? (
         <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' as const }}>{content}</div>
@@ -974,6 +1117,42 @@ function StudySectionCard({ section, isAR }: any) {
         </div>
       ) : (
         <div style={{ fontSize: 13 }}>{JSON.stringify(content)}</div>
+      )}
+
+      {showComments && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+          {comments.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? 'لا توجد تعليقات بعد' : 'No comments yet'}</div>}
+          {comments.map((c: any) => (
+            <div key={c.id} style={{ background: 'var(--navy)', borderRadius: 8, padding: 10, marginBottom: 8, opacity: c.resolved ? 0.6 : 1 }}>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>{c.body}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(c.createdAt).toLocaleString()}</span>
+                {c.resolved ? <span style={S.badge('#2ecc71')}>{isAR ? 'تم الحل' : 'Resolved'}</span> : (
+                  <button style={{ ...S.btn(), padding: '2px 8px', fontSize: 10 }} onClick={() => resolveComment(c.id)}>{isAR ? 'وضع علامة كمحلول' : 'Mark resolved'}</button>
+                )}
+              </div>
+            </div>
+          ))}
+          <div style={S.row}>
+            <input style={{ ...S.input, marginBottom: 0 }} value={newComment} onChange={e => setNewComment(e.target.value)} placeholder={isAR ? 'أضف تعليقًا...' : 'Add a comment...'} />
+            <button style={S.btn('primary')} onClick={submitComment}>{isAR ? 'إرسال' : 'Post'}</button>
+          </div>
+        </div>
+      )}
+
+      {showVersions && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+          {versions.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا يوجد سجل تعديلات بعد' : 'No edit history yet'}</div>}
+          {versions.map((v: any) => (
+            <div key={v.id} style={{ background: 'var(--navy)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={S.badge(v.changeType === 'AI_REVISIT' ? '#9b59b6' : '#3498db')}>{v.changeType === 'AI_REVISIT' ? (isAR ? 'مراجعة بالذكاء الاصطناعي' : 'AI Revisit') : (isAR ? 'تعديل يدوي' : 'Manual Edit')}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(v.createdAt).toLocaleString()}</span>
+              </div>
+              {v.changeReason && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>"{v.changeReason}"</div>}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -1082,7 +1261,7 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
         <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 30, marginBottom: 16 }}>{t('innov.not_generated_yet')}</div>
       )}
 
-      {hasGeneratedContent && sortedSections.map((s: any) => <StudySectionCard key={s.id} section={s} isAR={isAR} />)}
+      {hasGeneratedContent && sortedSections.map((s: any) => <StudySectionCard key={s.id} section={s} isAR={isAR} api={api} onUpdated={load} />)}
 
       <div style={{ ...S.card, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>

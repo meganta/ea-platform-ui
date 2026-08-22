@@ -735,3 +735,127 @@ describe('InnovationPage - Studies tab: Related EA Objects (Innovation-P5 tracea
     confirmSpy.mockRestore();
   });
 });
+
+describe('InnovationPage - Studies tab: study editor (Innovation-P4)', () => {
+  async function openStudy(study: any = GENERATED_STUDY) {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [study], '/innovation/studies/study-1': study, '/impact-preview': { changedSection: 'EXECUTIVE_SUMMARY', potentiallyStaleSections: [] } });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findByText('This is the summary.');
+  }
+
+  it('editing a narrative section persists the new content via PUT to the section content endpoint', async () => {
+    await openStudy();
+    const editButtons = screen.getAllByText('✏ Edit');
+    fireEvent.click(editButtons[0]); // EXECUTIVE_SUMMARY is the first section
+
+    const textarea = await screen.findByDisplayValue('This is the summary.');
+    fireEvent.change(textarea, { target: { value: 'Updated summary text.' } });
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/study-sections/sec-1/content') && c[1]?.method === 'PUT');
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(putCall[1].body)).toEqual({ content: 'Updated summary text.' });
+    });
+  });
+
+  it('editing the RECOMMENDATION section persists both fields as a real object via PUT, not a flattened string', async () => {
+    await openStudy();
+    const editButtons = screen.getAllByText('✏ Edit');
+    fireEvent.click(editButtons[2]); // RECOMMENDATION is the third section in GENERATED_STUDY
+
+    const rationaleInput = await screen.findByDisplayValue('Worth testing first');
+    fireEvent.change(rationaleInput, { target: { value: 'Updated rationale.' } });
+    fireEvent.click(screen.getByText('Save'));
+
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/study-sections/sec-3/content') && c[1]?.method === 'PUT');
+      expect(putCall).toBeDefined();
+      const body = JSON.parse(putCall[1].body);
+      expect(body.content.recommendation).toBe('PILOT');
+      expect(body.content.rationale).toBe('Updated rationale.');
+    });
+  });
+
+  it('Revisit with AI requires non-trivial guidance before submitting — a near-empty guidance shows an error and sends no request', async () => {
+    await openStudy();
+    fireEvent.click(screen.getAllByText('✨ Revisit with AI')[0]);
+    const textarea = await screen.findByPlaceholderText('e.g. Make the cost estimate more conservative');
+    fireEvent.change(textarea, { target: { value: 'ok' } });
+    fireEvent.click(screen.getByText('Submit'));
+
+    expect(await screen.findByText(/specific guidance/)).toBeInTheDocument();
+    const revisitCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/revisit'));
+    expect(revisitCall).toBeUndefined();
+  });
+
+  it('Revisit with AI with real guidance posts to the revisit endpoint with the guidance text', async () => {
+    await openStudy();
+    fireEvent.click(screen.getAllByText('✨ Revisit with AI')[0]);
+    const textarea = await screen.findByPlaceholderText('e.g. Make the cost estimate more conservative');
+    fireEvent.change(textarea, { target: { value: 'Make this section more specific about timelines.' } });
+    fireEvent.click(screen.getByText('Submit'));
+
+    await waitFor(() => {
+      const revisitCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/study-sections/sec-1/revisit'));
+      expect(revisitCall).toBeDefined();
+      expect(JSON.parse(revisitCall[1].body)).toEqual({ guidance: 'Make this section more specific about timelines.' });
+    });
+  });
+
+  it('approving a section posts to the approve endpoint', async () => {
+    await openStudy();
+    fireEvent.click(screen.getAllByText('✓ Approve')[0]);
+
+    await waitFor(() => {
+      const approveCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/study-sections/sec-1/approve'));
+      expect(approveCall).toBeDefined();
+      expect(approveCall[1].method).toBe('POST');
+    });
+  });
+
+  it('locking a section posts to the lock endpoint, and once locked, Edit/Revisit buttons are no longer offered for that section', async () => {
+    const lockedStudy = { ...GENERATED_STUDY, sections: [{ ...GENERATED_STUDY.sections[0], locked: true }] };
+    await openStudy(lockedStudy);
+    expect(screen.getByText('🔒 Locked')).toBeInTheDocument();
+    expect(screen.queryByText('✏ Edit')).not.toBeInTheDocument();
+    expect(screen.queryByText('✨ Revisit with AI')).not.toBeInTheDocument();
+  });
+
+  it('clicking unlock on a locked section posts to the unlock endpoint', async () => {
+    const lockedStudy = { ...GENERATED_STUDY, sections: [{ ...GENERATED_STUDY.sections[0], locked: true }] };
+    await openStudy(lockedStudy);
+    fireEvent.click(screen.getByText('🔓 Unlock'));
+
+    await waitFor(() => {
+      const unlockCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/study-sections/sec-1/unlock'));
+      expect(unlockCall).toBeDefined();
+    });
+  });
+
+  it('posting a comment sends it to the comments endpoint with the section-scoped body', async () => {
+    await openStudy();
+    fireEvent.click(screen.getAllByText('💬 Comments')[0]);
+    const input = await screen.findByPlaceholderText('Add a comment...');
+    fireEvent.change(input, { target: { value: 'This needs more detail on cost.' } });
+    fireEvent.click(screen.getByText('Post'));
+
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/study-sections/sec-1/comments') && c[1]?.method === 'POST');
+      expect(postCall).toBeDefined();
+      expect(JSON.parse(postCall[1].body)).toEqual({ body: 'This needs more detail on cost.' });
+    });
+  });
+
+  it('opening version history fetches from the versions endpoint for the correct section', async () => {
+    await openStudy();
+    fireEvent.click(screen.getAllByText('🕘 History')[0]);
+
+    await waitFor(() => {
+      const versionsCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/study-sections/sec-1/versions'));
+      expect(versionsCall).toBeDefined();
+    });
+  });
+});
