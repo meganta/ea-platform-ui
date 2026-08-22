@@ -209,7 +209,7 @@ function DomainsManager({ api }: { api: any }) {
 
   const load = useCallback(() => {
     setLoading(true)
-    api.get('/meta-model/domains').then((d: any) => { setDomains(Array.isArray(d) ? d : []); setLoading(false) })
+    api.get('/meta-model/domains').then((d: any) => { setDomains(Array.isArray(d) ? d : []); setLoading(false) }).catch(() => setLoading(false))
   }, [api])
 
   useEffect(() => { load() }, [load])
@@ -314,7 +314,7 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
     Promise.all([
       api.get('/meta-model/object-types'),
       api.get('/meta-model/domains'),
-    ]).then(([t, d]: any[]) => { setTypes(Array.isArray(t) ? t : []); setDomains(Array.isArray(d) ? d : []); setLoading(false) })
+    ]).then(([t, d]: any[]) => { setTypes(Array.isArray(t) ? t : []); setDomains(Array.isArray(d) ? d : []); setLoading(false) }).catch(() => setLoading(false))
   }, [api])
 
   useEffect(() => { load() }, [load])
@@ -566,11 +566,11 @@ function RelationshipsManager({ api }: { api: any }) {
       setRels(Array.isArray(r) ? r : [])
       setTypes(Array.isArray(t) ? t : [])
       setLoading(false)
-    })
+    }).catch(() => setLoading(false))
   }, [api])
 
   const loadMatrix = useCallback(() => {
-    api.get('/meta-model/relationships/matrix').then((m: any) => setMatrix(m))
+    api.get('/meta-model/relationships/matrix').then((m: any) => setMatrix(m)).catch(() => setMatrix(null))
   }, [api])
 
   useEffect(() => { load() }, [load])
@@ -1284,12 +1284,30 @@ function EnumDesigner({ api }: { api: any }) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const draft = await api.get('/meta-model/draft')
-    const vid = draft?.id || ''
-    setVersionId(vid)
-    if (vid) {
-      const data = await api.get(`/meta-model/enums?versionId=${vid}`)
-      setEnums(Array.isArray(data) ? data : [])
+    try {
+      // Falls back to the published version when there's no pending draft
+      // (the normal state right after a publish) - previously this threw
+      // on the very first line whenever no draft existed, with no
+      // .catch() anywhere in the chain, leaving the Enums tab stuck on
+      // "Loading..." forever. Matches the same fallback the backend's
+      // Domains/Object Types/Relationships list() methods now use (see
+      // TenantMetaModelService.getCurrentVersionForViewing()).
+      let version
+      try {
+        version = await api.get('/meta-model/draft')
+      } catch {
+        version = await api.get('/meta-model/published')
+      }
+      const vid = version?.id || ''
+      setVersionId(vid)
+      if (vid) {
+        const data = await api.get(`/meta-model/enums?versionId=${vid}`)
+        setEnums(Array.isArray(data) ? data : [])
+      } else {
+        setEnums([])
+      }
+    } catch {
+      setEnums([])
     }
     setLoading(false)
   }, [api])

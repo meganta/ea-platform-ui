@@ -14,7 +14,13 @@ function mockFetch(routes: Record<string, any>) {
   global.fetch = jest.fn().mockImplementation((url: string, options?: any) => {
     for (const pattern of sortedPatterns) {
       if (url.includes(pattern)) {
-        const value = typeof routes[pattern] === 'function' ? routes[pattern](options) : routes[pattern];
+        const routeValue = routes[pattern];
+        // A route can be marked as a failure with { __fail: true, status }
+        // to exercise error-handling paths, rather than always resolving ok.
+        if (routeValue && typeof routeValue === 'object' && routeValue.__fail) {
+          return Promise.resolve({ ok: false, status: routeValue.status ?? 500, statusText: 'Error', json: () => Promise.resolve({}), text: () => Promise.resolve('{}') });
+        }
+        const value = typeof routeValue === 'function' ? routeValue(options) : routeValue;
         return Promise.resolve({ ok: true, json: () => Promise.resolve(value), text: () => Promise.resolve(JSON.stringify(value)) });
       }
     }
@@ -128,6 +134,17 @@ describe('MetaModelPage - DomainsManager', () => {
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
     confirmSpy.mockRestore();
   });
+
+  it('stops the loading spinner instead of hanging forever when the domains request fails - the actual reported bug (all four Meta-Model Studio tabs stuck on "Loading..." with no visible error, since none of their fetch chains had a .catch())', async () => {
+    mockFetch({ '/meta-model/stats': STATS_WITH_MODEL, '/meta-model/domains': { __fail: true, status: 500 } });
+    render(<MetaModelPage />);
+    fireEvent.click(await screen.findByText('🗂 Domains'));
+    // Falls through to the same empty-state UI as a genuinely-empty
+    // domains list, rather than leaving a spinner on screen forever -
+    // matches this page's established pattern elsewhere in the codebase
+    // for turning a fetch failure into a safe, inert empty state.
+    expect(await screen.findByText(/No domains yet/)).toBeInTheDocument();
+  });
 });
 
 describe('MetaModelPage - ValidationPanel', () => {
@@ -179,5 +196,39 @@ describe('MetaModelPage - ObjectTypesList navigation', () => {
     fireEvent.click(otCard);
     // Editor view shows a Back button that the list view doesn't have
     await waitFor(() => expect(screen.getAllByText(/Back/).length).toBeGreaterThan(0));
+  });
+
+  it('stops the loading spinner instead of hanging forever when the object-types request fails', async () => {
+    mockFetch({ '/meta-model/stats': STATS_WITH_MODEL, '/meta-model/object-types': { __fail: true, status: 500 } });
+    render(<MetaModelPage />);
+    fireEvent.click(await screen.findByText('⬛ Object Types'));
+    // No spinner left on screen - the tab strip itself remains interactive,
+    // which is enough to prove loading resolved rather than hanging.
+    await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+  });
+});
+
+describe('MetaModelPage - EnumDesigner draft/published fallback', () => {
+  it("falls back to the published version's enums when there's no pending draft - the actual reported bug: EnumDesigner's load() threw on its very first line (fetching /meta-model/draft) whenever no draft existed, with no error handling anywhere in the chain, leaving the Enums tab stuck on Loading forever", async () => {
+    mockFetch({
+      '/meta-model/stats': STATS_WITH_MODEL,
+      '/meta-model/draft': { __fail: true, status: 404 },
+      '/meta-model/published': { id: 'published-version-1' },
+      '/meta-model/enums?versionId=published-version-1': [{ id: 'e1', code: 'STATUS', name: 'Status' }],
+    });
+    render(<MetaModelPage />);
+    fireEvent.click(await screen.findByText('🏷 Enums'));
+    expect(await screen.findByText('Status')).toBeInTheDocument();
+  });
+
+  it('shows an empty state rather than hanging when neither a draft nor a published version exists', async () => {
+    mockFetch({
+      '/meta-model/stats': STATS_WITH_MODEL,
+      '/meta-model/draft': { __fail: true, status: 404 },
+      '/meta-model/published': { __fail: true, status: 404 },
+    });
+    render(<MetaModelPage />);
+    fireEvent.click(await screen.findByText('🏷 Enums'));
+    await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
   });
 });
