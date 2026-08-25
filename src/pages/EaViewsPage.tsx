@@ -100,17 +100,33 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
   const [viewpoints, setViewpoints] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState('')
+  const [compatibility, setCompatibility] = useState<Record<string, any>>({})
 
   useEffect(() => {
     Promise.all([api.get('/ea-views/viewpoints'), api.post('/ea-views/viewpoints/seed')]).then(([vps]: any[]) => {
-      setViewpoints(Array.isArray(vps) ? vps : [])
+      const list = Array.isArray(vps) ? vps : []
+      setViewpoints(list)
       setLoading(false)
+      // Fired once per viewpoint after the list itself has loaded, not
+      // blocking the initial render - compatibility badges fill in
+      // progressively rather than delaying the whole library.
+      list.forEach((vp: any) => {
+        api.get(`/ea-views/viewpoints/${vp.id}/compatibility`).then((c: any) => {
+          if (c) setCompatibility(prev => ({ ...prev, [vp.id]: c }))
+        }).catch(() => {})
+      })
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const categories = Array.from(new Set(viewpoints.map(v => v.category)))
   const filtered = viewpoints.filter(v => !filterCat || v.category === filterCat)
+
+  const COMPAT_BADGE: Record<string, { label: string; color: string }> = {
+    COMPATIBLE: { label: '✓ Compatible', color: '#2ecc71' },
+    PARTIAL: { label: '! Partial', color: '#f39c12' },
+    NOT_COMPATIBLE: { label: '✕ Not Compatible', color: '#e74c3c' },
+  }
 
   return (
     <div>
@@ -126,7 +142,10 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
 
       {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          {filtered.map(vp => (
+          {filtered.map(vp => {
+            const compat = compatibility[vp.id]
+            const badge = compat ? COMPAT_BADGE[compat.status] : null
+            return (
             <div key={vp.id} style={{ ...S.card, cursor: 'pointer', transition: 'all 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = CATEGORY_COLOR[vp.category] || 'var(--accent)')}
               onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
@@ -136,9 +155,10 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: 14 }}>{vp.name}</div>
-                  <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' as const }}>
                     <span style={S.badge(CATEGORY_COLOR[vp.category] || '#3498db')}>{vp.category}</span>
                     <span style={S.badge('#7f8c8d')}>{(vp.defaultVisualization||'').replace(/_/g,' ')}</span>
+                    {badge && <span style={S.badge(badge.color)} title={compat.status === 'PARTIAL' || compat.status === 'NOT_COMPATIBLE' ? `Missing data for: ${compat.missingRootTypes.join(', ')}` : undefined}>{badge.label}</span>}
                   </div>
                 </div>
               </div>
@@ -146,7 +166,8 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
               {vp.purpose && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 12 }}>Purpose: {vp.purpose}</div>}
               <button style={{ ...S.btn('primary'), width: '100%', fontSize: 12 }} onClick={() => onCreate(vp)}>▶ Activate View</button>
             </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
@@ -178,6 +199,12 @@ function MyViews({ api, onOpen }: { api: any, onOpen: (v: any) => void }) {
     e.stopPropagation()
     if (!window.confirm('Delete this view?')) return
     await api.del(`/ea-views/${id}`)
+    load()
+  }
+
+  const cloneView = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    await api.post(`/ea-views/${id}/clone`)
     load()
   }
 
@@ -234,6 +261,7 @@ function MyViews({ api, onOpen }: { api: any, onOpen: (v: any) => void }) {
               </div>
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                 <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={e => toggleFav(e, v.id)}>⭐</button>
+                <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={e => cloneView(e, v.id)} title="Clone this view">⧉</button>
                 <button style={{ ...S.btn('danger'), padding: '3px 10px', fontSize: 12 }} onClick={e => deleteView(e, v.id)}>✕</button>
               </div>
             </div>
@@ -253,6 +281,9 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [search, setSearch] = useState('')
+  const [savedFilters, setSavedFilters] = useState<any[]>([])
+  const [showSaveFilterBox, setShowSaveFilterBox] = useState(false)
+  const [saveFilterName, setSaveFilterName] = useState('')
   const [selected, setSelected] = useState<any>(null)
   const [showSharePanel, setShowSharePanel] = useState(false)
   const [shareData, setShareData] = useState<any>(null)
@@ -353,6 +384,36 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
   }, [view.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    api.get('/ea-views/saved-filters').then((f: any) => setSavedFilters(Array.isArray(f) ? f : [])).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const applySavedFilter = (filterId: string) => {
+    const f = savedFilters.find((sf: any) => sf.id === filterId)
+    if (!f) return
+    const cfg = f.filterConfig || {}
+    setFilterDomain(cfg.domain || '')
+    setFilterType(cfg.assetType || '')
+    setFilterStatus(cfg.status || '')
+    setSearch(cfg.search || '')
+  }
+
+  const saveCurrentFilters = async () => {
+    if (!saveFilterName.trim()) return
+    const filterConfig = { domain: filterDomain || undefined, assetType: filterType || undefined, status: filterStatus || undefined, search: search || undefined }
+    const created = await api.post('/ea-views/saved-filters', { name: saveFilterName.trim(), filterConfig })
+    if (created?.id) setSavedFilters(prev => [...prev, created])
+    setShowSaveFilterBox(false)
+    setSaveFilterName('')
+  }
+
+  const deleteSavedFilter = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    await api.del(`/ea-views/saved-filters/${id}`)
+    setSavedFilters(prev => prev.filter((f: any) => f.id !== id))
+  }
 
   const publish = async () => {
     await api.post(`/ea-views/${view.id}/publish`)
@@ -910,8 +971,34 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
           <option value="">All Status</option>
           {['APPROVED','ACTIVE','UNDER_REVIEW','DRAFT','PLANNED','DEPRECATED'].map(s=><option key={s} value={s}>{s}</option>)}
         </select>
+        {savedFilters.length > 0 && (
+          <select style={{ ...S.input, maxWidth:170 }} value="" onChange={e => { if (e.target.value) applySavedFilter(e.target.value) }}>
+            <option value="">📁 Apply Saved Filter...</option>
+            {savedFilters.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        )}
+        <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setShowSaveFilterBox(v => !v)}>💾 Save Filters</button>
         <div style={{ marginLeft:'auto', fontSize:13, color:'var(--text-dim)', display:'flex', alignItems:'center' }}>{filteredNodes.length} / {data?.nodes?.length||0} objects</div>
       </div>
+
+      {showSaveFilterBox && (
+        <div style={{ ...S.card, marginBottom:16, padding:12, display:'flex', gap:8, alignItems:'center' }}>
+          <input style={{ ...S.input, maxWidth:220 }} placeholder="e.g. Critical Applications" value={saveFilterName} onChange={e => setSaveFilterName(e.target.value)} autoFocus />
+          <button style={{ ...S.btn('primary'), fontSize:12 }} disabled={!saveFilterName.trim()} onClick={saveCurrentFilters}>Save Current Filters</button>
+          <button style={{ ...S.btn(), fontSize:12 }} onClick={() => { setShowSaveFilterBox(false); setSaveFilterName('') }}>Cancel</button>
+        </div>
+      )}
+
+      {savedFilters.length > 0 && (
+        <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' as const }}>
+          {savedFilters.map((f: any) => (
+            <span key={f.id} style={{ ...S.badge('#7f8c8d'), display:'flex', alignItems:'center', gap:6, cursor:'pointer' }} onClick={() => applySavedFilter(f.id)}>
+              📁 {f.name}
+              <span onClick={(e) => deleteSavedFilter(e, f.id)} style={{ opacity:0.6 }} title="Delete this saved filter">✕</span>
+            </span>
+          ))}
+        </div>
+      )}
 
       {/* Share panel */}
       {showSharePanel && shareData && (

@@ -90,6 +90,39 @@ describe('EaViewsPage - ViewLibrary', () => {
     // Builder view hides the tab strip
     await waitFor(() => expect(screen.queryByText('🏠 Dashboard')).not.toBeInTheDocument());
   });
+
+  it('shows a Compatible badge once the compatibility check resolves', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views/viewpoints': [SAMPLE_VIEWPOINT],
+      '/ea-views/viewpoints/vp1/compatibility': { status: 'COMPATIBLE', rootTypeStatus: [], relatedTypeStatus: [], missingRootTypes: [] },
+    });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    await screen.findByText('Application Landscape');
+    expect(await screen.findByText('✓ Compatible')).toBeInTheDocument();
+  });
+
+  it('shows a Not Compatible badge when the tenant has no data for the required types', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views/viewpoints': [SAMPLE_VIEWPOINT],
+      '/ea-views/viewpoints/vp1/compatibility': { status: 'NOT_COMPATIBLE', rootTypeStatus: [], relatedTypeStatus: [], missingRootTypes: ['APPLICATION'] },
+    });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    await screen.findByText('Application Landscape');
+    expect(await screen.findByText('✕ Not Compatible')).toBeInTheDocument();
+  });
+
+  it('the library still renders (without a badge) when the compatibility check fails, rather than breaking the whole card', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views/viewpoints': [SAMPLE_VIEWPOINT],
+      '/ea-views/viewpoints/vp1/compatibility': { __fail: true, status: 500 },
+    });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    expect(await screen.findByText('Application Landscape')).toBeInTheDocument();
+    expect(screen.queryByText(/Compatible/)).not.toBeInTheDocument();
+  });
 });
 
 describe('EaViewsPage - MyViews', () => {
@@ -150,6 +183,23 @@ describe('EaViewsPage - MyViews', () => {
       expect(favCall).toBeDefined();
       expect(favCall[1].method).toBe('POST');
     });
+  });
+
+  it('clicking the clone button POSTs to the clone endpoint and refreshes the list, without opening the original view', async () => {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views': [SAMPLE_VIEW] });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    await screen.findByText('Payments Landscape');
+    fireEvent.click(screen.getByTitle('Clone this view'));
+    await waitFor(() => {
+      const cloneCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ea-views/v1/clone'));
+      expect(cloneCall).toBeDefined();
+      expect(cloneCall[1].method).toBe('POST');
+    });
+    // Still on my-views (tab strip visible), not navigated into the viewer -
+    // same event-propagation-stopped pattern already proven for favorite/delete.
+    expect(screen.getByText('🏠 Dashboard')).toBeInTheDocument();
   });
 
   it('does not delete when the user cancels the confirmation dialog', async () => {
@@ -261,6 +311,80 @@ describe('EaViewsPage - ViewViewer dashboard/roadmap branching', () => {
     const calls = (global.fetch as jest.Mock).mock.calls.map((c: any) => c[0]);
     expect(calls.some((u: string) => u.includes('/v1/roadmap'))).toBe(false);
     expect(calls.some((u: string) => u.includes('/v1/dashboard'))).toBe(false);
+  });
+});
+
+describe('EaViewsPage - Saved Filters', () => {
+  const GRAPH_VIEW = { id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH' };
+  async function openGraphView(extraRoutes: Record<string, any> = {}) {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [GRAPH_VIEW],
+      '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} },
+      '/ea-views/saved-filters': [],
+      ...extraRoutes,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('App Landscape'));
+  }
+
+  it('fetches the saved filter list when a view opens', async () => {
+    await openGraphView({ '/ea-views/saved-filters': [{ id: 'f1', name: 'Critical Applications', filterConfig: { status: 'APPROVED' } }] });
+    expect(await screen.findByText('📁 Critical Applications')).toBeInTheDocument();
+  });
+
+  it('does not show the saved-filters dropdown/chip list when there are none yet', async () => {
+    await openGraphView({ '/ea-views/saved-filters': [] });
+    await screen.findByText(/objects/); // wait for the view to finish loading
+    expect(screen.queryByText('📁 Apply Saved Filter...')).not.toBeInTheDocument();
+  });
+
+  it('clicking Save Filters opens the name input box', async () => {
+    await openGraphView();
+    fireEvent.click(await screen.findByText('💾 Save Filters'));
+    expect(screen.getByPlaceholderText(/Critical Applications/)).toBeInTheDocument();
+  });
+
+  it('Save Current Filters is disabled until a name is entered', async () => {
+    await openGraphView();
+    fireEvent.click(await screen.findByText('💾 Save Filters'));
+    expect(screen.getByText('Save Current Filters')).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText(/Critical Applications/), { target: { value: 'My Preset' } });
+    expect(screen.getByText('Save Current Filters')).not.toBeDisabled();
+  });
+
+  it('saving posts the current filter state and adds the new preset to the visible list', async () => {
+    await openGraphView({
+      '/ea-views/saved-filters': (opts: any) => {
+        if (opts?.method === 'POST') return { id: 'new-f1', name: JSON.parse(opts.body).name, filterConfig: JSON.parse(opts.body).filterConfig };
+        return [];
+      },
+    });
+    fireEvent.click(await screen.findByText('💾 Save Filters'));
+    fireEvent.change(screen.getByPlaceholderText(/Critical Applications/), { target: { value: 'My Preset' } });
+    fireEvent.click(screen.getByText('Save Current Filters'));
+    expect(await screen.findByText('📁 My Preset')).toBeInTheDocument();
+    const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ea-views/saved-filters') && c[1]?.method === 'POST');
+    expect(postCall).toBeDefined();
+    expect(JSON.parse(postCall[1].body).name).toBe('My Preset');
+  });
+
+  it('clicking a saved filter chip applies its filterConfig to the current view', async () => {
+    await openGraphView({ '/ea-views/saved-filters': [{ id: 'f1', name: 'Approved Only', filterConfig: { status: 'APPROVED', search: 'payments' } }] });
+    fireEvent.click(await screen.findByText('📁 Approved Only'));
+    expect((screen.getByPlaceholderText('🔍 Search...') as HTMLInputElement).value).toBe('payments');
+  });
+
+  it('deleting a saved filter chip removes it from the list without applying it', async () => {
+    await openGraphView({ '/ea-views/saved-filters': [{ id: 'f1', name: 'To Delete', filterConfig: { status: 'APPROVED' } }] });
+    await screen.findByText('📁 To Delete');
+    fireEvent.click(screen.getByTitle('Delete this saved filter'));
+    await waitFor(() => expect(screen.queryByText('📁 To Delete')).not.toBeInTheDocument());
+    const deleteCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ea-views/saved-filters/f1'));
+    expect(deleteCall[1].method).toBe('DELETE');
+    // Did not also apply the filter as a side effect of clicking the ✕
+    expect((screen.getByPlaceholderText('🔍 Search...') as HTMLInputElement).value).toBe('');
   });
 });
 
