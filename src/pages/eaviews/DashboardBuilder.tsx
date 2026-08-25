@@ -321,7 +321,7 @@ function WidgetContent({ widget, result }: { widget: DashboardWidget; result: an
     return (
       <div style={{ overflow: 'auto', flex: 1 }}>
         <table style={{ fontSize: 10, borderCollapse: 'collapse' }}>
-          <thead><tr><th /> {targets.map((t: any) => <th key={t.id} style={{ padding: 3, writingMode: 'vertical-rl' as const, fontWeight: 400, color: 'var(--text-dim)' }}>{t.name.slice(0, 14)}</th>)}</tr></thead>
+          <thead><tr><th />{targets.map((t: any) => <th key={t.id} style={{ padding: 3, writingMode: 'vertical-rl' as const, fontWeight: 400, color: 'var(--text-dim)' }}>{t.name.slice(0, 14)}</th>)}</tr></thead>
           <tbody>
             {sources.map((s: any) => (
               <tr key={s.id}>

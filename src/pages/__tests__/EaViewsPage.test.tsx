@@ -589,7 +589,7 @@ describe('EaViewsPage - ViewBuilder Path Builder wiring', () => {
     fireEvent.click(screen.getByText('CAPABILITY'));
     fireEvent.click(await screen.findByText(/uses/));
     fireEvent.change(screen.getByPlaceholderText(/Q4 2026 Application Portfolio/), { target: { value: 'My Path View' } });
-    fireEvent.click(screen.getByText('Save View'));
+    fireEvent.click(screen.getByText(/Create View/));
     await waitFor(() => {
       const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].endsWith('/ea-views') && c[1]?.method === 'POST');
       expect(postCall).toBeDefined();

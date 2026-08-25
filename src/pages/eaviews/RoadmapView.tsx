@@ -26,9 +26,8 @@ export function RoadmapConfigPanel({ api, assetType, initial, onSave, onCancel }
   useEffect(() => {
     setLoading(true)
     api.get(`/ea-views/date-fields?assetType=${encodeURIComponent(assetType)}`)
-      .then((fields: any) => setDateFields(Array.isArray(fields) ? fields : []))
-      .catch(() => setDateFields([]))
-      .then(() => setLoading(false))
+      .then((fields: any) => { setDateFields(Array.isArray(fields) ? fields : []); setLoading(false) })
+      .catch(() => { setDateFields([]); setLoading(false) })
   }, [api, assetType])
 
   if (loading) return <div style={{ ...S_LOCAL.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>Loading available date fields...</div>

@@ -305,11 +305,11 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
     setRoadmapNeedsConfig(false)
     api.get(`/ea-views/${view.id}/roadmap`)
       .then((d: any) => {
-        if (d?.error || d?.statusCode === 400) { setRoadmapNeedsConfig(true); return }
+        if (d?.error || d?.statusCode === 400) { setRoadmapNeedsConfig(true); setRoadmapLoading(false); return }
         setRoadmapItems(d?.items || [])
+        setRoadmapLoading(false)
       })
-      .catch(() => setRoadmapNeedsConfig(true))
-      .then(() => setRoadmapLoading(false))
+      .catch(() => { setRoadmapNeedsConfig(true); setRoadmapLoading(false) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.id, isRoadmap])
 
@@ -335,9 +335,9 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
       .then((d: any) => {
         setDashboardWidgets(d?.widgets || [])
         setDashboardResults(d?.results || {})
+        setDashboardLoading(false)
       })
-      .catch(() => { setDashboardWidgets([]); setDashboardResults({}) })
-      .then(() => setDashboardLoading(false))
+      .catch(() => { setDashboardWidgets([]); setDashboardResults({}); setDashboardLoading(false) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view.id, isDashboard])
 

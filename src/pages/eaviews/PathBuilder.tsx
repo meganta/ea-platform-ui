@@ -45,9 +45,8 @@ export function PathBuilder({ api, rootType, initialPath, onChange }: { api: any
     if (!currentType) { setOptions([]); return }
     setLoading(true)
     api.get(`/ea-views/relationship-options?sourceType=${encodeURIComponent(currentType)}`)
-      .then((opts: any) => setOptions(Array.isArray(opts) ? opts : []))
-      .catch(() => setOptions([]))
-      .then(() => setLoading(false))
+      .then((opts: any) => { setOptions(Array.isArray(opts) ? opts : []); setLoading(false) })
+      .catch(() => { setOptions([]); setLoading(false) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentType, api])
 
@@ -64,13 +63,17 @@ export function PathBuilder({ api, rootType, initialPath, onChange }: { api: any
   }
 
   if (!rootType) {
-    return <div style={{ ...S_LOCAL.card, textAlign: 'center', color: 'var(--text-dim)', padding: 20 }}>Select a root object type first to build a relationship path.</div>
+    return <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 20 }}>Select a root object type first to build a relationship path.</div>
   }
 
+  // No own title or outer card wrapper here - the one and only caller
+  // (ViewBuilder's "Relationship Path" section) already provides both,
+  // and doubling either up reads as a genuine, confusing UI redundancy
+  // (two "Relationship Path" headings, a card nested inside a card), not
+  // just a test artifact - caught by a test asserting on a single
+  // occurrence of the heading text.
   return (
-    <div style={S_LOCAL.card}>
-      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Relationship Path</div>
-
+    <>
       {/* Breadcrumb of the path built so far */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' as const, marginBottom: 16 }}>
         <span style={S_LOCAL.badge('#3498db')}>{rootType.replace(/_/g, ' ')}</span>
@@ -102,6 +105,6 @@ export function PathBuilder({ api, rootType, initialPath, onChange }: { api: any
           </div>
         )
       )}
-    </div>
+    </>
   )
 }
