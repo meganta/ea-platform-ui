@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 
@@ -127,6 +128,7 @@ function AssetModal({ asset, config, onClose, onSave, t }: any) {
 }
 
 function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
+  const navigate = useNavigate()
   const [asset, setAsset] = useState(initialAsset)
   const [attachments, setAttachments] = useState(initialAsset.attachments || [])
 
@@ -276,6 +278,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
 
         <div className="flex gap-2 mt-4">
           <button className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Close</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/ea-views?objectContext=${asset.id}`)} title="Explore this object's relationships and dependencies in EA Views">🕸 Show Dependencies</button>
           <button className="btn btn-danger btn-sm" onClick={() => { onDelete(asset.id); onClose() }}>Delete Asset</button>
         </div>
       </div>

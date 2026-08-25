@@ -5,8 +5,19 @@ jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ token: 'fake-token' }),
 }));
 
+// EaViewsPage now uses useSearchParams (Object Context View entry point) -
+// mocked per this codebase's established pattern (see LoginPage.test.tsx)
+// rather than wrapping every render() in a real Router, since
+// react-router-dom's real useSearchParams/useNavigate throw outside a
+// Router context and none of these tests need real routing behavior.
+let mockSearchParams = new URLSearchParams();
+jest.mock('react-router-dom', () => ({
+  useSearchParams: () => [mockSearchParams, jest.fn()],
+}), { virtual: true });
+
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSearchParams = new URLSearchParams();
 });
 
 function mockFetch(routes: Record<string, any>) {
@@ -14,7 +25,11 @@ function mockFetch(routes: Record<string, any>) {
   global.fetch = jest.fn().mockImplementation((url: string, options?: any) => {
     for (const pattern of sortedPatterns) {
       if (url.includes(pattern)) {
-        const value = typeof routes[pattern] === 'function' ? routes[pattern](options) : routes[pattern];
+        const routeValue = routes[pattern];
+        if (routeValue && typeof routeValue === 'object' && routeValue.__fail) {
+          return Promise.resolve({ ok: false, status: routeValue.status ?? 500, statusText: 'Error', json: () => Promise.resolve({ statusCode: routeValue.status ?? 500, message: routeValue.message || 'Error' }) });
+        }
+        const value = typeof routeValue === 'function' ? routeValue(options) : routeValue;
         return Promise.resolve({ ok: true, json: () => Promise.resolve(value) });
       }
     }
@@ -183,5 +198,191 @@ describe('EaViewsPage - SnapshotsPanel', () => {
     await screen.findByText('Select View');
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'v1' } });
     expect(await screen.findByText(/No snapshots for this view yet/)).toBeInTheDocument();
+  });
+});
+
+describe('EaViewsPage - ViewViewer dashboard/roadmap branching', () => {
+  async function openView(view: any, extraRoutes: Record<string, any> = {}) {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views': [view], ...extraRoutes });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText(view.name));
+  }
+
+  it('a DASHBOARD-type view fetches and renders its widgets, not the graph/heatmap/etc mode picker', async () => {
+    const view = { id: 'v1', name: 'Exec Dashboard', category: 'Governance', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'DASHBOARD' };
+    await openView(view, {
+      '/ea-views/v1/dashboard': { widgets: [{ id: 'w1', type: 'kpi', title: 'Total Apps', x: 0, y: 0, w: 1, h: 1, config: {} }], results: { w1: { value: 42, label: '42' } } },
+    });
+    expect(await screen.findByText('Total Apps')).toBeInTheDocument();
+    expect(screen.getByText('42')).toBeInTheDocument();
+    // The GRAPH/HEATMAP/etc quick mode picker is graph-data-specific and
+    // should not appear for a dashboard view.
+    expect(screen.queryByText(/HEATMAP/)).not.toBeInTheDocument();
+  });
+
+  it('a DASHBOARD-type view with no widgets yet shows the empty state with an "Add Widgets" prompt', async () => {
+    const view = { id: 'v1', name: 'Empty Dashboard', category: 'Governance', status: 'DRAFT', architectureState: 'CURRENT', visualization: 'DASHBOARD' };
+    await openView(view, { '/ea-views/v1/dashboard': { widgets: [], results: {} } });
+    expect(await screen.findByText(/no widgets yet/i)).toBeInTheDocument();
+  });
+
+  it('clicking "Edit Widgets" opens the DashboardBuilder', async () => {
+    const view = { id: 'v1', name: 'Exec Dashboard', category: 'Governance', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'DASHBOARD' };
+    await openView(view, { '/ea-views/v1/dashboard': { widgets: [], results: {} } });
+    await screen.findByText(/no widgets yet/i);
+    fireEvent.click(screen.getByText('⚙ Edit Widgets'));
+    expect(await screen.findByText('Dashboard Widgets (0)')).toBeInTheDocument();
+  });
+
+  it('a ROADMAP-type view with no date fields configured shows the config panel, not an error page', async () => {
+    const view = { id: 'v1', name: 'Project Roadmap', category: 'Governance', status: 'DRAFT', architectureState: 'CURRENT', visualization: 'ROADMAP', rootObjectTypes: ['TechProject'], roadmapConfig: {} };
+    await openView(view, {
+      '/ea-views/v1/roadmap': { __fail: true, status: 400, message: 'This view has no roadmap date fields configured yet' },
+      '/ea-views/date-fields': [{ code: 'startDate', name: 'Start Date' }, { code: 'endDate', name: 'End Date' }],
+    });
+    expect(await screen.findByText('Configure Roadmap Timeline')).toBeInTheDocument();
+  });
+
+  it('a ROADMAP-type view with date fields configured renders the timeline with real items', async () => {
+    const view = { id: 'v1', name: 'Project Roadmap', category: 'Governance', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'ROADMAP', rootObjectTypes: ['TechProject'], roadmapConfig: { startField: 'StartDate', endField: 'EndDate' } };
+    await openView(view, {
+      '/ea-views/v1/roadmap': { items: [{ id: 'p1', name: 'Phase 1 Rollout', start: '2026-01-01T00:00:00Z', end: '2026-06-01T00:00:00Z', group: 'PMO', status: 'ACTIVE', assetType: 'TechProject' }] },
+    });
+    expect(await screen.findByText('Phase 1 Rollout')).toBeInTheDocument();
+    expect(screen.getByText('PMO')).toBeInTheDocument();
+  });
+
+  it('a GRAPH-type view (the pre-existing default) still shows the mode picker and does not call the roadmap/dashboard endpoints at all', async () => {
+    const view = { id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH' };
+    await openView(view, { '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} } });
+    await waitFor(() => expect(screen.getByText(/GRAPH/)).toBeInTheDocument());
+    const calls = (global.fetch as jest.Mock).mock.calls.map((c: any) => c[0]);
+    expect(calls.some((u: string) => u.includes('/v1/roadmap'))).toBe(false);
+    expect(calls.some((u: string) => u.includes('/v1/dashboard'))).toBe(false);
+  });
+});
+
+describe('EaViewsPage - Tree/Cards visualization modes', () => {
+  it('switching to TREE mode nests a child under its parent via metadata.parentId and supports collapsing it', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Capability Tree', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/execute': { nodes: [
+        { id: 'p1', name: 'Parent Cap', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {} },
+        { id: 'c1', name: 'Child Cap', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { parentId: 'p1' } },
+      ], edges: [], metadata: {} },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Capability Tree'));
+    fireEvent.click(await screen.findByText(/TREE/));
+    expect(await screen.findByText('Parent Cap')).toBeInTheDocument();
+    expect(screen.getByText('Child Cap')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('▼'));
+    expect(screen.queryByText('Child Cap')).not.toBeInTheDocument();
+  });
+
+  it('switching to CARDS mode renders each node as a card with its description', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'App Cards', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/execute': { nodes: [{ id: 'a1', name: 'HR System', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {}, description: 'Handles employee records' }], edges: [], metadata: {} },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('App Cards'));
+    fireEvent.click(await screen.findByText(/CARDS/));
+    expect(await screen.findByText('HR System')).toBeInTheDocument();
+    expect(screen.getByText('Handles employee records')).toBeInTheDocument();
+  });
+});
+
+describe('EaViewsPage - generalized Heatmap field discovery', () => {
+  it('fetches heatmap-fields for the most common asset type in the result set when switching to HEATMAP mode', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Cap Heatmap', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/execute': { nodes: [{ id: 'c1', name: 'Cap A', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { maturityLevel: 'High' } }], edges: [], metadata: {} },
+      '/ea-views/heatmap-fields': [{ code: 'status', name: 'Status', declaredType: 'ENUM' }, { code: 'maturityLevel', name: 'Maturity Level', declaredType: 'TEXT' }],
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Cap Heatmap'));
+    fireEvent.click(await screen.findByText(/HEATMAP/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/heatmap-fields'));
+      expect(call).toBeDefined();
+      expect(call[0]).toContain('assetType=GovCapability');
+    });
+    expect(await screen.findByText('Maturity Level')).toBeInTheDocument();
+  });
+});
+
+describe('EaViewsPage - Object Context View entry point', () => {
+  it('reads the objectContext query param on mount and opens the standalone dependency viewer', async () => {
+    mockSearchParams = new URLSearchParams('objectContext=asset-123');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/object-context/asset-123': {
+        nodes: [{ id: 'asset-123', name: 'Payments API', assetType: 'Interface', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }],
+        edges: [], metadata: { totalNodes: 1, domains: ['APPLICATION'], executedAt: '2026-01-01T00:00:00Z' }, truncated: false,
+      },
+    });
+    render(<EaViewsPage />);
+    expect(await screen.findByText('Dependencies of Payments API')).toBeInTheDocument();
+    // Tab strip should be hidden, same as the builder/viewer sub-views.
+    expect(screen.queryByText('🏠 Dashboard')).not.toBeInTheDocument();
+  });
+
+  it('shows a truncation warning when the backend reports the result was cut off', async () => {
+    mockSearchParams = new URLSearchParams('objectContext=asset-123');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/object-context/asset-123': { nodes: [{ id: 'asset-123', name: 'Hub App', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {}, truncated: true },
+    });
+    render(<EaViewsPage />);
+    expect(await screen.findByText(/results were truncated/)).toBeInTheDocument();
+  });
+
+  it('does not open the object-context viewer when no query param is present', async () => {
+    mockFetch({ '/ea-views/stats': {} });
+    render(<EaViewsPage />);
+    expect(await screen.findByText('🗺 EA Views & Viewpoints Studio')).toBeInTheDocument();
+    expect(screen.queryByText(/Dependencies of/)).not.toBeInTheDocument();
+  });
+});
+
+describe('EaViewsPage - ViewBuilder Path Builder wiring', () => {
+  it('the Path Builder only appears once a root object type is selected (progressive disclosure)', async () => {
+    mockFetch({ '/ea-views/stats': {} });
+    render(<EaViewsPage />);
+    fireEvent.click(screen.getByText('+ New View'));
+    await screen.findByText('New Custom View');
+    expect(screen.queryByText('Relationship Path')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('CAPABILITY'));
+    expect(await screen.findByText('Relationship Path')).toBeInTheDocument();
+  });
+
+  it('adding a hop via the Path Builder includes it in the create-view payload', async () => {
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/relationship-options': [{ relationshipType: 'uses', direction: 'FORWARD', targetAssetType: 'ITComponent', targetTypeName: 'IT Component', label: 'uses', sampleCount: 5 }],
+      '/ea-views': (opts: any) => { if (opts?.method === 'POST') return { id: 'new-view-1', name: JSON.parse(opts.body).name }; return []; },
+    });
+    render(<EaViewsPage />);
+    fireEvent.click(screen.getByText('+ New View'));
+    await screen.findByText('New Custom View');
+    fireEvent.click(screen.getByText('CAPABILITY'));
+    fireEvent.click(await screen.findByText(/uses/));
+    fireEvent.change(screen.getByPlaceholderText(/Q4 2026 Application Portfolio/), { target: { value: 'My Path View' } });
+    fireEvent.click(screen.getByText('Save View'));
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].endsWith('/ea-views') && c[1]?.method === 'POST');
+      expect(postCall).toBeDefined();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.relationshipPath).toEqual([{ relationshipType: 'uses', direction: 'FORWARD', targetAssetType: 'ITComponent', label: 'uses', targetTypeName: 'IT Component' }]);
+    });
   });
 });

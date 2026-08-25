@@ -5,6 +5,15 @@ jest.mock('../../contexts/LangContext', () => ({
   useLang: () => ({ t: (key: string) => key }),
 }));
 
+// RepositoryPage now uses useNavigate (the "Show Dependencies" / Object
+// Context View entry point) - mocked per this codebase's established
+// pattern (see DashboardPage.test.tsx) rather than wrapping every render()
+// in a real Router.
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}), { virtual: true });
+
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.setItem('ea_token', 'fake-token');
@@ -153,6 +162,15 @@ describe('RepositoryPage - CRUD', () => {
       expect(deleteCall[0]).toContain('/ea-repository/assets/a1');
     });
     confirmSpy.mockRestore();
+  });
+
+  it('"Show Dependencies" navigates to EA Views with the object-context query param for this asset', async () => {
+    mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('Core Banking'));
+    fireEvent.click(await screen.findByText(/Show Dependencies/));
+    expect(mockNavigate).toHaveBeenCalledWith('/ea-views?objectContext=a1');
   });
 });
 

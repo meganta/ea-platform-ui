@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
+import { RoadmapConfigPanel, RoadmapTimeline } from './eaviews/RoadmapView'
+import { DashboardBuilder, DashboardGrid, DashboardWidget } from './eaviews/DashboardBuilder'
+
+import { PathBuilder, RelationshipHop } from './eaviews/PathBuilder'
+import { useSearchParams } from 'react-router-dom'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -37,6 +42,58 @@ const STATE_COLOR: Record<string,string> = { CURRENT:'#2ecc71', TARGET:'#3498db'
 const STATUS_COLOR: Record<string,string> = { DRAFT:'#f39c12', PUBLISHED:'#2ecc71', ARCHIVED:'#7f8c8d' }
 const DOMAIN_COLOR: Record<string,string> = { BUSINESS:'#3498db', APPLICATION:'#e67e22', DATA:'#1abc9c', TECHNOLOGY:'#e74c3c', SECURITY:'#9b59b6', STRATEGIC:'#2ecc71', BENEFICIARY_EXPERIENCE:'#16a085', CROSS_CUTTING:'#7f8c8d' }
 const TYPE_COLOR: Record<string,string> = { CAPABILITY:'#3498db', APPLICATION:'#e67e22', DATA_ENTITY:'#1abc9c', TECH_COMPONENT:'#e74c3c', SECURITY_CONTROL:'#9b59b6', EA_PRINCIPLE:'#2ecc71', INTEGRATION:'#f39c12' }
+
+// ── Force-directed auto-layout ──────────────────────────────────────────────
+//
+// A hand-rolled physics simulation (repulsion between every node pair,
+// spring attraction along edges) rather than a library dependency - kept
+// intentionally simple and synchronous. Capped to graphs of
+// FORCE_LAYOUT_MAX_NODES or fewer: beyond that, an O(n²)-per-iteration
+// simulation would visibly block the main thread regardless of
+// implementation quality, and a genuinely non-blocking version would need
+// Web Workers - out of scope for a first version. Iteration count also
+// scales down as node count grows, so mid-size graphs (dozens of nodes)
+// stay responsive without needing the hard cutoff.
+const FORCE_LAYOUT_MAX_NODES = 150
+function computeForceLayout(nodes: any[], edges: any[], existingPositions: Record<string, { x: number; y: number }>): Record<string, { x: number; y: number }> {
+  const pos: Record<string, { x: number; y: number }> = {}
+  nodes.forEach((n, i) => {
+    const angle = (i / Math.max(1, nodes.length)) * Math.PI * 2
+    pos[n.id] = existingPositions[n.id] ? { ...existingPositions[n.id] } : { x: 500 + Math.cos(angle) * 250, y: 350 + Math.sin(angle) * 250 }
+  })
+  const iterations = Math.max(30, Math.min(200, Math.round(15000 / Math.max(1, nodes.length))))
+  const IDEAL_EDGE_LENGTH = 190
+  const REPULSION = 14000
+  for (let iter = 0; iter < iterations; iter++) {
+    const forces: Record<string, { x: number; y: number }> = {}
+    nodes.forEach(n => { forces[n.id] = { x: 0, y: 0 } })
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i].id, b = nodes[j].id
+        const dx = pos[a].x - pos[b].x, dy = pos[a].y - pos[b].y
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1
+        const force = REPULSION / (dist * dist)
+        const fx = (dx / dist) * force, fy = (dy / dist) * force
+        forces[a].x += fx; forces[a].y += fy
+        forces[b].x -= fx; forces[b].y -= fy
+      }
+    }
+    for (const e of edges) {
+      if (!pos[e.sourceId] || !pos[e.targetId]) continue
+      const dx = pos[e.targetId].x - pos[e.sourceId].x, dy = pos[e.targetId].y - pos[e.sourceId].y
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1
+      const force = (dist - IDEAL_EDGE_LENGTH) * 0.02
+      const fx = (dx / dist) * force, fy = (dy / dist) * force
+      forces[e.sourceId].x += fx; forces[e.sourceId].y += fy
+      forces[e.targetId].x -= fx; forces[e.targetId].y -= fy
+    }
+    for (const n of nodes) {
+      pos[n.id].x += Math.max(-30, Math.min(30, forces[n.id].x)) * 0.5
+      pos[n.id].y += Math.max(-30, Math.min(30, forces[n.id].y)) * 0.5
+    }
+  }
+  return pos
+}
 
 // ── View Library (predefined viewpoints) ──────────────────────────────────────
 function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }) {
@@ -200,6 +257,66 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
   const [showSharePanel, setShowSharePanel] = useState(false)
   const [shareData, setShareData] = useState<any>(null)
   const [heatmapField, setHeatmapField] = useState('status')
+  const [heatmapFields, setHeatmapFields] = useState<{ code: string; name: string; declaredType: string }[]>([{ code: 'status', name: 'Status', declaredType: 'ENUM' }])
+  const [collapsedTreeNodes, setCollapsedTreeNodes] = useState<Set<string>>(new Set())
+
+  // Roadmap-specific state. Always declared (Rules of Hooks), only
+  // exercised when view.visualization === 'ROADMAP' - see the isRoadmap
+  // branch near the bottom of this component's render.
+  const isRoadmap = view.visualization === 'ROADMAP'
+  const [roadmapItems, setRoadmapItems] = useState<any[]>([])
+  const [roadmapLoading, setRoadmapLoading] = useState(true)
+  const [roadmapNeedsConfig, setRoadmapNeedsConfig] = useState(false)
+
+  const loadRoadmap = useCallback(() => {
+    if (!isRoadmap) return
+    setRoadmapLoading(true)
+    setRoadmapNeedsConfig(false)
+    api.get(`/ea-views/${view.id}/roadmap`)
+      .then((d: any) => {
+        if (d?.error || d?.statusCode === 400) { setRoadmapNeedsConfig(true); return }
+        setRoadmapItems(d?.items || [])
+      })
+      .catch(() => setRoadmapNeedsConfig(true))
+      .then(() => setRoadmapLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.id, isRoadmap])
+
+  useEffect(() => { if (isRoadmap) loadRoadmap() }, [isRoadmap, loadRoadmap])
+
+  const saveRoadmapConfig = async (cfg: { startField: string; endField: string; groupByField?: string }) => {
+    await api.put(`/ea-views/${view.id}`, { roadmapConfig: cfg })
+    loadRoadmap()
+  }
+
+  // Dashboard-specific state. Same always-declared-unconditionally
+  // approach as the roadmap state above (Rules of Hooks).
+  const isDashboard = view.visualization === 'DASHBOARD'
+  const [dashboardWidgets, setDashboardWidgets] = useState<DashboardWidget[]>([])
+  const [dashboardResults, setDashboardResults] = useState<Record<string, any>>({})
+  const [dashboardLoading, setDashboardLoading] = useState(true)
+  const [editingDashboard, setEditingDashboard] = useState(false)
+
+  const loadDashboard = useCallback(() => {
+    if (!isDashboard) return
+    setDashboardLoading(true)
+    api.get(`/ea-views/${view.id}/dashboard`)
+      .then((d: any) => {
+        setDashboardWidgets(d?.widgets || [])
+        setDashboardResults(d?.results || {})
+      })
+      .catch(() => { setDashboardWidgets([]); setDashboardResults({}) })
+      .then(() => setDashboardLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view.id, isDashboard])
+
+  useEffect(() => { if (isDashboard) loadDashboard() }, [isDashboard, loadDashboard])
+
+  const saveDashboardWidgets = async (widgets: DashboardWidget[]) => {
+    await api.put(`/ea-views/${view.id}`, { dashboardConfig: { widgets } })
+    setEditingDashboard(false)
+    loadDashboard()
+  }
 
   // Graph canvas state
   const [positions, setPositions] = useState<Record<string,{x:number,y:number}>>({})
@@ -207,6 +324,12 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
   const [pan, setPan] = useState({x:0,y:0})
   const [panStart, setPanStart] = useState<{mx:number,my:number,px:number,py:number}|null>(null)
   const [zoom, setZoom] = useState(1)
+  const [graphSearch, setGraphSearch] = useState('')
+  const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set())
+  const [expandingNodeId, setExpandingNodeId] = useState<string | null>(null)
+  const [layoutRunning, setLayoutRunning] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
+  const graphContainerRef = React.useRef<HTMLDivElement>(null)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -260,6 +383,51 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
   const domains = [...new Set((data?.nodes||[]).map((n: any) => n.domain))] as string[]
   const types = [...new Set((data?.nodes||[]).map((n: any) => n.assetType))] as string[]
 
+  // Heatmap field discovery: fields are per-object-type, so this fetches
+  // the available attributes for whichever asset type is most common in
+  // the current result set (a heatmap over a mixed-type result still gets
+  // a sensible field list rather than none at all - see the backend's
+  // getHeatmapFields() doc comment for why any attribute, not just
+  // declared ENUM/numeric ones, is offered).
+  useEffect(() => {
+    if (vizMode !== 'HEATMAP' || !data?.nodes?.length) return
+    const counts: Record<string, number> = {}
+    for (const n of data.nodes) counts[n.assetType] = (counts[n.assetType] || 0) + 1
+    const primaryType = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]
+    if (!primaryType) return
+    api.get(`/ea-views/heatmap-fields?assetType=${encodeURIComponent(primaryType)}`)
+      .then((fields: any) => setHeatmapFields(Array.isArray(fields) && fields.length ? fields : [{ code: 'status', name: 'Status', declaredType: 'ENUM' }]))
+      .catch(() => setHeatmapFields([{ code: 'status', name: 'Status', declaredType: 'ENUM' }]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vizMode, data])
+
+  // Mirrors the backend's computeHeatmapColorStrategy() exactly (see that
+  // method's doc comment) so the frontend can color cells immediately from
+  // data it already has, without a round trip per field change.
+  const HEATMAP_CATEGORICAL_PALETTE = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b']
+  function computeColorStrategy(nodes: any[], field: string): { strategy: 'numeric' | 'categorical' | 'status'; colorByValue: Record<string, string>; min?: number; max?: number } {
+    if (field === 'status') return { strategy: 'status', colorByValue: {} }
+    const rawValues = nodes.map(n => (n.metadata || {})[field]).filter((v: any) => v !== undefined && v !== null && v !== '')
+    const numericValues = rawValues.map((v: any) => Number(v)).filter((v: number) => !Number.isNaN(v))
+    if (rawValues.length > 0 && numericValues.length >= rawValues.length * 0.9) {
+      return { strategy: 'numeric', colorByValue: {}, min: Math.min(...numericValues), max: Math.max(...numericValues) }
+    }
+    const distinctValues = [...new Set(rawValues.map((v: any) => String(v)))].sort()
+    const colorByValue: Record<string, string> = {}
+    distinctValues.forEach((v, i) => { colorByValue[v as string] = HEATMAP_CATEGORICAL_PALETTE[i % HEATMAP_CATEGORICAL_PALETTE.length] })
+    return { strategy: 'categorical', colorByValue }
+  }
+  function numericGradientColor(value: number, min: number, max: number): string {
+    // Green (low) -> amber -> red (high), a common risk/intensity ramp.
+    const t = max === min ? 0.5 : (value - min) / (max - min)
+    if (t < 0.5) {
+      const s = t / 0.5
+      return `rgb(${Math.round(46 + s * (243 - 46))}, ${Math.round(204 + s * (156 - 204))}, ${Math.round(113 + s * (18 - 113))})`
+    }
+    const s = (t - 0.5) / 0.5
+    return `rgb(${Math.round(243 + s * (231 - 243))}, ${Math.round(156 + s * (76 - 156))}, ${Math.round(18 + s * (60 - 18))})`
+  }
+
   // Graph handlers
   const onNodeMouseDown = (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
@@ -283,6 +451,94 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
     const s=positions[e.sourceId]||{x:0,y:0}; const t=positions[e.targetId]||{x:0,y:0}
     return `M ${s.x+80} ${s.y+20} Q ${(s.x+80+t.x)/2} ${(s.y+20+t.y+20)/2} ${t.x} ${t.y+20}`
   }
+
+  // ── Graph: expand a node to reveal its neighbors on demand ─────────────
+  //
+  // Uses the object-context endpoint (depth=1: just this node's direct
+  // relationships) rather than trying to grow the saved view's own query -
+  // an expand action is inherently ad-hoc exploration, not something that
+  // should change what the saved view itself returns on every load.
+  const expandNode = async (nodeId: string) => {
+    if (expandedNodeIds.has(nodeId) || expandingNodeId) return
+    setExpandingNodeId(nodeId)
+    try {
+      const result = await api.get(`/ea-views/object-context/${nodeId}?depth=1`)
+      if (result?.nodes?.length) {
+        setData((prev: any) => {
+          const existingIds = new Set((prev?.nodes || []).map((n: any) => n.id))
+          const existingEdgeIds = new Set((prev?.edges || []).map((e: any) => e.id))
+          const newNodes = result.nodes.filter((n: any) => !existingIds.has(n.id))
+          const newEdges = result.edges.filter((e: any) => !existingEdgeIds.has(e.id))
+          return { ...prev, nodes: [...(prev?.nodes || []), ...newNodes], edges: [...(prev?.edges || []), ...newEdges] }
+        })
+        // Place newly-revealed nodes near the node that was expanded, so
+        // they don't all stack at the default (100,100) origin before the
+        // next auto-layout run.
+        const origin = positions[nodeId] || { x: 400, y: 300 }
+        setPositions(prev => {
+          const next = { ...prev }
+          result.nodes.forEach((n: any, i: number) => {
+            if (!next[n.id]) { const a = (i / result.nodes.length) * Math.PI * 2; next[n.id] = { x: origin.x + Math.cos(a) * 140, y: origin.y + Math.sin(a) * 140 } }
+          })
+          return next
+        })
+      }
+      setExpandedNodeIds(prev => new Set(prev).add(nodeId))
+    } finally {
+      setExpandingNodeId(null)
+    }
+  }
+
+  const runAutoLayout = () => {
+    if (filteredNodes.length > FORCE_LAYOUT_MAX_NODES) {
+      alert(`Auto-layout works best under ${FORCE_LAYOUT_MAX_NODES} objects (currently ${filteredNodes.length}). Try narrowing the filters first.`)
+      return
+    }
+    setLayoutRunning(true)
+    // A setTimeout(0) so the "Computing..." state actually paints before
+    // the synchronous simulation below blocks the thread - the simulation
+    // itself is still a single blocking pass (see computeForceLayout's doc
+    // comment on why this isn't fully async).
+    setTimeout(() => {
+      const newPositions = computeForceLayout(filteredNodes, (data?.edges || []).filter((e: any) => filteredNodes.find((n: any) => n.id === e.sourceId) && filteredNodes.find((n: any) => n.id === e.targetId)), positions)
+      setPositions(newPositions)
+      setLayoutRunning(false)
+    }, 0)
+  }
+
+  const graphSearchMatches = graphSearch.trim()
+    ? filteredNodes.filter((n: any) => n.name.toLowerCase().includes(graphSearch.trim().toLowerCase()))
+    : []
+  const focusOnNode = (n: any) => {
+    setSelected(n)
+    const p = positions[n.id]
+    if (p && graphContainerRef.current) {
+      const rect = graphContainerRef.current.getBoundingClientRect()
+      setPan({ x: rect.width / 2 - (p.x + 80) * zoom, y: rect.height / 2 - (p.y + 22) * zoom })
+    }
+  }
+
+  const toggleFullscreen = () => {
+    if (!graphContainerRef.current) return
+    if (!document.fullscreenElement) { graphContainerRef.current.requestFullscreen(); setIsFullscreen(true) }
+    else { document.exitFullscreen(); setIsFullscreen(false) }
+  }
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
+
+  // Mini-map: nodes scaled into a small fixed box, plus a rectangle
+  // showing the current viewport within the full node bounding box.
+  const graphBounds = (() => {
+    const pts = filteredNodes.map((n: any) => positions[n.id]).filter(Boolean) as { x: number; y: number }[]
+    if (pts.length === 0) return { minX: 0, minY: 0, maxX: 1000, maxY: 1000 }
+    return {
+      minX: Math.min(...pts.map(p => p.x)) - 40, minY: Math.min(...pts.map(p => p.y)) - 40,
+      maxX: Math.max(...pts.map(p => p.x)) + 200, maxY: Math.max(...pts.map(p => p.y)) + 80,
+    }
+  })()
 
   // ── Capability Map ──────────────────────────────────────────────────────────
   const renderCapabilityMap = () => {
@@ -323,35 +579,57 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
 
   // ── Heatmap ─────────────────────────────────────────────────────────────────
   const HEATMAP_STATUS: Record<string,string> = { APPROVED:'#2ecc71', ACTIVE:'#2ecc71', UNDER_REVIEW:'#f39c12', DRAFT:'#e67e22', DEPRECATED:'#e74c3c', PLANNED:'#3498db' }
-  const renderHeatmap = () => (
-    <div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center' }}>
-        <label style={{ ...S.label, marginBottom: 0 }}>Color by:</label>
-        <select style={{ ...S.input, maxWidth: 160 }} value={heatmapField} onChange={e => setHeatmapField(e.target.value)}>
-          <option value="status">Status</option>
-          <option value="domain">Domain</option>
-          <option value="assetType">Asset Type</option>
-        </select>
-        <div style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}>
-          {Object.entries(HEATMAP_STATUS).map(([k,c]) => <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: c }} />{k}</div>)}
+  const renderHeatmap = () => {
+    const strategy = computeColorStrategy(filteredNodes, heatmapField)
+    const getColor = (n: any): string => {
+      if (strategy.strategy === 'status') return HEATMAP_STATUS[n.status] || '#7f8c8d'
+      const raw = (n.metadata || {})[heatmapField]
+      if (raw === undefined || raw === null || raw === '') return '#4b5563' // muted gray for "no value"
+      if (strategy.strategy === 'numeric') {
+        const v = Number(raw)
+        return Number.isNaN(v) ? '#4b5563' : numericGradientColor(v, strategy.min!, strategy.max!)
+      }
+      return strategy.colorByValue[String(raw)] || '#7f8c8d'
+    }
+    return (
+      <div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' as const }}>
+          <label style={{ ...S.label, marginBottom: 0 }}>Color by:</label>
+          <select style={{ ...S.input, maxWidth: 220 }} value={heatmapField} onChange={e => setHeatmapField(e.target.value)}>
+            <option value="domain">Domain</option>
+            <option value="assetType">Asset Type</option>
+            {heatmapFields.map(f => <option key={f.code} value={f.code}>{f.name}</option>)}
+          </select>
+          <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' as const, maxWidth: '60%' }}>
+            {strategy.strategy === 'status' && Object.entries(HEATMAP_STATUS).map(([k,c]) => <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: c }} />{k}</div>)}
+            {strategy.strategy === 'categorical' && Object.entries(strategy.colorByValue).map(([k,c]) => <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: c }} />{k}</div>)}
+            {strategy.strategy === 'numeric' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-dim)' }}>
+                <span>{strategy.min}</span>
+                <div style={{ width: 100, height: 10, borderRadius: 5, background: 'linear-gradient(90deg, #2ecc71, #f39c12, #e74c3c)' }} />
+                <span>{strategy.max}</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
+          {filteredNodes.map((n: any) => {
+            const color = getColor(n)
+            const rawVal = heatmapField === 'status' ? n.status : heatmapField === 'domain' ? n.domain : heatmapField === 'assetType' ? n.assetType : (n.metadata || {})[heatmapField]
+            return (
+              <div key={n.id} onClick={() => setSelected(n)} style={{ padding: '10px 12px', borderRadius: 8, background: color+'22', border: `1px solid ${color}44`, cursor: 'pointer', transition: 'all 0.15s' }}
+                onMouseEnter={e => (e.currentTarget.style.background = color+'44')}
+                onMouseLeave={e => (e.currentTarget.style.background = color+'22')}>
+                <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 4 }}>{n.assetType.replace(/_/g,' ')}</div>
+                <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>{n.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{rawVal === undefined || rawVal === null || rawVal === '' ? '—' : String(rawVal)}</div>
+              </div>
+            )
+          })}
         </div>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-        {filteredNodes.map((n: any) => {
-          const color = heatmapField === 'status' ? (HEATMAP_STATUS[n.status]||'#7f8c8d') : heatmapField === 'domain' ? (DOMAIN_COLOR[n.domain]||'#7f8c8d') : (TYPE_COLOR[n.assetType]||'#7f8c8d')
-          return (
-            <div key={n.id} onClick={() => setSelected(n)} style={{ padding: '10px 12px', borderRadius: 8, background: color+'22', border: `1px solid ${color}44`, cursor: 'pointer', transition: 'all 0.15s' }}
-              onMouseEnter={e => (e.currentTarget.style.background = color+'44')}
-              onMouseLeave={e => (e.currentTarget.style.background = color+'22')}>
-              <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 4 }}>{n.assetType.replace(/_/g,' ')}</div>
-              <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>{n.name}</div>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{n.status}</div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+    )
+  }
 
   // ── Matrix ───────────────────────────────────────────────────────────────────
   const renderMatrix = () => {
@@ -424,16 +702,98 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
     </div>
   )
 
+  // ── Tree/Hierarchy (uses metadata.parentId - the same convention the
+  // capability hierarchy edges already rely on in the backend) ─────────────
+  const renderTree = () => {
+    const byParent = new Map<string, any[]>()
+    const roots: any[] = []
+    const nodeIds = new Set(filteredNodes.map((n: any) => n.id))
+    for (const n of filteredNodes) {
+      const parentId = n.metadata?.parentId
+      if (parentId && nodeIds.has(parentId)) {
+        if (!byParent.has(parentId)) byParent.set(parentId, [])
+        byParent.get(parentId)!.push(n)
+      } else {
+        roots.push(n)
+      }
+    }
+    const [collapsed, setLocalCollapsed] = [collapsedTreeNodes, setCollapsedTreeNodes] as const
+    const toggle = (id: string) => setLocalCollapsed(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+    const renderNode = (n: any, depth: number): React.ReactNode => {
+      const children = byParent.get(n.id) || []
+      const hasChildren = children.length > 0
+      const isCollapsed = collapsed.has(n.id)
+      const color = TYPE_COLOR[n.assetType] || '#7f8c8d'
+      return (
+        <div key={n.id}>
+          <div onClick={() => setSelected(n)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', marginLeft: depth * 22, borderRadius: 6, cursor: 'pointer' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.08)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+            {hasChildren ? (
+              <span onClick={e => { e.stopPropagation(); toggle(n.id) }} style={{ width: 16, textAlign: 'center', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer' }}>{isCollapsed ? '▶' : '▼'}</span>
+            ) : <span style={{ width: 16 }} />}
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
+            <span style={{ fontSize: 13, fontWeight: depth === 0 ? 600 : 400 }}>{n.name}</span>
+            <span style={{ ...S.badge(HEATMAP_STATUS[n.status] || '#7f8c8d'), fontSize: 10, marginLeft: 'auto' }}>{n.status}</span>
+          </div>
+          {hasChildren && !isCollapsed && children.map(c => renderNode(c, depth + 1))}
+        </div>
+      )
+    }
+    if (roots.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>No data. This visualization needs objects with a metadata.parentId hierarchy (e.g. capability levels).</div>
+    return <div style={S.card}>{roots.map(n => renderNode(n, 0))}</div>
+  }
+
+  // ── Cards ─────────────────────────────────────────────────────────────────
+  const renderCards = () => (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+      {filteredNodes.map((n: any) => {
+        const color = TYPE_COLOR[n.assetType] || '#7f8c8d'
+        return (
+          <div key={n.id} onClick={() => setSelected(n)} style={{ ...S.card, cursor: 'pointer', borderLeft: `3px solid ${color}` }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.05)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'var(--navy-light)')}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+              <span style={S.badge(color)}>{n.assetType.replace(/_/g, ' ')}</span>
+              <span style={S.badge(HEATMAP_STATUS[n.status] || '#7f8c8d')}>{n.status}</span>
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6, lineHeight: 1.3 }}>{n.name}</div>
+            {n.description && <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{n.description}</div>}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)' }}>
+              <span>{n.domain}</span>
+              <span>{n.owner || '—'}</span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
   // ── Graph ────────────────────────────────────────────────────────────────────
   const renderGraph = () => (
-    <div style={{ display: 'flex', height: 'calc(100vh - 280px)', gap: 0 }}>
+    <div ref={graphContainerRef} style={{ display: 'flex', height: isFullscreen ? '100vh' : 'calc(100vh - 280px)', gap: 0, background: isFullscreen ? 'var(--navy)' : 'transparent' }}>
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 10 }}>
-        <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', gap: 6 }}>
+        <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' as const, maxWidth: 'calc(100% - 200px)' }}>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => setZoom(z=>Math.min(2.5,z+0.15))}>+</button>
           <span style={{ fontSize: 12, color: 'var(--text-dim)', padding: '3px 6px' }}>{Math.round(zoom*100)}%</span>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => setZoom(z=>Math.max(0.25,z-0.15))}>−</button>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => { setZoom(1); setPan({x:0,y:0}) }}>⊡</button>
+          <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} disabled={layoutRunning} onClick={runAutoLayout}>{layoutRunning ? '⏳ Laying out...' : '🧭 Auto-Layout'}</button>
+          <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={toggleFullscreen}>{isFullscreen ? '⤢ Exit Fullscreen' : '⛶ Fullscreen'}</button>
           <span style={{ fontSize: 11, color: 'var(--text-dim)', padding: '3px 6px' }}>{filteredNodes.length} objects</span>
+          <div style={{ position: 'relative' }}>
+            <input value={graphSearch} onChange={e => setGraphSearch(e.target.value)} placeholder="🔍 Find node..." style={{ ...S.input, width: 150, padding: '4px 8px', fontSize: 12 }} />
+            {graphSearch.trim() && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as const, width: 220, zIndex: 20 }}>
+                {graphSearchMatches.length === 0 && <div style={{ padding: 8, fontSize: 12, color: 'var(--text-dim)' }}>No matches</div>}
+                {graphSearchMatches.slice(0, 8).map((n: any) => (
+                  <div key={n.id} onClick={() => { focusOnNode(n); setGraphSearch('') }} style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>{n.name}</div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         {loading ? <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-dim)' }}>Loading view data...</div> : (
           <svg style={{ width:'100%', height:'100%', cursor: panStart?'grabbing':dragging?'grabbing':'grab' }}
@@ -448,18 +808,29 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
               {filteredNodes.map((n: any) => {
                 const pos=positions[n.id]||{x:100,y:100}
                 const isSel=selected?.id===n.id
+                const isMatch = graphSearch.trim() && n.name.toLowerCase().includes(graphSearch.trim().toLowerCase())
+                const isExpanded = expandedNodeIds.has(n.id)
+                const isExpanding = expandingNodeId === n.id
                 const dc=DOMAIN_COLOR[n.domain]||'#3498db'
                 return (
-                  <g key={n.id} data-node="true" transform={`translate(${pos.x},${pos.y})`} onMouseDown={e=>onNodeMouseDown(e,n.id)} style={{cursor:'grab'}}>
-                    <rect width={160} height={44} rx={8} fill="var(--navy-light)" stroke={isSel?'var(--accent)':dc+'55'} strokeWidth={isSel?2:1.5} />
+                  <g key={n.id} data-node="true" transform={`translate(${pos.x},${pos.y})`} onMouseDown={e=>onNodeMouseDown(e,n.id)} onDoubleClick={() => expandNode(n.id)} style={{cursor: isExpanding ? 'wait' : 'grab'}}>
+                    <rect width={160} height={44} rx={8} fill="var(--navy-light)" stroke={isSel?'var(--accent)':isMatch?'#f39c12':dc+'55'} strokeWidth={isSel||isMatch?2:1.5} />
                     <rect width={5} height={44} rx={2} fill={dc} />
                     <text x={16} y={18} fontSize={11} fontWeight={600} fill="var(--text)">{n.name.length>17?n.name.slice(0,16)+'…':n.name}</text>
                     <text x={16} y={32} fontSize={9} fill="rgba(100,116,139,0.7)">{n.assetType.replace(/_/g,' ')} · {n.domain}</text>
                     <circle cx={148} cy={10} r={5} fill={HEATMAP_STATUS[n.status]||'#7f8c8d'} />
+                    {isExpanding ? <text x={148} y={38} fontSize={9} fill="var(--accent)">⏳</text> : !isExpanded && <text x={148} y={38} fontSize={9} fill="rgba(100,116,139,0.6)" title="Double-click to expand">⊕</text>}
                   </g>
                 )
               })}
             </g>
+          </svg>
+        )}
+        {/* Mini-map */}
+        {!loading && filteredNodes.length > 0 && (
+          <svg width={140} height={100} style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(15,23,42,0.85)', border: '1px solid var(--border)', borderRadius: 8 }}
+            viewBox={`${graphBounds.minX} ${graphBounds.minY} ${graphBounds.maxX - graphBounds.minX} ${graphBounds.maxY - graphBounds.minY}`}>
+            {filteredNodes.map((n: any) => { const p = positions[n.id]; if (!p) return null; return <rect key={n.id} x={p.x} y={p.y} width={160} height={44} fill={DOMAIN_COLOR[n.domain] || '#3498db'} opacity={0.7} /> })}
           </svg>
         )}
       </div>
@@ -491,16 +862,33 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
           </div>
         </div>
         <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
-          <button style={{ ...S.btn(), fontSize:12 }} onClick={load}>↻ Refresh</button>
+          <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={shareView}>🔗 Share</button>
+          {isDashboard && <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setEditingDashboard(true)}>⚙ Edit Widgets</button>}
           {view.status === 'DRAFT' && <button style={{ ...S.btn('primary'), fontSize:12 }} onClick={publish}>🚀 Publish</button>}
         </div>
       </div>
 
+      {isDashboard ? (
+        editingDashboard ? (
+          <DashboardBuilder widgets={dashboardWidgets} onSave={saveDashboardWidgets} onCancel={() => setEditingDashboard(false)} />
+        ) : dashboardLoading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:60 }}>Loading dashboard...</div>
+        : (
+          <DashboardGrid widgets={dashboardWidgets} results={dashboardResults} onEdit={() => setEditingDashboard(true)} />
+        )
+      ) : isRoadmap ? (
+        roadmapLoading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:60 }}>Loading roadmap...</div>
+        : roadmapNeedsConfig ? (
+          <RoadmapConfigPanel api={api} assetType={view.rootObjectTypes?.[0] || ''} initial={view.roadmapConfig || {}} onSave={saveRoadmapConfig} onCancel={onBack} />
+        ) : (
+          <RoadmapTimeline items={roadmapItems} onSelect={(item) => setSelected({ ...item, assetType: item.assetType, tags: [] })} />
+        )
+      ) : (
+      <>
       {/* Viz mode selector */}
       <div style={{ display:'flex', gap:2, background:'var(--navy-light)', borderRadius:8, padding:3, marginBottom:16, width:'fit-content' }}>
-        {['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TABLE'].map(m => (
+        {['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE'].map(m => (
           <button key={m} style={{ ...S.btn(), padding:'5px 12px', fontSize:12, background:vizMode===m?'var(--accent)':'none', color:vizMode===m?'var(--navy)':'var(--text-dim)' }} onClick={()=>setVizMode(m)}>
             {VIZ_ICONS[m]} {m.replace(/_/g,' ')}
           </button>
@@ -544,7 +932,11 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
         : vizMode === 'CAPABILITY_MAP' ? renderCapabilityMap()
         : vizMode === 'HEATMAP' ? renderHeatmap()
         : vizMode === 'MATRIX' ? renderMatrix()
+        : vizMode === 'TREE' ? renderTree()
+        : vizMode === 'CARDS' ? renderCards()
         : renderTable()}
+      </>
+      )}
     </div>
   )
 }
@@ -553,7 +945,7 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
 function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpoint: any, onCreated: (v: any) => void, onCancel: () => void }) {
   const ASSET_TYPES = ['CAPABILITY','APPLICATION','DATA_ENTITY','TECH_COMPONENT','SECURITY_CONTROL','EA_PRINCIPLE','INTEGRATION','PROCESS','ORG_UNIT','RISK']
   const DOMAINS = ['BUSINESS','APPLICATION','DATA','TECHNOLOGY','SECURITY','STRATEGIC','BENEFICIARY_EXPERIENCE','CROSS_CUTTING']
-  const VIZS = ['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TABLE','LANDSCAPE']
+  const VIZS = ['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE','ROADMAP','DASHBOARD','LANDSCAPE']
   const STATES = ['CURRENT','TARGET','TRANSITION','BASELINE','PLANNED']
   const CATS = ['Business','Application','Data','Technology','Security','Cross-Domain','Strategic','Governance','Custom']
 
@@ -567,6 +959,7 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
     relatedObjectTypes: string[]
     domains: string[]
     viewpointId: string | undefined
+    relationshipPath: RelationshipHop[]
   }>({
     name: viewpoint?.name || '',
     description: viewpoint?.description || '',
@@ -577,6 +970,7 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
     relatedObjectTypes: viewpoint?.relatedObjectTypes || [],
     domains: viewpoint?.requiredDomains || [],
     viewpointId: viewpoint?.id || undefined,
+    relationshipPath: [],
   })
   const [saving, setSaving] = useState(false)
 
@@ -642,6 +1036,16 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
               </div>
             </div>
           </div>
+
+          {/* Progressive disclosure: the Path Builder only appears once a
+              root type is picked - a single-level view (the pre-existing,
+              simpler flow) doesn't need it at all. */}
+          {form.rootObjectTypes.length > 0 && (
+            <div style={S.card}>
+              <div style={{ fontSize:14, fontWeight:600, marginBottom:6 }}>Relationship Path <span style={{ fontWeight:400, fontSize:12, color:'var(--text-dim)' }}>(optional - walk multiple hops instead of a single-level view)</span></div>
+              <PathBuilder api={api} rootType={form.rootObjectTypes[0]} initialPath={form.relationshipPath} onChange={(path) => setForm(f => ({ ...f, relationshipPath: path }))} />
+            </div>
+          )}
 
           <div style={S.card}>
             <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Domains</div>
@@ -802,6 +1206,124 @@ function ViewsDashboard({ api, stats, onTab, onOpenView }: { api: any, stats: an
 }
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
+// ── Object Context Viewer ("Open in View" from a repository asset) ────────
+//
+// Deliberately NOT reusing ViewViewer - that component's snapshot/share/
+// publish/edit machinery is all saved-view concepts that don't apply to
+// an ad-hoc "show me this object's dependencies" query. This is a smaller,
+// standalone viewer: fetch, force-layout, pan/zoom/click - the exploration
+// primitives, without the full Studio chrome around them.
+function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: string; onBack: () => void }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [depth, setDepth] = useState(2)
+  const [positions, setPositions] = useState<Record<string,{x:number,y:number}>>({})
+  const [selected, setSelected] = useState<any>(null)
+  const [dragging, setDragging] = useState<{id:string,ox:number,oy:number}|null>(null)
+  const [pan, setPan] = useState({x:0,y:0})
+  const [panStart, setPanStart] = useState<{mx:number,my:number,px:number,py:number}|null>(null)
+  const [zoom, setZoom] = useState(1)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    api.get(`/ea-views/object-context/${assetId}?depth=${depth}`).then((d: any) => {
+      setData(d)
+      if (d?.nodes?.length) setPositions(computeForceLayout(d.nodes, d.edges || [], {}))
+      setLoading(false)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetId, depth])
+
+  useEffect(() => { load() }, [load])
+
+  const onNodeMouseDown = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation()
+    const p = positions[id]||{x:100,y:100}
+    setDragging({id, ox:e.clientX-p.x, oy:e.clientY-p.y})
+    setSelected(data?.nodes?.find((n: any) => n.id===id)||null)
+  }
+  const onSvgMouseDown = (e: React.MouseEvent) => {
+    if ((e.target as Element).closest('[data-node]')) return
+    setPanStart({mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y})
+    setSelected(null)
+  }
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (dragging) setPositions(p=>({...p,[dragging.id]:{x:(e.clientX-dragging.ox)/zoom,y:(e.clientY-dragging.oy)/zoom}}))
+    else if (panStart) setPan({x:panStart.px+e.clientX-panStart.mx,y:panStart.py+e.clientY-panStart.my})
+  }
+  const onMouseUp = () => { setDragging(null); setPanStart(null) }
+  const getEdgePath = (e: any) => {
+    const s=positions[e.sourceId]||{x:0,y:0}; const t=positions[e.targetId]||{x:0,y:0}
+    return `M ${s.x+80} ${s.y+20} Q ${(s.x+80+t.x)/2} ${(s.y+20+t.y+20)/2} ${t.x} ${t.y+20}`
+  }
+
+  const rootNode = (data?.nodes || []).find((n: any) => n.id === assetId)
+
+  return (
+    <div>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:16 }}>
+        <button style={{ ...S.btn(), padding:'6px 12px' }} onClick={onBack}>← Back</button>
+        <div>
+          <div style={{ fontSize:18, fontWeight:700 }}>{rootNode ? `Dependencies of ${rootNode.name}` : 'Object Context'}</div>
+          <div style={{ fontSize:12, color:'var(--text-dim)' }}>Ad-hoc exploration - not a saved view</div>
+        </div>
+        <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:8 }}>
+          <label style={{ fontSize:12, color:'var(--text-dim)' }}>Depth:</label>
+          <select style={{ ...S.input, width:70 }} value={depth} onChange={e => setDepth(parseInt(e.target.value, 10))}>
+            {[1,2,3,4].map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <button style={{ ...S.btn(), fontSize:12 }} onClick={load}>↻ Refresh</button>
+        </div>
+      </div>
+      {data?.truncated && (
+        <div style={{ ...S.card, borderColor:'#f39c12', marginBottom:16, fontSize:12 }}>⚠ This object has more connections than can be shown at once - results were truncated. Try a lower depth.</div>
+      )}
+      <div style={{ display: 'flex', height: 'calc(100vh - 280px)', gap: 0 }}>
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 10 }}>
+          <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', gap: 6 }}>
+            <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => setZoom(z=>Math.min(2.5,z+0.15))}>+</button>
+            <span style={{ fontSize: 12, color: 'var(--text-dim)', padding: '3px 6px' }}>{Math.round(zoom*100)}%</span>
+            <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => setZoom(z=>Math.max(0.25,z-0.15))}>−</button>
+            <span style={{ fontSize: 11, color: 'var(--text-dim)', padding: '3px 6px' }}>{data?.nodes?.length||0} objects</span>
+          </div>
+          {loading ? <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-dim)' }}>Loading...</div> : (
+            <svg style={{ width:'100%', height:'100%', cursor: panStart?'grabbing':dragging?'grabbing':'grab' }}
+              onMouseDown={onSvgMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+              <defs><marker id="arrow3" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(3,105,161,0.4)" /></marker></defs>
+              <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
+                {(data?.edges||[]).map((e: any) => <path key={e.id} d={getEdgePath(e)} stroke="rgba(3,105,161,0.25)" strokeWidth={1.5} fill="none" markerEnd="url(#arrow3)" />)}
+                {(data?.nodes||[]).map((n: any) => {
+                  const pos=positions[n.id]||{x:100,y:100}
+                  const isSel=selected?.id===n.id
+                  const isRoot = n.id === assetId
+                  const dc=DOMAIN_COLOR[n.domain]||'#3498db'
+                  return (
+                    <g key={n.id} data-node="true" transform={`translate(${pos.x},${pos.y})`} onMouseDown={e=>onNodeMouseDown(e,n.id)} style={{cursor:'grab'}}>
+                      <rect width={160} height={44} rx={8} fill="var(--navy-light)" stroke={isRoot?'var(--accent)':isSel?'#f39c12':dc+'55'} strokeWidth={isRoot||isSel?2.5:1.5} />
+                      <rect width={5} height={44} rx={2} fill={dc} />
+                      <text x={16} y={18} fontSize={11} fontWeight={600} fill="var(--text)">{n.name.length>17?n.name.slice(0,16)+'…':n.name}</text>
+                      <text x={16} y={32} fontSize={9} fill="rgba(100,116,139,0.7)">{n.assetType.replace(/_/g,' ')} · {n.domain}</text>
+                    </g>
+                  )
+                })}
+              </g>
+            </svg>
+          )}
+        </div>
+        {selected && (
+          <div style={{ width: 240, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, marginLeft:12, padding:16, overflowY:'auto' as const, flexShrink:0 }}>
+            <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>{selected.name}</div>
+            {[{l:'Type',v:selected.assetType?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:'Status',v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
+              <div key={f.l} style={{ marginBottom:10 }}><div style={S.label}>{f.l}</div><div style={{fontSize:13}}>{f.v}</div></div>
+            ))}
+            <button style={{...S.btn(),marginTop:16,fontSize:12,width:'100%'}} onClick={()=>setSelected(null)}>Close</button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function EaViewsPage() {
   const api = useViewsApi()
   const [tab, setTab] = useState('dashboard')
@@ -809,6 +1331,18 @@ export default function EaViewsPage() {
   const [activeView, setActiveView] = useState<any>(null)
   const [selectedViewpoint, setSelectedViewpoint] = useState<any>(null)
   const [, setShowBuilder] = useState(false)
+  const [objectContextId, setObjectContextId] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  // "Open in View" entry point from repository asset pages (Object Context
+  // View, spec section 51) - reacts to the objectContext query param via
+  // useSearchParams (not a mount-only window.location.search read), so
+  // clicking "Show Dependencies" for a different asset while already on
+  // this page works correctly too, not just on the initial navigation in.
+  useEffect(() => {
+    const id = searchParams.get('objectContext')
+    if (id) { setObjectContextId(id); setTab('object-context') }
+  }, [searchParams])
 
   const loadStats = useCallback(() => { api.get('/ea-views/stats').then(setStats) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadStats() }, [loadStats])
@@ -845,12 +1379,12 @@ export default function EaViewsPage() {
         <button style={S.btn('primary')} onClick={()=>{ setSelectedViewpoint(null); setShowBuilder(true); setTab('builder') }}>+ New View</button>
       </div>
 
-      {tab !== 'viewer' && tab !== 'builder' && (
+      {tab !== 'viewer' && tab !== 'builder' && tab !== 'object-context' && (
         <div style={S.tabs}>
           {TABS.map(t=><button key={t.id} style={S.tab(tab===t.id)} onClick={()=>setTab(t.id)}>{t.label}</button>)}
         </div>
       )}
-      {tab !== 'viewer' && tab !== 'builder' && (() => {
+      {tab !== 'viewer' && tab !== 'builder' && tab !== 'object-context' && (() => {
         const TAB_HELP: Record<string, string> = {
           dashboard: "A quick summary of the diagrams and views that have been created from your architecture data.",
           library: "Ready-made templates for common types of diagrams - pick one to quickly build a view without starting from scratch.",
@@ -871,6 +1405,7 @@ export default function EaViewsPage() {
         {tab === 'snapshots' && <SnapshotsPanel api={api} />}
         {tab === 'builder' && <ViewBuilder api={api} viewpoint={selectedViewpoint} onCreated={handleViewCreated} onCancel={()=>setTab('my-views')} />}
         {tab === 'viewer' && activeView && <ViewViewer api={api} view={activeView} onBack={()=>setTab('my-views')} onRefresh={loadStats} />}
+        {tab === 'object-context' && objectContextId && <ObjectContextViewer api={api} assetId={objectContextId} onBack={() => { setTab('dashboard'); setSearchParams({}) }} />}
       </div>
     </div>
   )
