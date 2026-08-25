@@ -1117,11 +1117,21 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
                 {ASSET_TYPES.map(t=><span key={t} onClick={()=>setForm(f=>({...f,rootObjectTypes:toggleArr(f.rootObjectTypes,t)}))} style={{ ...S.badge(form.rootObjectTypes.includes(t)?TYPE_COLOR[t]||'var(--accent)':'#7f8c8d'), cursor:'pointer', opacity:form.rootObjectTypes.includes(t)?1:0.5 }}>{t.replace(/_/g,' ')}</span>)}
               </div>
             </div>
-            <div><label style={S.label}>Related Object Types</label>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' as const }}>
-                {ASSET_TYPES.filter(t=>!form.rootObjectTypes.includes(t)).map(t=><span key={t} onClick={()=>setForm(f=>({...f,relatedObjectTypes:toggleArr(f.relatedObjectTypes,t)}))} style={{ ...S.badge(form.relatedObjectTypes.includes(t)?'#f39c12':'#7f8c8d'), cursor:'pointer', opacity:form.relatedObjectTypes.includes(t)?1:0.5 }}>{t.replace(/_/g,' ')}</span>)}
+            {/* Progressive disclosure: hidden until at least one root type
+                is picked. Before that, the exclusion filter below has
+                nothing to exclude yet, so every type would render
+                identically (same unselected styling) in both this section
+                and Primary Object Types above - confusingly duplicated and
+                genuinely ambiguous to click, caught by a test asserting on
+                a single "CAPABILITY" badge finding two matches instead of
+                one. */}
+            {form.rootObjectTypes.length > 0 && (
+              <div><label style={S.label}>Related Object Types</label>
+                <div style={{ display:'flex', gap:6, flexWrap:'wrap' as const }}>
+                  {ASSET_TYPES.filter(t=>!form.rootObjectTypes.includes(t)).map(t=><span key={t} onClick={()=>setForm(f=>({...f,relatedObjectTypes:toggleArr(f.relatedObjectTypes,t)}))} style={{ ...S.badge(form.relatedObjectTypes.includes(t)?'#f39c12':'#7f8c8d'), cursor:'pointer', opacity:form.relatedObjectTypes.includes(t)?1:0.5 }}>{t.replace(/_/g,' ')}</span>)}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Progressive disclosure: the Path Builder only appears once a
