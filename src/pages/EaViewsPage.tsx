@@ -1217,22 +1217,30 @@ function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: stri
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [depth, setDepth] = useState(2)
+  const [direction, setDirection] = useState<'BOTH'|'UPSTREAM'|'DOWNSTREAM'>('BOTH')
+  const [relTypeFilter, setRelTypeFilter] = useState<Set<string>>(new Set())
   const [positions, setPositions] = useState<Record<string,{x:number,y:number}>>({})
   const [selected, setSelected] = useState<any>(null)
   const [dragging, setDragging] = useState<{id:string,ox:number,oy:number}|null>(null)
   const [pan, setPan] = useState({x:0,y:0})
   const [panStart, setPanStart] = useState<{mx:number,my:number,px:number,py:number}|null>(null)
   const [zoom, setZoom] = useState(1)
+  const [pathTargetSearch, setPathTargetSearch] = useState('')
+  const [pathTargetOptions, setPathTargetOptions] = useState<any[]>([])
+  const [pathResult, setPathResult] = useState<any>(null)
+  const [pathSearching, setPathSearching] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
-    api.get(`/ea-views/object-context/${assetId}?depth=${depth}`).then((d: any) => {
+    const params = new URLSearchParams({ depth: String(depth), direction })
+    if (relTypeFilter.size > 0) params.set('relationshipTypes', [...relTypeFilter].join(','))
+    api.get(`/ea-views/object-context/${assetId}?${params.toString()}`).then((d: any) => {
       setData(d)
       if (d?.nodes?.length) setPositions(computeForceLayout(d.nodes, d.edges || [], {}))
       setLoading(false)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assetId, depth])
+  }, [assetId, depth, direction, relTypeFilter])
 
   useEffect(() => { load() }, [load])
 
@@ -1257,6 +1265,41 @@ function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: stri
     return `M ${s.x+80} ${s.y+20} Q ${(s.x+80+t.x)/2} ${(s.y+20+t.y+20)/2} ${t.x} ${t.y+20}`
   }
 
+  const toggleRelType = (type: string) => setRelTypeFilter(prev => { const next = new Set(prev); next.has(type) ? next.delete(type) : next.add(type); return next })
+  // Populated from the full-graph relationship types actually observed
+  // once (not re-derived from the currently-filtered result, which would
+  // shrink the checklist itself as filters get applied) - a simple
+  // client-side cache of the type names seen the first time this
+  // assetId+depth+direction combination loaded with no filter.
+  const [knownRelTypes, setKnownRelTypes] = useState<string[]>([])
+  useEffect(() => {
+    if (relTypeFilter.size === 0 && data?.edges?.length) {
+      setKnownRelTypes(prev => [...new Set([...prev, ...data.edges.map((e: any) => e.relationshipType)])])
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
+
+  const searchPathTargets = async (q: string) => {
+    setPathTargetSearch(q)
+    if (q.trim().length < 2) { setPathTargetOptions([]); return }
+    // Searches the full repository, not just objects already loaded in
+    // this exploration - a genuinely useful dependency-path question is
+    // often "is there a path between this and something I haven't
+    // navigated to yet", not just between two objects already on screen.
+    const results = await api.get(`/ea-repository/assets?search=${encodeURIComponent(q.trim())}`)
+    setPathTargetOptions((Array.isArray(results) ? results : []).filter((n: any) => n.id !== assetId).slice(0, 8))
+  }
+  const findPathTo = async (targetId: string) => {
+    setPathSearching(true)
+    setPathTargetOptions([])
+    try {
+      const result = await api.get(`/ea-views/shortest-path?from=${assetId}&to=${targetId}`)
+      setPathResult(result)
+    } finally {
+      setPathSearching(false)
+    }
+  }
+
   const rootNode = (data?.nodes || []).find((n: any) => n.id === assetId)
 
   return (
@@ -1268,12 +1311,61 @@ function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: stri
           <div style={{ fontSize:12, color:'var(--text-dim)' }}>Ad-hoc exploration - not a saved view</div>
         </div>
         <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ display:'flex', gap:2, background:'var(--navy-light)', borderRadius:8, padding:2 }}>
+            {(['BOTH','UPSTREAM','DOWNSTREAM'] as const).map(d => (
+              <button key={d} style={{ ...S.btn(), padding:'4px 10px', fontSize:11, background:direction===d?'var(--accent)':'none', color:direction===d?'var(--navy)':'var(--text-dim)' }} onClick={()=>setDirection(d)} title={d==='UPSTREAM'?'What feeds into this object':d==='DOWNSTREAM'?'What this object feeds into':'Both directions'}>
+                {d==='UPSTREAM'?'⬅ Upstream':d==='DOWNSTREAM'?'Downstream ➡':'↔ Both'}
+              </button>
+            ))}
+          </div>
           <label style={{ fontSize:12, color:'var(--text-dim)' }}>Depth:</label>
           <select style={{ ...S.input, width:70 }} value={depth} onChange={e => setDepth(parseInt(e.target.value, 10))}>
             {[1,2,3,4].map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={load}>↻ Refresh</button>
         </div>
+      </div>
+      {knownRelTypes.length > 0 && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12, flexWrap:'wrap' as const }}>
+          <span style={{ fontSize:11, color:'var(--text-dim)' }}>Filter relationship types:</span>
+          {knownRelTypes.map(t => (
+            <span key={t} onClick={()=>toggleRelType(t)} style={{ ...S.badge(relTypeFilter.has(t)?'var(--accent)':'#7f8c8d'), cursor:'pointer', opacity:relTypeFilter.size===0||relTypeFilter.has(t)?1:0.5 }}>{t}</span>
+          ))}
+          {relTypeFilter.size > 0 && <button style={{ ...S.btn(), padding:'2px 8px', fontSize:10 }} onClick={()=>setRelTypeFilter(new Set())}>Clear</button>}
+        </div>
+      )}
+      <div style={{ ...S.card, marginBottom:16, padding:12 }}>
+        <div style={{ fontSize:12, fontWeight:600, marginBottom:8 }}>🔍 Find shortest path to another object</div>
+        <div style={{ position:'relative', maxWidth:320 }}>
+          <input style={S.input} value={pathTargetSearch} onChange={e => searchPathTargets(e.target.value)} placeholder="Search for an object by name..." />
+          {pathTargetOptions.length > 0 && (
+            <div style={{ position:'absolute', top:'100%', left:0, marginTop:4, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:8, width:'100%', zIndex:20, maxHeight:200, overflowY:'auto' as const }}>
+              {pathTargetOptions.map((n: any) => (
+                <div key={n.id} onClick={() => { setPathTargetSearch(n.name); findPathTo(n.id) }} style={{ padding:'6px 10px', fontSize:12, cursor:'pointer', borderBottom:'1px solid var(--border)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>{n.name}</div>
+              ))}
+            </div>
+          )}
+        </div>
+        {pathSearching && <div style={{ fontSize:12, color:'var(--text-dim)', marginTop:8 }}>Searching...</div>}
+        {pathResult && !pathSearching && (
+          pathResult.found ? (
+            <div style={{ marginTop:10, fontSize:12 }}>
+              <strong>Path found</strong> ({pathResult.nodes.length} objects, {pathResult.edges.length} hops):
+              <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' as const, marginTop:6 }}>
+                {pathResult.nodes.map((n: any, i: number) => (
+                  <React.Fragment key={n.id}>
+                    {i > 0 && <span style={{ color:'var(--text-dim)' }}>→ {pathResult.edges[i-1]?.label} →</span>}
+                    <span style={S.badge(TYPE_COLOR[n.assetType]||'var(--accent)')}>{n.name}</span>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop:10, fontSize:12, color:'var(--text-dim)' }}>No connecting path found between these two objects.</div>
+          )
+        )}
       </div>
       {data?.truncated && (
         <div style={{ ...S.card, borderColor:'#f39c12', marginBottom:16, fontSize:12 }}>⚠ This object has more connections than can be shown at once - results were truncated. Try a lower depth.</div>

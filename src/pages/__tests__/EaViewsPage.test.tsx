@@ -352,6 +352,94 @@ describe('EaViewsPage - Object Context View entry point', () => {
     expect(await screen.findByText('🗺 EA Views & Viewpoints Studio')).toBeInTheDocument();
     expect(screen.queryByText(/Dependencies of/)).not.toBeInTheDocument();
   });
+
+  it('clicking Upstream re-fetches object-context with direction=UPSTREAM (Dependency Analysis)', async () => {
+    mockSearchParams = new URLSearchParams('objectContext=asset-123');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/object-context/asset-123': { nodes: [{ id: 'asset-123', name: 'Hub App', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {}, truncated: false },
+    });
+    render(<EaViewsPage />);
+    await screen.findByText('Dependencies of Hub App');
+    fireEvent.click(screen.getByText(/Upstream/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/object-context/asset-123')).pop();
+      expect(call[0]).toContain('direction=UPSTREAM');
+    });
+  });
+
+  it('clicking Downstream re-fetches object-context with direction=DOWNSTREAM (Impact Analysis)', async () => {
+    mockSearchParams = new URLSearchParams('objectContext=asset-123');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/object-context/asset-123': { nodes: [{ id: 'asset-123', name: 'Hub App', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {}, truncated: false },
+    });
+    render(<EaViewsPage />);
+    await screen.findByText('Dependencies of Hub App');
+    fireEvent.click(screen.getByText(/Downstream/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/object-context/asset-123')).pop();
+      expect(call[0]).toContain('direction=DOWNSTREAM');
+    });
+  });
+
+  it('shows a relationship-type filter checklist once edges are loaded, and toggling one re-fetches with relationshipTypes set', async () => {
+    mockSearchParams = new URLSearchParams('objectContext=asset-123');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/object-context/asset-123': {
+        nodes: [
+          { id: 'asset-123', name: 'Hub App', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} },
+          { id: 'b1', name: 'Dep B', assetType: 'ITComponent', domain: 'TECHNOLOGY', status: 'APPROVED', tags: [], metadata: {} },
+        ],
+        edges: [{ id: 'e1', sourceId: 'asset-123', targetId: 'b1', relationshipType: 'uses', label: 'uses' }],
+        metadata: {}, truncated: false,
+      },
+    });
+    render(<EaViewsPage />);
+    await screen.findByText('Dependencies of Hub App');
+    expect(await screen.findByText('uses')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('uses'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/object-context/asset-123')).pop();
+      expect(call[0]).toContain('relationshipTypes=uses');
+    });
+  });
+
+  it('searching for a path target queries the full repository (not just currently-loaded nodes), and selecting a result fetches the shortest path', async () => {
+    mockSearchParams = new URLSearchParams('objectContext=asset-123');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/object-context/asset-123': { nodes: [{ id: 'asset-123', name: 'Hub App', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {}, truncated: false },
+      '/ea-repository/assets?search=Payments': [{ id: 'far-away-1', name: 'Payments Gateway', assetType: 'Application' }],
+      '/ea-views/shortest-path': { found: true, nodes: [{ id: 'asset-123', name: 'Hub App', assetType: 'Application' }, { id: 'far-away-1', name: 'Payments Gateway', assetType: 'Application' }], edges: [{ id: 'e1', sourceId: 'asset-123', targetId: 'far-away-1', relationshipType: 'uses', label: 'uses' }] },
+    });
+    render(<EaViewsPage />);
+    await screen.findByText('Dependencies of Hub App');
+    fireEvent.change(screen.getByPlaceholderText(/Search for an object by name/), { target: { value: 'Payments' } });
+    fireEvent.click(await screen.findByText('Payments Gateway'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/shortest-path'));
+      expect(call[0]).toContain('from=asset-123');
+      expect(call[0]).toContain('to=far-away-1');
+    });
+    expect(await screen.findByText('Path found')).toBeInTheDocument();
+  });
+
+  it('shows "no connecting path" when the shortest-path search finds nothing, not an error', async () => {
+    mockSearchParams = new URLSearchParams('objectContext=asset-123');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/object-context/asset-123': { nodes: [{ id: 'asset-123', name: 'Hub App', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {}, truncated: false },
+      '/ea-repository/assets?search=Nowhere': [{ id: 'isolated-1', name: 'Isolated Thing', assetType: 'Application' }],
+      '/ea-views/shortest-path': { found: false, nodes: [], edges: [] },
+    });
+    render(<EaViewsPage />);
+    await screen.findByText('Dependencies of Hub App');
+    fireEvent.change(screen.getByPlaceholderText(/Search for an object by name/), { target: { value: 'Nowhere' } });
+    fireEvent.click(await screen.findByText('Isolated Thing'));
+    expect(await screen.findByText(/No connecting path found/)).toBeInTheDocument();
+  });
 });
 
 describe('EaViewsPage - ViewBuilder Path Builder wiring', () => {
