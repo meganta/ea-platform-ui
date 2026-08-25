@@ -24,6 +24,11 @@ describe('PathBuilder', () => {
     const api = mockApi({ 'relationship-options': [] });
     render(<PathBuilder api={api} rootType="GovCapability" initialPath={[]} onChange={jest.fn()} />);
     await waitFor(() => expect(api.get).toHaveBeenCalledWith(expect.stringContaining('sourceType=GovCapability')));
+    // Also wait for the fetch's resolution to actually land (setOptions/
+    // setLoading), not just confirm the call happened - otherwise this
+    // test returns while that resolution is still pending, and it fires
+    // in a later tick with no act() wrapping around it anymore.
+    expect(await screen.findByText(/No relationships found from this object type/)).toBeInTheDocument();
   });
 
   it('shows the empty state when no relationship options exist for this type yet', async () => {
@@ -57,7 +62,13 @@ describe('PathBuilder', () => {
     render(<PathBuilder api={api} rootType="Application" initialPath={[]} onChange={onChange} />);
     fireEvent.click(await screen.findByText('→ uses'));
     expect(onChange).toHaveBeenCalledWith([{ relationshipType: 'uses', direction: 'FORWARD', targetAssetType: 'ITComponent', label: 'uses', targetTypeName: 'IT Component' }]);
+    // The breadcrumb badge below updates synchronously from the click (no
+    // async wait needed for it specifically), but the click also changes
+    // currentType, which re-triggers the options effect for the new type -
+    // wait for that to actually resolve too, or it settles after this test
+    // has already returned (same reasoning as the mount test above).
     expect(await screen.findByText('IT Component')).toBeInTheDocument(); // breadcrumb badge, not just the option button
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith(expect.stringContaining('sourceType=ITComponent')));
   });
 
   it('fetches the next hop\'s options scoped to the newly-added target type, not the original root', async () => {
@@ -83,18 +94,34 @@ describe('PathBuilder', () => {
     const removeButtons = screen.getAllByText('✕');
     fireEvent.click(removeButtons[0]); // remove from the first hop onward
     expect(onChange).toHaveBeenCalledWith([]);
+    // Truncating the path changes currentType back to the root type,
+    // re-triggering the options fetch - wait for that to actually
+    // resolve (see the mount test's comment above for why this matters).
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith(expect.stringContaining('sourceType=Application')));
+    expect(await screen.findByText(/No relationships found from this object type/)).toBeInTheDocument();
   });
 
-  it('shows the single-level placeholder message when the path is empty', () => {
+  it('shows the single-level placeholder message when the path is empty', async () => {
     const api = mockApi({ 'relationship-options': [] });
     render(<PathBuilder api={api} rootType="Application" initialPath={[]} onChange={jest.fn()} />);
     expect(screen.getByText(/single-level view/)).toBeInTheDocument();
+    // The synchronous assertion above doesn't depend on the mount effect's
+    // fetch resolving (path.length===0 is already known at render time),
+    // but the fetch still fires and this test would otherwise return
+    // before it settles - same reasoning as the mount test above.
+    expect(await screen.findByText(/No relationships found from this object type/)).toBeInTheDocument();
   });
 
   it('caps the path at 6 hops and shows a max-depth message instead of more options', async () => {
     const api = mockApi({ 'relationship-options': [{ relationshipType: 'x', direction: 'FORWARD', targetAssetType: 'Y', label: 'x', sampleCount: 1 }] });
     const sixHopPath = Array.from({ length: 6 }, (_, i) => ({ relationshipType: `hop${i}`, direction: 'FORWARD' as const, targetAssetType: `Type${i}`, label: `hop${i}`, targetTypeName: `Type${i}` }));
     render(<PathBuilder api={api} rootType="Application" initialPath={sixHopPath} onChange={jest.fn()} />);
+    // "Maximum path depth reached" renders synchronously from
+    // path.length >= 6, independent of the mount effect's fetch - but
+    // that fetch still fires (based on currentType, regardless of what
+    // path.length gates in the UI) and needs to be awaited too, or it
+    // settles after this test has already returned.
     expect(await screen.findByText(/Maximum path depth reached/)).toBeInTheDocument();
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith(expect.stringContaining('sourceType=Type5')));
   });
 });
