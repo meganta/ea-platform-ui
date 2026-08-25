@@ -880,7 +880,7 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
                     <text x={16} y={18} fontSize={11} fontWeight={600} fill="var(--text)">{n.name.length>17?n.name.slice(0,16)+'…':n.name}</text>
                     <text x={16} y={32} fontSize={9} fill="rgba(100,116,139,0.7)">{n.assetType.replace(/_/g,' ')} · {n.domain}</text>
                     <circle cx={148} cy={10} r={5} fill={HEATMAP_STATUS[n.status]||'#7f8c8d'} />
-                    {isExpanding ? <text x={148} y={38} fontSize={9} fill="var(--accent)">⏳</text> : !isExpanded && <text x={148} y={38} fontSize={9} fill="rgba(100,116,139,0.6)" title="Double-click to expand">⊕</text>}
+                    {isExpanding ? <text x={148} y={38} fontSize={9} fill="var(--accent)">⏳</text> : !isExpanded && <text x={148} y={38} fontSize={9} fill="rgba(100,116,139,0.6)">⊕<title>Double-click to expand</title></text>}
                   </g>
                 )
               })}
