@@ -6,7 +6,7 @@ import { DashboardBuilder, DashboardGrid, DashboardWidget } from './eaviews/Dash
 
 import { PathBuilder, RelationshipHop } from './eaviews/PathBuilder'
 import { useSearchParams } from 'react-router-dom'
-import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG } from './eaviews/exportUtils'
+import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -588,34 +588,63 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
     else { document.exitFullscreen(); setIsFullscreen(false) }
   }
 
-  // ── Export (scoped V1: JSON/CSV/SVG - see exportUtils.ts for why PDF/
-  // PPTX/PNG/true-XLSX aren't included yet). Every format's content comes
-  // only from state already held by this component (filteredNodes, data,
-  // view) - no export triggers a fresh fetch of its own. Options offered
-  // depend on the active vizMode, since a roadmap-shaped export doesn't
-  // make sense from graph data and vice versa. ──────────────────────────
+  // ── Export (JSON/CSV/SVG/PNG/PDF/PPTX - true binary XLSX remains
+  // deferred, see exportUtils.ts's header comment for why). Every format's
+  // content comes only from state already held by this component
+  // (filteredNodes, data, view) - no export triggers a fresh fetch of its
+  // own. Options offered depend on the active vizMode, since a roadmap-
+  // shaped export doesn't make sense from graph data and vice versa.
+  // PDF/PPTX/PNG generation is async (canvas rasterization, dynamic
+  // library import) - exportingFormat tracks which one is in flight so
+  // the menu can show a spinner and avoid double-clicks. ──────────────────
+  const [exportingFormat, setExportingFormat] = useState<string | null>(null)
   const exportMeta = { viewName: view.name, architectureState: view.architectureState }
-  const runExport = (format: 'json' | 'csv' | 'svg') => {
+  const getMatrixSourcesTargets = () => {
+    const sources = filteredNodes.filter((n: any) => view.rootObjectTypes?.includes(n.assetType))
+    const targets = filteredNodes.filter((n: any) => view.relatedObjectTypes?.includes(n.assetType))
+    const displayTargets = targets.length > 0 ? targets : filteredNodes.filter((n: any) => !view.rootObjectTypes?.includes(n.assetType))
+    return { sources, targets: displayTargets }
+  }
+  const runExport = async (format: 'json' | 'csv' | 'svg' | 'png' | 'pdf' | 'pptx') => {
     setShowExportMenu(false)
     if (format === 'json') {
       const payload = isRoadmap ? { items: roadmapItems } : isDashboard ? { widgets: dashboardWidgets, results: dashboardResults } : { nodes: filteredNodes, edges: data?.edges || [] }
       exportAsJSON(payload, exportMeta)
       return
     }
-    if (format === 'svg') {
-      if (graphSvgRef.current) exportGraphAsSVG(graphSvgRef.current, exportMeta)
+    if (format === 'csv') {
+      if (isRoadmap) { exportRoadmapAsCSV(roadmapItems, exportMeta); return }
+      if (vizMode === 'MATRIX') { const { sources, targets } = getMatrixSourcesTargets(); exportMatrixAsCSV(sources, targets, data?.edges || [], exportMeta); return }
+      exportNodesAsCSV(filteredNodes, exportMeta)
       return
     }
-    // csv
-    if (isRoadmap) { exportRoadmapAsCSV(roadmapItems, exportMeta); return }
-    if (vizMode === 'MATRIX') {
-      const sources = filteredNodes.filter((n: any) => view.rootObjectTypes?.includes(n.assetType))
-      const targets = filteredNodes.filter((n: any) => view.relatedObjectTypes?.includes(n.assetType))
-      const displayTargets = targets.length > 0 ? targets : filteredNodes.filter((n: any) => !view.rootObjectTypes?.includes(n.assetType))
-      exportMatrixAsCSV(sources, displayTargets, data?.edges || [], exportMeta)
-      return
+    // svg/png/pdf/pptx: graph-shaped formats need the live SVG element;
+    // table-shaped formats (pdf/pptx only - svg/png are graph-only, see
+    // the menu's own conditional rendering below) work from the same
+    // node/matrix/roadmap data CSV already uses.
+    setExportingFormat(format)
+    try {
+      if (format === 'svg') { if (graphSvgRef.current) exportGraphAsSVG(graphSvgRef.current, exportMeta); return }
+      if (format === 'png') { if (graphSvgRef.current) await exportGraphAsPNG(graphSvgRef.current, exportMeta); return }
+      if (format === 'pdf') {
+        if (isRoadmap) { await exportRoadmapAsPDF(roadmapItems, exportMeta); return }
+        if (vizMode === 'MATRIX') { const { sources, targets } = getMatrixSourcesTargets(); await exportMatrixAsPDF(sources, targets, data?.edges || [], exportMeta); return }
+        if (vizMode === 'GRAPH' && graphSvgRef.current) { await exportGraphAsPDF(graphSvgRef.current, exportMeta); return }
+        await exportNodesAsPDF(filteredNodes, exportMeta)
+        return
+      }
+      if (format === 'pptx') {
+        if (isRoadmap) { await exportRoadmapAsPPTX(roadmapItems, exportMeta); return }
+        if (vizMode === 'MATRIX') { const { sources, targets } = getMatrixSourcesTargets(); await exportMatrixAsPPTX(sources, targets, data?.edges || [], exportMeta); return }
+        if (vizMode === 'GRAPH' && graphSvgRef.current) { await exportGraphAsPPTX(graphSvgRef.current, exportMeta); return }
+        await exportNodesAsPPTX(filteredNodes, exportMeta)
+        return
+      }
+    } catch (e: any) {
+      alert(`Export failed: ${e.message || 'unknown error'}`)
+    } finally {
+      setExportingFormat(null)
     }
-    exportNodesAsCSV(filteredNodes, exportMeta)
   }
 
   useEffect(() => {
@@ -960,21 +989,23 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
           <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
           <div style={{ position:'relative' }}>
-            <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setShowExportMenu(v => !v)}>⬇ Export</button>
-            {showExportMenu && (
-              <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:8, zIndex:20, minWidth:120, overflow:'hidden' }}>
-                <button style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 12px', fontSize:12, background:'none', border:'none', color:'var(--text)', cursor:'pointer' }} onClick={() => runExport('json')}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>JSON</button>
-                {!isDashboard && (
-                  <button style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 12px', fontSize:12, background:'none', border:'none', color:'var(--text)', cursor:'pointer' }} onClick={() => runExport('csv')}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>CSV</button>
-                )}
-                {vizMode === 'GRAPH' && !isRoadmap && !isDashboard && (
-                  <button style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 12px', fontSize:12, background:'none', border:'none', color:'var(--text)', cursor:'pointer' }} onClick={() => runExport('svg')}
-                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>SVG</button>
-                )}
-              </div>
-            )}
+            <button style={{ ...S.btn(), fontSize:12 }} disabled={!!exportingFormat} onClick={() => setShowExportMenu(v => !v)}>{exportingFormat ? `⏳ Exporting ${exportingFormat.toUpperCase()}...` : '⬇ Export'}</button>
+            {showExportMenu && (() => {
+              const isGraphMode = vizMode === 'GRAPH' && !isRoadmap && !isDashboard
+              const itemStyle = { display:'block' as const, width:'100%', textAlign:'left' as const, padding:'8px 12px', fontSize:12, background:'none', border:'none', color:'var(--text)', cursor:'pointer' }
+              const hoverIn = (e: React.MouseEvent<HTMLButtonElement>) => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')
+              const hoverOut = (e: React.MouseEvent<HTMLButtonElement>) => (e.currentTarget.style.background = 'none')
+              return (
+                <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:8, zIndex:20, minWidth:130, overflow:'hidden' }}>
+                  <button style={itemStyle} onClick={() => runExport('json')} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>JSON</button>
+                  {!isDashboard && <button style={itemStyle} onClick={() => runExport('csv')} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>CSV</button>}
+                  {isGraphMode && <button style={itemStyle} onClick={() => runExport('svg')} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>SVG</button>}
+                  {isGraphMode && <button style={itemStyle} onClick={() => runExport('png')} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>PNG</button>}
+                  {!isDashboard && <button style={itemStyle} onClick={() => runExport('pdf')} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>PDF</button>}
+                  {!isDashboard && <button style={itemStyle} onClick={() => runExport('pptx')} onMouseEnter={hoverIn} onMouseLeave={hoverOut}>PPTX</button>}
+                </div>
+              )
+            })()}
           </div>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={shareView}>🔗 Share</button>
           {isDashboard && <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setEditingDashboard(true)}>⚙ Edit Widgets</button>}

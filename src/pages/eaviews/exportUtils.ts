@@ -1,16 +1,13 @@
-// ── Export Pipeline (Tier 5, scoped V1) ─────────────────────────────────────
+// ── Export Pipeline (Tier 5) ─────────────────────────────────────────────────
 //
-// Deliberately scoped to JSON, CSV, and SVG for this round - all three are
-// pure client-side transformations of data the browser has already fetched
-// through an authorized endpoint, so there is no new backend surface and no
-// new way to leak data beyond what the viewer could already see on screen.
-// PDF, PPTX, PNG, and true XLSX are NOT included here - PDF/PPTX need a
-// rendering/layout library this project doesn't have installed yet, PNG
-// needs canvas-based SVG rasterization (real cross-browser quirks), and
-// XLSX needs a binary-format library (SheetJS or similar) - each is a
-// meaningfully bigger, riskier addition than a single review round should
-// take on at once, so they're left for a following round rather than
-// attempted alongside everything else here.
+// First round: JSON, CSV, SVG - pure client-side transformations of data
+// the browser has already fetched through an authorized endpoint. This
+// round adds PNG (canvas rasterization, no new dependency), PDF (jspdf),
+// and PPTX (pptxgenjs) - two new client-side libraries, still no new
+// backend surface. True binary XLSX (vs. the CSV already shipped, which
+// opens fine in Excel) remains deferred - it needs a binary spreadsheet
+// library (SheetJS or similar), a separate addition from either of the
+// two brought in here.
 //
 // Every exported file's content only ever comes from data already present
 // in the calling component's state (never a fresh fetch triggered by the
@@ -125,9 +122,26 @@ export function exportRoadmapAsCSV(items: any[], meta: ExportMetadata) {
 const SVG_STANDALONE_STYLE = `
   text { font-family: -apple-system, Segoe UI, Roboto, sans-serif; }
 `
-export function exportGraphAsSVG(svgElement: SVGSVGElement, meta: ExportMetadata) {
+
+// Shared by exportGraphAsSVG and every raster format below (PNG, PDF,
+// PPTX all need to rasterize this same graph) - builds a standalone SVG
+// markup string from the live element. Explicitly sets width/height
+// attributes from the element's actual rendered size: the live SVG only
+// has CSS width:100%/height:100% (fine inside this app's layout), which
+// gives a standalone copy no intrinsic size - it can render as 0x0 (or
+// unpredictably) both in a plain SVG viewer and, critically, when loaded
+// into an Image element for canvas rasterization, which is exactly what
+// every raster export below needs to do.
+function buildStandaloneSvgMarkup(svgElement: SVGSVGElement, meta: ExportMetadata): { markup: string; width: number; height: number } {
+  const rect = svgElement.getBoundingClientRect()
+  const width = Math.max(1, Math.round(rect.width) || 1200)
+  const height = Math.max(1, Math.round(rect.height) || 800)
+
   const clone = svgElement.cloneNode(true) as SVGSVGElement
   clone.removeAttribute('style') // drop the live element's cursor/etc. inline styles - not meaningful in a static export
+  clone.setAttribute('width', String(width))
+  clone.setAttribute('height', String(height))
+  clone.setAttribute('viewBox', `0 0 ${width} ${height}`)
   const styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style')
   styleEl.textContent = SVG_STANDALONE_STYLE
   clone.insertBefore(styleEl, clone.firstChild)
@@ -135,5 +149,228 @@ export function exportGraphAsSVG(svgElement: SVGSVGElement, meta: ExportMetadata
 
   const serialized = new XMLSerializer().serializeToString(clone)
   const withHeader = `<?xml version="1.0" encoding="UTF-8"?>\n<!-- ${meta.viewName}${meta.architectureState ? ` (${meta.architectureState})` : ''} - exported ${meta.generatedAt || new Date().toISOString()} -->\n${serialized}`
-  downloadBlob(new Blob([withHeader], { type: 'image/svg+xml;charset=utf-8;' }), `${safeFilenamePart(meta.viewName)}.svg`)
+  return { markup: withHeader, width, height }
+}
+
+export function exportGraphAsSVG(svgElement: SVGSVGElement, meta: ExportMetadata) {
+  const { markup } = buildStandaloneSvgMarkup(svgElement, meta)
+  downloadBlob(new Blob([markup], { type: 'image/svg+xml;charset=utf-8;' }), `${safeFilenamePart(meta.viewName)}.svg`)
+}
+
+// ── PNG (Graph view) ─────────────────────────────────────────────────────
+//
+// SVG -> canvas -> PNG, the standard browser-native technique (no new
+// dependency needed): load the standalone SVG markup as an Image, draw it
+// onto a canvas sized to match, then read the canvas back out as a PNG
+// blob. Async because image loading is inherently async - every caller
+// needs to await this or handle the returned promise.
+//
+// renderGraphToCanvas is exported separately (not just used internally)
+// because exportGraphAsPDF/exportGraphAsPPTX below need the same
+// rasterized canvas to embed as an image in their own document formats -
+// they call this directly rather than going through exportGraphAsPNG's
+// download step.
+export function renderGraphToCanvas(svgElement: SVGSVGElement, meta: ExportMetadata): Promise<HTMLCanvasElement> {
+  const { markup, width, height } = buildStandaloneSvgMarkup(svgElement, meta)
+  const svgBlob = new Blob([markup], { type: 'image/svg+xml;charset=utf-8;' })
+  const svgUrl = URL.createObjectURL(svgBlob)
+
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(svgUrl)
+      const canvas = document.createElement('canvas')
+      // 2x scale for a reasonably crisp export on high-DPI displays,
+      // without the file size exploding the way a much higher multiple
+      // would - a fixed middle ground rather than reading the actual
+      // devicePixelRatio, so exports are consistent across machines.
+      const scale = 2
+      canvas.width = width * scale
+      canvas.height = height * scale
+      const ctx = canvas.getContext('2d')
+      if (!ctx) { reject(new Error('Canvas 2D context unavailable')); return }
+      ctx.fillStyle = '#0f172a' // matches --navy - a transparent PNG would show as harsh white/black depending on the viewer otherwise
+      ctx.fillRect(0, 0, canvas.width, canvas.height)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+      resolve(canvas)
+    }
+    img.onerror = () => { URL.revokeObjectURL(svgUrl); reject(new Error('Failed to rasterize graph SVG for export')) }
+    img.src = svgUrl
+  })
+}
+
+export async function exportGraphAsPNG(svgElement: SVGSVGElement, meta: ExportMetadata): Promise<void> {
+  const canvas = await renderGraphToCanvas(svgElement, meta)
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(blob => {
+      if (!blob) { reject(new Error('Failed to convert graph canvas to PNG')); return }
+      downloadBlob(blob, `${safeFilenamePart(meta.viewName)}.png`)
+      resolve()
+    }, 'image/png')
+  })
+}
+
+// ── Shared table-row shaping (used by both PDF and PPTX table exports) ─────
+//
+// Both formats need the same {headers, rows} shape - one place to define
+// what a "row" of node/matrix/roadmap data means, rather than deriving it
+// separately (and risking drift) in the PDF and PPTX renderers below.
+function nodesToTableRows(nodes: any[]): { headers: string[]; rows: string[][] } {
+  return {
+    headers: ['Name', 'Type', 'Domain', 'Status', 'Owner'],
+    rows: nodes.map(n => [n.name || '', n.assetType || '', n.domain || '', n.status || '', n.owner || '']),
+  }
+}
+function matrixToTableRows(sources: any[], targets: any[], relationships: any[]): { headers: string[]; rows: string[][] } {
+  const hasRel = (sId: string, tId: string) => relationships.some((r: any) => (r.sourceId === sId && r.targetId === tId) || (r.sourceId === tId && r.targetId === sId))
+  return {
+    headers: ['', ...targets.map(t => t.name)],
+    rows: sources.map(s => [s.name, ...targets.map(t => (hasRel(s.id, t.id) ? 'X' : ''))]),
+  }
+}
+function roadmapToTableRows(items: any[]): { headers: string[]; rows: string[][] } {
+  return {
+    headers: ['Name', 'Start', 'End', 'Group', 'Status'],
+    rows: items.map(it => [it.name || '', it.start || '', it.end || '', it.group || '', it.status || '']),
+  }
+}
+
+// ── PDF ───────────────────────────────────────────────────────────────────
+//
+// jsPDF is loaded via a dynamic import rather than a top-level one - it's
+// a meaningfully large library that only a user who actually clicks
+// "Export as PDF" ever needs, so keeping it out of the main bundle (CRA/
+// webpack code-splits a dynamic import() automatically) means everyone
+// else's page load isn't paying for it.
+function writePdfHeader(doc: any, meta: ExportMetadata, pageWidth: number): number {
+  doc.setFontSize(16)
+  doc.setTextColor(20, 20, 20)
+  doc.text(meta.viewName, 40, 40)
+  doc.setFontSize(9)
+  doc.setTextColor(120, 120, 120)
+  const subtitle = [meta.architectureState, `Generated ${meta.generatedAt || new Date().toISOString()}`].filter(Boolean).join(' · ')
+  doc.text(subtitle, 40, 56)
+  doc.setDrawColor(200, 200, 200)
+  doc.line(40, 66, pageWidth - 40, 66)
+  return 90 // y-coordinate content should start at, below the header
+}
+
+// A hand-rolled table drawer (no autotable plugin dependency) - text +
+// ruled lines only, but that's sufficient for a data export and avoids
+// pulling in a third library on top of jspdf itself. Paginates by adding
+// a new page (with its own header re-drawn) whenever a row would run
+// past the bottom margin, so a long node list or roadmap doesn't silently
+// clip off the page.
+function drawPdfTable(doc: any, headers: string[], rows: string[][], meta: ExportMetadata, pageWidth: number, pageHeight: number) {
+  const margin = 40
+  const usableWidth = pageWidth - margin * 2
+  const colWidth = usableWidth / Math.max(1, headers.length)
+  const rowHeight = 18
+  const maxCellChars = Math.max(6, Math.floor(colWidth / 5)) // rough width-to-character-count budget, not exact metrics - good enough to avoid gross overlap between columns
+
+  let y = writePdfHeader(doc, meta, pageWidth)
+  doc.setFontSize(9)
+  doc.setFont('helvetica', 'bold')
+  headers.forEach((h, i) => doc.text(String(h).slice(0, maxCellChars), margin + i * colWidth + 2, y))
+  y += 4
+  doc.setDrawColor(180, 180, 180)
+  doc.line(margin, y, pageWidth - margin, y)
+  y += rowHeight - 4
+  doc.setFont('helvetica', 'normal')
+
+  for (const row of rows) {
+    if (y > pageHeight - 40) {
+      doc.addPage()
+      y = writePdfHeader(doc, meta, pageWidth)
+      doc.setFontSize(9)
+    }
+    row.forEach((cell, i) => doc.text(String(cell ?? '').slice(0, maxCellChars), margin + i * colWidth + 2, y))
+    y += rowHeight
+  }
+}
+
+export async function exportGraphAsPDF(svgElement: SVGSVGElement, meta: ExportMetadata): Promise<void> {
+  const canvas = await renderGraphToCanvas(svgElement, meta)
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const startY = writePdfHeader(doc, meta, pageWidth)
+  const margin = 40
+  const availW = pageWidth - margin * 2
+  const availH = pageHeight - startY - margin
+  const scale = Math.min(availW / canvas.width, availH / canvas.height, 1) // never upscale beyond the canvas's own rendered size
+  const imgW = canvas.width * scale
+  const imgH = canvas.height * scale
+  doc.addImage(canvas.toDataURL('image/png'), 'PNG', margin, startY, imgW, imgH)
+  doc.save(`${safeFilenamePart(meta.viewName)}.pdf`)
+}
+
+async function exportTableAsPDF(headers: string[], rows: string[][], meta: ExportMetadata, filenameSuffix: string) {
+  const { jsPDF } = await import('jspdf')
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
+  drawPdfTable(doc, headers, rows, meta, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight())
+  doc.save(`${safeFilenamePart(meta.viewName)}${filenameSuffix}.pdf`)
+}
+export function exportNodesAsPDF(nodes: any[], meta: ExportMetadata): Promise<void> {
+  const { headers, rows } = nodesToTableRows(nodes)
+  return exportTableAsPDF(headers, rows, meta, '')
+}
+export function exportMatrixAsPDF(sources: any[], targets: any[], relationships: any[], meta: ExportMetadata): Promise<void> {
+  const { headers, rows } = matrixToTableRows(sources, targets, relationships)
+  return exportTableAsPDF(headers, rows, meta, '-matrix')
+}
+export function exportRoadmapAsPDF(items: any[], meta: ExportMetadata): Promise<void> {
+  const { headers, rows } = roadmapToTableRows(items)
+  return exportTableAsPDF(headers, rows, meta, '-roadmap')
+}
+
+// ── PPTX ──────────────────────────────────────────────────────────────────
+//
+// Same dynamic-import reasoning as jsPDF above. pptxgenjs's addTable()
+// supports real native tables (unlike jsPDF, which needed the hand-rolled
+// drawPdfTable above), so table exports here are genuinely native PPTX
+// tables, not an image of one.
+const PPTX_TABLE_OPTS = { fontSize: 10, border: { type: 'solid', color: 'CCCCCC', pt: 0.5 }, autoPage: true } as const
+
+async function newPptxWithTitleSlide(meta: ExportMetadata) {
+  const PptxGenJS = (await import('pptxgenjs')).default
+  const pptx = new PptxGenJS()
+  pptx.defineLayout({ name: 'EA_WIDE', width: 13.33, height: 7.5 })
+  pptx.layout = 'EA_WIDE'
+  const slide = pptx.addSlide()
+  slide.addText(meta.viewName, { x: 0.4, y: 0.3, w: 12.5, h: 0.6, fontSize: 22, bold: true, color: '141414' })
+  const subtitle = [meta.architectureState, `Generated ${meta.generatedAt || new Date().toISOString()}`].filter(Boolean).join('  ·  ')
+  slide.addText(subtitle, { x: 0.4, y: 0.85, w: 12.5, h: 0.35, fontSize: 11, color: '787878' })
+  return { pptx, slide }
+}
+
+export async function exportGraphAsPPTX(svgElement: SVGSVGElement, meta: ExportMetadata): Promise<void> {
+  const canvas = await renderGraphToCanvas(svgElement, meta)
+  const { pptx, slide } = await newPptxWithTitleSlide(meta)
+  const aspectRatio = canvas.width / canvas.height
+  const maxW = 12.5, maxH = 5.8
+  const w = aspectRatio > maxW / maxH ? maxW : maxH * aspectRatio
+  const h = aspectRatio > maxW / maxH ? maxW / aspectRatio : maxH
+  slide.addImage({ data: canvas.toDataURL('image/png'), x: (13.33 - w) / 2, y: 1.4, w, h })
+  await pptx.writeFile({ fileName: `${safeFilenamePart(meta.viewName)}.pptx` })
+}
+
+async function exportTableAsPPTX(headers: string[], rows: string[][], meta: ExportMetadata, filenameSuffix: string) {
+  const { pptx, slide } = await newPptxWithTitleSlide(meta)
+  const tableRows = [headers.map(h => ({ text: h, options: { bold: true, fill: { color: 'F0F0F0' } } })), ...rows.map(r => r.map(c => ({ text: c })))]
+  slide.addTable(tableRows, { x: 0.4, y: 1.4, w: 12.5, h: 5.6, ...PPTX_TABLE_OPTS })
+  await pptx.writeFile({ fileName: `${safeFilenamePart(meta.viewName)}${filenameSuffix}.pptx` })
+}
+export function exportNodesAsPPTX(nodes: any[], meta: ExportMetadata): Promise<void> {
+  const { headers, rows } = nodesToTableRows(nodes)
+  return exportTableAsPPTX(headers, rows, meta, '')
+}
+export function exportMatrixAsPPTX(sources: any[], targets: any[], relationships: any[], meta: ExportMetadata): Promise<void> {
+  const { headers, rows } = matrixToTableRows(sources, targets, relationships)
+  return exportTableAsPPTX(headers, rows, meta, '-matrix')
+}
+export function exportRoadmapAsPPTX(items: any[], meta: ExportMetadata): Promise<void> {
+  const { headers, rows } = roadmapToTableRows(items)
+  return exportTableAsPPTX(headers, rows, meta, '-roadmap')
 }

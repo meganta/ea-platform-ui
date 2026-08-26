@@ -17,14 +17,23 @@ jest.mock('react-router-dom', () => ({
 
 // Export wiring tests only need to verify EaViewsPage calls the right
 // exportUtils function with the right data - the export functions'
-// internal CSV/JSON/SVG logic already has its own dedicated, thorough
-// coverage in eaviews/__tests__/exportUtils.test.ts.
+// internal CSV/JSON/SVG/PNG/PDF/PPTX logic already has its own dedicated,
+// thorough coverage in eaviews/__tests__/exportUtils.test.ts.
 jest.mock('../eaviews/exportUtils', () => ({
   exportAsJSON: jest.fn(),
   exportNodesAsCSV: jest.fn(),
   exportMatrixAsCSV: jest.fn(),
   exportRoadmapAsCSV: jest.fn(),
   exportGraphAsSVG: jest.fn(),
+  exportGraphAsPNG: jest.fn().mockResolvedValue(undefined),
+  exportGraphAsPDF: jest.fn().mockResolvedValue(undefined),
+  exportNodesAsPDF: jest.fn().mockResolvedValue(undefined),
+  exportMatrixAsPDF: jest.fn().mockResolvedValue(undefined),
+  exportRoadmapAsPDF: jest.fn().mockResolvedValue(undefined),
+  exportGraphAsPPTX: jest.fn().mockResolvedValue(undefined),
+  exportNodesAsPPTX: jest.fn().mockResolvedValue(undefined),
+  exportMatrixAsPPTX: jest.fn().mockResolvedValue(undefined),
+  exportRoadmapAsPPTX: jest.fn().mockResolvedValue(undefined),
 }));
 import * as exportUtils from '../eaviews/exportUtils';
 
@@ -342,12 +351,15 @@ describe('EaViewsPage - Export', () => {
     await screen.findByText(/objects/);
   }
 
-  it('clicking Export opens a menu with JSON, CSV, and SVG options for a GRAPH view', async () => {
+  it('clicking Export opens a menu with JSON, CSV, SVG, PNG, PDF, and PPTX options for a GRAPH view', async () => {
     await openGraphView();
     fireEvent.click(screen.getByText('⬇ Export'));
     expect(screen.getByText('JSON')).toBeInTheDocument();
     expect(screen.getByText('CSV')).toBeInTheDocument();
     expect(screen.getByText('SVG')).toBeInTheDocument();
+    expect(screen.getByText('PNG')).toBeInTheDocument();
+    expect(screen.getByText('PDF')).toBeInTheDocument();
+    expect(screen.getByText('PPTX')).toBeInTheDocument();
   });
 
   it('clicking JSON calls exportAsJSON with the current nodes/edges and closes the menu', async () => {
@@ -392,7 +404,71 @@ describe('EaViewsPage - Export', () => {
     expect(screen.queryByText('SVG')).not.toBeInTheDocument();
   });
 
-  it('a DASHBOARD view only offers JSON export, not CSV or SVG', async () => {
+  it('does not offer a PNG option once switched to a non-graph visualization mode (PDF/PPTX remain available for tabular formats)', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText(/TABLE/));
+    fireEvent.click(screen.getByText('⬇ Export'));
+    expect(screen.queryByText('PNG')).not.toBeInTheDocument();
+    expect(screen.getByText('PDF')).toBeInTheDocument();
+    expect(screen.getByText('PPTX')).toBeInTheDocument();
+  });
+
+  it('clicking PNG calls exportGraphAsPNG with the live svg element and shows an exporting indicator while in flight', async () => {
+    let resolvePng: () => void = () => {};
+    (exportUtils.exportGraphAsPNG as jest.Mock).mockReturnValue(new Promise<void>(res => { resolvePng = res; }));
+    await openGraphView();
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('PNG'));
+    expect(exportUtils.exportGraphAsPNG).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ viewName: 'App Landscape' }));
+    expect(await screen.findByText(/Exporting PNG/)).toBeInTheDocument();
+    resolvePng();
+    await waitFor(() => expect(screen.queryByText(/Exporting PNG/)).not.toBeInTheDocument());
+  });
+
+  it('clicking PDF on a GRAPH view calls exportGraphAsPDF (the image-embedding variant), not the table variant', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('PDF'));
+    await waitFor(() => expect(exportUtils.exportGraphAsPDF).toHaveBeenCalled());
+    expect(exportUtils.exportNodesAsPDF).not.toHaveBeenCalled();
+  });
+
+  it('clicking PDF on a TABLE view calls exportNodesAsPDF (the table variant), not the graph-image variant', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText(/TABLE/));
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('PDF'));
+    await waitFor(() => expect(exportUtils.exportNodesAsPDF).toHaveBeenCalled());
+    expect(exportUtils.exportGraphAsPDF).not.toHaveBeenCalled();
+  });
+
+  it('clicking PDF on a MATRIX view calls exportMatrixAsPDF', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText(/MATRIX/));
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('PDF'));
+    await waitFor(() => expect(exportUtils.exportMatrixAsPDF).toHaveBeenCalled());
+  });
+
+  it('clicking PPTX on a GRAPH view calls exportGraphAsPPTX', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('PPTX'));
+    await waitFor(() => expect(exportUtils.exportGraphAsPPTX).toHaveBeenCalled());
+  });
+
+  it('shows an error alert if an async export rejects, and clears the exporting indicator afterward', async () => {
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    (exportUtils.exportGraphAsPNG as jest.Mock).mockRejectedValue(new Error('rasterization failed'));
+    await openGraphView();
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('PNG'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('rasterization failed')));
+    expect(screen.queryByText(/Exporting PNG/)).not.toBeInTheDocument();
+    alertSpy.mockRestore();
+  });
+
+  it('a DASHBOARD view only offers JSON export, not CSV, SVG, PNG, PDF, or PPTX', async () => {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [{ id: 'v2', name: 'Exec Dashboard', category: 'Governance', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'DASHBOARD' }],
       '/ea-views/v2/dashboard': { widgets: [], results: {} },
@@ -406,6 +482,9 @@ describe('EaViewsPage - Export', () => {
     expect(screen.getByText('JSON')).toBeInTheDocument();
     expect(screen.queryByText('CSV')).not.toBeInTheDocument();
     expect(screen.queryByText('SVG')).not.toBeInTheDocument();
+    expect(screen.queryByText('PNG')).not.toBeInTheDocument();
+    expect(screen.queryByText('PDF')).not.toBeInTheDocument();
+    expect(screen.queryByText('PPTX')).not.toBeInTheDocument();
   });
 });
 
