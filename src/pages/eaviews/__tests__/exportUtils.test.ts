@@ -22,35 +22,50 @@ import {
 // libraries themselves produce correct binary PDF/PPTX output - parsing
 // real binary output isn't reasonable for a unit test, and isn't this
 // file's responsibility to verify anyway.
-const mockJsPdfDoc = {
-  setFontSize: jest.fn(), setTextColor: jest.fn(), setDrawColor: jest.fn(),
-  text: jest.fn(), line: jest.fn(), setFont: jest.fn(), addImage: jest.fn(),
-  addPage: jest.fn(), save: jest.fn(),
-  internal: { pageSize: { getWidth: () => 800, getHeight: () => 600 } },
-};
-// jsPDF/PptxGenJS are invoked with `new` in exportUtils.ts, so the mock
-// needs to be genuinely constructible. A real ES6 class with an explicit
-// `return mockXxx` in its constructor is used here rather than
-// jest.fn(implementation) - class constructors unambiguously support
-// `new` (unlike arrow functions, which aren't constructible at all and
-// throw if you try), and this doesn't depend on any particular internal
-// behavior of how jest's own mock wrapper forwards `new` calls to a
-// jest.fn()'s implementation, which a first attempt at this fix
-// (jest.fn(() => mockXxx), later jest.fn(function () { return mockXxx }))
-// got wrong twice - confirmed by two real test runs, not assumed right
-// this time without that evidence. A class constructor explicitly
-// returning an object is standard, unambiguous JS: that returned object
-// becomes the result of `new`, so `new MockJsPDF()` reliably yields
-// mockJsPdfDoc itself (not a copy), and every existing assertion here
-// against mockJsPdfDoc.xxx.mock.calls keeps working unchanged.
-class MockJsPDF { constructor() { return mockJsPdfDoc } }
-jest.mock('jspdf', () => ({ jsPDF: MockJsPDF }));
+//
+// Both mock objects and their constructor classes are defined ENTIRELY
+// inside the jest.mock() factory below, with zero variables referenced
+// across the factory's boundary - this deliberately avoids relying on
+// Jest's "mock"-prefixed-identifier hoisting exception at all, which two
+// earlier attempts at this exact fix got wrong in different ways
+// (confirmed by two separate real test-run failures, not assumed): first
+// an arrow-function jest.fn() implementation (not constructible at all),
+// then a `class MockJsPDF` referenced BY NAME inside the factory (a
+// genuine ReferenceError - "Cannot access before initialization" - since
+// jest.mock() calls are hoisted above class declarations, and unlike the
+// lowercase `const mockJsPdfDoc` case, a class name starting with
+// uppercase "Mock" evidently isn't covered by whatever Jest's exact
+// allow-listing rule actually checks). Rather than keep guessing at that
+// rule's precise behavior, this sidesteps it entirely: nothing is
+// referenced from outside the factory function, so there's nothing for
+// hoisting to break. The mock document/instance objects are exposed back
+// out via jest.requireMock() below, for tests that need to assert on
+// their jest.fn() call histories (e.g. mockJsPdfDoc.text.mock.calls).
+jest.mock('jspdf', () => {
+  const mockDoc = {
+    setFontSize: jest.fn(), setTextColor: jest.fn(), setDrawColor: jest.fn(),
+    text: jest.fn(), line: jest.fn(), setFont: jest.fn(), addImage: jest.fn(),
+    addPage: jest.fn(), save: jest.fn(),
+    internal: { pageSize: { getWidth: () => 800, getHeight: () => 600 } },
+  };
+  class MockJsPDF { constructor() { return mockDoc } }
+  return { jsPDF: MockJsPDF, __mockDoc: mockDoc };
+});
 
-const mockPptxSlide = { addText: jest.fn(), addImage: jest.fn(), addTable: jest.fn() };
-const mockPptxInstance = { defineLayout: jest.fn(), layout: '', addSlide: jest.fn(() => mockPptxSlide), writeFile: jest.fn().mockResolvedValue(undefined) };
-// Same class-based fix and reasoning as MockJsPDF above.
-class MockPptxGenJS { constructor() { return mockPptxInstance } }
-jest.mock('pptxgenjs', () => ({ __esModule: true, default: MockPptxGenJS }));
+jest.mock('pptxgenjs', () => {
+  const mockSlide = { addText: jest.fn(), addImage: jest.fn(), addTable: jest.fn() };
+  const mockInstance = { defineLayout: jest.fn(), layout: '', addSlide: jest.fn(() => mockSlide), writeFile: jest.fn().mockResolvedValue(undefined) };
+  class MockPptxGenJS { constructor() { return mockInstance } }
+  return { __esModule: true, default: MockPptxGenJS, __mockSlide: mockSlide, __mockInstance: mockInstance };
+});
+
+// Pulls the actual mock objects the classes above construct out of
+// Jest's module registry - a plain, ordinary import/require of the
+// (already-mocked) module, not a reference into the factory's closure,
+// so this has none of the hoisting concerns above.
+const mockJsPdfDoc = (jest.requireMock('jspdf') as any).__mockDoc;
+const mockPptxSlide = (jest.requireMock('pptxgenjs') as any).__mockSlide;
+const mockPptxInstance = (jest.requireMock('pptxgenjs') as any).__mockInstance;
 
 // JSDOM does not implement URL.createObjectURL/revokeObjectURL at all -
 // every exporter in this file goes through them via the shared
