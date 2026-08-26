@@ -28,11 +28,29 @@ const mockJsPdfDoc = {
   addPage: jest.fn(), save: jest.fn(),
   internal: { pageSize: { getWidth: () => 800, getHeight: () => 600 } },
 };
-jest.mock('jspdf', () => ({ jsPDF: jest.fn(() => mockJsPdfDoc) }));
+// jsPDF/PptxGenJS are invoked with `new` in exportUtils.ts, so the mock
+// needs to be genuinely constructible. A real ES6 class with an explicit
+// `return mockXxx` in its constructor is used here rather than
+// jest.fn(implementation) - class constructors unambiguously support
+// `new` (unlike arrow functions, which aren't constructible at all and
+// throw if you try), and this doesn't depend on any particular internal
+// behavior of how jest's own mock wrapper forwards `new` calls to a
+// jest.fn()'s implementation, which a first attempt at this fix
+// (jest.fn(() => mockXxx), later jest.fn(function () { return mockXxx }))
+// got wrong twice - confirmed by two real test runs, not assumed right
+// this time without that evidence. A class constructor explicitly
+// returning an object is standard, unambiguous JS: that returned object
+// becomes the result of `new`, so `new MockJsPDF()` reliably yields
+// mockJsPdfDoc itself (not a copy), and every existing assertion here
+// against mockJsPdfDoc.xxx.mock.calls keeps working unchanged.
+class MockJsPDF { constructor() { return mockJsPdfDoc } }
+jest.mock('jspdf', () => ({ jsPDF: MockJsPDF }));
 
 const mockPptxSlide = { addText: jest.fn(), addImage: jest.fn(), addTable: jest.fn() };
 const mockPptxInstance = { defineLayout: jest.fn(), layout: '', addSlide: jest.fn(() => mockPptxSlide), writeFile: jest.fn().mockResolvedValue(undefined) };
-jest.mock('pptxgenjs', () => ({ __esModule: true, default: jest.fn(() => mockPptxInstance) }));
+// Same class-based fix and reasoning as MockJsPDF above.
+class MockPptxGenJS { constructor() { return mockPptxInstance } }
+jest.mock('pptxgenjs', () => ({ __esModule: true, default: MockPptxGenJS }));
 
 // JSDOM does not implement URL.createObjectURL/revokeObjectURL at all -
 // every exporter in this file goes through them via the shared
