@@ -145,6 +145,47 @@ describe('EaViewsPage - ViewLibrary', () => {
     expect(await screen.findByText('Application Landscape')).toBeInTheDocument();
     expect(screen.queryByText(/Compatible/)).not.toBeInTheDocument();
   });
+
+  it('shows stakeholder and concern tags on a viewpoint card when present', async () => {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views/viewpoints': [
+      { id: 'vp1', name: 'App Portfolio', category: 'APPLICATION', description: 'x', stakeholders: ['CIO', 'Application Architect'], concerns: ['Application duplication', 'Technology risk'] },
+    ] });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    await screen.findByText('App Portfolio');
+    expect(screen.getByText(/CIO, Application Architect/)).toBeInTheDocument();
+    expect(screen.getByText('Application duplication')).toBeInTheDocument();
+    expect(screen.getByText('Technology risk')).toBeInTheDocument();
+  });
+
+  it('does not render a stakeholder/concern block at all for a viewpoint with neither', async () => {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views/viewpoints': [{ id: 'vp1', name: 'No Metadata View', category: 'APPLICATION', description: 'x' }] });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    await screen.findByText('No Metadata View');
+    expect(screen.queryByText('👤', { exact: false })).not.toBeInTheDocument();
+  });
+
+  it('shows a stakeholder filter dropdown populated from every viewpoint\'s stakeholders, and filtering by one narrows the list', async () => {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views/viewpoints': [
+      { id: 'vp1', name: 'App Portfolio', category: 'APPLICATION', description: 'x', stakeholders: ['CIO'] },
+      { id: 'vp2', name: 'Data Landscape', category: 'DATA', description: 'y', stakeholders: ['Data Architect'] },
+    ] });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    await screen.findByText('App Portfolio');
+    fireEvent.change(screen.getByText('All Stakeholders').closest('select')!, { target: { value: 'CIO' } });
+    expect(screen.getByText('App Portfolio')).toBeInTheDocument();
+    expect(screen.queryByText('Data Landscape')).not.toBeInTheDocument();
+  });
+
+  it('does not show the stakeholder filter dropdown at all when no viewpoint has any stakeholders defined', async () => {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views/viewpoints': [{ id: 'vp1', name: 'Plain View', category: 'APPLICATION', description: 'x' }] });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    await screen.findByText('Plain View');
+    expect(screen.queryByText('All Stakeholders')).not.toBeInTheDocument();
+  });
 });
 
 describe('EaViewsPage - MyViews', () => {
@@ -333,6 +374,150 @@ describe('EaViewsPage - ViewViewer dashboard/roadmap branching', () => {
     const calls = (global.fetch as jest.Mock).mock.calls.map((c: any) => c[0]);
     expect(calls.some((u: string) => u.includes('/v1/roadmap'))).toBe(false);
     expect(calls.some((u: string) => u.includes('/v1/dashboard'))).toBe(false);
+  });
+});
+
+describe('EaViewsPage - Architecture Packs tab', () => {
+  it('navigates to the Packs tab and shows the CollectionsPanel', async () => {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views/collections': [] });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📦 Architecture Packs'));
+    expect(await screen.findByText('Architecture Packs')).toBeInTheDocument();
+    expect(await screen.findByText(/No Architecture Packs yet/)).toBeInTheDocument();
+  });
+});
+
+describe('EaViewsPage - Version History', () => {
+  const VIEW = { id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH', currentVersionNumber: 2 };
+  async function openView(extraRoutes: Record<string, any> = {}) {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [VIEW],
+      '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} },
+      '/ea-views/saved-filters': [],
+      ...extraRoutes,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('App Landscape'));
+    await screen.findByText(/objects/);
+  }
+
+  it('clicking History fetches and shows the version list', async () => {
+    await openView({ '/ea-views/v1/versions': [{ id: 'ver-2', versionNumber: 2, changeReason: 'Published', status: 'PUBLISHED', createdAt: '2026-02-01T00:00:00Z' }, { id: 'ver-1', versionNumber: 1, changeReason: 'Initial creation', status: 'DRAFT', createdAt: '2026-01-01T00:00:00Z' }] });
+    fireEvent.click(screen.getByText('🕐 History'));
+    expect(await screen.findByText('Published')).toBeInTheDocument();
+    expect(screen.getByText('Initial creation')).toBeInTheDocument();
+  });
+
+  it('shows an empty-history message when there is none yet', async () => {
+    await openView({ '/ea-views/v1/versions': [] });
+    fireEvent.click(screen.getByText('🕐 History'));
+    expect(await screen.findByText(/No version history yet/)).toBeInTheDocument();
+  });
+
+  it('does not show a Restore button for the currently active version', async () => {
+    await openView({ '/ea-views/v1/versions': [{ id: 'ver-2', versionNumber: 2, changeReason: 'Current', status: 'PUBLISHED', createdAt: '2026-02-01T00:00:00Z' }] });
+    fireEvent.click(screen.getByText('🕐 History'));
+    await screen.findByText('Current');
+    expect(screen.queryByText('Restore')).not.toBeInTheDocument();
+  });
+
+  it('shows a Restore button for a non-current version, and confirms before restoring', async () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    await openView({ '/ea-views/v1/versions': [{ id: 'ver-1', versionNumber: 1, changeReason: 'Old version', status: 'DRAFT', createdAt: '2026-01-01T00:00:00Z' }] });
+    fireEvent.click(screen.getByText('🕐 History'));
+    await screen.findByText('Old version');
+    fireEvent.click(screen.getByText('Restore'));
+    await waitFor(() => {
+      const restoreCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/versions/ver-1/restore'));
+      expect(restoreCall).toBeDefined();
+      expect(restoreCall[1].method).toBe('POST');
+    });
+    confirmSpy.mockRestore();
+  });
+
+  it('does not restore when the confirmation is cancelled', async () => {
+    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+    await openView({ '/ea-views/v1/versions': [{ id: 'ver-1', versionNumber: 1, changeReason: 'Old version', status: 'DRAFT', createdAt: '2026-01-01T00:00:00Z' }] });
+    fireEvent.click(screen.getByText('🕐 History'));
+    await screen.findByText('Old version');
+    fireEvent.click(screen.getByText('Restore'));
+    const restoreCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/restore'));
+    expect(restoreCall).toBeUndefined();
+    confirmSpy.mockRestore();
+  });
+});
+
+describe('EaViewsPage - Approval Workflow', () => {
+  async function openDraftView(view: any, extraRoutes: Record<string, any> = {}) {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [view],
+      '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} },
+      '/ea-views/saved-filters': [],
+      ...extraRoutes,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText(view.name));
+    await screen.findByText(/objects/);
+  }
+
+  it('a DRAFT view with no pending approval shows "Request Approval" alongside Publish, not Approve/Reject', async () => {
+    await openDraftView({ id: 'v1', name: 'Draft View', category: 'Application', status: 'DRAFT', architectureState: 'CURRENT', visualization: 'GRAPH', approvalStatus: 'NOT_REQUIRED' });
+    expect(screen.getByText('📝 Request Approval')).toBeInTheDocument();
+    expect(screen.getByText('🚀 Publish')).toBeInTheDocument();
+    expect(screen.queryByText('✓ Approve')).not.toBeInTheDocument();
+  });
+
+  it('a DRAFT view with a PENDING approval shows Approve/Reject, and a Pending badge, not the Request Approval button', async () => {
+    await openDraftView({ id: 'v1', name: 'Pending View', category: 'Application', status: 'DRAFT', architectureState: 'CURRENT', visualization: 'GRAPH', approvalStatus: 'PENDING' });
+    expect(screen.getByText('✓ Approve')).toBeInTheDocument();
+    expect(screen.getByText('✕ Reject')).toBeInTheDocument();
+    expect(screen.queryByText('📝 Request Approval')).not.toBeInTheDocument();
+    expect(screen.getByText('⏳ Pending Approval')).toBeInTheDocument();
+  });
+
+  it('a PUBLISHED view shows neither the approval buttons nor the Publish button', async () => {
+    await openDraftView({ id: 'v1', name: 'Live View', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH', approvalStatus: 'NOT_REQUIRED' });
+    expect(screen.queryByText('📝 Request Approval')).not.toBeInTheDocument();
+    expect(screen.queryByText('🚀 Publish')).not.toBeInTheDocument();
+  });
+
+  it('clicking Request Approval posts to the right endpoint and the button set updates without navigating away', async () => {
+    await openDraftView(
+      { id: 'v1', name: 'Draft View', category: 'Application', status: 'DRAFT', architectureState: 'CURRENT', visualization: 'GRAPH', approvalStatus: 'NOT_REQUIRED' },
+      { '/ea-views/v1/request-approval': { id: 'v1', approvalStatus: 'PENDING' } },
+    );
+    fireEvent.click(screen.getByText('📝 Request Approval'));
+    expect(await screen.findByText('✓ Approve')).toBeInTheDocument();
+    expect(screen.queryByText('📝 Request Approval')).not.toBeInTheDocument();
+  });
+
+  it('clicking Approve prompts for notes and posts them, updating the view to PUBLISHED without navigating away', async () => {
+    const promptSpy = jest.spyOn(window, 'prompt').mockReturnValue('Looks good');
+    await openDraftView(
+      { id: 'v1', name: 'Pending View', category: 'Application', status: 'DRAFT', architectureState: 'CURRENT', visualization: 'GRAPH', approvalStatus: 'PENDING' },
+      { '/ea-views/v1/approve': { id: 'v1', status: 'PUBLISHED', approvalStatus: 'APPROVED' } },
+    );
+    fireEvent.click(screen.getByText('✓ Approve'));
+    await waitFor(() => {
+      const approveCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/v1/approve'));
+      expect(approveCall).toBeDefined();
+      expect(JSON.parse(approveCall[1].body)).toEqual({ notes: 'Looks good' });
+    });
+    expect(await screen.findByText('✓ Approved')).toBeInTheDocument();
+    promptSpy.mockRestore();
+  });
+
+  it('clicking Reject prompts for a reason and does nothing if the prompt is cancelled', async () => {
+    const promptSpy = jest.spyOn(window, 'prompt').mockReturnValue(null);
+    await openDraftView({ id: 'v1', name: 'Pending View', category: 'Application', status: 'DRAFT', architectureState: 'CURRENT', visualization: 'GRAPH', approvalStatus: 'PENDING' });
+    fireEvent.click(screen.getByText('✕ Reject'));
+    const rejectCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/v1/reject'));
+    expect(rejectCall).toBeUndefined();
+    promptSpy.mockRestore();
   });
 });
 

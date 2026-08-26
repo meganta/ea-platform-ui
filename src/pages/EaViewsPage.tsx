@@ -6,6 +6,7 @@ import { DashboardBuilder, DashboardGrid, DashboardWidget } from './eaviews/Dash
 
 import { PathBuilder, RelationshipHop } from './eaviews/PathBuilder'
 import { useSearchParams } from 'react-router-dom'
+import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -101,6 +102,7 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
   const [viewpoints, setViewpoints] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState('')
+  const [filterStakeholder, setFilterStakeholder] = useState('')
   const [compatibility, setCompatibility] = useState<Record<string, any>>({})
 
   useEffect(() => {
@@ -121,7 +123,8 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
   }, [])
 
   const categories = Array.from(new Set(viewpoints.map(v => v.category)))
-  const filtered = viewpoints.filter(v => !filterCat || v.category === filterCat)
+  const allStakeholders = Array.from(new Set(viewpoints.flatMap(v => v.stakeholders || []))).sort()
+  const filtered = viewpoints.filter(v => (!filterCat || v.category === filterCat) && (!filterStakeholder || (v.stakeholders || []).includes(filterStakeholder)))
 
   const COMPAT_BADGE: Record<string, { label: string; color: string }> = {
     COMPATIBLE: { label: '✓ Compatible', color: '#2ecc71' },
@@ -136,9 +139,15 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
         <button style={S.btn('primary')} onClick={() => onCreate(null)}>+ Custom View</button>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' as const }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' as const, alignItems: 'center' }}>
         <button style={{ ...S.btn(), background: !filterCat ? 'var(--accent)' : undefined, color: !filterCat ? 'var(--navy)' : undefined }} onClick={() => setFilterCat('')}>All</button>
         {categories.map(c => <button key={c} style={{ ...S.btn(), background: filterCat === c ? CATEGORY_COLOR[c] : undefined, color: filterCat === c ? '#fff' : undefined }} onClick={() => setFilterCat(c)}>{c}</button>)}
+        {allStakeholders.length > 0 && (
+          <select style={{ ...S.input, maxWidth: 180, marginLeft: 'auto' }} value={filterStakeholder} onChange={e => setFilterStakeholder(e.target.value)}>
+            <option value="">All Stakeholders</option>
+            {allStakeholders.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+        )}
       </div>
 
       {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
@@ -165,6 +174,12 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 12 }}>{vp.description}</div>
               {vp.purpose && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 12 }}>Purpose: {vp.purpose}</div>}
+              {(vp.stakeholders?.length > 0 || vp.concerns?.length > 0) && (
+                <div style={{ marginBottom: 12 }}>
+                  {vp.stakeholders?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>👤 {vp.stakeholders.join(', ')}</div>}
+                  {vp.concerns?.length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const }}>{vp.concerns.map((c: string) => <span key={c} style={{ ...S.badge('#9b59b6'), fontSize: 10 }}>{c}</span>)}</div>}
+                </div>
+              )}
               <button style={{ ...S.btn('primary'), width: '100%', fontSize: 12 }} onClick={() => onCreate(vp)}>▶ Activate View</button>
             </div>
             )
@@ -274,7 +289,19 @@ function MyViews({ api, onOpen }: { api: any, onOpen: (v: any) => void }) {
 }
 
 // ── View Viewer (graph + matrix + heatmap + capability map) ───────────────────
-function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onBack: () => void, onRefresh: () => void }) {
+function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view: any, onBack: () => void, onRefresh: () => void }) {
+  // publish()/approveView()/rejectView()/requestApproval() all return the
+  // updated view from the backend, but the parent's onRefresh only
+  // refreshes dashboard stats, not this specific view object it passed
+  // down as a prop - without this, clicking e.g. Approve would show no
+  // visible change until navigating away and back, which looks like the
+  // action silently failed. viewOverrides holds whatever fields the most
+  // recent action changed, merged over the (possibly stale) prop for
+  // display; reset whenever the user opens a genuinely different view.
+  const [viewOverrides, setViewOverrides] = useState<Partial<any>>({})
+  useEffect(() => { setViewOverrides({}) }, [viewProp.id])
+  const view = { ...viewProp, ...viewOverrides }
+
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [vizMode, setVizMode] = useState<string>(view.visualization || 'GRAPH')
@@ -364,6 +391,9 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
   const graphContainerRef = React.useRef<HTMLDivElement>(null)
   const graphSvgRef = React.useRef<SVGSVGElement>(null)
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [showVersionHistory, setShowVersionHistory] = useState(false)
+  const [versions, setVersions] = useState<any[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -419,8 +449,43 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
   }
 
   const publish = async () => {
-    await api.post(`/ea-views/${view.id}/publish`)
+    const updated = await api.post(`/ea-views/${view.id}/publish`)
+    setViewOverrides(prev => ({ ...prev, ...updated }))
     onRefresh()
+  }
+
+  // ── Version History ───────────────────────────────────────────────────
+  const loadVersions = async () => {
+    setVersionsLoading(true)
+    const v = await api.get(`/ea-views/${view.id}/versions`)
+    setVersions(Array.isArray(v) ? v : [])
+    setVersionsLoading(false)
+  }
+  const openVersionHistory = () => { setShowVersionHistory(true); loadVersions() }
+  const restoreVersion = async (versionId: string) => {
+    if (!window.confirm('Restore this version? Your current configuration will be saved as a new version first, so nothing is lost.')) return
+    const updated = await api.post(`/ea-views/${view.id}/versions/${versionId}/restore`)
+    setViewOverrides(prev => ({ ...prev, ...updated }))
+    setShowVersionHistory(false)
+    load()
+  }
+
+  // ── Approval Workflow ─────────────────────────────────────────────────
+  const requestApproval = async () => {
+    const updated = await api.post(`/ea-views/${view.id}/request-approval`)
+    setViewOverrides(prev => ({ ...prev, ...updated }))
+  }
+  const approveView = async () => {
+    const notes = window.prompt('Approval notes (optional):') || undefined
+    const updated = await api.post(`/ea-views/${view.id}/approve`, { notes })
+    setViewOverrides(prev => ({ ...prev, ...updated }))
+    onRefresh()
+  }
+  const rejectView = async () => {
+    const notes = window.prompt('Reason for rejection:')
+    if (notes === null) return // cancelled
+    const updated = await api.post(`/ea-views/${view.id}/reject`, { notes })
+    setViewOverrides(prev => ({ ...prev, ...updated }))
   }
 
   const takeSnapshot = async () => {
@@ -983,11 +1048,17 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
             <span style={S.badge(CATEGORY_COLOR[view.category]||'#3498db')}>{view.category}</span>
             <span style={S.badge(STATUS_COLOR[view.status])}>{view.status}</span>
             <span style={S.badge(STATE_COLOR[view.architectureState]||'#7f8c8d')}>{view.architectureState}</span>
+            {view.approvalStatus && view.approvalStatus !== 'NOT_REQUIRED' && (
+              <span style={S.badge(view.approvalStatus === 'APPROVED' ? '#2ecc71' : view.approvalStatus === 'REJECTED' ? '#e74c3c' : '#f39c12')}>
+                {view.approvalStatus === 'PENDING' ? '⏳ Pending Approval' : view.approvalStatus === 'APPROVED' ? '✓ Approved' : '✕ Rejected'}
+              </span>
+            )}
           </div>
         </div>
         <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
+          <button style={{ ...S.btn(), fontSize:12 }} onClick={openVersionHistory}>🕐 History</button>
           <div style={{ position:'relative' }}>
             <button style={{ ...S.btn(), fontSize:12 }} disabled={!!exportingFormat} onClick={() => setShowExportMenu(v => !v)}>{exportingFormat ? `⏳ Exporting ${exportingFormat.toUpperCase()}...` : '⬇ Export'}</button>
             {showExportMenu && (() => {
@@ -1009,9 +1080,45 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
           </div>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={shareView}>🔗 Share</button>
           {isDashboard && <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setEditingDashboard(true)}>⚙ Edit Widgets</button>}
+          {view.status === 'DRAFT' && view.approvalStatus === 'PENDING' && (
+            <>
+              <button style={{ ...S.btn(), fontSize:12, color:'#2ecc71' }} onClick={approveView}>✓ Approve</button>
+              <button style={{ ...S.btn(), fontSize:12, color:'#e74c3c' }} onClick={rejectView}>✕ Reject</button>
+            </>
+          )}
+          {view.status === 'DRAFT' && view.approvalStatus !== 'PENDING' && (
+            <button style={{ ...S.btn(), fontSize:12 }} onClick={requestApproval}>📝 Request Approval</button>
+          )}
           {view.status === 'DRAFT' && <button style={{ ...S.btn('primary'), fontSize:12 }} onClick={publish}>🚀 Publish</button>}
         </div>
       </div>
+
+      {showVersionHistory && (
+        <div style={{ ...S.card, marginBottom:16, borderColor:'var(--accent)' }}>
+          <div style={{ display:'flex', alignItems:'center', marginBottom:12 }}>
+            <div style={{ fontWeight:600 }}>🕐 Version History</div>
+            <button style={{ ...S.btn(), fontSize:11, marginLeft:'auto' }} onClick={() => setShowVersionHistory(false)}>Close</button>
+          </div>
+          {versionsLoading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:20 }}>Loading...</div>
+            : versions.length === 0 ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:20 }}>No version history yet.</div>
+            : (
+              <div style={{ display:'flex', flexDirection:'column' as const, gap:6 }}>
+                {versions.map((v: any) => (
+                  <div key={v.id} style={{ display:'flex', alignItems:'center', gap:12, padding:'8px 10px', borderRadius:6, background:'var(--navy-mid)' }}>
+                    <span style={S.badge('#3498db')}>v{v.versionNumber}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:13 }}>{v.changeReason || '(no reason given)'}</div>
+                      <div style={{ fontSize:11, color:'var(--text-dim)' }}>{new Date(v.createdAt).toLocaleString()} · {v.status}</div>
+                    </div>
+                    {v.versionNumber !== view.currentVersionNumber && (
+                      <button style={{ ...S.btn(), fontSize:11 }} onClick={() => restoreVersion(v.id)}>Restore</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+        </div>
+      )}
 
       {isDashboard ? (
         editingDashboard ? (
@@ -1637,6 +1744,7 @@ export default function EaViewsPage() {
     { id:'dashboard', label:'🏠 Dashboard' },
     { id:'library', label:'📚 View Library' },
     { id:'my-views', label:'📋 My Views' },
+    { id:'packs', label:'📦 Architecture Packs' },
     { id:'snapshots', label:'📸 Snapshots' },
   ]
 
@@ -1673,6 +1781,7 @@ export default function EaViewsPage() {
         {tab === 'dashboard' && <ViewsDashboard api={api} stats={stats} onTab={setTab} onOpenView={openView} />}
         {tab === 'library' && <ViewLibrary api={api} onCreate={handleLibraryCreate} />}
         {tab === 'my-views' && <MyViews api={api} onOpen={openView} />}
+        {tab === 'packs' && <CollectionsPanel api={api} onOpenView={openView} />}
         {tab === 'snapshots' && <SnapshotsPanel api={api} />}
         {tab === 'builder' && <ViewBuilder api={api} viewpoint={selectedViewpoint} onCreated={handleViewCreated} onCancel={()=>setTab('my-views')} />}
         {tab === 'viewer' && activeView && <ViewViewer api={api} view={activeView} onBack={()=>setTab('my-views')} onRefresh={loadStats} />}
