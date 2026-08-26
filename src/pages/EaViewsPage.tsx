@@ -6,6 +6,7 @@ import { DashboardBuilder, DashboardGrid, DashboardWidget } from './eaviews/Dash
 
 import { PathBuilder, RelationshipHop } from './eaviews/PathBuilder'
 import { useSearchParams } from 'react-router-dom'
+import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG } from './eaviews/exportUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -361,6 +362,8 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
   const [layoutRunning, setLayoutRunning] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const graphContainerRef = React.useRef<HTMLDivElement>(null)
+  const graphSvgRef = React.useRef<SVGSVGElement>(null)
+  const [showExportMenu, setShowExportMenu] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -584,6 +587,37 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
     if (!document.fullscreenElement) { graphContainerRef.current.requestFullscreen(); setIsFullscreen(true) }
     else { document.exitFullscreen(); setIsFullscreen(false) }
   }
+
+  // ── Export (scoped V1: JSON/CSV/SVG - see exportUtils.ts for why PDF/
+  // PPTX/PNG/true-XLSX aren't included yet). Every format's content comes
+  // only from state already held by this component (filteredNodes, data,
+  // view) - no export triggers a fresh fetch of its own. Options offered
+  // depend on the active vizMode, since a roadmap-shaped export doesn't
+  // make sense from graph data and vice versa. ──────────────────────────
+  const exportMeta = { viewName: view.name, architectureState: view.architectureState }
+  const runExport = (format: 'json' | 'csv' | 'svg') => {
+    setShowExportMenu(false)
+    if (format === 'json') {
+      const payload = isRoadmap ? { items: roadmapItems } : isDashboard ? { widgets: dashboardWidgets, results: dashboardResults } : { nodes: filteredNodes, edges: data?.edges || [] }
+      exportAsJSON(payload, exportMeta)
+      return
+    }
+    if (format === 'svg') {
+      if (graphSvgRef.current) exportGraphAsSVG(graphSvgRef.current, exportMeta)
+      return
+    }
+    // csv
+    if (isRoadmap) { exportRoadmapAsCSV(roadmapItems, exportMeta); return }
+    if (vizMode === 'MATRIX') {
+      const sources = filteredNodes.filter((n: any) => view.rootObjectTypes?.includes(n.assetType))
+      const targets = filteredNodes.filter((n: any) => view.relatedObjectTypes?.includes(n.assetType))
+      const displayTargets = targets.length > 0 ? targets : filteredNodes.filter((n: any) => !view.rootObjectTypes?.includes(n.assetType))
+      exportMatrixAsCSV(sources, displayTargets, data?.edges || [], exportMeta)
+      return
+    }
+    exportNodesAsCSV(filteredNodes, exportMeta)
+  }
+
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement)
     document.addEventListener('fullscreenchange', handler)
@@ -857,7 +891,7 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
           </div>
         </div>
         {loading ? <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-dim)' }}>Loading view data...</div> : (
-          <svg style={{ width:'100%', height:'100%', cursor: panStart?'grabbing':dragging?'grabbing':'grab' }}
+          <svg ref={graphSvgRef} style={{ width:'100%', height:'100%', cursor: panStart?'grabbing':dragging?'grabbing':'grab' }}
             onMouseDown={onSvgMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}>
             <defs><marker id="arrow2" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(3,105,161,0.4)" /></marker></defs>
             <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
@@ -925,6 +959,23 @@ function ViewViewer({ api, view, onBack, onRefresh }: { api: any, view: any, onB
         <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
+          <div style={{ position:'relative' }}>
+            <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setShowExportMenu(v => !v)}>⬇ Export</button>
+            {showExportMenu && (
+              <div style={{ position:'absolute', top:'100%', right:0, marginTop:4, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:8, zIndex:20, minWidth:120, overflow:'hidden' }}>
+                <button style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 12px', fontSize:12, background:'none', border:'none', color:'var(--text)', cursor:'pointer' }} onClick={() => runExport('json')}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>JSON</button>
+                {!isDashboard && (
+                  <button style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 12px', fontSize:12, background:'none', border:'none', color:'var(--text)', cursor:'pointer' }} onClick={() => runExport('csv')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>CSV</button>
+                )}
+                {vizMode === 'GRAPH' && !isRoadmap && !isDashboard && (
+                  <button style={{ display:'block', width:'100%', textAlign:'left', padding:'8px 12px', fontSize:12, background:'none', border:'none', color:'var(--text)', cursor:'pointer' }} onClick={() => runExport('svg')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')} onMouseLeave={e => (e.currentTarget.style.background = 'none')}>SVG</button>
+                )}
+              </div>
+            )}
+          </div>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={shareView}>🔗 Share</button>
           {isDashboard && <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setEditingDashboard(true)}>⚙ Edit Widgets</button>}
           {view.status === 'DRAFT' && <button style={{ ...S.btn('primary'), fontSize:12 }} onClick={publish}>🚀 Publish</button>}

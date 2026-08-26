@@ -15,6 +15,19 @@ jest.mock('react-router-dom', () => ({
   useSearchParams: () => [mockSearchParams, jest.fn()],
 }), { virtual: true });
 
+// Export wiring tests only need to verify EaViewsPage calls the right
+// exportUtils function with the right data - the export functions'
+// internal CSV/JSON/SVG logic already has its own dedicated, thorough
+// coverage in eaviews/__tests__/exportUtils.test.ts.
+jest.mock('../eaviews/exportUtils', () => ({
+  exportAsJSON: jest.fn(),
+  exportNodesAsCSV: jest.fn(),
+  exportMatrixAsCSV: jest.fn(),
+  exportRoadmapAsCSV: jest.fn(),
+  exportGraphAsSVG: jest.fn(),
+}));
+import * as exportUtils from '../eaviews/exportUtils';
+
 beforeEach(() => {
   jest.clearAllMocks();
   mockSearchParams = new URLSearchParams();
@@ -311,6 +324,88 @@ describe('EaViewsPage - ViewViewer dashboard/roadmap branching', () => {
     const calls = (global.fetch as jest.Mock).mock.calls.map((c: any) => c[0]);
     expect(calls.some((u: string) => u.includes('/v1/roadmap'))).toBe(false);
     expect(calls.some((u: string) => u.includes('/v1/dashboard'))).toBe(false);
+  });
+});
+
+describe('EaViewsPage - Export', () => {
+  const GRAPH_VIEW = { id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH', rootObjectTypes: ['Application'], relatedObjectTypes: ['ITComponent'] };
+  async function openGraphView() {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [GRAPH_VIEW],
+      '/ea-views/v1/execute': { nodes: [{ id: 'a1', name: 'App A', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {} },
+      '/ea-views/saved-filters': [],
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('App Landscape'));
+    await screen.findByText(/objects/);
+  }
+
+  it('clicking Export opens a menu with JSON, CSV, and SVG options for a GRAPH view', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText('⬇ Export'));
+    expect(screen.getByText('JSON')).toBeInTheDocument();
+    expect(screen.getByText('CSV')).toBeInTheDocument();
+    expect(screen.getByText('SVG')).toBeInTheDocument();
+  });
+
+  it('clicking JSON calls exportAsJSON with the current nodes/edges and closes the menu', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('JSON'));
+    expect(exportUtils.exportAsJSON).toHaveBeenCalledWith(
+      expect.objectContaining({ nodes: expect.arrayContaining([expect.objectContaining({ name: 'App A' })]) }),
+      expect.objectContaining({ viewName: 'App Landscape', architectureState: 'CURRENT' }),
+    );
+    expect(screen.queryByText('JSON')).not.toBeInTheDocument(); // menu closed
+  });
+
+  it('clicking CSV on a GRAPH view calls exportNodesAsCSV (not the matrix exporter)', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('CSV'));
+    expect(exportUtils.exportNodesAsCSV).toHaveBeenCalled();
+    expect(exportUtils.exportMatrixAsCSV).not.toHaveBeenCalled();
+  });
+
+  it('clicking SVG calls exportGraphAsSVG with the live svg element', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('SVG'));
+    expect(exportUtils.exportGraphAsSVG).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ viewName: 'App Landscape' }));
+  });
+
+  it('switching to MATRIX mode and exporting CSV calls exportMatrixAsCSV, not the plain node exporter', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText(/MATRIX/));
+    fireEvent.click(screen.getByText('⬇ Export'));
+    fireEvent.click(screen.getByText('CSV'));
+    expect(exportUtils.exportMatrixAsCSV).toHaveBeenCalled();
+    expect(exportUtils.exportNodesAsCSV).not.toHaveBeenCalled();
+  });
+
+  it('does not offer an SVG option once switched to a non-graph visualization mode', async () => {
+    await openGraphView();
+    fireEvent.click(screen.getByText(/TABLE/));
+    fireEvent.click(screen.getByText('⬇ Export'));
+    expect(screen.queryByText('SVG')).not.toBeInTheDocument();
+  });
+
+  it('a DASHBOARD view only offers JSON export, not CSV or SVG', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v2', name: 'Exec Dashboard', category: 'Governance', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'DASHBOARD' }],
+      '/ea-views/v2/dashboard': { widgets: [], results: {} },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Exec Dashboard'));
+    await screen.findByText(/no widgets yet/i);
+    fireEvent.click(screen.getByText('⬇ Export'));
+    expect(screen.getByText('JSON')).toBeInTheDocument();
+    expect(screen.queryByText('CSV')).not.toBeInTheDocument();
+    expect(screen.queryByText('SVG')).not.toBeInTheDocument();
   });
 });
 
