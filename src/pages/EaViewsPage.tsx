@@ -394,6 +394,11 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [versions, setVersions] = useState<any[]>([])
   const [versionsLoading, setVersionsLoading] = useState(false)
+  const [showAiPanel, setShowAiPanel] = useState(false)
+  const [aiQuestion, setAiQuestion] = useState('')
+  const [aiAnalysis, setAiAnalysis] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -468,6 +473,45 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     setViewOverrides(prev => ({ ...prev, ...updated }))
     setShowVersionHistory(false)
     load()
+  }
+
+  // ── AI Explanation (Copilot integration) ─────────────────────────────────
+  //
+  // api.post() never rejects on an HTTP error status (only a genuine
+  // network failure - fetch itself only rejects for that, not for a 4xx/
+  // 5xx response), so a try/catch alone would never actually surface a
+  // 400/500 here; the response still "resolves" with an error-shaped
+  // body ({statusCode, message}) that has no analysis field. Checking for
+  // that explicitly, same reasoning as the Roadmap "needs config" 400
+  // case handled the same way earlier this session.
+  const runAiAction = async (action: 'explain' | 'risks' | 'gaps' | 'duplicates') => {
+    setAiLoading(true)
+    setAiError('')
+    setAiAnalysis('')
+    try {
+      const result = await api.post(`/ea-views/${view.id}/ai-explain`, { action })
+      if (result?.statusCode >= 400 || !result?.analysis) { setAiError(result?.message || 'The AI assistant could not analyze this view. Please try again.'); return }
+      setAiAnalysis(result.analysis)
+    } catch (e: any) {
+      setAiError('Something went wrong asking the AI about this view. Please try again.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+  const askAiQuestion = async () => {
+    if (!aiQuestion.trim()) return
+    setAiLoading(true)
+    setAiError('')
+    setAiAnalysis('')
+    try {
+      const result = await api.post(`/ea-views/${view.id}/ai-explain`, { question: aiQuestion.trim() })
+      if (result?.statusCode >= 400 || !result?.analysis) { setAiError(result?.message || 'The AI assistant could not analyze this view. Please try again.'); return }
+      setAiAnalysis(result.analysis)
+    } catch (e: any) {
+      setAiError('Something went wrong asking the AI about this view. Please try again.')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   // ── Approval Workflow ─────────────────────────────────────────────────
@@ -1059,6 +1103,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={openVersionHistory}>🕐 History</button>
+          <button style={{ ...S.btn(), fontSize:12 }} onClick={() => { setShowAiPanel(v => !v); setAiAnalysis(''); setAiError(''); setAiQuestion('') }}>🤖 Ask AI</button>
           <div style={{ position:'relative' }}>
             <button style={{ ...S.btn(), fontSize:12 }} disabled={!!exportingFormat} onClick={() => setShowExportMenu(v => !v)}>{exportingFormat ? `⏳ Exporting ${exportingFormat.toUpperCase()}...` : '⬇ Export'}</button>
             {showExportMenu && (() => {
@@ -1117,6 +1162,31 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                 ))}
               </div>
             )}
+        </div>
+      )}
+
+      {showAiPanel && (
+        <div style={{ ...S.card, marginBottom:16, borderColor:'var(--accent)' }}>
+          <div style={{ display:'flex', alignItems:'center', marginBottom:12 }}>
+            <div style={{ fontWeight:600 }}>🤖 Ask AI About This View</div>
+            <button style={{ ...S.btn(), fontSize:11, marginLeft:'auto' }} onClick={() => setShowAiPanel(false)}>Close</button>
+          </div>
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap' as const, marginBottom:12 }}>
+            <button style={{ ...S.btn(), fontSize:12 }} disabled={aiLoading} onClick={() => runAiAction('explain')}>Explain this View</button>
+            <button style={{ ...S.btn(), fontSize:12 }} disabled={aiLoading} onClick={() => runAiAction('risks')}>Identify Risks</button>
+            <button style={{ ...S.btn(), fontSize:12 }} disabled={aiLoading} onClick={() => runAiAction('gaps')}>Identify Gaps</button>
+            <button style={{ ...S.btn(), fontSize:12 }} disabled={aiLoading} onClick={() => runAiAction('duplicates')}>Find Duplicates</button>
+          </div>
+          <div style={{ display:'flex', gap:8, marginBottom:12 }}>
+            <input style={{ ...S.input, flex:1 }} value={aiQuestion} onChange={e => setAiQuestion(e.target.value)} placeholder="Or ask your own question, e.g. What stands out here?"
+              onKeyDown={e => { if (e.key === 'Enter') askAiQuestion() }} />
+            <button style={{ ...S.btn('primary'), fontSize:12 }} disabled={aiLoading || !aiQuestion.trim()} onClick={askAiQuestion}>Ask</button>
+          </div>
+          {aiLoading && <div style={{ color:'var(--text-dim)', textAlign:'center', padding:20 }}>Thinking...</div>}
+          {aiError && <div style={{ color:'#e74c3c', fontSize:13, padding:'8px 0' }}>⚠ {aiError}</div>}
+          {aiAnalysis && !aiLoading && (
+            <div style={{ background:'var(--navy-mid)', borderRadius:8, padding:14, fontSize:13, lineHeight:1.6, whiteSpace:'pre-wrap' as const }}>{aiAnalysis}</div>
+          )}
         </div>
       )}
 

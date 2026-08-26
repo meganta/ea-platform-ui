@@ -521,6 +521,93 @@ describe('EaViewsPage - Approval Workflow', () => {
   });
 });
 
+describe('EaViewsPage - AI Explanation (Copilot integration)', () => {
+  async function openView(extraRoutes: Record<string, any> = {}) {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH' }],
+      '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} },
+      '/ea-views/saved-filters': [],
+      ...extraRoutes,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('App Landscape'));
+    await screen.findByText(/objects/);
+  }
+
+  it('clicking Ask AI opens the panel with the four preset actions and a free-text question box', async () => {
+    await openView();
+    fireEvent.click(screen.getByText('🤖 Ask AI'));
+    expect(screen.getByText('Explain this View')).toBeInTheDocument();
+    expect(screen.getByText('Identify Risks')).toBeInTheDocument();
+    expect(screen.getByText('Identify Gaps')).toBeInTheDocument();
+    expect(screen.getByText('Find Duplicates')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Or ask your own question/)).toBeInTheDocument();
+  });
+
+  it('clicking a preset action posts the right action and renders the returned analysis', async () => {
+    await openView({ '/ea-views/v1/ai-explain': { analysis: 'This view shows 5 applications with one deprecated system.' } });
+    fireEvent.click(screen.getByText('🤖 Ask AI'));
+    fireEvent.click(screen.getByText('Identify Risks'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ai-explain'));
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body)).toEqual({ action: 'risks' });
+    });
+    expect(await screen.findByText('This view shows 5 applications with one deprecated system.')).toBeInTheDocument();
+  });
+
+  it('shows a "Thinking..." indicator while the request is in flight, and disables the preset buttons', async () => {
+    let resolveFn: (v: any) => void = () => {};
+    const api = { '/ea-views/v1/ai-explain': () => new Promise(res => { resolveFn = res; }) };
+    await openView(api);
+    fireEvent.click(screen.getByText('🤖 Ask AI'));
+    fireEvent.click(screen.getByText('Explain this View'));
+    expect(await screen.findByText('Thinking...')).toBeInTheDocument();
+    expect(screen.getByText('Explain this View')).toBeDisabled();
+    resolveFn({ analysis: 'Done.' });
+    await waitFor(() => expect(screen.queryByText('Thinking...')).not.toBeInTheDocument());
+  });
+
+  it('typing a custom question and pressing Enter asks it instead of a preset action', async () => {
+    await openView({ '/ea-views/v1/ai-explain': { analysis: 'Two applications are past end of life.' } });
+    fireEvent.click(screen.getByText('🤖 Ask AI'));
+    fireEvent.change(screen.getByPlaceholderText(/Or ask your own question/), { target: { value: 'Which apps are near end of life?' } });
+    fireEvent.keyDown(screen.getByPlaceholderText(/Or ask your own question/), { key: 'Enter' });
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ai-explain'));
+      expect(JSON.parse(call[1].body)).toEqual({ question: 'Which apps are near end of life?' });
+    });
+    expect(await screen.findByText('Two applications are past end of life.')).toBeInTheDocument();
+  });
+
+  it('the Ask button is disabled until a question is typed', async () => {
+    await openView();
+    fireEvent.click(screen.getByText('🤖 Ask AI'));
+    expect(screen.getByText('Ask')).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText(/Or ask your own question/), { target: { value: 'x' } });
+    expect(screen.getByText('Ask')).not.toBeDisabled();
+  });
+
+  it('shows an error message (not a blank panel) when the backend returns an error-shaped response, since api.post never rejects on an HTTP error status', async () => {
+    await openView({ '/ea-views/v1/ai-explain': { __fail: true, status: 400, message: 'Unknown action' } });
+    fireEvent.click(screen.getByText('🤖 Ask AI'));
+    fireEvent.click(screen.getByText('Explain this View'));
+    expect(await screen.findByText(/Unknown action/)).toBeInTheDocument();
+  });
+
+  it('closing and reopening the panel does not carry over a previous analysis or error', async () => {
+    await openView({ '/ea-views/v1/ai-explain': { analysis: 'First answer.' } });
+    fireEvent.click(screen.getByText('🤖 Ask AI'));
+    fireEvent.click(screen.getByText('Explain this View'));
+    await screen.findByText('First answer.');
+    fireEvent.click(screen.getByText('Close'));
+    fireEvent.click(screen.getByText('🤖 Ask AI'));
+    expect(screen.queryByText('First answer.')).not.toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - Export', () => {
   const GRAPH_VIEW = { id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH', rootObjectTypes: ['Application'], relatedObjectTypes: ['ITComponent'] };
   async function openGraphView() {
