@@ -9,6 +9,14 @@ jest.mock('../../contexts/LangContext', () => ({
   useLang: () => ({ isAR: false, t: (key: string) => key }),
 }));
 
+// AttachedViewsPanel has its own dedicated, thorough test coverage in
+// components/__tests__/AttachedViewsPanel.test.tsx - mocked here so this
+// file only needs to verify GovernancePage actually renders it with the
+// right review id, not re-test its internals.
+jest.mock('../../components/AttachedViewsPanel', () => ({
+  AttachedViewsPanel: ({ reviewId }: { reviewId: string }) => <div data-testid="attached-views-panel">Attached Views for {reviewId}</div>,
+}));
+
 function makeReview(overrides: Partial<Record<string, any>> = {}) {
   return {
     id: 'r1', title: 'Payment Gateway HLD Review', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0',
@@ -155,6 +163,16 @@ describe('GovernancePage - list view', () => {
     fireEvent.change(screen.getByPlaceholderText('Search reviews...'), { target: { value: 'Review 1' } });
     // Filtering to "Review 1" matches Review 1, 10-19 (11 items) - still fits on 1 page, so page indicator disappears
     await waitFor(() => expect(screen.queryByText(/page \d\/\d/)).not.toBeInTheDocument());
+  });
+});
+
+describe('GovernancePage - Attached Views (Tier 6 Reviews integration)', () => {
+  it('renders AttachedViewsPanel with the open review\'s id on the summary tab', async () => {
+    const review = makeReview({ id: 'r1' });
+    mockReportView(review, { decision: 'APPROVED', executiveSummary: 'Summary text.', overallScore: 85 });
+    render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    expect(await screen.findByText('Attached Views for r1')).toBeInTheDocument();
   });
 });
 

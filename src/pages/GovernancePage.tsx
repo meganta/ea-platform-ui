@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
+import { AttachedViewsPanel } from '../components/AttachedViewsPanel'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -2001,6 +2002,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               )}
             </div>
           )}
+          <AttachedViewsPanel reviewId={review.id} apiUrl={apiUrl} token={token} isAR={isAR} />
+
           {/* 1. Executive Summary FIRST */}
           <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 20, marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
