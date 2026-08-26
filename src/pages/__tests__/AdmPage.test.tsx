@@ -9,6 +9,15 @@ jest.mock('react-markdown', () => ({ __esModule: true, default: ({ children }: a
 jest.mock('../../components/DiagramViewer', () => ({ DiagramViewer: () => <div /> }));
 jest.mock('../../components/Phase7Workspace', () => ({ Phase7Workspace: () => <div /> }));
 
+// AdmPage now uses useNavigate (the "Related Architecture Views" links to
+// EA Views) - mocked per this codebase's established pattern (see
+// DashboardPage.test.tsx) rather than wrapping every render() in a real
+// Router.
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}), { virtual: true });
+
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.setItem('ea_token', 'fake-token');
@@ -89,6 +98,45 @@ describe('AdmPage - list view', () => {
     render(<AdmPage />);
     expect(await screen.findByText(/BUSINESS, DATA, APPLICATION/)).toBeInTheDocument();
     expect(screen.getByText(/\+2/)).toBeInTheDocument();
+  });
+});
+
+describe('AdmPage - Related Architecture Views (EA Views integration)', () => {
+  it('shows all four architecture-state links once a cycle is selected', async () => {
+    mockFetch({ '/adm/cycles': [SAMPLE_CYCLE] });
+    render(<AdmPage />);
+    await waitFor(() => expect(screen.getAllByText('Q1 2026 ADM Cycle').length).toBeGreaterThan(0));
+    expect(await screen.findByText('🗺 Baseline')).toBeInTheDocument();
+    expect(screen.getByText('🗺 Current')).toBeInTheDocument();
+    expect(screen.getByText('🗺 Target')).toBeInTheDocument();
+    expect(screen.getByText('🗺 Transition')).toBeInTheDocument();
+  });
+
+  it('clicking a state link navigates to EA Views with the matching architectureState query param', async () => {
+    mockFetch({ '/adm/cycles': [SAMPLE_CYCLE] });
+    render(<AdmPage />);
+    await waitFor(() => expect(screen.getAllByText('Q1 2026 ADM Cycle').length).toBeGreaterThan(0));
+    fireEvent.click(await screen.findByText('🗺 Target'));
+    expect(mockNavigate).toHaveBeenCalledWith('/ea-views?architectureState=TARGET');
+  });
+
+  it('each of the four links navigates with its own distinct state, not all pointing to the same one', async () => {
+    mockFetch({ '/adm/cycles': [SAMPLE_CYCLE] });
+    render(<AdmPage />);
+    await waitFor(() => expect(screen.getAllByText('Q1 2026 ADM Cycle').length).toBeGreaterThan(0));
+    fireEvent.click(await screen.findByText('🗺 Baseline'));
+    fireEvent.click(screen.getByText('🗺 Current'));
+    fireEvent.click(screen.getByText('🗺 Transition'));
+    expect(mockNavigate).toHaveBeenNthCalledWith(1, '/ea-views?architectureState=BASELINE');
+    expect(mockNavigate).toHaveBeenNthCalledWith(2, '/ea-views?architectureState=CURRENT');
+    expect(mockNavigate).toHaveBeenNthCalledWith(3, '/ea-views?architectureState=TRANSITION');
+  });
+
+  it('does not show the section at all when no cycle is selected (empty-cycles state)', async () => {
+    mockFetch({ '/adm/cycles': [] });
+    render(<AdmPage />);
+    await screen.findByText('adm.no_cycles');
+    expect(screen.queryByText('🗺 Baseline')).not.toBeInTheDocument();
   });
 });
 

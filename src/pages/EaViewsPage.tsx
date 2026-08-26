@@ -191,12 +191,22 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
 }
 
 // ── My Views list ─────────────────────────────────────────────────────────────
-function MyViews({ api, onOpen }: { api: any, onOpen: (v: any) => void }) {
+function MyViews({ api, onOpen, initialArchitectureState }: { api: any, onOpen: (v: any) => void, initialArchitectureState?: string }) {
   const [views, setViews] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filterCat, setFilterCat] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [filterArchState, setFilterArchState] = useState(initialArchitectureState || '')
   const [favOnly, setFavOnly] = useState(false)
+
+  // Syncs to a CHANGED initialArchitectureState, not just its value at
+  // first mount - matching ObjectContextViewer's prop-sync pattern
+  // (assetId in its useCallback dependency array) rather than a plain
+  // useState initial value, which would silently miss a second "Related
+  // Architecture Views" link click from ADM while already on this tab
+  // (setTab('my-views') to an already-current value doesn't force a
+  // remount, so a useState-only initial value would never update).
+  useEffect(() => { if (initialArchitectureState) setFilterArchState(initialArchitectureState) }, [initialArchitectureState])
 
   const load = useCallback(() => {
     setLoading(true)
@@ -227,6 +237,7 @@ function MyViews({ api, onOpen }: { api: any, onOpen: (v: any) => void }) {
   const filtered = views.filter(v =>
     (!filterCat || v.category === filterCat) &&
     (!filterStatus || v.status === filterStatus) &&
+    (!filterArchState || v.architectureState === filterArchState) &&
     (!favOnly || v.isFavorite)
   )
   const categories = [...new Set(views.map(v => v.category))]
@@ -249,6 +260,10 @@ function MyViews({ api, onOpen }: { api: any, onOpen: (v: any) => void }) {
           <option value="">All Status</option>
           <option value="DRAFT">Draft</option>
           <option value="PUBLISHED">Published</option>
+        </select>
+        <select style={{ ...S.input, maxWidth: 150 }} value={filterArchState} onChange={e => setFilterArchState(e.target.value)}>
+          <option value="">All Architecture States</option>
+          {['BASELINE', 'CURRENT', 'TARGET', 'TRANSITION', 'PLANNED'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <button style={{ ...S.btn(), background: favOnly ? '#f39c1222' : undefined, color: favOnly ? '#f39c12' : undefined }} onClick={() => setFavOnly(!favOnly)}>⭐ Favorites</button>
       </div>
@@ -1780,6 +1795,7 @@ export default function EaViewsPage() {
   const [selectedViewpoint, setSelectedViewpoint] = useState<any>(null)
   const [, setShowBuilder] = useState(false)
   const [objectContextId, setObjectContextId] = useState<string | null>(null)
+  const [initialArchState, setInitialArchState] = useState<string | undefined>(undefined)
   const [searchParams, setSearchParams] = useSearchParams()
 
   // "Open in View" entry point from repository asset pages (Object Context
@@ -1790,6 +1806,13 @@ export default function EaViewsPage() {
   useEffect(() => {
     const id = searchParams.get('objectContext')
     if (id) { setObjectContextId(id); setTab('object-context') }
+  }, [searchParams])
+
+  // "Related Architecture Views" entry point from ADM cycle pages (spec
+  // section 70) - lands on My Views pre-filtered to the requested state.
+  useEffect(() => {
+    const state = searchParams.get('architectureState')
+    if (state) { setInitialArchState(state); setTab('my-views') }
   }, [searchParams])
 
   const loadStats = useCallback(() => { api.get('/ea-views/stats').then(setStats) }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1850,7 +1873,7 @@ export default function EaViewsPage() {
       <div style={S.content}>
         {tab === 'dashboard' && <ViewsDashboard api={api} stats={stats} onTab={setTab} onOpenView={openView} />}
         {tab === 'library' && <ViewLibrary api={api} onCreate={handleLibraryCreate} />}
-        {tab === 'my-views' && <MyViews api={api} onOpen={openView} />}
+        {tab === 'my-views' && <MyViews api={api} onOpen={openView} initialArchitectureState={initialArchState} />}
         {tab === 'packs' && <CollectionsPanel api={api} onOpenView={openView} />}
         {tab === 'snapshots' && <SnapshotsPanel api={api} />}
         {tab === 'builder' && <ViewBuilder api={api} viewpoint={selectedViewpoint} onCreated={handleViewCreated} onCancel={()=>setTab('my-views')} />}

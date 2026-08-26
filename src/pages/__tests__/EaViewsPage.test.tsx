@@ -279,6 +279,40 @@ describe('EaViewsPage - MyViews', () => {
   });
 });
 
+describe('EaViewsPage - Related Architecture Views entry point (ADM integration)', () => {
+  it('reads the architectureState query param and lands directly on My Views, pre-filtered', async () => {
+    mockSearchParams = new URLSearchParams('architectureState=TARGET');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views': [
+        { id: 'v1', name: 'Target App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'TARGET' },
+        { id: 'v2', name: 'Current App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT' },
+      ],
+    });
+    render(<EaViewsPage />);
+    expect(await screen.findByText('Target App Landscape')).toBeInTheDocument();
+    expect(screen.queryByText('Current App Landscape')).not.toBeInTheDocument();
+  });
+
+  it('the architecture-state filter dropdown reflects the incoming param and can be changed manually afterward', async () => {
+    mockSearchParams = new URLSearchParams('architectureState=BASELINE');
+    mockFetch({ '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Baseline View', category: 'Application', status: 'PUBLISHED', architectureState: 'BASELINE' }] });
+    render(<EaViewsPage />);
+    await screen.findByText('Baseline View');
+    const select = screen.getByText('All Architecture States').closest('select') as HTMLSelectElement;
+    expect(select.value).toBe('BASELINE');
+    fireEvent.change(select, { target: { value: '' } });
+    expect(select.value).toBe('');
+  });
+
+  it('does not land on My Views or apply any filter when no architectureState param is present', async () => {
+    mockFetch({ '/ea-views/stats': {} });
+    render(<EaViewsPage />);
+    expect(await screen.findByText('🗺 EA Views & Viewpoints Studio')).toBeInTheDocument();
+    expect(screen.queryByText('Target App Landscape')).not.toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - SnapshotsPanel', () => {
   it('does not fetch snapshots until a view is selected', async () => {
     mockFetch({ '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'View A' }] });

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import ReactMarkdown from 'react-markdown'
 import { DiagramViewer } from '../components/DiagramViewer'
@@ -1607,6 +1608,7 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
 // ── Main ADM Page ─────────────────────────────────────────
 export default function AdmPage() {
   const { t, isAR } = useLang()
+  const navigate = useNavigate()
   const [cycles, setCycles] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -1707,6 +1709,36 @@ export default function AdmPage() {
                       {l}
                     </button>
                   ))}
+                </div>
+
+                {/* Related Architecture Views (spec section 70: ADM should
+                    reuse the View Engine rather than duplicate
+                    visualization logic - ADM has no diagramming of its own
+                    to remove here, so the integration is adding this
+                    missing capability by linking out to it). Offered as
+                    plain architecture-state links rather than a specific
+                    per-phase mapping - TOGAF and NORA have genuinely
+                    different phase structures (see PHASES/PHASE_NAMES
+                    above), and guessing a "this exact phase means Target
+                    architecture" mapping risked being wrong for one
+                    framework or the other without deeper domain expertise
+                    than is safe to assume here; letting the architect pick
+                    which state they want is simpler and can't be
+                    incorrect. */}
+                <div className="card mb-4" style={{ padding: '12px 16px' }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-dim)', marginBottom: 8 }}>
+                    {isAR ? 'عرض العمارة ذات الصلة' : 'Related Architecture Views'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
+                    {(['BASELINE', 'CURRENT', 'TARGET', 'TRANSITION'] as const).map(state => (
+                      <button key={state} onClick={() => navigate(`/ea-views?architectureState=${state}`)}
+                        style={{ fontSize: 11, padding: '5px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--accent)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-dim)' }}>
+                        🗺 {state === 'BASELINE' ? (isAR ? 'الأساسية' : 'Baseline') : state === 'CURRENT' ? (isAR ? 'الحالية' : 'Current') : state === 'TARGET' ? (isAR ? 'المستهدفة' : 'Target') : (isAR ? 'الانتقالية' : 'Transition')}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 {cycleView === 'repository' && <CycleRepositoryView cycle={selected} />}
