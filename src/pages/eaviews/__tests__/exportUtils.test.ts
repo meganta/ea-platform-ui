@@ -54,7 +54,23 @@ jest.mock('jspdf', () => {
 
 jest.mock('pptxgenjs', () => {
   const mockSlide = { addText: jest.fn(), addImage: jest.fn(), addTable: jest.fn() };
-  const mockInstance = { defineLayout: jest.fn(), layout: '', addSlide: jest.fn(() => mockSlide), writeFile: jest.fn().mockResolvedValue(undefined) };
+  // addSlide is a PLAIN function, not jest.fn()-wrapped, and deliberately
+  // so: react-scripts' baked-in Jest config sets resetMocks: true
+  // (confirmed in node_modules/react-scripts/scripts/utils/
+  // createJestConfig.js, not assumed), which strips every jest.fn()'s
+  // implementation before each test - addSlide's `() => mockSlide` was
+  // being wiped this way, leaving it returning undefined by the time any
+  // test actually ran (jsPDF's method mocks never needed a specific
+  // return value, so the same reset was invisible there). No test
+  // asserts on addSlide's own call history, so a plain function is a
+  // complete, simpler fix - entirely immune to resetMocks since it was
+  // never a mock in the first place. writeFile stays jest.fn() (three
+  // tests assert toHaveBeenCalledWith on it), which remains correct even
+  // though resetMocks also strips its .mockResolvedValue(undefined) -
+  // that doesn't affect these tests since `await undefined` still
+  // resolves fine, and call-tracking is unaffected because the reset
+  // happens before each test starts, not during it.
+  const mockInstance = { defineLayout: jest.fn(), layout: '', addSlide: () => mockSlide, writeFile: jest.fn().mockResolvedValue(undefined) };
   class MockPptxGenJS { constructor() { return mockInstance } }
   return { __esModule: true, default: MockPptxGenJS, __mockSlide: mockSlide, __mockInstance: mockInstance };
 });
