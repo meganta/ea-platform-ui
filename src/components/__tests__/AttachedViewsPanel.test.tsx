@@ -80,6 +80,14 @@ describe('AttachedViewsPanel', () => {
     await screen.findByText('No architecture views attached yet.');
     fireEvent.click(screen.getByText('+ Attach View'));
     await screen.findByText('Select a view...');
+    // Waiting for the shell of the <select> to render is not enough - the
+    // /ea-views fetch that populates its options is still async at this
+    // point. Setting a native <select>'s value to something with no
+    // matching <option> yet is silently ignored by the DOM (not an
+    // error), which left selectedViewId unset, the Attach button
+    // disabled, and no POST ever made - a real race condition a test run
+    // caught that static review of the test's own logic did not.
+    await screen.findByText('App Landscape');
     fireEvent.change(screen.getByText('Select a view...').closest('select')!, { target: { value: 'v1' } });
     fireEvent.change(screen.getByPlaceholderText('Optional note'), { target: { value: 'For reference' } });
     fireEvent.click(screen.getByText('Attach'));

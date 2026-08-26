@@ -50,7 +50,8 @@ describe('CollectionsPanel', () => {
   });
 
   it('creating a pack posts the name/description/category and refreshes the list', async () => {
-    const api = mockApi({ 'collections': (body?: any) => (body ? { id: 'new-id', ...body, items: [] } : [{ id: 'c1', name: 'My Pack', items: [] }]) });
+    let created = false; // tracks whether the POST has happened yet, so the mock GET response differs before/after - the initial load must be empty (matching the "no packs yet" state the test starts from), only the POST-triggered reload should return the newly created pack. Same class of staleness bug caught and fixed once already in AttachedViewsPanel.test.tsx's analogous "attaching..." test - missed applying the same fix here the first time around.
+    const api = mockApi({ 'collections': (body?: any) => { if (body) { created = true; return { id: 'new-id', ...body, items: [] }; } return created ? [{ id: 'c1', name: 'My Pack', items: [] }] : []; } });
     render(<CollectionsPanel api={api} onOpenView={jest.fn()} />);
     await screen.findByText(/No Architecture Packs yet/);
     fireEvent.click(screen.getByText('+ New Pack'));

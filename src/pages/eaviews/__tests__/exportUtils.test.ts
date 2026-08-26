@@ -46,6 +46,28 @@ describe('exportUtils', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // This environment's JSDOM Blob implementation doesn't implement
+    // .text() at all - confirmed by a real test run ("blob.text is not a
+    // function"), not assumed. Every downloadBlob()-based exporter in
+    // this file gets tested by reading the Blob's content back out via
+    // .text(), so a minimal, reliable Blob replacement is needed here
+    // rather than depending on this environment's incomplete native one.
+    // parts.join('') is sufficient since every exporter in exportUtils.ts
+    // passes a single string element (new Blob([content], {type})), and
+    // join('') correctly concatenates even if that ever changes to more
+    // than one part.
+    class MockBlob {
+      parts: any[]
+      type: string
+      constructor(parts: any[] = [], options?: { type?: string }) {
+        this.parts = parts
+        this.type = options?.type || ''
+      }
+      text() {
+        return Promise.resolve(this.parts.join(''))
+      }
+    }
+    (global as any).Blob = MockBlob;
     (global as any).URL.createObjectURL = jest.fn(() => 'blob:mock-url');
     (global as any).URL.revokeObjectURL = jest.fn();
     clickSpy = jest.fn();

@@ -14,6 +14,21 @@
 // export itself), which is what keeps export security straightforward for
 // this scope: if the viewer was authorized to see it on screen, exporting
 // it doesn't grant anything new.
+//
+// jsPDF/pptxgenjs are imported statically (not via a dynamic import() kept
+// out of the main bundle for code-splitting, as first written) after a
+// real test run showed jest.mock('jspdf', ...)/jest.mock('pptxgenjs', ...)
+// were not reliably applied to this project's dynamic import() calls under
+// its actual CRA/react-scripts Jest configuration - every PDF/PPTX test
+// failed identically (the mocked instance's methods were never the ones
+// actually invoked), which static imports don't have any equivalent risk
+// for; they're the most reliably jest.mock()-able import form under any
+// standard Jest/Babel setup. Trades away the original bundle-splitting
+// intent for confirmed test reliability and correctness - a reasonable
+// trade given this could only be verified by an actual test run, not by
+// static review, and the dynamic-import version failed that verification.
+import { jsPDF } from 'jspdf'
+import PptxGenJS from 'pptxgenjs'
 
 function downloadBlob(blob: Blob, filename: string) {
   const objUrl = URL.createObjectURL(blob)
@@ -291,7 +306,6 @@ function drawPdfTable(doc: any, headers: string[], rows: string[][], meta: Expor
 
 export async function exportGraphAsPDF(svgElement: SVGSVGElement, meta: ExportMetadata): Promise<void> {
   const canvas = await renderGraphToCanvas(svgElement, meta)
-  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
@@ -307,7 +321,6 @@ export async function exportGraphAsPDF(svgElement: SVGSVGElement, meta: ExportMe
 }
 
 async function exportTableAsPDF(headers: string[], rows: string[][], meta: ExportMetadata, filenameSuffix: string) {
-  const { jsPDF } = await import('jspdf')
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
   drawPdfTable(doc, headers, rows, meta, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight())
   doc.save(`${safeFilenamePart(meta.viewName)}${filenameSuffix}.pdf`)
@@ -327,14 +340,12 @@ export function exportRoadmapAsPDF(items: any[], meta: ExportMetadata): Promise<
 
 // ── PPTX ──────────────────────────────────────────────────────────────────
 //
-// Same dynamic-import reasoning as jsPDF above. pptxgenjs's addTable()
-// supports real native tables (unlike jsPDF, which needed the hand-rolled
-// drawPdfTable above), so table exports here are genuinely native PPTX
-// tables, not an image of one.
+// pptxgenjs's addTable() supports real native tables (unlike jsPDF, which
+// needed the hand-rolled drawPdfTable above), so table exports here are
+// genuinely native PPTX tables, not an image of one.
 const PPTX_TABLE_OPTS = { fontSize: 10, border: { type: 'solid', color: 'CCCCCC', pt: 0.5 }, autoPage: true } as const
 
 async function newPptxWithTitleSlide(meta: ExportMetadata) {
-  const PptxGenJS = (await import('pptxgenjs')).default
   const pptx = new PptxGenJS()
   pptx.defineLayout({ name: 'EA_WIDE', width: 13.33, height: 7.5 })
   pptx.layout = 'EA_WIDE'
