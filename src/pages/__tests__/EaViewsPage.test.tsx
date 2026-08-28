@@ -1000,6 +1000,295 @@ describe('EaViewsPage - Graph progressive disclosure (Phase 4C)', () => {
   });
 });
 
+describe('EaViewsPage - Scenario switching (Phase 5A)', () => {
+  const capA = { id: 'capA', name: 'Capability A', role: 'PRIMARY', assetType: 'GovCapability', semanticType: 'BusinessCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {} };
+  const appX = { id: 'appX', name: 'App X', role: 'RELATED', assetType: 'Application', semanticType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} };
+  const techY = { id: 'techY', name: 'Tech Y', role: 'RELATED', assetType: 'TechComponent', semanticType: 'TechComponent', domain: 'TECHNOLOGY', status: 'APPROVED', tags: [], metadata: {} };
+  const appZ = { id: 'appZ', name: 'App Z', role: 'RELATED', assetType: 'Application', semanticType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} };
+  const techK = { id: 'techK', name: 'Tech K', role: 'RELATED', assetType: 'TechComponent', semanticType: 'TechComponent', domain: 'TECHNOLOGY', status: 'APPROVED', tags: [], metadata: {} };
+  const appQ = { id: 'appQ', name: 'App Q', role: 'RELATED', assetType: 'Application', semanticType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} };
+  const techM = { id: 'techM', name: 'Tech M', role: 'RELATED', assetType: 'TechComponent', semanticType: 'TechComponent', domain: 'TECHNOLOGY', status: 'APPROVED', tags: [], metadata: {} };
+
+  const scenarioList = [
+    { id: 'current', name: 'Current Architecture', type: 'CURRENT', status: 'APPROVED', horizonDate: null, sequence: null, parentScenarioId: null },
+    { id: 'transition', name: 'Transition 2027', type: 'TRANSITION', status: 'APPROVED', horizonDate: '2027-06-01', sequence: 1, parentScenarioId: 'current' },
+    { id: 'targetA', name: 'Target A', type: 'TARGET', status: 'APPROVED', horizonDate: '2028-01-01', sequence: 2, parentScenarioId: 'transition' },
+    { id: 'targetB', name: 'Target B', type: 'TARGET', status: 'DRAFT', horizonDate: '2028-01-01', sequence: 2, parentScenarioId: 'transition' },
+  ];
+
+  function makeDatasetResponse(scenarioId: string, objects: any[], relationships: any[], paths: any[] = []) {
+    return {
+      legacy: { nodes: objects, edges: relationships, metadata: {} },
+      dataset: { context: { scenario: { id: scenarioId } }, objects, relationships, paths, hierarchies: [], metrics: [], provenance: { truncated: false } },
+      eligibility: { eligible: [{ visualization: 'TABLE', eligible: true, score: 0.7, reasons: [] }, { visualization: 'GRAPH', eligible: true, score: 0.6, reasons: [] }], ineligible: [] },
+    };
+  }
+  // Each response's relationships form a single Capability -> App -> Tech
+  // chain, matching the acceptance fixture's actual configured-path
+  // intent - included as `paths` too, so Table renders one correlated
+  // row per scenario (matching Phase 4A's own real behavior) rather than
+  // two separate single-hop rows that would repeat the App name across
+  // rows as both a source and a target.
+  const currentResponse = makeDatasetResponse('current', [capA, appX, techY],
+    [{ id: 'r1', sourceId: 'capA', targetId: 'appX', relationshipType: 'supported_by', label: 'supported_by' }, { id: 'r2', sourceId: 'appX', targetId: 'techY', relationshipType: 'hosted_on', label: 'hosted_on' }],
+    [{ id: 'pCurrent', rootObjectId: 'capA', objectIds: ['capA', 'appX', 'techY'], relationshipIds: ['r1', 'r2'], hopCount: 2 }]);
+  const targetAResponse = makeDatasetResponse('targetA', [capA, appZ, techK],
+    [{ id: 'r3', sourceId: 'capA', targetId: 'appZ', relationshipType: 'supported_by', label: 'supported_by' }, { id: 'r4', sourceId: 'appZ', targetId: 'techK', relationshipType: 'hosted_on', label: 'hosted_on' }],
+    [{ id: 'pTargetA', rootObjectId: 'capA', objectIds: ['capA', 'appZ', 'techK'], relationshipIds: ['r3', 'r4'], hopCount: 2 }]);
+  const targetBResponse = makeDatasetResponse('targetB', [capA, appQ, techM],
+    [{ id: 'r5', sourceId: 'capA', targetId: 'appQ', relationshipType: 'supported_by', label: 'supported_by' }, { id: 'r6', sourceId: 'appQ', targetId: 'techM', relationshipType: 'hosted_on', label: 'hosted_on' }],
+    [{ id: 'pTargetB', rootObjectId: 'capA', objectIds: ['capA', 'appQ', 'techM'], relationshipIds: ['r5', 'r6'], hopCount: 2 }]);
+
+  async function openView(datasetRoute: any) {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Multi-Scenario View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': scenarioList,
+      '/ea-views/v1/dataset': datasetRoute,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Multi-Scenario View'));
+    await screen.findByText('Current Architecture');
+  }
+
+  // ── Mandatory race-condition test ───────────────────────────────────
+  it('fast Current -> Target A -> Target B switching: Target B resolving first is never overwritten by a later-resolving, stale Target A response', async () => {
+    let resolveA: (v: any) => void = () => {};
+    let resolveB: (v: any) => void = () => {};
+    const promiseA = new Promise(r => { resolveA = r; });
+    const promiseB = new Promise(r => { resolveB = r; });
+    await openView((options: any) => {
+      const body = JSON.parse(options.body);
+      if (body.scenarioId === 'targetA') return promiseA;
+      if (body.scenarioId === 'targetB') return promiseB;
+      return currentResponse;
+    });
+
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A')); // request A - deliberately never resolved yet
+    // pendingScenarioId now shows "Switching to Target A…" as the summary badge - re-derive the current summary text to reopen
+    fireEvent.click(screen.getByText(/Switching to Target A/));
+    fireEvent.click(await screen.findByText('Target B')); // request B, before A has resolved
+
+    // B resolves first
+    resolveB(targetBResponse);
+    await screen.findByText('App Q'); // Target B's own object appears
+    expect(screen.getAllByText('Target B').length).toBeGreaterThan(0);
+    expect(screen.queryByText('App X')).not.toBeInTheDocument(); // Current's object is gone
+    expect(screen.queryByText('App Z')).not.toBeInTheDocument(); // Target A's object never appeared
+
+    // A resolves AFTER B - this stale response must never commit
+    resolveA(targetAResponse);
+    await new Promise(r => setTimeout(r, 0)); // flush microtasks
+    expect(screen.getAllByText('Target B').length).toBeGreaterThan(0); // label still correctly says B
+    expect(screen.getByText('App Q')).toBeInTheDocument(); // B's data still displayed
+    expect(screen.queryByText('App Z')).not.toBeInTheDocument(); // A's data never overwrote B's
+  });
+
+  it('a failed scenario switch retains the previously committed scenario and dataset, and shows an error, without pretending the switch succeeded', async () => {
+    await openView((options: any) => {
+      const body = JSON.parse(options.body);
+      if (body.scenarioId === 'targetA') return Promise.reject(new Error('network error'));
+      return currentResponse;
+    });
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await waitFor(() => expect(screen.getByText(/Failed to switch scenario/)).toBeInTheDocument());
+    // scenario label and data are both still Current's, not falsely showing Target A
+    expect(screen.getAllByText('Current Architecture').length).toBeGreaterThan(0);
+    expect(screen.getByText('App X')).toBeInTheDocument();
+    expect(screen.queryByText('App Z')).not.toBeInTheDocument();
+  });
+
+  it('a successful switch updates the scenario label and the displayed dataset together, in the same commit', async () => {
+    await openView((options: any) => {
+      const body = JSON.parse(options.body);
+      return body.scenarioId === 'targetA' ? targetAResponse : currentResponse;
+    });
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await screen.findByText('App Z');
+    expect(screen.getAllByText('Target A').length).toBeGreaterThan(0);
+    expect(screen.queryByText('App X')).not.toBeInTheDocument();
+  });
+
+  it('the scenario selector lists all four scenarios with lineage-correct grouping - Target A and Target B as siblings, not sequential', async () => {
+    await openView(currentResponse);
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    expect(await screen.findByText('Transition 2027')).toBeInTheDocument();
+    expect(screen.getByText('Target A')).toBeInTheDocument();
+    expect(screen.getByText('Target B')).toBeInTheDocument();
+    expect(screen.getAllByText('DRAFT').length).toBeGreaterThan(0); // Target B's own draft badge
+  });
+
+  it('shows the lightweight lineage context path for the active scenario', async () => {
+    await openView((options: any) => {
+      const body = JSON.parse(options.body);
+      return body.scenarioId === 'targetA' ? targetAResponse : currentResponse;
+    });
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await screen.findByText('App Z');
+    expect(await screen.findByText('Current Architecture → Transition 2027 → Target A')).toBeInTheDocument();
+  });
+
+  it('shows an eligibility-fallback notice with the scenario name when the current visualization becomes ineligible after a switch', async () => {
+    const ineligibleTargetA = { ...targetAResponse, eligibility: { eligible: [{ visualization: 'GRAPH', eligible: true, score: 0.6, reasons: [] }], ineligible: [{ visualization: 'TABLE', eligible: false, score: 0, reasons: ['no objects'] }] } };
+    await openView((options: any) => {
+      const body = JSON.parse(options.body);
+      return body.scenarioId === 'targetA' ? ineligibleTargetA : currentResponse;
+    });
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await waitFor(() => expect(screen.getByText(/is unavailable for Target A. Switched to/)).toBeInTheDocument());
+  });
+
+  it('temporarily switching scenario does not persist/mutate the saved View - no PUT request is made merely from switching', async () => {
+    await openView((options: any) => {
+      const body = JSON.parse(options.body);
+      return body.scenarioId === 'targetA' ? targetAResponse : currentResponse;
+    });
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await screen.findByText('App Z');
+    expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[1]?.method === 'PUT')).toBe(false);
+  });
+
+  it('explicit "Set as default" persists the active scenario via PUT, only on explicit user action', async () => {
+    await openView((options: any) => {
+      const body = JSON.parse(options.body);
+      return body.scenarioId === 'targetA' ? targetAResponse : currentResponse;
+    });
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await screen.findByText('App Z');
+    fireEvent.click(screen.getAllByText('Target A')[0]); // reopen to find the button (Target A is now the active summary badge)
+    fireEvent.click(await screen.findByText(/Set as default/));
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT');
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(putCall[1].body)).toMatchObject({ scenarioId: 'targetA' });
+    });
+  });
+
+  it('a scenario-less View displays "Current Architecture" rather than an ambiguous "No Scenario"', async () => {
+    await openView(currentResponse);
+    expect(screen.getAllByText('Current Architecture').length).toBeGreaterThan(0);
+  });
+
+  it('switching scenario in GRAPH mode retains focus on Capability A (present in both) while its scenario-specific neighbors change', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Graph Scenario View', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': scenarioList,
+      '/ea-views/v1/dataset': (options: any) => {
+        const body = JSON.parse(options.body);
+        return body.scenarioId === 'targetA' ? targetAResponse : currentResponse;
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Graph Scenario View'));
+    await screen.findByText('Capability A');
+    expect(screen.getByText('App X')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await screen.findByText('App Z');
+    expect(screen.getByText('Capability A')).toBeInTheDocument(); // focus retained
+    expect(screen.queryByText('App X')).not.toBeInTheDocument(); // Current's neighbor gone
+    expect(screen.getByText('App Z')).toBeInTheDocument(); // Target A's neighbor present via normal disclosure
+  });
+
+  // Section 10: URL scenario state
+  it('a ?scenario=<id> URL param is sent as the initial scenario override on load', async () => {
+    mockSearchParams = new URLSearchParams('scenario=targetA');
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Multi-Scenario View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': scenarioList,
+      '/ea-views/v1/dataset': (options: any) => {
+        const body = JSON.parse(options.body);
+        return body.scenarioId === 'targetA' ? targetAResponse : currentResponse;
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Multi-Scenario View'));
+    await screen.findByText('App Z'); // Target A's own object, proving the URL override was applied on the initial load
+    expect(screen.getAllByText('Target A').length).toBeGreaterThan(0);
+  });
+
+  it('an invalid/cross-tenant ?scenario=<id> falls back safely to the View\'s own default rather than getting stuck', async () => {
+    mockSearchParams = new URLSearchParams('scenario=not-a-real-scenario');
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Multi-Scenario View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': scenarioList,
+      '/ea-views/v1/dataset': (options: any) => {
+        const body = JSON.parse(options.body);
+        return body.scenarioId === 'not-a-real-scenario' ? {} : currentResponse; // simulates the backend's failure shape - no `dataset` key
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Multi-Scenario View'));
+    await screen.findByText('App X'); // fell back to Current's own real data, not stuck on an error
+    expect(screen.getAllByText('Current Architecture').length).toBeGreaterThan(0);
+  });
+
+  // Section 5: explicit per-renderer verification beyond Table/Graph -
+  // Matrix and Heatmap have their own scenario-specific reset logic
+  // (matrixDrilldown, heatmapField) worth proving directly rather than
+  // trusting the shared dataset/eligibility plumbing alone.
+  it('MATRIX mode reflects the new scenario\'s dataset after a switch, and a stale drill-down is cleared if its objects no longer exist', async () => {
+    const matrixEligibility = { eligible: [{ visualization: 'MATRIX', eligible: true, score: 0.9, reasons: [], recommendedConfig: { rowType: 'BusinessCapability', columnType: 'TechComponent', relationMode: 'PATH', path: [{ from: 'BusinessCapability', relationship: 'supported_by', to: 'Application' }, { from: 'Application', relationship: 'hosted_on', to: 'TechComponent' }] } }], ineligible: [] };
+    const currentMatrixResponse = { ...currentResponse, eligibility: matrixEligibility };
+    const targetAMatrixResponse = { ...targetAResponse, eligibility: matrixEligibility };
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Matrix Scenario View', visualization: 'MATRIX', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': scenarioList,
+      '/ea-views/v1/dataset': (options: any) => {
+        const body = JSON.parse(options.body);
+        return body.scenarioId === 'targetA' ? targetAMatrixResponse : currentMatrixResponse;
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Matrix Scenario View'));
+    await screen.findByText('Capability A'); // Current's matrix row
+    expect(screen.getByText('Tech Y')).toBeInTheDocument(); // Current's matrix column
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await waitFor(() => expect(screen.queryByText('Tech Y')).not.toBeInTheDocument()); // Current's column is gone
+    expect(screen.getByText('Tech K')).toBeInTheDocument(); // Target A's column present instead
+  });
+
+  it('HEATMAP metric selection resets to the new scenario\'s recommended metric when the previous one is unavailable', async () => {
+    const currentHeatmapResponse = { ...currentResponse, eligibility: { eligible: [{ visualization: 'HEATMAP', eligible: true, score: 0.7, reasons: [], recommendedConfig: { metricKey: 'riskLevel' } }], ineligible: [] }, dataset: { ...currentResponse.dataset, metrics: [{ key: 'riskLevel', label: 'riskLevel', dataType: 'categorical', coveragePercent: 100, distinctValues: ['HIGH'] }], hierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null }, source: 'metadata.parentId' }] } };
+    const targetAHeatmapResponse = { ...targetAResponse, eligibility: { eligible: [{ visualization: 'HEATMAP', eligible: true, score: 0.7, reasons: [], recommendedConfig: { metricKey: 'maturity' } }], ineligible: [] }, dataset: { ...targetAResponse.dataset, metrics: [{ key: 'maturity', label: 'maturity', dataType: 'categorical', coveragePercent: 100, distinctValues: ['LOW'] }], hierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null }, source: 'metadata.parentId' }] } };
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Heatmap Scenario View', visualization: 'HEATMAP', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': scenarioList,
+      '/ea-views/v1/dataset': (options: any) => {
+        const body = JSON.parse(options.body);
+        return body.scenarioId === 'targetA' ? targetAHeatmapResponse : currentHeatmapResponse;
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Heatmap Scenario View'));
+    await screen.findByText('Capability A');
+    fireEvent.click(screen.getAllByText('Current Architecture')[0]);
+    fireEvent.click(await screen.findByText('Target A'));
+    await waitFor(() => expect(screen.getByText('Capability A')).toBeInTheDocument());
+    // the "Color by" selector should now offer Target A's own recommended metric as an option
+    expect(screen.getByText('maturity')).toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - Object Context View entry point', () => {
   it('reads the objectContext query param on mount and opens the standalone dependency viewer', async () => {
     mockSearchParams = new URLSearchParams('objectContext=asset-123');

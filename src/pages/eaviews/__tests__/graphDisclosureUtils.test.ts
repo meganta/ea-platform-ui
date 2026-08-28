@@ -1,4 +1,4 @@
-import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandNextPathHop, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters, computeSemanticGroups } from '../graphDisclosureUtils'
+import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandNextPathHop, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters } from '../graphDisclosureUtils'
 
 describe('graphDisclosureUtils', () => {
   // The exact Phase 4C acceptance fixture:
@@ -156,16 +156,6 @@ describe('graphDisclosureUtils', () => {
     expect(outgoingOnly.visibleObjectIds.has('tech1')).toBe(true)
     const incomingOnly = expandNeighbors(indexes, computeInitialVisibleSet(indexes, 'tech1'), 'tech1', 'incoming')
     expect(incomingOnly.visibleObjectIds).toEqual(new Set(['tech1', 'appX', 'appZ']))
-  })
-
-  // ── Grouping ───────────────────────────────────────────────────────
-
-  it('computeSemanticGroups groups visible objects deterministically by semanticType', () => {
-    const expanded = expandAllNextPathHops(indexes, computeInitialVisibleSet(indexes, 'capA'))
-    const groups = computeSemanticGroups(acceptanceDataset, expanded.visibleObjectIds, 'semanticType')
-    expect(groups.get('BusinessCapability')).toEqual(['capA'])
-    expect(groups.get('Application')?.sort()).toEqual(['appX', 'appY'])
-    expect(groups.get('TechComponent')?.sort()).toEqual(['tech1', 'tech2'])
   })
 
   // ── Scenario isolation ─────────────────────────────────────────────

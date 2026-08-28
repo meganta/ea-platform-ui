@@ -11,6 +11,7 @@ import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, 
 import { determineTableMode, buildRelationshipTable, buildMatrix } from './eaviews/tableMatrixUtils'
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
 import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters, ExpandDirection } from './eaviews/graphDisclosureUtils'
+import { buildScenarioLineageTree, getScenarioLineagePath, chooseVisualizationAfterScenarioSwitch } from './eaviews/scenarioSelectorUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -319,6 +320,15 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [viewOverrides, setViewOverrides] = useState<Partial<any>>({})
   useEffect(() => { setViewOverrides({}) }, [viewProp.id])
   const view = { ...viewProp, ...viewOverrides }
+  // Phase 5A Section 10: ?scenario=<id> URL state - read once on mount as
+  // the initial scenario override (falls back safely to the view's own
+  // saved scenario if the id is invalid/cross-tenant, since the backend
+  // still validates it), updated on every successful switch so a
+  // refresh/shared link reopens the same scenario. Kept lightweight
+  // (this component's own useSearchParams call, same hook already used
+  // elsewhere in this file) rather than threading scenario state through
+  // routing config.
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [data, setData] = useState<any>(null)
   // Phase 4A: canonical ViewDataset + its eligibility evaluation, fetched
@@ -328,6 +338,31 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // `data` exactly as before, completely unaware this exists.
   const [dataset, setDataset] = useState<any>(null)
   const [eligibility, setEligibility] = useState<any>(null)
+  // Phase 5A: scenario selector state. The "saved/default" scenario
+  // lives on `view.scenarioId` itself (already in scope, via
+  // viewOverrides for optimistic updates after Set-as-Default) - not
+  // duplicated here. `committedScenarioId`/`committedData*` are only
+  // ever updated together, atomically, when a scenario-switch request
+  // both succeeds AND is still the latest one issued (Section 4's
+  // "transactional state transition" - the label the user sees and the
+  // dataset actually displayed must never disagree). `pendingScenarioId`
+  // is shown as a loading indicator on the requested-but-not-yet-
+  // committed scenario; `scenarioSwitchError` surfaces a failed switch
+  // without ever touching the still-valid committed state.
+  const [scenarios, setScenarios] = useState<any[]>([])
+  const [committedScenarioId, setCommittedScenarioId] = useState<string | null>(null)
+  const [pendingScenarioId, setPendingScenarioId] = useState<string | null>(null)
+  const [scenarioSwitchError, setScenarioSwitchError] = useState<string | null>(null)
+  const [vizAutoSwitchNotice, setVizAutoSwitchNotice] = useState<string | null>(null)
+  const [savingDefaultScenario, setSavingDefaultScenario] = useState(false)
+  // Race-condition protection (Section F/3): a ref, not state, since the
+  // "is my response still the latest?" check inside an async callback
+  // needs a synchronous read of the CURRENT value at resolution time -
+  // state updates are batched/async and cannot give that guarantee, a
+  // ref can. Incremented once per switchScenario() call; a response only
+  // commits if its own captured token still matches this ref's current
+  // value when the fetch resolves.
+  const scenarioRequestTokenRef = React.useRef(0)
   // Phase 4A: which matrix cell is currently drilled into (Section 10) -
   // null when no drill-down panel is open. Holds the cell's row/column
   // object plus its real backing items (relationships for DIRECT, paths
@@ -447,16 +482,35 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
 
   const load = useCallback(() => {
     setLoading(true)
+    setScenarioSwitchError(null)
+    setVizAutoSwitchNotice(null)
+    // Section 3/16: one list call for the selector, alongside the one
+    // /dataset call for the initial scenario-resolved result - never a
+    // per-scenario or per-renderer fetch. A fresh view load always
+    // starts a new "latest wins" token generation too, so any switch
+    // request left over from a previous view can never commit here.
+    const myToken = ++scenarioRequestTokenRef.current
+    api.get('/ea-views/scenarios').then((s: any) => { if (myToken === scenarioRequestTokenRef.current) setScenarios(Array.isArray(s) ? s : []) })
     // Phase 4A: single fetch to the new /dataset endpoint, not a second
     // call alongside /execute - `d.legacy` is byte-compatible with what
     // /execute always returned (verified by a dedicated backend test),
     // so every existing renderer below reading `data` is completely
     // unaffected. `d.dataset`/`d.eligibility` are new, additive state
-    // only Table/Matrix read.
-    api.post(`/ea-views/${view.id}/dataset`, {}).then((d: any) => {
+    // only Table/Matrix read. Phase 5A: ?scenario=<id> from the URL, if
+    // present, is sent as the initial scenarioId override - api.post
+    // never rejects on an HTTP error status (the backend's own 404 for
+    // an invalid/cross-tenant id resolves normally), so failure is
+    // detected the same way switchScenario does (!d?.dataset), then
+    // safely retried without the override rather than leaving the
+    // viewer stuck on an error for what's still a perfectly valid View.
+    const urlScenarioId = searchParams.get('scenario')
+    const fetchDataset = (scenarioOverride?: string) => api.post(`/ea-views/${view.id}/dataset`, scenarioOverride ? { scenarioId: scenarioOverride } : {})
+    const applyDatasetResult = (d: any) => {
+      if (myToken !== scenarioRequestTokenRef.current) return // a newer load()/switchScenario() has already superseded this
       setData(d?.legacy ?? d)
       setDataset(d?.dataset ?? null)
       setEligibility(d?.eligibility ?? null)
+      setCommittedScenarioId(d?.dataset?.context?.scenario?.id ?? null)
       // Phase 4B: initialize the selected heatmap metric from
       // VisualizationEligibility's own recommendation rather than a fixed
       // 'status' default - 'status' isn't guaranteed to be a metric this
@@ -479,10 +533,93 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         setPositions(pos)
       }
       setLoading(false)
+    }
+    fetchDataset(urlScenarioId || undefined).then((d: any) => {
+      if (urlScenarioId && !d?.dataset) { fetchDataset().then(applyDatasetResult); return } // invalid/cross-tenant URL scenario - fall back safely to the view's own default rather than getting stuck
+      applyDatasetResult(d)
     })
   }, [view.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { load() }, [load])
+
+  // ── Scenario switching (Phase 5A) ────────────────────────────────────
+  //
+  // Section 3/4's core requirements: latest-request-wins race safety, and
+  // a strictly transactional commit - the scenario label and the
+  // displayed dataset are only ever updated TOGETHER, in the same commit,
+  // never independently. A failed or superseded request never touches
+  // committedScenarioId/data/dataset/eligibility at all, so a still-valid
+  // prior scenario stays fully displayed and correctly labeled.
+  const switchScenario = (scenarioId: string) => {
+    const myToken = ++scenarioRequestTokenRef.current
+    setPendingScenarioId(scenarioId)
+    setScenarioSwitchError(null)
+    setVizAutoSwitchNotice(null)
+    api.post(`/ea-views/${view.id}/dataset`, { scenarioId }).then((d: any) => {
+      if (myToken !== scenarioRequestTokenRef.current) return // superseded by a newer switch - never commit a stale response, even a successful one
+      if (!d?.dataset) { setScenarioSwitchError('Failed to switch scenario. Showing the previous scenario.'); setPendingScenarioId(null); return }
+      // Single, atomic commit - every piece of "what's currently shown"
+      // updates together, in one React batch, so there is never a render
+      // where the label and the data disagree (Section 4).
+      setData(d.legacy ?? d)
+      setDataset(d.dataset)
+      setEligibility(d.eligibility ?? null)
+      setCommittedScenarioId(d.dataset?.context?.scenario?.id ?? scenarioId)
+      setPendingScenarioId(null)
+      // Phase 5A Section 10: URL reflects the committed scenario only -
+      // never the requested-but-not-yet-resolved one, keeping the same
+      // label/data-never-disagree guarantee extended to the URL too.
+      setSearchParams(prev => { const next = new URLSearchParams(prev); next.set('scenario', d.dataset?.context?.scenario?.id ?? scenarioId); return next })
+      // Section 7: eligibility fallback with an unobtrusive, specific
+      // explanation - never a silent renderer swap, never leaving the
+      // user on an invalid one either.
+      const { vizMode: nextVizMode, changed } = chooseVisualizationAfterScenarioSwitch(d.eligibility, vizMode)
+      if (changed) {
+        const scenarioName = scenarios.find(s => s.id === (d.dataset?.context?.scenario?.id ?? scenarioId))?.name || 'this scenario'
+        setVizAutoSwitchNotice(nextVizMode
+          ? `${VIZ_ICONS[vizMode] ? vizMode.replace(/_/g, ' ') : vizMode} is unavailable for ${scenarioName}. Switched to ${nextVizMode.replace(/_/g, ' ')}.`
+          : `No visualization is available for ${scenarioName}.`)
+        if (nextVizMode) setVizMode(nextVizMode)
+      }
+      // Section 6/H: reset stale, scenario-specific selections rather than
+      // carrying old object IDs into a new scenario's data. Matrix drill-
+      // down and heatmap metric are handled here since they reference
+      // specific dataset content directly; Graph's own focus/highlight
+      // reset already happens via its existing dataset-driven useEffect
+      // (chooseFocusObject already prefers retaining the prior focus only
+      // when it still exists in the new dataset - see that effect).
+      const newObjectIds = new Set((d.dataset?.objects ?? []).map((o: any) => o.id))
+      if (selected && !newObjectIds.has(selected.id)) setSelected(null)
+      if (matrixDrilldown && (!newObjectIds.has(matrixDrilldown.rowObj?.id) || !newObjectIds.has(matrixDrilldown.colObj?.id))) setMatrixDrilldown(null)
+      const newMetricKeys = new Set((d.dataset?.metrics ?? []).map((m: any) => m.key))
+      if (!newMetricKeys.has(heatmapField)) {
+        const recommended = d.eligibility?.eligible?.find((v: any) => v.visualization === 'HEATMAP')?.recommendedConfig?.metricKey
+        if (recommended) setHeatmapField(recommended)
+      }
+    }).catch(() => {
+      if (myToken !== scenarioRequestTokenRef.current) return
+      setScenarioSwitchError('Failed to switch scenario. Showing the previous scenario.')
+      setPendingScenarioId(null)
+    })
+  }
+
+  // Section 9/D: an explicit user action only - never invoked by
+  // switchScenario itself. Reuses the existing view-update endpoint/
+  // permission (scenarioId is already an updatable field there, with its
+  // own tenant-scoped validation) rather than a new one. Uses
+  // viewOverrides (the established optimistic-update pattern in this
+  // component) so the "saved" indicator updates immediately on success,
+  // without a full view reload; a failure leaves viewOverrides untouched,
+  // so the UI never falsely claims the default changed.
+  const setAsDefaultScenario = async (scenarioId: string) => {
+    setSavingDefaultScenario(true)
+    try {
+      const result = await api.put(`/ea-views/${view.id}`, { scenarioId })
+      if (result?.id) setViewOverrides((prev: any) => ({ ...prev, scenarioId }))
+    } finally {
+      setSavingDefaultScenario(false)
+    }
+  }
 
   useEffect(() => {
     api.get('/ea-views/saved-filters').then((f: any) => setSavedFilters(Array.isArray(f) ? f : [])).catch(() => {})
@@ -627,10 +764,18 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // Initializes (or re-initializes, on a genuinely new dataset) the
   // focused, bounded initial view - never the full dataset by default
   // (Section 2). Re-runs when the dataset itself changes (a fresh view
-  // load, or a scenario switch), not on every render.
+  // load, or a scenario switch), not on every render. Phase 5A: prefers
+  // retaining the PRIOR graph focus (via a ref, since graphFocusId isn't
+  // a dependency here and a closure would otherwise capture a stale
+  // value) over the generic `selected` object - Section 6's "if focused
+  // Capability A exists in both scenarios, focus may remain" refers
+  // specifically to the graph's own focus concept, not whatever object
+  // happens to be selected for the detail panel at the moment.
+  const priorGraphFocusIdRef = React.useRef<string | null>(null)
+  useEffect(() => { priorGraphFocusIdRef.current = graphFocusId }, [graphFocusId])
   useEffect(() => {
     if (!dataset) { setGraphVisibleState(null); setGraphFocusId(null); return }
-    const focusId = chooseFocusObject(dataset, selected?.id)
+    const focusId = chooseFocusObject(dataset, priorGraphFocusIdRef.current ?? selected?.id)
     setGraphFocusId(focusId)
     setGraphVisibleState(focusId ? computeInitialVisibleSet(graphIndexes, focusId) : null)
     setGraphHighlightedPathId(null)
@@ -1433,12 +1578,69 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           <div style={{ display:'flex', gap:6, marginTop:2 }}>
             <span style={S.badge(CATEGORY_COLOR[view.category]||'#3498db')}>{view.category}</span>
             <span style={S.badge(STATUS_COLOR[view.status])}>{view.status}</span>
-            <span style={S.badge(STATE_COLOR[view.architectureState]||'#7f8c8d')}>{view.architectureState}</span>
             {view.approvalStatus && view.approvalStatus !== 'NOT_REQUIRED' && (
               <span style={S.badge(view.approvalStatus === 'APPROVED' ? '#2ecc71' : view.approvalStatus === 'REJECTED' ? '#e74c3c' : '#f39c12')}>
                 {view.approvalStatus === 'PENDING' ? '⏳ Pending Approval' : view.approvalStatus === 'APPROVED' ? '✓ Approved' : '✕ Rejected'}
               </span>
             )}
+          </div>
+          {/* ── Scenario Selector (Phase 5A) ─────────────────────────────
+              Section 3: name/type/status/horizon + lineage context.
+              Section 4: pendingScenarioId shows a loading state on the
+              badge itself rather than blanking the page - the previously
+              committed scenario/dataset stay fully visible underneath
+              until the new one actually commits. */}
+          <div style={{ marginTop: 6 }}>
+            <details style={{ position: 'relative', display: 'inline-block' }}>
+              <summary style={{ listStyle: 'none', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <span style={S.badge(STATE_COLOR[scenarios.find(s => s.id === committedScenarioId)?.type] || '#7f8c8d')}>
+                  {pendingScenarioId ? `Switching to ${scenarios.find(s => s.id === pendingScenarioId)?.name || '…'}…` : (scenarios.find(s => s.id === committedScenarioId)?.name || 'Current Architecture')}
+                </span>
+                {scenarios.find(s => s.id === committedScenarioId)?.status === 'DRAFT' && <span style={{ ...S.badge('#f39c12'), fontSize: 10 }}>DRAFT</span>}
+                {view.scenarioId === committedScenarioId && committedScenarioId && <span title="This is the View's saved default scenario" style={{ fontSize: 11, color: 'var(--text-dim)' }}>★ default</span>}
+                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>▾</span>
+              </summary>
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, zIndex: 30, minWidth: 280, maxHeight: 360, overflowY: 'auto' as const }}>
+                {(() => {
+                  const tree = buildScenarioLineageTree(scenarios)
+                  const renderScenarioOption = (id: string, depth: number): React.ReactNode => {
+                    const s = scenarios.find(x => x.id === id)
+                    if (!s) return null
+                    const children = tree.childrenByParentId[id] ?? []
+                    const isActive = id === committedScenarioId
+                    return (
+                      <div key={id}>
+                        <div onClick={() => !isActive && switchScenario(id)}
+                          style={{ marginLeft: depth * 14, display: 'flex', alignItems: 'center', gap: 6, padding: '5px 8px', borderRadius: 6, cursor: isActive ? 'default' : 'pointer', background: isActive ? 'rgba(3,105,161,0.12)' : 'transparent' }}
+                          onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = 'rgba(3,105,161,0.06)' }}
+                          onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
+                          <span style={{ fontSize: 12, fontWeight: isActive ? 600 : 400 }}>{s.name}</span>
+                          <span style={{ ...S.badge(STATE_COLOR[s.type] || '#7f8c8d'), fontSize: 9 }}>{s.type}</span>
+                          {s.status === 'DRAFT' && <span style={{ ...S.badge('#f39c12'), fontSize: 9 }}>DRAFT</span>}
+                          {s.horizonDate && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(s.horizonDate).toLocaleDateString(undefined, { year: 'numeric', month: 'short' })}</span>}
+                          {view.scenarioId === s.id && <span style={{ fontSize: 10, color: 'var(--text-dim)' }} title="View's saved default">★</span>}
+                        </div>
+                        {children.map(c => renderScenarioOption(c, depth + 1))}
+                      </div>
+                    )
+                  }
+                  return tree.rootIds.map(id => renderScenarioOption(id, 0))
+                })()}
+                {scenarios.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: 8 }}>No architecture scenarios available.</div>}
+                {committedScenarioId && view.scenarioId !== committedScenarioId && (
+                  <button disabled={savingDefaultScenario} onClick={() => setAsDefaultScenario(committedScenarioId)} style={{ ...S.btn(), marginTop: 8, width: '100%', fontSize: 11 }}>
+                    {savingDefaultScenario ? 'Saving…' : '★ Set as default for this View'}
+                  </button>
+                )}
+              </div>
+            </details>
+            {/* Section 11: lightweight lineage context, e.g. "Current -> Transition 2027 -> Target A" */}
+            {committedScenarioId && scenarios.length > 0 && (() => {
+              const path = getScenarioLineagePath(scenarios, committedScenarioId)
+              return path.length > 1 ? <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{path.map((s: any) => s.name).join(' → ')}</div> : null
+            })()}
+            {scenarioSwitchError && <div style={{ fontSize: 11, color: '#e74c3c', marginTop: 4 }}>⚠ {scenarioSwitchError}</div>}
+            {vizAutoSwitchNotice && <div style={{ fontSize: 11, color: '#f39c12', marginTop: 4 }} onClick={() => setVizAutoSwitchNotice(null)}>ℹ {vizAutoSwitchNotice} <span style={{ cursor: 'pointer', textDecoration: 'underline' }}>Dismiss</span></div>}
           </div>
         </div>
         <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>

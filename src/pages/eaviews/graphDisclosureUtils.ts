@@ -210,19 +210,3 @@ export function applyGraphFilters(dataset: any, visibleObjectIds: Set<string>, v
   }))
   return { objectIds, relationshipIds }
 }
-
-// Deterministic grouping by semantic type or domain (Section 9) - never
-// AI/algorithmic-community clustering. Returns a simple key->objectIds
-// map the renderer can use to lay out or color-band groups.
-export function computeSemanticGroups(dataset: any, visibleObjectIds: Set<string>, groupBy: 'semanticType' | 'domain' = 'semanticType'): Map<string, string[]> {
-  const objectById = new Map<string, any>((dataset?.objects ?? []).map((o: any) => [o.id, o]))
-  const groups = new Map<string, string[]>()
-  for (const id of visibleObjectIds) {
-    const o: any = objectById.get(id)
-    if (!o) continue
-    const key = groupBy === 'semanticType' ? (o.semanticType || o.assetType) : o.domain
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key)!.push(id)
-  }
-  return groups
-}
