@@ -1634,7 +1634,12 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
   const ASSET_TYPES = ['CAPABILITY','APPLICATION','DATA_ENTITY','TECH_COMPONENT','SECURITY_CONTROL','EA_PRINCIPLE','INTEGRATION','PROCESS','ORG_UNIT','RISK']
   const DOMAINS = ['BUSINESS','APPLICATION','DATA','TECHNOLOGY','SECURITY','STRATEGIC','BENEFICIARY_EXPERIENCE','CROSS_CUTTING']
   const VIZS = ['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE','ROADMAP','DASHBOARD','LANDSCAPE']
-  const STATES = ['CURRENT','TARGET','TRANSITION','BASELINE','PLANNED']
+  // Phase 5A: the old Architecture State selector (STATES: CURRENT/
+  // TARGET/TRANSITION/BASELINE/PLANNED) is retired from view creation -
+  // architectureState is still sent in the create payload for backend
+  // compatibility (defaulted to 'CURRENT', never shown to the user), but
+  // architecture scenario selection is now a viewing-time concern via
+  // the ScenarioSelector, not a per-View fixed choice at creation.
   const CATS = ['Business','Application','Data','Technology','Security','Cross-Domain','Strategic','Governance','Custom']
 
   const [form, setForm] = useState<{
@@ -1688,11 +1693,6 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
               <div><label style={S.label}>Category</label>
                 <select style={S.input} value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
                   {CATS.map(c=><option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div><label style={S.label}>Architecture State</label>
-                <select style={S.input} value={form.architectureState} onChange={e=>setForm(f=>({...f,architectureState:e.target.value}))}>
-                  {STATES.map(s=><option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
               <div style={{ gridColumn:'1/-1' }}><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
@@ -1761,7 +1761,6 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
             <div style={{ display:'flex', flexDirection:'column' as const, gap:8 }}>
               <div><div style={S.label}>View Name</div><div style={{ fontSize:13, fontWeight:500 }}>{form.name || '—'}</div></div>
               <div><div style={S.label}>Visualization</div><div style={{ fontSize:13 }}>{VIZ_ICONS[form.visualization]} {form.visualization.replace(/_/g,' ')}</div></div>
-              <div><div style={S.label}>State</div><div style={{ ...S.badge(STATE_COLOR[form.architectureState]||'#7f8c8d'), display:'inline-flex' }}>{form.architectureState}</div></div>
               <div><div style={S.label}>Primary Types</div><div style={{ display:'flex', gap:4, flexWrap:'wrap' as const }}>
                 {form.rootObjectTypes.length ? form.rootObjectTypes.map((t: string)=><span key={t} style={{ ...S.badge(TYPE_COLOR[t]||'#3498db'), fontSize:10 }}>{t.replace(/_/g,' ')}</span>) : <span style={{ fontSize:12, color:'var(--text-dim)' }}>None selected</span>}
               </div></div>
