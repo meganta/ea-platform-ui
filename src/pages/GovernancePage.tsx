@@ -366,16 +366,36 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
               {evidenceOpen && evidence && (
                 <div style={{ marginTop: 8 }}>
                   {evidence.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No evidence records found — the underlying schema may not be synced yet, or this finding predates evidence tracking.</div>}
-                  {evidence.map((ev: any) => (
-                    <div key={ev.id} style={{ padding: '8px 10px', marginBottom: 6, borderRadius: 6, background: 'var(--navy-mid)', fontSize: 12 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{ev.sourceType === 'DOCUMENT' ? '📄 Document' : ev.sourceType === 'TENANT_REPOSITORY' ? '🏛 Tenant Repository' : '📋 Regulatory'}</span>
-                        {ev.sourceType === 'DOCUMENT' && ev.fileName && <span style={{ color: 'var(--text-muted)' }}>{ev.fileName}{ev.pageNumber ? ` (p.${ev.pageNumber})` : ''}</span>}
-                        {ev.sourceType === 'TENANT_REPOSITORY' && ev.tenantObjectName && <span style={{ color: 'var(--text-muted)' }}>{ev.tenantObjectName}</span>}
+                  {evidence.map((ev: any) => {
+                    // Validity/authority badge (product decision 2026-08-28,
+                    // backend commit 03e681c) — only rendered when the
+                    // backend actually captured it (sourceAuthorityLevel
+                    // undefined for DOCUMENT evidence and for any record
+                    // written before this field existed), and never for
+                    // AUTHORITATIVE, which is the clean/common case that
+                    // needs no caveat.
+                    const validityBadge: Record<string, { text: string; color: string }> = {
+                      ADVISORY: { text: ev.validityClassification === 'FUTURE' ? 'NOT YET EFFECTIVE' : 'DRAFT', color: '#f39c12' },
+                      HISTORICAL: { text: ev.validityClassification === 'SUPERSEDED' ? 'SUPERSEDED' : 'EXPIRED/DEPRECATED', color: '#e74c3c' },
+                      UNVALIDATED: { text: 'VALIDITY UNKNOWN', color: '#7f8c8d' },
+                    }
+                    const badge = ev.sourceAuthorityLevel && ev.sourceAuthorityLevel !== 'AUTHORITATIVE' ? validityBadge[ev.sourceAuthorityLevel] : null
+                    return (
+                      <div key={ev.id} style={{ padding: '8px 10px', marginBottom: 6, borderRadius: 6, background: 'var(--navy-mid)', fontSize: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{ev.sourceType === 'DOCUMENT' ? '📄 Document' : ev.sourceType === 'TENANT_REPOSITORY' ? '🏛 Tenant Repository' : '📋 Regulatory'}</span>
+                          {ev.sourceType === 'DOCUMENT' && ev.fileName && <span style={{ color: 'var(--text-muted)' }}>{ev.fileName}{ev.pageNumber ? ` (p.${ev.pageNumber})` : ''}</span>}
+                          {ev.sourceType === 'TENANT_REPOSITORY' && ev.tenantObjectName && <span style={{ color: 'var(--text-muted)' }}>{ev.tenantObjectName}{ev.tenantObjectVersion ? ` v${ev.tenantObjectVersion}` : ''}</span>}
+                        </div>
+                        {badge && (
+                          <div style={{ marginBottom: 4 }}>
+                            <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: `${badge.color}22`, color: badge.color, fontWeight: 600 }}>{badge.text}</span>
+                          </div>
+                        )}
+                        <div style={{ color: 'var(--text)' }}>{ev.extractedTextSnippet || ev.tenantObjectSnippet || ev.regulatorySource || '(no snippet available)'}</div>
                       </div>
-                      <div style={{ color: 'var(--text)' }}>{ev.extractedTextSnippet || ev.tenantObjectSnippet || ev.regulatorySource || '(no snippet available)'}</div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
