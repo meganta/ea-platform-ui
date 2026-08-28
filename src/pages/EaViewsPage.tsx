@@ -9,6 +9,7 @@ import { useSearchParams } from 'react-router-dom'
 import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
 import { determineTableMode, buildRelationshipTable, buildMatrix } from './eaviews/tableMatrixUtils'
+import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -345,8 +346,13 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [showSharePanel, setShowSharePanel] = useState(false)
   const [shareData, setShareData] = useState<any>(null)
   const [heatmapField, setHeatmapField] = useState('status')
-  const [heatmapFields, setHeatmapFields] = useState<{ code: string; name: string; declaredType: string }[]>([{ code: 'status', name: 'Status', declaredType: 'ENUM' }])
   const [collapsedTreeNodes, setCollapsedTreeNodes] = useState<Set<string>>(new Set())
+  // Phase 4B: which related-object type Capability Map's overlay counts
+  // (Section 2's "Applications supporting capability: N" example) - a
+  // single selectable overlay at a time, matching "prefer one selected
+  // metric/overlay at a time" rather than a full analytics designer.
+  const [capabilityOverlayType, setCapabilityOverlayType] = useState('Application')
+  const [capabilityDrilldown, setCapabilityDrilldown] = useState<any>(null)
 
   // Roadmap-specific state. Always declared (Rules of Hooks), only
   // exercised when view.visualization === 'ROADMAP' - see the isRoadmap
@@ -441,6 +447,13 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       setData(d?.legacy ?? d)
       setDataset(d?.dataset ?? null)
       setEligibility(d?.eligibility ?? null)
+      // Phase 4B: initialize the selected heatmap metric from
+      // VisualizationEligibility's own recommendation rather than a fixed
+      // 'status' default - 'status' isn't guaranteed to be a metric this
+      // dataset actually offers, and the eligibility engine already
+      // picked the best candidate.
+      const heatmapRecommendedMetric = d?.eligibility?.eligible?.find((v: any) => v.visualization === 'HEATMAP')?.recommendedConfig?.metricKey
+      if (heatmapRecommendedMetric) setHeatmapField(heatmapRecommendedMetric)
       const legacyNodes = d?.legacy?.nodes
       if (legacyNodes) {
         // Auto-layout by domain in columns
@@ -594,40 +607,16 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const domains = [...new Set((data?.nodes||[]).map((n: any) => n.domain))] as string[]
   const types = [...new Set((data?.nodes||[]).map((n: any) => n.assetType))] as string[]
 
-  // Heatmap field discovery: fields are per-object-type, so this fetches
-  // the available attributes for whichever asset type is most common in
-  // the current result set (a heatmap over a mixed-type result still gets
-  // a sensible field list rather than none at all - see the backend's
-  // getHeatmapFields() doc comment for why any attribute, not just
-  // declared ENUM/numeric ones, is offered).
-  useEffect(() => {
-    if (vizMode !== 'HEATMAP' || !data?.nodes?.length) return
-    const counts: Record<string, number> = {}
-    for (const n of data.nodes) counts[n.assetType] = (counts[n.assetType] || 0) + 1
-    const primaryType = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0]
-    if (!primaryType) return
-    api.get(`/ea-views/heatmap-fields?assetType=${encodeURIComponent(primaryType)}`)
-      .then((fields: any) => setHeatmapFields(Array.isArray(fields) && fields.length ? fields : [{ code: 'status', name: 'Status', declaredType: 'ENUM' }]))
-      .catch(() => setHeatmapFields([{ code: 'status', name: 'Status', declaredType: 'ENUM' }]))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vizMode, data])
+  // Phase 4B: heatmap-fields backend endpoint removed - ViewDataset.metrics
+  // (already present in the single /dataset fetch) provides the same
+  // candidate-metric information, data-driven from actual returned
+  // values, with zero extra network calls (Section 12's explicit "no new
+  // network calls" requirement).
 
-  // Mirrors the backend's computeHeatmapColorStrategy() exactly (see that
-  // method's doc comment) so the frontend can color cells immediately from
-  // data it already has, without a round trip per field change.
+  // Phase 4B: color-strategy computation is now handled by
+  // buildHeatmapDisplay (ViewDataset.metrics already carries dataType/min/
+  // max/distinctValues) - only the color mapping itself stays here.
   const HEATMAP_CATEGORICAL_PALETTE = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e', '#16a085', '#c0392b']
-  function computeColorStrategy(nodes: any[], field: string): { strategy: 'numeric' | 'categorical' | 'status'; colorByValue: Record<string, string>; min?: number; max?: number } {
-    if (field === 'status') return { strategy: 'status', colorByValue: {} }
-    const rawValues = nodes.map(n => (n.metadata || {})[field]).filter((v: any) => v !== undefined && v !== null && v !== '')
-    const numericValues = rawValues.map((v: any) => Number(v)).filter((v: number) => !Number.isNaN(v))
-    if (rawValues.length > 0 && numericValues.length >= rawValues.length * 0.9) {
-      return { strategy: 'numeric', colorByValue: {}, min: Math.min(...numericValues), max: Math.max(...numericValues) }
-    }
-    const distinctValues = [...new Set(rawValues.map((v: any) => String(v)))].sort()
-    const colorByValue: Record<string, string> = {}
-    distinctValues.forEach((v, i) => { colorByValue[v as string] = HEATMAP_CATEGORICAL_PALETTE[i % HEATMAP_CATEGORICAL_PALETTE.length] })
-    return { strategy: 'categorical', colorByValue }
-  }
   function numericGradientColor(value: number, min: number, max: number): string {
     // Green (low) -> amber -> red (high), a common risk/intensity ramp.
     const t = max === min ? 0.5 : (value - min) / (max - min)
@@ -812,88 +801,129 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   })()
 
   // ── Capability Map ──────────────────────────────────────────────────────────
+  // ── Capability Map (Phase 4B) ────────────────────────────────────────
+  //
+  // Consumes buildCapabilityMapDisplay(dataset, eligibility) - real
+  // hierarchy from ViewDataset.hierarchies, whatever depth is actually
+  // present (Section 2's explicit "do not preserve the old artificial
+  // two-level limit"). Deeper branches use the same collapse mechanism as
+  // Tree (shared collapsedTreeNodes state) for progressive rendering
+  // rather than becoming unusable.
   const renderCapabilityMap = () => {
-    // Filters on semanticType (resolved server-side against the tenant's
-    // actual published meta-model, or the legacy generic-type fallback -
-    // see view-query.service.ts / semantic-type-resolver.ts) rather than
-    // a hardcoded assetType string like 'CAPABILITY'. Framework-typed
-    // capability data (e.g. NORA 2.0's GovCapability, TOGAF's Capability)
-    // and legacy generic-typed data both resolve to the same
-    // 'BusinessCapability' semanticType, so this works regardless of
-    // which framework the tenant has published or how the asset was
-    // created.
-    const caps = filteredNodes.filter((n: any) => n.semanticType === 'BusinessCapability')
-    const l1 = caps.filter((c: any) => !c.metadata?.parentId || c.metadata?.level === 1)
-    const l2 = caps.filter((c: any) => c.metadata?.parentId && c.metadata?.level !== 1)
+    const display = buildCapabilityMapDisplay(dataset, eligibility)
+    if (!display.eligible) {
+      return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40, maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>▦</div>
+        <div>{display.reason}</div>
+      </div>
+    }
+    const objectById = new Map<string, any>((dataset?.objects ?? []).map((o: any) => [o.id, o]))
+    const toggle = (id: string) => setCollapsedTreeNodes(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+
+    const renderCapNode = (id: string, depth: number): React.ReactNode => {
+      const cap = objectById.get(id)
+      if (!cap) return null
+      const children = display.childrenByParentId?.[id] ?? []
+      const hasChildren = children.length > 0
+      const isCollapsed = collapsedTreeNodes.has(id)
+      const overlayCount = computeCapabilityOverlayCount(dataset, id, capabilityOverlayType)
+      return (
+        <div key={id} style={{ marginLeft: depth * 18 }}>
+          <div onClick={() => setCapabilityDrilldown(buildCapabilityDrilldown(dataset, id))}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: depth === 0 ? '#3498db22' : 'var(--navy-light)', border: depth === 0 ? '2px solid #3498db44' : '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', marginBottom: 6, cursor: 'pointer' }}>
+            {hasChildren ? (
+              <span onClick={e => { e.stopPropagation(); toggle(id) }} style={{ width: 14, textAlign: 'center', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer' }}>{isCollapsed ? '▶' : '▼'}</span>
+            ) : <span style={{ width: 14 }} />}
+            <span style={{ fontSize: depth === 0 ? 13 : 12, fontWeight: depth === 0 ? 700 : 500, color: depth === 0 ? '#3498db' : 'var(--text)' }}>{cap.name}</span>
+            {overlayCount !== null && <span style={{ marginLeft: 'auto', fontSize: 10, color: 'var(--text-dim)' }}>{capabilityOverlayType}: {overlayCount}</span>}
+          </div>
+          {hasChildren && !isCollapsed && children.map(c => renderCapNode(c, depth + 1))}
+        </div>
+      )
+    }
 
     return (
       <div style={{ overflowX: 'auto' }}>
-        <div style={{ display: 'flex', gap: 12, minWidth: 800 }}>
-          {l1.map((cap: any) => {
-            const children = l2.filter((c: any) => c.metadata?.parentId === cap.id)
-            return (
-              <div key={cap.id} style={{ flex: 1, minWidth: 160 }}>
-                <div style={{ background: '#3498db22', border: '2px solid #3498db44', borderRadius: 8, padding: '8px 12px', marginBottom: 8, cursor: 'pointer', fontWeight: 700, fontSize: 13, textAlign: 'center', color: '#3498db' }}
-                  onClick={() => setSelected(cap)}>{cap.name}</div>
-                {children.map((child: any) => (
-                  <div key={child.id} style={{ background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', marginBottom: 6, cursor: 'pointer', fontSize: 12 }}
-                    onClick={() => setSelected(child)}>{child.name}</div>
-                ))}
-              </div>
-            )
-          })}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, alignItems: 'center' }}>
+          <label style={{ ...S.label, marginBottom: 0 }}>Overlay:</label>
+          <select style={{ ...S.input, maxWidth: 200 }} value={capabilityOverlayType} onChange={e => setCapabilityOverlayType(e.target.value)}>
+            {[...new Set((dataset?.objects ?? []).map((o: any) => o.semanticType || o.assetType))].filter((t: any) => t !== 'BusinessCapability').map((t: any) => <option key={t} value={t}>{t}</option>)}
+          </select>
         </div>
-        {l1.length === 0 && <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>No capability data. Add capabilities to the EA Repository first.</div>}
+        <div style={{ display: 'flex', gap: 20, minWidth: 800 }}>
+          {(display.rootIds ?? []).map(rootId => <div key={rootId} style={{ flex: 1, minWidth: 200 }}>{renderCapNode(rootId, 0)}</div>)}
+        </div>
+        {capabilityDrilldown && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setCapabilityDrilldown(null)}>
+            <div style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, maxWidth: 480, maxHeight: '70vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+              {capabilityDrilldown.parent && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>Parent: {capabilityDrilldown.parent.name}</div>}
+              {capabilityDrilldown.children.length > 0 && <div style={{ fontSize: 12, marginBottom: 8 }}>Children: {capabilityDrilldown.children.map((c: any) => c.name).join(', ')}</div>}
+              {capabilityDrilldown.related.length > 0 && <div style={{ fontSize: 12, marginBottom: 8 }}>Related: {capabilityDrilldown.related.map((r: any) => r.name).join(', ')}</div>}
+              <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => setCapabilityDrilldown(null)}>Close</button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
 
-  // ── Heatmap ─────────────────────────────────────────────────────────────────
+  // ── Heatmap (Phase 4B) ────────────────────────────────────────────────
+  //
+  // Consumes buildHeatmapDisplay(dataset, eligibility, heatmapField) -
+  // structure + metric, never just colored objects (Section 3). Missing
+  // values render as a distinct muted tile, never coerced to 0 or a
+  // fabricated color.
   const HEATMAP_STATUS: Record<string,string> = { APPROVED:'#2ecc71', ACTIVE:'#2ecc71', UNDER_REVIEW:'#f39c12', DRAFT:'#e67e22', DEPRECATED:'#e74c3c', PLANNED:'#3498db' }
   const renderHeatmap = () => {
-    const strategy = computeColorStrategy(filteredNodes, heatmapField)
-    const getColor = (n: any): string => {
-      if (strategy.strategy === 'status') return HEATMAP_STATUS[n.status] || '#7f8c8d'
-      const raw = (n.metadata || {})[heatmapField]
-      if (raw === undefined || raw === null || raw === '') return '#4b5563' // muted gray for "no value"
-      if (strategy.strategy === 'numeric') {
-        const v = Number(raw)
-        return Number.isNaN(v) ? '#4b5563' : numericGradientColor(v, strategy.min!, strategy.max!)
-      }
-      return strategy.colorByValue[String(raw)] || '#7f8c8d'
+    const display = buildHeatmapDisplay(dataset, eligibility, heatmapField)
+    if (!display.eligible) {
+      return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40, maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>▤</div>
+        <div>{display.reason}</div>
+      </div>
     }
+    const colorByValue: Record<string, string> = {}
+    if (display.dataType === 'categorical' || display.dataType === 'status') {
+      (display.distinctValues ?? []).forEach((v, i) => { colorByValue[v] = display.dataType === 'status' ? (HEATMAP_STATUS[v] || '#7f8c8d') : HEATMAP_CATEGORICAL_PALETTE[i % HEATMAP_CATEGORICAL_PALETTE.length] })
+    }
+    const getColor = (tile: { value: number | string | null }): string => {
+      if (tile.value === null) return '#4b5563' // muted gray for genuinely missing values
+      if (display.dataType === 'numeric') return numericGradientColor(tile.value as number, display.min!, display.max!)
+      return colorByValue[String(tile.value)] || '#7f8c8d'
+    }
+    const objectById = new Map<string, any>((dataset?.objects ?? []).map((o: any) => [o.id, o]))
     return (
       <div>
+        {dataset?.provenance?.truncated && (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>Results are truncated - this heatmap does not represent every matching object.</div>
+        )}
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' as const }}>
           <label style={{ ...S.label, marginBottom: 0 }}>Color by:</label>
           <select style={{ ...S.input, maxWidth: 220 }} value={heatmapField} onChange={e => setHeatmapField(e.target.value)}>
-            <option value="domain">Domain</option>
-            <option value="assetType">Asset Type</option>
-            {heatmapFields.map(f => <option key={f.code} value={f.code}>{f.name}</option>)}
+            {(display.candidateMetrics ?? [heatmapField]).map(m => <option key={m} value={m}>{m}</option>)}
           </select>
           <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' as const, maxWidth: '60%' }}>
-            {strategy.strategy === 'status' && Object.entries(HEATMAP_STATUS).map(([k,c]) => <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: c }} />{k}</div>)}
-            {strategy.strategy === 'categorical' && Object.entries(strategy.colorByValue).map(([k,c]) => <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: c }} />{k}</div>)}
-            {strategy.strategy === 'numeric' && (
+            {(display.dataType === 'categorical' || display.dataType === 'status') && Object.entries(colorByValue).map(([k,c]) => <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: c }} />{k}</div>)}
+            {display.dataType === 'numeric' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-dim)' }}>
-                <span>{strategy.min}</span>
+                <span>{display.min}</span>
                 <div style={{ width: 100, height: 10, borderRadius: 5, background: 'linear-gradient(90deg, #2ecc71, #f39c12, #e74c3c)' }} />
-                <span>{strategy.max}</span>
+                <span>{display.max}</span>
               </div>
             )}
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-          {filteredNodes.map((n: any) => {
-            const color = getColor(n)
-            const rawVal = heatmapField === 'status' ? n.status : heatmapField === 'domain' ? n.domain : heatmapField === 'assetType' ? n.assetType : (n.metadata || {})[heatmapField]
+          {(display.tiles ?? []).map(tile => {
+            const color = getColor(tile)
+            const obj = objectById.get(tile.objectId)
             return (
-              <div key={n.id} onClick={() => setSelected(n)} style={{ padding: '10px 12px', borderRadius: 8, background: color+'22', border: `1px solid ${color}44`, cursor: 'pointer', transition: 'all 0.15s' }}
+              <div key={tile.objectId} onClick={() => setSelected(obj)} style={{ padding: '10px 12px', borderRadius: 8, background: color+'22', border: `1px solid ${color}44`, cursor: 'pointer', transition: 'all 0.15s' }}
                 onMouseEnter={e => (e.currentTarget.style.background = color+'44')}
                 onMouseLeave={e => (e.currentTarget.style.background = color+'22')}>
-                <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 4 }}>{n.assetType.replace(/_/g,' ')}</div>
-                <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>{n.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{rawVal === undefined || rawVal === null || rawVal === '' ? '—' : String(rawVal)}</div>
+                <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 4 }}>{obj?.assetType?.replace(/_/g,' ')}</div>
+                <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>{tile.name}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{tile.displayValue}</div>
               </div>
             )
           })}
@@ -1072,68 +1102,105 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
 
   // ── Tree/Hierarchy (uses metadata.parentId - the same convention the
   // capability hierarchy edges already rely on in the backend) ─────────────
+  // ── Tree (Phase 4B) ───────────────────────────────────────────────────
+  //
+  // Consumes buildTreeDisplay(dataset, eligibility) - real hierarchy only
+  // (Section 4). The render function itself also carries a defensive
+  // visited-set guard during recursion (not just the utility's own cycle
+  // detection) so malformed data can never cause infinite recursion here,
+  // even if it somehow slipped past the utility layer.
   const renderTree = () => {
-    const byParent = new Map<string, any[]>()
-    const roots: any[] = []
-    const nodeIds = new Set(filteredNodes.map((n: any) => n.id))
-    for (const n of filteredNodes) {
-      const parentId = n.metadata?.parentId
-      if (parentId && nodeIds.has(parentId)) {
-        if (!byParent.has(parentId)) byParent.set(parentId, [])
-        byParent.get(parentId)!.push(n)
-      } else {
-        roots.push(n)
-      }
+    const display = buildTreeDisplay(dataset, eligibility)
+    if (!display.eligible) {
+      return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40, maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>⌵</div>
+        <div>{display.reason}</div>
+      </div>
     }
-    const [collapsed, setLocalCollapsed] = [collapsedTreeNodes, setCollapsedTreeNodes] as const
-    const toggle = (id: string) => setLocalCollapsed(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
-    const renderNode = (n: any, depth: number): React.ReactNode => {
-      const children = byParent.get(n.id) || []
+    const objectById = new Map<string, any>((dataset?.objects ?? []).map((o: any) => [o.id, o]))
+    const toggle = (id: string) => setCollapsedTreeNodes(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next })
+    const renderNode = (id: string, depth: number, ancestry: Set<string>): React.ReactNode => {
+      if (ancestry.has(id)) return null // defensive cycle guard at render time too, independent of the utility's own detection
+      const n = objectById.get(id)
+      if (!n) return null
+      const children = display.childrenByParentId?.[id] ?? []
       const hasChildren = children.length > 0
-      const isCollapsed = collapsed.has(n.id)
+      const isCollapsed = collapsedTreeNodes.has(id)
       const color = TYPE_COLOR[n.assetType] || '#7f8c8d'
       return (
-        <div key={n.id}>
+        <div key={id}>
           <div onClick={() => setSelected(n)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', marginLeft: depth * 22, borderRadius: 6, cursor: 'pointer' }}
             onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.08)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
             {hasChildren ? (
-              <span onClick={e => { e.stopPropagation(); toggle(n.id) }} style={{ width: 16, textAlign: 'center', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer' }}>{isCollapsed ? '▶' : '▼'}</span>
+              <span onClick={e => { e.stopPropagation(); toggle(id) }} style={{ width: 16, textAlign: 'center', fontSize: 10, color: 'var(--text-dim)', cursor: 'pointer' }}>{isCollapsed ? '▶' : '▼'}</span>
             ) : <span style={{ width: 16 }} />}
             <span style={{ width: 8, height: 8, borderRadius: 2, background: color, flexShrink: 0 }} />
             <span style={{ fontSize: 13, fontWeight: depth === 0 ? 600 : 400 }}>{n.name}</span>
             <span style={{ ...S.badge(HEATMAP_STATUS[n.status] || '#7f8c8d'), fontSize: 10, marginLeft: 'auto' }}>{n.status}</span>
           </div>
-          {hasChildren && !isCollapsed && children.map(c => renderNode(c, depth + 1))}
+          {hasChildren && !isCollapsed && children.map(c => renderNode(c, depth + 1, new Set([...ancestry, id])))}
         </div>
       )
     }
-    if (roots.length === 0) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>No data. This visualization needs objects with a metadata.parentId hierarchy (e.g. capability levels).</div>
-    return <div style={S.card}>{roots.map(n => renderNode(n, 0))}</div>
+    return (
+      <div>
+        {display.malformed && <div style={{ fontSize: 12, color: '#f39c12', marginBottom: 10 }}>⚠ Some hierarchy data was malformed (a cycle or dangling reference) and was safely excluded.</div>}
+        <div style={S.card}>{(display.rootIds ?? []).map(id => renderNode(id, 0, new Set()))}</div>
+      </div>
+    )
   }
 
   // ── Cards ─────────────────────────────────────────────────────────────────
+  // ── Cards (Phase 4B) ──────────────────────────────────────────────────
+  //
+  // Consumes buildCardContext(dataset, objectId) for relationship
+  // summaries - object + meaningful context, not an isolated inventory
+  // tile (Section 5). Entirely derived from the already-fetched dataset;
+  // no per-card fetch. A density warning (reusing the existing filter
+  // bar, not new pagination infrastructure) appears above a threshold.
+  const CARDS_WARN_THRESHOLD = 100
   const renderCards = () => (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
-      {filteredNodes.map((n: any) => {
-        const color = TYPE_COLOR[n.assetType] || '#7f8c8d'
-        return (
-          <div key={n.id} onClick={() => setSelected(n)} style={{ ...S.card, cursor: 'pointer', borderLeft: `3px solid ${color}` }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.05)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'var(--navy-light)')}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-              <span style={S.badge(color)}>{n.assetType.replace(/_/g, ' ')}</span>
-              <span style={S.badge(HEATMAP_STATUS[n.status] || '#7f8c8d')}>{n.status}</span>
+    <div>
+      {filteredNodes.length > CARDS_WARN_THRESHOLD && (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
+          {filteredNodes.length} cards - use the filters above to narrow this down for easier browsing.
+        </div>
+      )}
+      {dataset?.provenance?.truncated && (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>Results are truncated - not every matching object is shown.</div>
+      )}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 14 }}>
+        {filteredNodes.map((n: any) => {
+          const color = TYPE_COLOR[n.assetType] || '#7f8c8d'
+          const context = dataset ? buildCardContext(dataset, n.id) : null
+          return (
+            <div key={n.id} onClick={() => setSelected(n)} style={{ ...S.card, cursor: 'pointer', borderLeft: `3px solid ${color}` }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.05)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'var(--navy-light)')}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                <span style={S.badge(color)}>{n.assetType.replace(/_/g, ' ')}</span>
+                <span style={S.badge(HEATMAP_STATUS[n.status] || '#7f8c8d')}>{n.status}</span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6, lineHeight: 1.3 }}>{n.name}</div>
+              {n.description && <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{n.description}</div>}
+              {context && context.summaries.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  {context.summaries.map(s => (
+                    <div key={s.relationshipType} style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 2 }}>
+                      <span style={{ fontStyle: 'italic' }}>{s.label}:</span> {s.relatedNames.join(', ')}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)' }}>
+                <span>{n.domain}</span>
+                <span>{n.owner || '—'}</span>
+              </div>
             </div>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6, lineHeight: 1.3 }}>{n.name}</div>
-            {n.description && <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.4, marginBottom: 8, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' as const, overflow: 'hidden' }}>{n.description}</div>}
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-dim)' }}>
-              <span>{n.domain}</span>
-              <span>{n.owner || '—'}</span>
-            </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 

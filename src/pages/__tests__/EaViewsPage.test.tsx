@@ -869,13 +869,16 @@ describe('EaViewsPage - Saved Filters', () => {
 });
 
 describe('EaViewsPage - Tree/Cards visualization modes', () => {
-  it('switching to TREE mode nests a child under its parent via metadata.parentId and supports collapsing it', async () => {
+  it('switching to TREE mode nests a child under its parent via ViewDataset.hierarchies and supports collapsing it', async () => {
+    const p1 = { id: 'p1', name: 'Parent Cap', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {} };
+    const c1 = { id: 'c1', name: 'Child Cap', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { parentId: 'p1' } };
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Capability Tree', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
-      '/ea-views/v1/dataset': { legacy: { nodes: [
-        { id: 'p1', name: 'Parent Cap', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {} },
-        { id: 'c1', name: 'Child Cap', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { parentId: 'p1' } },
-      ], edges: [], metadata: {} } },
+      '/ea-views/v1/dataset': {
+        legacy: { nodes: [p1, c1], edges: [], metadata: {} },
+        dataset: { objects: [p1, c1], relationships: [], paths: [], hierarchies: [{ rootIds: ['p1'], parentByObjectId: { p1: null, c1: 'p1' }, source: 'metadata.parentId' }], metrics: [] },
+        eligibility: { eligible: [{ visualization: 'TREE', eligible: true, score: 0.85, reasons: [] }], ineligible: [] },
+      },
     });
     render(<EaViewsPage />);
     await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
@@ -889,9 +892,13 @@ describe('EaViewsPage - Tree/Cards visualization modes', () => {
   });
 
   it('switching to CARDS mode renders each node as a card with its description', async () => {
+    const a1 = { id: 'a1', name: 'HR System', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {}, description: 'Handles employee records' };
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'App Cards', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
-      '/ea-views/v1/dataset': { legacy: { nodes: [{ id: 'a1', name: 'HR System', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {}, description: 'Handles employee records' }], edges: [], metadata: {} } },
+      '/ea-views/v1/dataset': {
+        legacy: { nodes: [a1], edges: [], metadata: {} },
+        dataset: { objects: [a1], relationships: [], paths: [], hierarchies: [], metrics: [] },
+      },
     });
     render(<EaViewsPage />);
     await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
@@ -903,24 +910,29 @@ describe('EaViewsPage - Tree/Cards visualization modes', () => {
   });
 });
 
-describe('EaViewsPage - generalized Heatmap field discovery', () => {
-  it('fetches heatmap-fields for the most common asset type in the result set when switching to HEATMAP mode', async () => {
+// Phase 4B: the old /heatmap-fields backend endpoint was removed -
+// ViewDataset.metrics (already present in the single /dataset fetch)
+// replaces its purpose entirely. This replaces the old "fetches
+// heatmap-fields..." test, which verified behavior that no longer
+// exists.
+describe('EaViewsPage - Heatmap metric selection (Phase 4B)', () => {
+  it('HEATMAP mode uses ViewDataset.metrics candidates directly, with no separate heatmap-fields network call', async () => {
+    const c1 = { id: 'c1', name: 'Cap A', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { maturityLevel: 'High' } };
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Cap Heatmap', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
-      '/ea-views/v1/dataset': { legacy: { nodes: [{ id: 'c1', name: 'Cap A', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { maturityLevel: 'High' } }], edges: [], metadata: {} } },
-      '/ea-views/heatmap-fields': [{ code: 'status', name: 'Status', declaredType: 'ENUM' }, { code: 'maturityLevel', name: 'Maturity Level', declaredType: 'TEXT' }],
+      '/ea-views/v1/dataset': {
+        legacy: { nodes: [c1], edges: [], metadata: {} },
+        dataset: { objects: [c1], relationships: [], paths: [], hierarchies: [{ rootIds: ['c1'], parentByObjectId: { c1: null }, source: 'metadata.parentId' }], metrics: [{ key: 'maturityLevel', label: 'maturityLevel', dataType: 'categorical', coveragePercent: 100, distinctValues: ['High'] }] },
+        eligibility: { eligible: [{ visualization: 'HEATMAP', eligible: true, score: 0.7, reasons: [], recommendedConfig: { metricKey: 'maturityLevel', candidateMetrics: ['maturityLevel'] } }], ineligible: [] },
+      },
     });
     render(<EaViewsPage />);
     await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
     fireEvent.click(screen.getAllByText('📋 My Views')[0]);
     fireEvent.click(await screen.findByText('Cap Heatmap'));
     fireEvent.click(await screen.findByText(/HEATMAP/));
-    await waitFor(() => {
-      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/heatmap-fields'));
-      expect(call).toBeDefined();
-      expect(call[0]).toContain('assetType=GovCapability');
-    });
-    expect(await screen.findByText('Maturity Level')).toBeInTheDocument();
+    expect(await screen.findByText('Cap A')).toBeInTheDocument();
+    expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('/heatmap-fields'))).toBe(false);
   });
 });
 
