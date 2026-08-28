@@ -18,7 +18,7 @@ interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: stri
 interface Architect { id: string; code: string; name: string; role: string; domain?: string; avatar: string; description?: string; isChief: boolean; aiModel: string; isActive: boolean }
 
 const MODEL_LABEL: Record<string, string> = { haiku: '⚡ Fast', sonnet: '🧠 Smart' }
-const DOMAIN_COLOR: Record<string, string> = { CHIEF: '#f39c12', BUSINESS: '#3498db', APPLICATION: '#e67e22', INTEGRATION: '#16a085', DATA: '#1abc9c', TECHNOLOGY: '#e74c3c', SECURITY: '#9b59b6' }
+const DOMAIN_COLOR: Record<string, string> = { CHIEF: '#f39c12', BUSINESS: '#3498db', BENEFICIARY: '#2980b9', APPLICATION: '#e67e22', INTEGRATION: '#16a085', DATA: '#1abc9c', TECHNOLOGY: '#e74c3c', SECURITY: '#9b59b6' }
 
 // ── Meeting Assistant ─────────────────────────────────────────────────────────
 function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) {
@@ -34,7 +34,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const pollRef = useRef<any>(null)
 
-  const DOMAIN_COLOR: Record<string,string> = { CHIEF:'#f39c12', BUSINESS:'#3498db', APPLICATION:'#e67e22', INTEGRATION:'#16a085', DATA:'#1abc9c', TECHNOLOGY:'#e74c3c', SECURITY:'#9b59b6' }
+  const DOMAIN_COLOR: Record<string,string> = { CHIEF:'#f39c12', BUSINESS:'#3498db', BENEFICIARY:'#2980b9', APPLICATION:'#e67e22', INTEGRATION:'#16a085', DATA:'#1abc9c', TECHNOLOGY:'#e74c3c', SECURITY:'#9b59b6' }
   const STATUS_COLOR: Record<string,string> = { COMPLETED:'#2ecc71', PROCESSING:'#f39c12', SCHEDULED:'#3498db', ACTIVE:'#e67e22', CANCELLED:'#7f8c8d' }
 
   const load = useCallback(() => {
