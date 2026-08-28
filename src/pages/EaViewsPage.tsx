@@ -8,6 +8,7 @@ import { PathBuilder, RelationshipHop } from './eaviews/PathBuilder'
 import { useSearchParams } from 'react-router-dom'
 import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
+import { determineTableMode, buildRelationshipTable, buildMatrix } from './eaviews/tableMatrixUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -318,6 +319,19 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const view = { ...viewProp, ...viewOverrides }
 
   const [data, setData] = useState<any>(null)
+  // Phase 4A: canonical ViewDataset + its eligibility evaluation, fetched
+  // in the SAME call as `data` (see load() below) - avoids a second,
+  // duplicate fetch. Only Table and Matrix consume these; every other
+  // renderer (Graph/CapabilityMap/Heatmap/Tree/Cards) continues reading
+  // `data` exactly as before, completely unaware this exists.
+  const [dataset, setDataset] = useState<any>(null)
+  const [eligibility, setEligibility] = useState<any>(null)
+  // Phase 4A: which matrix cell is currently drilled into (Section 10) -
+  // null when no drill-down panel is open. Holds the cell's row/column
+  // object plus its real backing items (relationships for DIRECT, paths
+  // for PATH) - never re-queried, reused directly from the already-built
+  // matrix.
+  const [matrixDrilldown, setMatrixDrilldown] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [vizMode, setVizMode] = useState<string>(view.visualization || 'GRAPH')
   const [filterDomain, setFilterDomain] = useState('')
@@ -417,12 +431,21 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
 
   const load = useCallback(() => {
     setLoading(true)
-    api.post(`/ea-views/${view.id}/execute`, {}).then((d: any) => {
-      setData(d)
-      if (d?.nodes) {
+    // Phase 4A: single fetch to the new /dataset endpoint, not a second
+    // call alongside /execute - `d.legacy` is byte-compatible with what
+    // /execute always returned (verified by a dedicated backend test),
+    // so every existing renderer below reading `data` is completely
+    // unaffected. `d.dataset`/`d.eligibility` are new, additive state
+    // only Table/Matrix read.
+    api.post(`/ea-views/${view.id}/dataset`, {}).then((d: any) => {
+      setData(d?.legacy ?? d)
+      setDataset(d?.dataset ?? null)
+      setEligibility(d?.eligibility ?? null)
+      const legacyNodes = d?.legacy?.nodes
+      if (legacyNodes) {
         // Auto-layout by domain in columns
         const domGroups: Record<string,any[]> = {}
-        for (const n of d.nodes) { const dk = n.domain||'Other'; if(!domGroups[dk])domGroups[dk]=[]; domGroups[dk].push(n) }
+        for (const n of legacyNodes) { const dk = n.domain||'Other'; if(!domGroups[dk])domGroups[dk]=[]; domGroups[dk].push(n) }
         const pos: Record<string,{x:number,y:number}> = {}
         let colX = 60
         for (const [,ns] of Object.entries(domGroups)) {
@@ -880,41 +903,165 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   }
 
   // ── Matrix ───────────────────────────────────────────────────────────────────
+  // ── Matrix (Phase 4A - DIRECT/PATH semantic matrix) ─────────────────────
+  //
+  // Consumes buildMatrix(dataset, eligibility) - never independently
+  // invents row/column axes (Section 6). Ineligibility shows the
+  // deterministic reason, not an empty grid that looks broken (Section
+  // 11). Row/column limits are explicit ("Showing X of Y"), never a
+  // silent slice (Section 12) - the old implementation's silent
+  // .slice(0,30)/.slice(0,20) is exactly what this replaces.
+  const MATRIX_ROW_LIMIT = 30
+  const MATRIX_COL_LIMIT = 20
   const renderMatrix = () => {
-    const sources = filteredNodes.filter((n: any) => view.rootObjectTypes?.includes(n.assetType))
-    const targets = filteredNodes.filter((n: any) => view.relatedObjectTypes?.includes(n.assetType))
-    const displayTargets = targets.length > 0 ? targets : filteredNodes.filter((n: any) => !view.rootObjectTypes?.includes(n.assetType))
-
-    if (sources.length === 0) return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>No matrix data. Ensure both source and target object types are configured in the view.</div>
+    const result = buildMatrix(dataset, eligibility)
+    if (!result.eligible) {
+      return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40, maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ fontSize: 28, marginBottom: 12 }}>⊞</div>
+        <div>{result.reason}</div>
+      </div>
+    }
+    const allRows = result.rows ?? []
+    const allCols = result.columns ?? []
+    const rows = allRows.slice(0, MATRIX_ROW_LIMIT)
+    const cols = allCols.slice(0, MATRIX_COL_LIMIT)
+    const cell = (rowId: string, colId: string) => result.cells?.get(`${rowId}::${colId}`)
 
     return (
+      <div>
+        {result.relationMode === 'PATH' && result.pathSteps && (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10, padding: '6px 10px', background: 'var(--navy-mid)', borderRadius: 6, display: 'inline-block' }}>
+            Path-based Matrix ({result.pathSteps.length} hops) — Derived through: {[result.pathSteps[0].from, ...result.pathSteps.map(s => s.to)].join(' → ')}
+          </div>
+        )}
+        {(allRows.length > MATRIX_ROW_LIMIT || allCols.length > MATRIX_COL_LIMIT) && (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+            Showing {rows.length} of {allRows.length} {result.rowType} × {cols.length} of {allCols.length} {result.columnType}
+          </div>
+        )}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ borderCollapse: 'collapse', minWidth: '100%' }}>
+            <thead>
+              <tr>
+                <th style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, position: 'sticky', left: 0, minWidth: 140 }}>{result.rowType} ↓ / {result.columnType} →</th>
+                {cols.map((c: any) => (
+                  <th key={c.id} style={{ padding: '6px 10px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: TYPE_COLOR[c.assetType]||'var(--text)', whiteSpace: 'nowrap', minWidth: 100, maxWidth: 140 }}>
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r: any, ri: number) => (
+                <tr key={r.id} style={{ background: ri % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>
+                  <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, position: 'sticky', left: 0, background: ri % 2 === 0 ? 'var(--navy-light)' : 'var(--navy)', maxWidth: 140 }}>
+                    <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: TYPE_COLOR[r.assetType]||'var(--text)' }}>{r.name}</div>
+                  </td>
+                  {cols.map((c: any) => {
+                    const populated = cell(r.id, c.id)
+                    return (
+                      <td key={c.id}
+                        onClick={() => populated && setMatrixDrilldown({ rowObj: r, colObj: c, relationMode: result.relationMode, items: populated.items })}
+                        style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', cursor: populated ? 'pointer' : 'default', background: populated ? 'rgba(3,105,161,0.12)' : 'transparent' }}>
+                        {populated && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>{populated.count > 1 ? `${populated.count} ${result.relationMode === 'PATH' ? 'paths' : ''}`.trim() : (result.relationMode === 'PATH' ? '1 path' : '●')}</span>}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {matrixDrilldown && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setMatrixDrilldown(null)}>
+            <div style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, maxWidth: 500, maxHeight: '70vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>{matrixDrilldown.rowObj.name} × {matrixDrilldown.colObj.name}</div>
+              {matrixDrilldown.relationMode === 'DIRECT' ? (
+                <div>
+                  {matrixDrilldown.items.map((rel: any) => (
+                    <div key={rel.id} style={{ fontSize: 12, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>{matrixDrilldown.rowObj.name} —{rel.label || rel.relationshipType}→ {matrixDrilldown.colObj.name}</div>
+                  ))}
+                </div>
+              ) : (
+                <div>
+                  {matrixDrilldown.items.map((path: any) => (
+                    <div key={path.id} style={{ fontSize: 12, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                      {path.objectIds.map((oid: string) => (dataset?.objects ?? []).find((o: any) => o.id === oid)?.name || oid).join(' → ')}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button style={{ ...S.btn(), marginTop: 12 }} onClick={() => setMatrixDrilldown(null)}>Close</button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Table ────────────────────────────────────────────────────────────────────
+  // ── Table (Phase 4A - relationship-aware, with inventory fallback) ──────
+  //
+  // determineTableMode/buildRelationshipTable consume ViewDataset directly
+  // (Section 1) - the inventory branch below (unchanged JSX) is the
+  // genuine fallback for a single-object-set view, not the default for a
+  // relational one.
+  const renderTable = () => {
+    const mode = determineTableMode(dataset)
+    if (mode === 'relationship') {
+      const table = buildRelationshipTable(dataset)
+      // Interleaves object columns with the relationship label between
+      // each consecutive pair, matching the spec's own worked example:
+      // Business Capability | supported_by | Application | hosted_on | Technology
+      const headerCells: string[] = []
+      table.columns.forEach((c, i) => { headerCells.push(c); if (i < table.relationLabels.length) headerCells.push(table.relationLabels[i]) })
+      return (
+        <div style={{ overflowX: 'auto' }}>
+          {dataset?.provenance?.truncated && (
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>This result was truncated by a traversal size limit - not every matching path is shown.</div>
+          )}
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                {headerCells.map((h, i) => (
+                  <th key={i} style={{ padding: '8px 12px', background: i % 2 === 1 ? 'transparent' : 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: i % 2 === 1 ? 10 : 11, color: 'var(--text-dim)', fontWeight: i % 2 === 1 ? 400 : 600, fontStyle: i % 2 === 1 ? 'italic' : 'normal' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {table.rows.map((row, ri) => {
+                const cells: any[] = []
+                row.values.forEach((v, i) => {
+                  cells.push(<td key={`o${i}`} style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontWeight: 500, cursor: 'pointer' }} onClick={() => setSelected((dataset?.objects ?? []).find((o: any) => o.id === v.id))}>{v.name}</td>)
+                  if (i < table.relationLabels.length) cells.push(<td key={`r${i}`} style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>{table.relationLabels[i]}</td>)
+                })
+                return <tr key={row.id} style={{ background: ri % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>{cells}</tr>
+              })}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+    // Inventory fallback - unchanged from before Phase 4A.
+    return (
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ borderCollapse: 'collapse', minWidth: '100%' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              <th style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, position: 'sticky', left: 0, minWidth: 140 }}>Source ↓ / Related →</th>
-              {displayTargets.slice(0,20).map((t: any) => (
-                <th key={t.id} style={{ padding: '6px 10px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: TYPE_COLOR[t.assetType]||'var(--text)', whiteSpace: 'nowrap', minWidth: 100, maxWidth: 140 }}>
-                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.name}</div>
-                </th>
-              ))}
+              {['Name','Type','Domain','Status','Owner','Tags'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
-            {sources.slice(0,30).map((src: any, ri: number) => (
-              <tr key={src.id} style={{ background: ri % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>
-                <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, position: 'sticky', left: 0, background: ri % 2 === 0 ? 'var(--navy-light)' : 'var(--navy)', maxWidth: 140 }}>
-                  <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: TYPE_COLOR[src.assetType]||'var(--text)' }}>{src.name}</div>
-                </td>
-                {displayTargets.slice(0,20).map((tgt: any) => {
-                  const hasRel = data?.edges?.some((e: any) => (e.sourceId===src.id&&e.targetId===tgt.id)||(e.sourceId===tgt.id&&e.targetId===src.id))
-                  const sameDomain = src.domain === tgt.domain
-                  return (
-                    <td key={tgt.id} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', background: hasRel ? 'rgba(3,105,161,0.12)' : sameDomain ? 'rgba(15,23,42,0.03)' : 'transparent' }}>
-                      {hasRel && <div style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--accent)', margin: '0 auto' }} />}
-                    </td>
-                  )
-                })}
+            {filteredNodes.map((n: any, i: number) => (
+              <tr key={n.id} onClick={() => setSelected(n)} style={{ cursor: 'pointer', background: i%2===0?'var(--navy-light)':'transparent' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.05)')}
+                onMouseLeave={e => (e.currentTarget.style.background = i%2===0?'var(--navy-light)':'transparent')}>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontWeight: 500 }}>{n.name}</td>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}><span style={S.badge(TYPE_COLOR[n.assetType]||'#7f8c8d')}>{n.assetType.replace(/_/g,' ')}</span></td>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-dim)' }}>{n.domain}</td>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}><span style={S.badge(HEATMAP_STATUS[n.status]||'#7f8c8d')}>{n.status}</span></td>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-dim)' }}>{n.owner||'—'}</td>
+                <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>{(n.tags||[]).slice(0,2).map((t: string) => <span key={t} style={{ ...S.badge('#7f8c8d'), marginRight: 4, fontSize: 10 }}>{t}</span>)}</td>
               </tr>
             ))}
           </tbody>
@@ -922,33 +1069,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       </div>
     )
   }
-
-  // ── Table ────────────────────────────────────────────────────────────────────
-  const renderTable = () => (
-    <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr>
-            {['Name','Type','Domain','Status','Owner','Tags'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>{h}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {filteredNodes.map((n: any, i: number) => (
-            <tr key={n.id} onClick={() => setSelected(n)} style={{ cursor: 'pointer', background: i%2===0?'var(--navy-light)':'transparent' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.05)')}
-              onMouseLeave={e => (e.currentTarget.style.background = i%2===0?'var(--navy-light)':'transparent')}>
-              <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontWeight: 500 }}>{n.name}</td>
-              <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}><span style={S.badge(TYPE_COLOR[n.assetType]||'#7f8c8d')}>{n.assetType.replace(/_/g,' ')}</span></td>
-              <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-dim)' }}>{n.domain}</td>
-              <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}><span style={S.badge(HEATMAP_STATUS[n.status]||'#7f8c8d')}>{n.status}</span></td>
-              <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-dim)' }}>{n.owner||'—'}</td>
-              <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>{(n.tags||[]).slice(0,2).map((t: string) => <span key={t} style={{ ...S.badge('#7f8c8d'), marginRight: 4, fontSize: 10 }}>{t}</span>)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  )
 
   // ── Tree/Hierarchy (uses metadata.parentId - the same convention the
   // capability hierarchy edges already rely on in the backend) ─────────────

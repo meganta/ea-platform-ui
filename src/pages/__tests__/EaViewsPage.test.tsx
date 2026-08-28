@@ -403,7 +403,7 @@ describe('EaViewsPage - ViewViewer dashboard/roadmap branching', () => {
 
   it('a GRAPH-type view (the pre-existing default) still shows the mode picker and does not call the roadmap/dashboard endpoints at all', async () => {
     const view = { id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH' };
-    await openView(view, { '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} } });
+    await openView(view, { '/ea-views/v1/dataset': { legacy: { nodes: [], edges: [], metadata: {} } } });
     await waitFor(() => expect(screen.getByText(/GRAPH/)).toBeInTheDocument());
     const calls = (global.fetch as jest.Mock).mock.calls.map((c: any) => c[0]);
     expect(calls.some((u: string) => u.includes('/v1/roadmap'))).toBe(false);
@@ -426,7 +426,7 @@ describe('EaViewsPage - Version History', () => {
   async function openView(extraRoutes: Record<string, any> = {}) {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [VIEW],
-      '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} },
+      '/ea-views/v1/dataset': { legacy: { nodes: [], edges: [], metadata: {} } },
       '/ea-views/saved-filters': [],
       ...extraRoutes,
     });
@@ -487,7 +487,7 @@ describe('EaViewsPage - Approval Workflow', () => {
   async function openDraftView(view: any, extraRoutes: Record<string, any> = {}) {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [view],
-      '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} },
+      '/ea-views/v1/dataset': { legacy: { nodes: [], edges: [], metadata: {} } },
       '/ea-views/saved-filters': [],
       ...extraRoutes,
     });
@@ -559,7 +559,7 @@ describe('EaViewsPage - AI Explanation (Copilot integration)', () => {
   async function openView(extraRoutes: Record<string, any> = {}) {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH' }],
-      '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} },
+      '/ea-views/v1/dataset': { legacy: { nodes: [], edges: [], metadata: {} } },
       '/ea-views/saved-filters': [],
       ...extraRoutes,
     });
@@ -647,7 +647,7 @@ describe('EaViewsPage - Export', () => {
   async function openGraphView() {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [GRAPH_VIEW],
-      '/ea-views/v1/execute': { nodes: [{ id: 'a1', name: 'App A', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {} },
+      '/ea-views/v1/dataset': { legacy: { nodes: [{ id: 'a1', name: 'App A', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {} } },
       '/ea-views/saved-filters': [],
     });
     render(<EaViewsPage />);
@@ -799,7 +799,7 @@ describe('EaViewsPage - Saved Filters', () => {
   async function openGraphView(extraRoutes: Record<string, any> = {}) {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [GRAPH_VIEW],
-      '/ea-views/v1/execute': { nodes: [], edges: [], metadata: {} },
+      '/ea-views/v1/dataset': { legacy: { nodes: [], edges: [], metadata: {} } },
       '/ea-views/saved-filters': [],
       ...extraRoutes,
     });
@@ -872,10 +872,10 @@ describe('EaViewsPage - Tree/Cards visualization modes', () => {
   it('switching to TREE mode nests a child under its parent via metadata.parentId and supports collapsing it', async () => {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Capability Tree', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
-      '/ea-views/v1/execute': { nodes: [
+      '/ea-views/v1/dataset': { legacy: { nodes: [
         { id: 'p1', name: 'Parent Cap', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {} },
         { id: 'c1', name: 'Child Cap', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { parentId: 'p1' } },
-      ], edges: [], metadata: {} },
+      ], edges: [], metadata: {} } },
     });
     render(<EaViewsPage />);
     await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
@@ -891,7 +891,7 @@ describe('EaViewsPage - Tree/Cards visualization modes', () => {
   it('switching to CARDS mode renders each node as a card with its description', async () => {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'App Cards', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
-      '/ea-views/v1/execute': { nodes: [{ id: 'a1', name: 'HR System', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {}, description: 'Handles employee records' }], edges: [], metadata: {} },
+      '/ea-views/v1/dataset': { legacy: { nodes: [{ id: 'a1', name: 'HR System', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {}, description: 'Handles employee records' }], edges: [], metadata: {} } },
     });
     render(<EaViewsPage />);
     await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
@@ -907,7 +907,7 @@ describe('EaViewsPage - generalized Heatmap field discovery', () => {
   it('fetches heatmap-fields for the most common asset type in the result set when switching to HEATMAP mode', async () => {
     mockFetch({
       '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Cap Heatmap', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
-      '/ea-views/v1/execute': { nodes: [{ id: 'c1', name: 'Cap A', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { maturityLevel: 'High' } }], edges: [], metadata: {} },
+      '/ea-views/v1/dataset': { legacy: { nodes: [{ id: 'c1', name: 'Cap A', assetType: 'GovCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: { maturityLevel: 'High' } }], edges: [], metadata: {} } },
       '/ea-views/heatmap-fields': [{ code: 'status', name: 'Status', declaredType: 'ENUM' }, { code: 'maturityLevel', name: 'Maturity Level', declaredType: 'TEXT' }],
     });
     render(<EaViewsPage />);
