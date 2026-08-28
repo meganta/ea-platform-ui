@@ -338,3 +338,100 @@ describe('GovernancePage - report view: Financial tab in-tab editing', () => {
     expect(screen.getByText('Consolidate CRM licenses')).toBeInTheDocument();
   });
 });
+
+describe('GovernancePage - report view: Domains & Findings tab, evidence validity badge (product decision 2026-08-28)', () => {
+  function mockReportViewWithEvidence(review: any, report: any, findings: any[], evidence: any[]) {
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/governance/reviews?')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [review], total: 1 }) });
+      }
+      if (url.includes('/evidence?findingId=')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(evidence) });
+      }
+      if (url.includes(`/governance/reviews/${review.id}/findings`)) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(findings) });
+      }
+      if (url.includes(`/governance/reviews/${review.id}/report`)) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(report) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+  }
+
+  const V2_FINDING = { id: 'f-v2-1', title: 'Missing MFA enforcement', description: 'No MFA required for admin access.', recommendation: 'Enforce MFA.', severity: 'HIGH', domain: 'SECURITY_ARCHITECTURE', criterionId: 'SD-SEC-01', basisType: 'TENANT_MISALIGNMENT' };
+
+  it('shows no validity badge for an AUTHORITATIVE citation', async () => {
+    const review = makeReview({ id: 'r1' });
+    const evidence = [{ id: 'ev-1', sourceType: 'TENANT_REPOSITORY', tenantObjectName: 'IAM Standard', tenantObjectSnippet: 'MFA required.', sourceAuthorityLevel: 'AUTHORITATIVE', validityClassification: 'CURRENT' }];
+    mockReportViewWithEvidence(review, { decision: 'REQUIRES_CHANGES', overallScore: 60 }, [V2_FINDING], evidence);
+    render(<GovernancePage />);
+
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    fireEvent.click(await screen.findByText('Domains & Findings'));
+    fireEvent.click(await screen.findByText('Missing MFA enforcement'));
+    fireEvent.click(await screen.findByText('📄 View evidence'));
+
+    await screen.findByText('IAM Standard');
+    expect(screen.queryByText('DRAFT')).not.toBeInTheDocument();
+    expect(screen.queryByText('VALIDITY UNKNOWN')).not.toBeInTheDocument();
+  });
+
+  it('shows a DRAFT badge for an ADVISORY citation', async () => {
+    const review = makeReview({ id: 'r1' });
+    const evidence = [{ id: 'ev-1', sourceType: 'TENANT_REPOSITORY', tenantObjectName: 'Draft IAM Standard', tenantObjectSnippet: 'MFA proposed.', sourceAuthorityLevel: 'ADVISORY', validityClassification: 'CURRENT' }];
+    mockReportViewWithEvidence(review, { decision: 'REQUIRES_CHANGES', overallScore: 60 }, [V2_FINDING], evidence);
+    render(<GovernancePage />);
+
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    fireEvent.click(await screen.findByText('Domains & Findings'));
+    fireEvent.click(await screen.findByText('Missing MFA enforcement'));
+    fireEvent.click(await screen.findByText('📄 View evidence'));
+
+    await screen.findByText('Draft IAM Standard');
+    expect(screen.getByText('DRAFT')).toBeInTheDocument();
+  });
+
+  it('shows a SUPERSEDED badge for a HISTORICAL/SUPERSEDED citation', async () => {
+    const review = makeReview({ id: 'r1' });
+    const evidence = [{ id: 'ev-1', sourceType: 'TENANT_REPOSITORY', tenantObjectName: 'Old IAM Standard', tenantObjectSnippet: 'MFA required.', sourceAuthorityLevel: 'HISTORICAL', validityClassification: 'SUPERSEDED' }];
+    mockReportViewWithEvidence(review, { decision: 'REQUIRES_CHANGES', overallScore: 60 }, [V2_FINDING], evidence);
+    render(<GovernancePage />);
+
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    fireEvent.click(await screen.findByText('Domains & Findings'));
+    fireEvent.click(await screen.findByText('Missing MFA enforcement'));
+    fireEvent.click(await screen.findByText('📄 View evidence'));
+
+    await screen.findByText('Old IAM Standard');
+    expect(screen.getByText('SUPERSEDED')).toBeInTheDocument();
+  });
+
+  it('shows a VALIDITY UNKNOWN badge for an UNVALIDATED citation', async () => {
+    const review = makeReview({ id: 'r1' });
+    const evidence = [{ id: 'ev-1', sourceType: 'TENANT_REPOSITORY', tenantObjectName: 'Undated IAM Standard', tenantObjectSnippet: 'MFA required.', sourceAuthorityLevel: 'UNVALIDATED', validityClassification: 'UNKNOWN' }];
+    mockReportViewWithEvidence(review, { decision: 'REQUIRES_CHANGES', overallScore: 60 }, [V2_FINDING], evidence);
+    render(<GovernancePage />);
+
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    fireEvent.click(await screen.findByText('Domains & Findings'));
+    fireEvent.click(await screen.findByText('Missing MFA enforcement'));
+    fireEvent.click(await screen.findByText('📄 View evidence'));
+
+    await screen.findByText('Undated IAM Standard');
+    expect(screen.getByText('VALIDITY UNKNOWN')).toBeInTheDocument();
+  });
+
+  it('renders no badge (rather than crashing) for a citation with no sourceAuthorityLevel at all — records written before this field existed', async () => {
+    const review = makeReview({ id: 'r1' });
+    const evidence = [{ id: 'ev-1', sourceType: 'TENANT_REPOSITORY', tenantObjectName: 'Legacy Standard', tenantObjectSnippet: 'MFA required.' }];
+    mockReportViewWithEvidence(review, { decision: 'REQUIRES_CHANGES', overallScore: 60 }, [V2_FINDING], evidence);
+    render(<GovernancePage />);
+
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    fireEvent.click(await screen.findByText('Domains & Findings'));
+    fireEvent.click(await screen.findByText('Missing MFA enforcement'));
+    fireEvent.click(await screen.findByText('📄 View evidence'));
+
+    await screen.findByText('Legacy Standard');
+  });
+});
