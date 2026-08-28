@@ -936,6 +936,70 @@ describe('EaViewsPage - Heatmap metric selection (Phase 4B)', () => {
   });
 });
 
+// Phase 4C: Graph progressive disclosure - verifies the focus/initial-
+// visible-subset/expand-next-hop behavior actually wires through the real
+// component, not just the pure utility functions in isolation.
+describe('EaViewsPage - Graph progressive disclosure (Phase 4C)', () => {
+  const capA = { id: 'capA', name: 'Capability A', role: 'PRIMARY', assetType: 'GovCapability', semanticType: 'BusinessCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {} };
+  const appX = { id: 'appX', name: 'App X', role: 'RELATED', assetType: 'Application', semanticType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} };
+  const tech1 = { id: 'tech1', name: 'Tech 1', role: 'RELATED', assetType: 'TechComponent', semanticType: 'TechComponent', domain: 'TECHNOLOGY', status: 'APPROVED', tags: [], metadata: {} };
+  const relCapAX = { id: 'relCapAX', sourceId: 'capA', targetId: 'appX', relationshipType: 'supported_by', label: 'supported_by' };
+  const relXTech1 = { id: 'relXTech1', sourceId: 'appX', targetId: 'tech1', relationshipType: 'hosted_on', label: 'hosted_on' };
+  const graphDataset = {
+    objects: [capA, appX, tech1],
+    relationships: [relCapAX, relXTech1],
+    paths: [{ id: 'p1', rootObjectId: 'capA', objectIds: ['capA', 'appX', 'tech1'], relationshipIds: ['relCapAX', 'relXTech1'], hopCount: 2 }],
+    hierarchies: [], metrics: [], provenance: { truncated: false },
+  };
+  const graphEligibility = { eligible: [{ visualization: 'GRAPH', eligible: true, score: 0.9, reasons: [] }], ineligible: [] };
+
+  it('initially shows only Capability A and App X (Tech 1 stays hidden), not the full 3-object dataset', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Focus Graph', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/dataset': { legacy: { nodes: [capA, appX, tech1], edges: [relCapAX, relXTech1], metadata: {} }, dataset: graphDataset, eligibility: graphEligibility },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Focus Graph'));
+    expect(await screen.findByText('Capability A')).toBeInTheDocument();
+    expect(screen.getByText('App X')).toBeInTheDocument();
+    expect(screen.queryByText('Tech 1')).not.toBeInTheDocument();
+    expect(screen.getByText(/Showing 2 of 3 objects/)).toBeInTheDocument();
+  });
+
+  it('clicking "Expand next hop" reveals Tech 1', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Focus Graph', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/dataset': { legacy: { nodes: [capA, appX, tech1], edges: [relCapAX, relXTech1], metadata: {} }, dataset: graphDataset, eligibility: graphEligibility },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Focus Graph'));
+    await screen.findByText('Capability A');
+    fireEvent.click(screen.getByText(/Expand next hop/));
+    expect(await screen.findByText('Tech 1')).toBeInTheDocument();
+    expect(screen.getByText(/Showing 3 of 3 objects/)).toBeInTheDocument();
+  });
+
+  it('shows the deterministic ineligibility reason instead of an empty canvas when GRAPH is not eligible', async () => {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'No Rels', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/dataset': {
+        legacy: { nodes: [capA], edges: [], metadata: {} },
+        dataset: { objects: [capA], relationships: [], paths: [], hierarchies: [], metrics: [], provenance: { truncated: false } },
+        eligibility: { eligible: [], ineligible: [{ visualization: 'GRAPH', eligible: false, score: 0, reasons: ['No relationships in this result - a graph would show only disconnected objects.'] }] },
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('No Rels'));
+    expect(await screen.findByText(/No relationships in this result/)).toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - Object Context View entry point', () => {
   it('reads the objectContext query param on mount and opens the standalone dependency viewer', async () => {
     mockSearchParams = new URLSearchParams('objectContext=asset-123');

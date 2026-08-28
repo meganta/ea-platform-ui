@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
 import { RoadmapConfigPanel, RoadmapTimeline } from './eaviews/RoadmapView'
@@ -10,6 +10,7 @@ import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
 import { determineTableMode, buildRelationshipTable, buildMatrix } from './eaviews/tableMatrixUtils'
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
+import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters, ExpandDirection } from './eaviews/graphDisclosureUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -419,8 +420,17 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [panStart, setPanStart] = useState<{mx:number,my:number,px:number,py:number}|null>(null)
   const [zoom, setZoom] = useState(1)
   const [graphSearch, setGraphSearch] = useState('')
+  // Phase 4C: progressive disclosure state - visibleObjectIds/
+  // visibleRelationshipIds/revealedBy from graphDisclosureUtils, built
+  // purely client-side over the already-fetched dataset. null means "not
+  // yet initialized for this dataset" (see the useEffect below), not
+  // "empty" - an empty Set is a valid, real state.
+  const [graphVisibleState, setGraphVisibleState] = useState<any>(null)
+  const [graphFocusId, setGraphFocusId] = useState<string | null>(null)
+  const [graphRelTypeFilter, setGraphRelTypeFilter] = useState<Set<string>>(new Set())
+  const [graphObjectTypeFilter, setGraphObjectTypeFilter] = useState<Set<string>>(new Set())
+  const [graphHighlightedPathId, setGraphHighlightedPathId] = useState<string | null>(null)
   const [expandedNodeIds, setExpandedNodeIds] = useState<Set<string>>(new Set())
-  const [expandingNodeId, setExpandingNodeId] = useState<string | null>(null)
   const [layoutRunning, setLayoutRunning] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const graphContainerRef = React.useRef<HTMLDivElement>(null)
@@ -607,6 +617,26 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const domains = [...new Set((data?.nodes||[]).map((n: any) => n.domain))] as string[]
   const types = [...new Set((data?.nodes||[]).map((n: any) => n.assetType))] as string[]
 
+  // ── Graph progressive disclosure (Phase 4C) ──────────────────────────
+  //
+  // Indexes built once per dataset (Section 27's explicit indexing
+  // guidance), reused across every expand/collapse/filter interaction -
+  // no re-scanning dataset.relationships/paths on every click.
+  const graphIndexes = useMemo(() => buildGraphIndexes(dataset), [dataset])
+
+  // Initializes (or re-initializes, on a genuinely new dataset) the
+  // focused, bounded initial view - never the full dataset by default
+  // (Section 2). Re-runs when the dataset itself changes (a fresh view
+  // load, or a scenario switch), not on every render.
+  useEffect(() => {
+    if (!dataset) { setGraphVisibleState(null); setGraphFocusId(null); return }
+    const focusId = chooseFocusObject(dataset, selected?.id)
+    setGraphFocusId(focusId)
+    setGraphVisibleState(focusId ? computeInitialVisibleSet(graphIndexes, focusId) : null)
+    setGraphHighlightedPathId(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataset])
+
   // Phase 4B: heatmap-fields backend endpoint removed - ViewDataset.metrics
   // (already present in the single /dataset fetch) provides the same
   // candidate-metric information, data-driven from actual returned
@@ -652,41 +682,37 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     return `M ${s.x+80} ${s.y+20} Q ${(s.x+80+t.x)/2} ${(s.y+20+t.y+20)/2} ${t.x} ${t.y+20}`
   }
 
-  // ── Graph: expand a node to reveal its neighbors on demand ─────────────
-  //
-  // Uses the object-context endpoint (depth=1: just this node's direct
-  // relationships) rather than trying to grow the saved view's own query -
-  // an expand action is inherently ad-hoc exploration, not something that
-  // should change what the saved view itself returns on every load.
-  const expandNode = async (nodeId: string) => {
-    if (expandedNodeIds.has(nodeId) || expandingNodeId) return
-    setExpandingNodeId(nodeId)
-    try {
-      const result = await api.get(`/ea-views/object-context/${nodeId}?depth=1`)
-      if (result?.nodes?.length) {
-        setData((prev: any) => {
-          const existingIds = new Set((prev?.nodes || []).map((n: any) => n.id))
-          const existingEdgeIds = new Set((prev?.edges || []).map((e: any) => e.id))
-          const newNodes = result.nodes.filter((n: any) => !existingIds.has(n.id))
-          const newEdges = result.edges.filter((e: any) => !existingEdgeIds.has(e.id))
-          return { ...prev, nodes: [...(prev?.nodes || []), ...newNodes], edges: [...(prev?.edges || []), ...newEdges] }
-        })
-        // Place newly-revealed nodes near the node that was expanded, so
-        // they don't all stack at the default (100,100) origin before the
-        // next auto-layout run.
-        const origin = positions[nodeId] || { x: 400, y: 300 }
-        setPositions(prev => {
-          const next = { ...prev }
-          result.nodes.forEach((n: any, i: number) => {
-            if (!next[n.id]) { const a = (i / result.nodes.length) * Math.PI * 2; next[n.id] = { x: origin.x + Math.cos(a) * 140, y: origin.y + Math.sin(a) * 140 } }
-          })
-          return next
-        })
-      }
-      setExpandedNodeIds(prev => new Set(prev).add(nodeId))
-    } finally {
-      setExpandingNodeId(null)
-    }
+  // Phase 4C: purely client-side over the already-fetched dataset - no
+  // network call (replaces the old /object-context fetch entirely,
+  // Section 27's explicit "no per-expansion API request" requirement).
+  const expandNode = (nodeId: string, direction: ExpandDirection = 'both') => {
+    if (!graphVisibleState) return
+    const newState = expandNeighbors(graphIndexes, graphVisibleState, nodeId, direction)
+    const newlyRevealedIds = [...newState.visibleObjectIds].filter(id => !graphVisibleState.visibleObjectIds.has(id))
+    setGraphVisibleState(newState)
+    setExpandedNodeIds(prev => new Set(prev).add(nodeId))
+    // Place newly-revealed nodes near the expanded node so they don't
+    // stack at the shared default origin before the next auto-layout run.
+    const origin = positions[nodeId] || { x: 400, y: 300 }
+    setPositions(prev => {
+      const next = { ...prev }
+      newlyRevealedIds.forEach((id, i) => {
+        if (!next[id]) { const a = (i / Math.max(1, newlyRevealedIds.length)) * Math.PI * 2; next[id] = { x: origin.x + Math.cos(a) * 140, y: origin.y + Math.sin(a) * 140 } }
+      })
+      return next
+    })
+  }
+
+
+  const expandNextHop = () => {
+    if (!graphVisibleState) return
+    setGraphVisibleState(expandAllNextPathHops(graphIndexes, graphVisibleState))
+  }
+
+  const collapseNode = (nodeId: string) => {
+    if (!graphVisibleState || !graphFocusId) return
+    setGraphVisibleState(collapseBranch(graphVisibleState, nodeId, graphFocusId))
+    setExpandedNodeIds(prev => { const next = new Set(prev); next.delete(nodeId); return next })
   }
 
   const runAutoLayout = () => {
@@ -1205,24 +1231,71 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   )
 
   // ── Graph ────────────────────────────────────────────────────────────────────
-  const renderGraph = () => (
+  // ── Graph visible subset (Phase 4C) ──────────────────────────────────
+  //
+  // graphVisibleState (progressive disclosure) -> relationship/object-type
+  // filters -> pruneDanglingRelationships, all pure and over the already-
+  // fetched dataset. graphEligible/graphIneligibleReason let the render
+  // below show the deterministic reason instead of an empty canvas
+  // (Section 19).
+  const graphEval = eligibility?.eligible?.find((v: any) => v.visualization === 'GRAPH')
+  const graphIneligibleReason = eligibility?.ineligible?.find((v: any) => v.visualization === 'GRAPH')?.reasons?.[0]
+  const { graphVisibleObjects, graphVisibleEdges, graphHighlight } = (() => {
+    if (!dataset || !graphVisibleState) return { graphVisibleObjects: [] as any[], graphVisibleEdges: [] as any[], graphHighlight: null as any }
+    const filtered = applyGraphFilters(dataset, graphVisibleState.visibleObjectIds, graphVisibleState.visibleRelationshipIds, {
+      relationshipTypes: graphRelTypeFilter.size > 0 ? [...graphRelTypeFilter] : undefined,
+      objectTypes: graphObjectTypeFilter.size > 0 ? [...graphObjectTypeFilter] : undefined,
+    })
+    const prunedRelIds = pruneDanglingRelationships(dataset, filtered.objectIds, filtered.relationshipIds)
+    const objs = (dataset.objects ?? []).filter((o: any) => filtered.objectIds.has(o.id))
+    const edges = (dataset.relationships ?? []).filter((r: any) => prunedRelIds.has(r.id))
+    const highlight = graphHighlightedPathId ? computePathHighlight(dataset, graphHighlightedPathId) : null
+    return { graphVisibleObjects: objs, graphVisibleEdges: edges, graphHighlight: highlight }
+  })()
+  const graphAllRelTypes = [...new Set((dataset?.relationships ?? []).map((r: any) => r.relationshipType))] as string[]
+  const graphAllObjectTypes = [...new Set((dataset?.objects ?? []).map((o: any) => o.semanticType || o.assetType))] as string[]
+
+  const renderGraph = () => {
+    if (eligibility && !graphEval) {
+      return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - 280px)', color: 'var(--text-dim)', textAlign: 'center' }}>
+        <div style={{ maxWidth: 480 }}>
+          <div style={{ fontSize: 28, marginBottom: 12 }}>⬡</div>
+          <div>{graphIneligibleReason || 'Graph is not available for this view - it has no meaningful relationships to show.'}</div>
+        </div>
+      </div>
+    }
+    const totalObjects = dataset?.objects?.length ?? 0
+    return (
     <div ref={graphContainerRef} style={{ display: 'flex', height: isFullscreen ? '100vh' : 'calc(100vh - 280px)', gap: 0, background: isFullscreen ? 'var(--navy)' : 'transparent' }}>
       <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 10 }}>
         <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' as const, maxWidth: 'calc(100% - 200px)' }}>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => setZoom(z=>Math.min(2.5,z+0.15))}>+</button>
           <span style={{ fontSize: 12, color: 'var(--text-dim)', padding: '3px 6px' }}>{Math.round(zoom*100)}%</span>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => setZoom(z=>Math.max(0.25,z-0.15))}>−</button>
-          <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => { setZoom(1); setPan({x:0,y:0}) }}>⊡</button>
+          <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => { setZoom(1); setPan({x:0,y:0}) }}>⊡ Fit</button>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} disabled={layoutRunning} onClick={runAutoLayout}>{layoutRunning ? '⏳ Laying out...' : '🧭 Auto-Layout'}</button>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={toggleFullscreen}>{isFullscreen ? '⤢ Exit Fullscreen' : '⛶ Fullscreen'}</button>
-          <span style={{ fontSize: 11, color: 'var(--text-dim)', padding: '3px 6px' }}>{filteredNodes.length} objects</span>
+          {/* Section 12/13: visible-vs-total, distinct from dataset truncation */}
+          <span style={{ fontSize: 11, color: 'var(--text-dim)', padding: '3px 6px' }} title="Objects currently shown vs. total in this dataset - expand relationships to explore more.">
+            Showing {graphVisibleObjects.length} of {totalObjects} objects
+          </span>
+          {dataset?.provenance?.truncated && (
+            <span style={{ fontSize: 11, color: '#f39c12', padding: '3px 6px' }} title="The underlying architecture result itself was cut off by a query limit - not every matching object exists in this dataset at all.">
+              ⚠ Dataset truncated
+            </span>
+          )}
           <div style={{ position: 'relative' }}>
             <input value={graphSearch} onChange={e => setGraphSearch(e.target.value)} placeholder="🔍 Find node..." style={{ ...S.input, width: 150, padding: '4px 8px', fontSize: 12 }} />
             {graphSearch.trim() && (
               <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, maxHeight: 200, overflowY: 'auto' as const, width: 220, zIndex: 20 }}>
                 {graphSearchMatches.length === 0 && <div style={{ padding: 8, fontSize: 12, color: 'var(--text-dim)' }}>No matches</div>}
                 {graphSearchMatches.slice(0, 8).map((n: any) => (
-                  <div key={n.id} onClick={() => { focusOnNode(n); setGraphSearch('') }} style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+                  <div key={n.id} onClick={() => {
+                    // Section 22: reveal the match if progressive disclosure
+                    // currently hides it, then focus/center on it.
+                    if (graphVisibleState && !graphVisibleState.visibleObjectIds.has(n.id)) setGraphVisibleState({ ...graphVisibleState, visibleObjectIds: new Set([...graphVisibleState.visibleObjectIds, n.id]) })
+                    focusOnNode(n); setGraphSearch('')
+                  }} style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
                     onMouseEnter={e => (e.currentTarget.style.background = 'rgba(3,105,161,0.1)')}
                     onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>{n.name}</div>
                 ))}
@@ -1230,31 +1303,79 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
             )}
           </div>
         </div>
+        {/* Section 4/5/7/8/23: expand/filter/reset controls */}
+        <div style={{ position: 'absolute', top: 46, left: 10, zIndex: 10, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' as const, maxWidth: 'calc(100% - 20px)' }}>
+          <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 11 }} onClick={expandNextHop} title="Advance every visible object one hop further along the View's configured path">⇥ Expand next hop</button>
+          <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 11 }} onClick={() => { if (graphFocusId) { setGraphVisibleState(computeInitialVisibleSet(graphIndexes, graphFocusId)); setGraphHighlightedPathId(null); setGraphRelTypeFilter(new Set()); setGraphObjectTypeFilter(new Set()) } }}>↺ Reset to focus</button>
+          {graphAllRelTypes.length > 1 && (
+            <details style={{ position: 'relative' }}>
+              <summary style={{ ...S.btn(), padding: '3px 10px', fontSize: 11, display: 'inline-block', cursor: 'pointer', listStyle: 'none' }}>Relationships ▾</summary>
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, padding: 8, zIndex: 20, minWidth: 160 }}>
+                {graphAllRelTypes.map(t => (
+                  <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '3px 0', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={graphRelTypeFilter.size === 0 || graphRelTypeFilter.has(t)} onChange={() => setGraphRelTypeFilter(prev => { const next = new Set(prev.size === 0 ? graphAllRelTypes : prev); next.has(t) ? next.delete(t) : next.add(t); return next.size === graphAllRelTypes.length ? new Set() : next })} />
+                    {t}
+                  </label>
+                ))}
+              </div>
+            </details>
+          )}
+          {graphAllObjectTypes.length > 1 && (
+            <details style={{ position: 'relative' }}>
+              <summary style={{ ...S.btn(), padding: '3px 10px', fontSize: 11, display: 'inline-block', cursor: 'pointer', listStyle: 'none' }}>Object types ▾</summary>
+              <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, padding: 8, zIndex: 20, minWidth: 160 }}>
+                {graphAllObjectTypes.map(t => (
+                  <label key={t} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, padding: '3px 0', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={graphObjectTypeFilter.size === 0 || graphObjectTypeFilter.has(t)} onChange={() => setGraphObjectTypeFilter(prev => { const next = new Set(prev.size === 0 ? graphAllObjectTypes : prev); next.has(t) ? next.delete(t) : next.add(t); return next.size === graphAllObjectTypes.length ? new Set() : next })} />
+                    {t}
+                  </label>
+                ))}
+              </div>
+            </details>
+          )}
+          {(dataset?.paths?.length ?? 0) > 0 && (
+            <select style={{ ...S.input, padding: '3px 8px', fontSize: 11, maxWidth: 180 }} value={graphHighlightedPathId ?? ''} onChange={e => setGraphHighlightedPathId(e.target.value || null)}>
+              <option value="">Highlight path…</option>
+              {(dataset.paths ?? []).map((p: any) => {
+                const names = p.objectIds.map((oid: string) => (dataset.objects ?? []).find((o: any) => o.id === oid)?.name || oid)
+                return <option key={p.id} value={p.id}>{names.join(' → ')}</option>
+              })}
+            </select>
+          )}
+        </div>
         {loading ? <div style={{ display:'flex',alignItems:'center',justifyContent:'center',height:'100%',color:'var(--text-dim)' }}>Loading view data...</div> : (
           <svg ref={graphSvgRef} style={{ width:'100%', height:'100%', cursor: panStart?'grabbing':dragging?'grabbing':'grab' }}
             onMouseDown={onSvgMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}>
             <defs><marker id="arrow2" markerWidth="8" markerHeight="8" refX="8" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="rgba(3,105,161,0.4)" /></marker></defs>
             <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
-              {(data?.edges||[]).filter((e: any) => filteredNodes.find((n: any)=>n.id===e.sourceId) && filteredNodes.find((n: any)=>n.id===e.targetId)).map((e: any) => (
-                <g key={e.id}>
-                  <path d={getEdgePath(e)} stroke="rgba(3,105,161,0.25)" strokeWidth={1.5} fill="none" markerEnd="url(#arrow2)" />
-                </g>
-              ))}
-              {filteredNodes.map((n: any) => {
+              {graphVisibleEdges.map((e: any) => {
+                const isHighlighted = graphHighlight?.relationshipIds.has(e.id)
+                const dimmed = graphHighlight && !isHighlighted
+                return (
+                  <g key={e.id}>
+                    <path d={getEdgePath(e)} stroke={isHighlighted ? 'var(--accent)' : 'rgba(3,105,161,0.25)'} strokeWidth={isHighlighted ? 2.5 : 1.5} fill="none" markerEnd="url(#arrow2)" opacity={dimmed ? 0.15 : 1} />
+                    {isHighlighted && (() => { const s=positions[e.sourceId]||{x:0,y:0}; const t=positions[e.targetId]||{x:0,y:0}; return <text x={(s.x+t.x)/2+40} y={(s.y+t.y)/2+20} fontSize={9} fill="var(--accent)" textAnchor="middle">{e.label || e.relationshipType}</text> })()}
+                  </g>
+                )
+              })}
+              {graphVisibleObjects.map((n: any) => {
                 const pos=positions[n.id]||{x:100,y:100}
                 const isSel=selected?.id===n.id
+                const isFocus = n.id === graphFocusId
                 const isMatch = graphSearch.trim() && n.name.toLowerCase().includes(graphSearch.trim().toLowerCase())
                 const isExpanded = expandedNodeIds.has(n.id)
-                const isExpanding = expandingNodeId === n.id
+                const isHighlighted = graphHighlight?.objectIds.has(n.id)
+                const dimmed = graphHighlight && !isHighlighted
                 const dc=DOMAIN_COLOR[n.domain]||'#3498db'
                 return (
-                  <g key={n.id} data-node="true" transform={`translate(${pos.x},${pos.y})`} onMouseDown={e=>onNodeMouseDown(e,n.id)} onDoubleClick={() => expandNode(n.id)} style={{cursor: isExpanding ? 'wait' : 'grab'}}>
-                    <rect width={160} height={44} rx={8} fill="var(--navy-light)" stroke={isSel?'var(--accent)':isMatch?'#f39c12':dc+'55'} strokeWidth={isSel||isMatch?2:1.5} />
+                  <g key={n.id} data-node="true" transform={`translate(${pos.x},${pos.y})`} onMouseDown={e=>onNodeMouseDown(e,n.id)}
+                    onDoubleClick={() => isExpanded ? collapseNode(n.id) : expandNode(n.id)} style={{cursor: 'grab', opacity: dimmed ? 0.2 : 1}}>
+                    <rect width={160} height={44} rx={8} fill="var(--navy-light)" stroke={isSel||isHighlighted?'var(--accent)':isFocus?'#f39c12':isMatch?'#f39c12':dc+'55'} strokeWidth={isSel||isMatch||isFocus||isHighlighted?2:1.5} />
                     <rect width={5} height={44} rx={2} fill={dc} />
                     <text x={16} y={18} fontSize={11} fontWeight={600} fill="var(--text)">{n.name.length>17?n.name.slice(0,16)+'…':n.name}</text>
-                    <text x={16} y={32} fontSize={9} fill="rgba(100,116,139,0.7)">{n.assetType.replace(/_/g,' ')} · {n.domain}</text>
+                    <text x={16} y={32} fontSize={9} fill="rgba(100,116,139,0.7)">{(n.semanticType || n.assetType)?.replace(/_/g,' ')} · {n.domain}</text>
                     <circle cx={148} cy={10} r={5} fill={HEATMAP_STATUS[n.status]||'#7f8c8d'} />
-                    {isExpanding ? <text x={148} y={38} fontSize={9} fill="var(--accent)">⏳</text> : !isExpanded && <text x={148} y={38} fontSize={9} fill="rgba(100,116,139,0.6)">⊕<title>Double-click to expand</title></text>}
+                    {isExpanded ? <text x={148} y={38} fontSize={9} fill="rgba(100,116,139,0.6)">⊖<title>Double-click to collapse</title></text> : <text x={148} y={38} fontSize={9} fill="rgba(100,116,139,0.6)">⊕<title>Double-click to expand</title></text>}
                   </g>
                 )
               })}
@@ -1262,26 +1383,45 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           </svg>
         )}
         {/* Mini-map */}
-        {!loading && filteredNodes.length > 0 && (
+        {!loading && graphVisibleObjects.length > 0 && (
           <svg width={140} height={100} style={{ position: 'absolute', bottom: 10, right: 10, background: 'rgba(15,23,42,0.85)', border: '1px solid var(--border)', borderRadius: 8 }}
             viewBox={`${graphBounds.minX} ${graphBounds.minY} ${graphBounds.maxX - graphBounds.minX} ${graphBounds.maxY - graphBounds.minY}`}>
-            {filteredNodes.map((n: any) => { const p = positions[n.id]; if (!p) return null; return <rect key={n.id} x={p.x} y={p.y} width={160} height={44} fill={DOMAIN_COLOR[n.domain] || '#3498db'} opacity={0.7} /> })}
+            {graphVisibleObjects.map((n: any) => { const p = positions[n.id]; if (!p) return null; return <rect key={n.id} x={p.x} y={p.y} width={160} height={44} fill={DOMAIN_COLOR[n.domain] || '#3498db'} opacity={0.7} /> })}
           </svg>
         )}
       </div>
-      {selected && (
-        <div style={{ width: 240, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, marginLeft:12, padding:16, overflowY:'auto' as const, flexShrink:0 }}>
+      {selected && (() => {
+        // Section 16: reuses ViewDataset directly for incoming/outgoing
+        // relationships and path memberships - no per-node API request.
+        const cardCtx = dataset ? buildCardContext(dataset, selected.id) : null
+        const memberPaths = graphIndexes.pathsByObject.get(selected.id) ?? []
+        return (
+        <div style={{ width: 260, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, marginLeft:12, padding:16, overflowY:'auto' as const, flexShrink:0 }}>
           <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>{selected.name}</div>
-          {[{l:'Type',v:selected.assetType?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:'Status',v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
+          {[{l:'Type',v:(selected.semanticType || selected.assetType)?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:'Status',v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
             <div key={f.l} style={{ marginBottom:10 }}><div style={S.label}>{f.l}</div><div style={{fontSize:13}}>{f.v}</div></div>
           ))}
           {selected.description && <><div style={S.label}>Description</div><div style={{fontSize:12,color:'var(--text-dim)',lineHeight:1.6}}>{selected.description}</div></>}
+          {cardCtx && cardCtx.summaries.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={S.label}>Relationships ({cardCtx.relationshipCount})</div>
+              {cardCtx.summaries.map(s => <div key={s.relationshipType} style={{ fontSize: 12, marginBottom: 4 }}><span style={{ fontStyle: 'italic', color: 'var(--text-dim)' }}>{s.label}:</span> {s.relatedNames.join(', ')}</div>)}
+            </div>
+          )}
+          {memberPaths.length > 0 && (
+            <div style={{ marginTop: 10 }}>
+              <div style={S.label}>Path membership</div>
+              {memberPaths.map((p: any) => <div key={p.id} onClick={() => setGraphHighlightedPathId(p.id)} style={{ fontSize: 11, color: 'var(--accent)', cursor: 'pointer', marginBottom: 2 }}>{p.objectIds.map((oid: string) => (dataset.objects ?? []).find((o: any) => o.id === oid)?.name || oid).join(' → ')}</div>)}
+            </div>
+          )}
           {selected.tags?.length > 0 && <><div style={{...S.label,marginTop:8}}>Tags</div><div style={{display:'flex',gap:4,flexWrap:'wrap' as const}}>{selected.tags.map((t:string)=><span key={t} style={{...S.badge('#7f8c8d'),fontSize:10}}>{t}</span>)}</div></>}
           <button style={{...S.btn(),marginTop:16,fontSize:12,width:'100%'}} onClick={()=>setSelected(null)}>Close</button>
         </div>
-      )}
+        )
+      })()}
     </div>
-  )
+    )
+  }
 
   return (
     <div>
