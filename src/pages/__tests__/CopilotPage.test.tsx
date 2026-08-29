@@ -426,3 +426,90 @@ describe('CopilotPage - Task Playbooks (Copilot Phase 2)', () => {
     expect(runButton).toBeDisabled();
   });
 });
+
+describe('CopilotPage - Action Draft review (Copilot Phase 3)', () => {
+  const DRAFT_PENDING = {
+    id: 'draft-1', status: 'PENDING_APPROVAL', targetModule: 'EA_REPOSITORY', targetEntityType: 'EA_ASSET', proposedActionType: 'CREATE',
+    proposingArchitectCode: 'APPLICATION', confidence: 0.8, payload: { name: 'Proposed Service' }, assumptions: ['No existing duplicate found'], missingInformation: [],
+  };
+
+  it('shows "No action drafts yet" when there are none', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/action-drafts': [] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    expect(await screen.findByText('No action drafts yet. An architect can propose one while helping with a task.')).toBeInTheDocument();
+  });
+
+  it('lists a draft with its status, proposing architect, and payload', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/action-drafts': [DRAFT_PENDING] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    expect(await screen.findByText('EA_REPOSITORY · EA_ASSET · CREATE')).toBeInTheDocument();
+    expect(screen.getByText('PENDING APPROVAL')).toBeInTheDocument();
+    expect(screen.getByText(/Proposed by APPLICATION/)).toBeInTheDocument();
+    expect(screen.getByText(/Proposed Service/)).toBeInTheDocument();
+  });
+
+  it('approving a PENDING_APPROVAL draft calls the approve endpoint and refreshes the list', async () => {
+    let approved = false;
+    (global.fetch as jest.Mock) = jest.fn().mockImplementation((url: string, options?: any) => {
+      if (options?.method === 'POST' && url.includes('/approve')) { approved = true; return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...DRAFT_PENDING, status: 'APPROVED' }) }); }
+      if (url.includes('/copilot/action-drafts')) return Promise.resolve({ ok: true, json: () => Promise.resolve(approved ? [{ ...DRAFT_PENDING, status: 'APPROVED' }] : [DRAFT_PENDING]) });
+      if (url.includes('/copilot/architects')) return Promise.resolve({ ok: true, json: () => Promise.resolve(ARCHITECTS) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    fireEvent.click(await screen.findByText('Approve'));
+
+    await waitFor(() => {
+      const approveCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/approve'));
+      expect(approveCall).toBeDefined();
+    });
+    expect(await screen.findByText('APPROVED')).toBeInTheDocument();
+  });
+
+  it('rejecting prompts for a reason and includes it in the request body', async () => {
+    (global.fetch as jest.Mock) = jest.fn().mockImplementation((url: string, options?: any) => {
+      if (options?.method === 'POST' && url.includes('/reject')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...DRAFT_PENDING, status: 'REJECTED' }) });
+      if (url.includes('/copilot/action-drafts')) return Promise.resolve({ ok: true, json: () => Promise.resolve([DRAFT_PENDING]) });
+      if (url.includes('/copilot/architects')) return Promise.resolve({ ok: true, json: () => Promise.resolve(ARCHITECTS) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    fireEvent.click(await screen.findByText('Reject'));
+    fireEvent.change(screen.getByPlaceholderText('Reason (optional)'), { target: { value: 'not needed' } });
+    fireEvent.click(screen.getByText('Confirm Reject'));
+
+    await waitFor(() => {
+      const rejectCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/reject'));
+      expect(rejectCall).toBeDefined();
+    });
+    const rejectCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/reject'));
+    expect(JSON.parse(rejectCall![1].body).reason).toBe('not needed');
+  });
+
+  it('shows an Execute button for an APPROVED draft, and a final EXECUTED state', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/action-drafts': [{ ...DRAFT_PENDING, status: 'APPROVED' }] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    expect(await screen.findByText('Execute')).toBeInTheDocument();
+  });
+
+  it('shows the real execution result for an EXECUTED draft, not just a generic success message', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [],
+      '/copilot/action-drafts': [{ ...DRAFT_PENDING, status: 'EXECUTED', executionResult: { success: true, entityId: 'new-asset-42' } }],
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    expect(await screen.findByText(/created new-asset-42/)).toBeInTheDocument();
+  });
+});

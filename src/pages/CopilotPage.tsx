@@ -526,6 +526,116 @@ function PlaybookRunner({ api }: { api: any }) {
   )
 }
 
+const ACTION_DRAFT_STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
+  DRAFT: { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },
+  PENDING_APPROVAL: { bg: 'rgba(234,179,8,0.15)', fg: '#eab308' },
+  APPROVED: { bg: 'rgba(59,130,246,0.15)', fg: '#3b82f6' },
+  REJECTED: { bg: 'rgba(239,68,68,0.15)', fg: '#ef4444' },
+  EXPIRED: { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },
+  EXECUTED: { bg: 'rgba(34,197,94,0.15)', fg: '#22c55e' },
+}
+
+/** Phase 3: review/approval UI for Copilot Action Drafts — the human side of the create(DRAFT)->submit(PENDING_APPROVAL)->approve(APPROVED)->execute(EXECUTED) lifecycle the backend already enforces. No draft can move forward without an explicit click here; this component never auto-advances anything. */
+function ActionDraftReview({ api }: { api: any }) {
+  const [drafts, setDrafts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+
+  const load = () => {
+    setLoading(true)
+    api.get('/copilot/action-drafts').then((d: any) => setDrafts(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function act(id: string, action: string, body?: any) {
+    setBusyId(id)
+    try {
+      await api.post(`/copilot/action-drafts/${id}/${action}`, body)
+      load()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function confirmReject(id: string) {
+    act(id, 'reject', { reason: rejectReason || undefined })
+    setRejectingId(null)
+    setRejectReason('')
+  }
+
+  return (
+    <div style={{ padding: 20, maxWidth: 720 }}>
+      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>📝 Action Drafts</div>
+
+      {loading ? (
+        <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading...</div>
+      ) : drafts.length === 0 ? (
+        <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>No action drafts yet. An architect can propose one while helping with a task.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {drafts.map(d => {
+            const style = ACTION_DRAFT_STATUS_STYLE[d.status] || ACTION_DRAFT_STATUS_STYLE.DRAFT
+            const busy = busyId === d.id
+            return (
+              <div key={d.id} style={{ padding: 14, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--navy-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{d.targetModule} · {d.targetEntityType} · {d.proposedActionType}</div>
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 9px', borderRadius: 999, background: style.bg, color: style.fg, whiteSpace: 'nowrap' }}>{d.status.replace(/_/g, ' ')}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                  Proposed by {d.proposingArchitectCode}{d.confidence != null && ` · confidence ${Math.round(d.confidence * 100)}%`}
+                </div>
+                <pre style={{ fontSize: 11.5, background: 'var(--navy)', padding: 8, borderRadius: 6, marginTop: 8, overflow: 'auto', maxHeight: 160 }}>{JSON.stringify(d.payload, null, 2)}</pre>
+                {d.assumptions?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>Assumptions: {d.assumptions.join('; ')}</div>}
+                {d.missingInformation?.length > 0 && <div style={{ fontSize: 11, color: '#eab308', marginTop: 4 }}>Missing information: {d.missingInformation.join('; ')}</div>}
+
+                <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {d.status === 'DRAFT' && (
+                    <button onClick={() => act(d.id, 'submit')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>
+                      Submit for Approval
+                    </button>
+                  )}
+                  {d.status === 'PENDING_APPROVAL' && (
+                    <>
+                      <button onClick={() => act(d.id, 'approve')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, background: 'var(--accent)', color: 'var(--navy)', border: 'none', cursor: busy ? 'default' : 'pointer' }}>
+                        Approve
+                      </button>
+                      <button onClick={() => setRejectingId(d.id)} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 600, fontSize: 12, background: 'none', border: '1px solid #ef4444', color: '#ef4444', cursor: busy ? 'default' : 'pointer' }}>
+                        Reject
+                      </button>
+                    </>
+                  )}
+                  {d.status === 'APPROVED' && (
+                    <button onClick={() => act(d.id, 'execute')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, background: '#3b82f6', color: 'white', border: 'none', cursor: busy ? 'default' : 'pointer' }}>
+                      {busy ? 'Executing...' : 'Execute'}
+                    </button>
+                  )}
+                  {d.status === 'EXECUTED' && (
+                    <div style={{ fontSize: 12, color: '#22c55e' }}>✅ Executed{d.executionResult?.entityId ? ` — created ${d.executionResult.entityId}` : ''}</div>
+                  )}
+                  {d.status === 'REJECTED' && (
+                    <div style={{ fontSize: 12, color: '#ef4444' }}>❌ Rejected{d.rejectionReason ? `: ${d.rejectionReason}` : ''}</div>
+                  )}
+                </div>
+
+                {rejectingId === d.id && (
+                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                    <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Reason (optional)" style={{ flex: 1, padding: '6px 10px', borderRadius: 6, fontSize: 12 }} />
+                    <button onClick={() => confirmReject(d.id)} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer' }}>Confirm Reject</button>
+                    <button onClick={() => { setRejectingId(null); setRejectReason('') }} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, background: 'none', border: '1px solid var(--border)', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CopilotPage() {
   const api = useApi()
   const [architects, setArchitects] = useState<Architect[]>([])
@@ -538,7 +648,7 @@ export default function CopilotPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [includeChief, setIncludeChief] = useState(true)
-  const [sidebarTab, setSidebarTab] = useState<'architects' | 'history' | 'meetings' | 'playbooks'>('architects')
+  const [sidebarTab, setSidebarTab] = useState<'architects' | 'history' | 'meetings' | 'playbooks' | 'actiondrafts'>('architects')
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -789,9 +899,9 @@ export default function CopilotPage() {
 
         {/* Sidebar tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-          {(['architects', 'history', 'meetings', 'playbooks'] as const).map(t => (
+          {(['architects', 'history', 'meetings', 'playbooks', 'actiondrafts'] as const).map(t => (
             <button key={t} style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSidebarTab(t)}>
-              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : t === 'meetings' ? '📋 Meetings' : '🧭 Playbooks'}
+              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : t === 'meetings' ? '📋 Meetings' : t === 'playbooks' ? '🧭 Playbooks' : '📝 Drafts'}
             </button>
           ))}
         </div>
@@ -861,6 +971,10 @@ export default function CopilotPage() {
       ) : sidebarTab === 'playbooks' ? (
         <div style={{ flex: 1, overflow: 'auto' }}>
           <PlaybookRunner api={api} />
+        </div>
+      ) : sidebarTab === 'actiondrafts' ? (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <ActionDraftReview api={api} />
         </div>
       ) : (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
