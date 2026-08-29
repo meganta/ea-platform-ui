@@ -31,7 +31,7 @@ interface EvidenceItem {
   score: number
   targetRef: { type: string; id: string }
 }
-interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[] }
+interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[]; remainingSpeech?: string | null }
 interface Architect { id: string; code: string; name: string; role: string; domain?: string; avatar: string; description?: string; isChief: boolean; aiModel: string; isActive: boolean }
 
 // Phase 1: authority-level color coding, matching the same caveat
@@ -674,6 +674,11 @@ export default function CopilotPage() {
         id: processingId + 'a', role: 'architect', content: data.architectText,
         architectCode: arch?.code, architectName: arch?.name, architectAvatar: arch?.avatar,
         timestamp: new Date(),
+        // Phase 6: the spoken audio may be a sentence-boundary-aware
+        // excerpt of a long answer (never mid-word) — remainingText is
+        // whatever wasn't spoken, so "Speak more" can pick up exactly
+        // where the audio left off.
+        remainingSpeech: data.remainingText ?? null,
       }])
 
       if (data.conversationId) setActiveConvId(data.conversationId)
@@ -693,6 +698,26 @@ export default function CopilotPage() {
       setMessages(m => [...m, { id: Date.now() + 'err', role: 'system', content: 'Voice processing failed: ' + e.message, timestamp: new Date() }])
     } finally {
       setVoiceLoading(false)
+    }
+  }
+
+  // Phase 6: continues speaking a message's held-back remainder (see
+  // voice.service.ts's sentence-boundary splitting) by calling the same
+  // synthesize endpoint again with just that text. Chains correctly if
+  // the remainder is itself still too long to speak in one go - each
+  // response's own remainingText replaces the message's, so repeated
+  // clicks work through the whole answer in order.
+  const speakMore = async (msg: Msg) => {
+    if (!msg.remainingSpeech) return
+    try {
+      const res = await api.post('/copilot/voice/synthesize', { text: msg.remainingSpeech, architectCode: msg.architectCode || 'CHIEF' })
+      if (res.audioBase64 && audioPlayerRef.current) {
+        audioPlayerRef.current.src = `data:audio/mpeg;base64,${res.audioBase64}`
+        audioPlayerRef.current.play().catch(() => {})
+      }
+      setMessages(m => m.map(x => x.id === msg.id ? { ...x, remainingSpeech: res.remainingText ?? null } : x))
+    } catch (e) {
+      console.error('Speak more failed:', e)
     }
   }
 
@@ -900,6 +925,11 @@ export default function CopilotPage() {
                   {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
                 {m.role === 'architect' && <EvidenceDrawer evidence={m.evidence} />}
+                {m.role === 'architect' && m.remainingSpeech && (
+                  <button onClick={() => speakMore(m)} style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)', background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '3px 9px', cursor: 'pointer' }}>
+                    🔊 Speak more
+                  </button>
+                )}
               </div>
             </div>
           ))}
