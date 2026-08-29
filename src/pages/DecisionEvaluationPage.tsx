@@ -166,6 +166,7 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
@@ -174,6 +175,25 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
   }, [api, id])
 
   useEffect(() => { load() }, [load])
+
+  const onExportWord = async () => {
+    setExporting(true)
+    try {
+      const token = localStorage.getItem('ea_token')
+      const res = await fetch(`${API}/decision-evaluation/${id}/export/word?lang=${isAR ? 'ar' : 'en'}`, { headers: { Authorization: `Bearer ${token}` } })
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = `decision-assessment-${id}.docx`
+      document.body.appendChild(a); a.click(); a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (e: any) {
+      alert(e.message || (isAR ? 'فشل التصدير' : 'Export failed'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const run = async (fn: () => Promise<any>) => {
     setBusy(true); setError(null)
@@ -195,6 +215,7 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
           </div>
         </div>
         <div style={S.row}>
+          <button style={S.btn()} disabled={exporting} onClick={() => onExportWord()}>📄 {exporting ? '...' : (isAR ? 'تصدير Word' : 'Export Word')}</button>
           {(status === 'DRAFT' || status === 'CRITERIA_REVIEW') && (
             <button style={S.btn('primary')} disabled={busy} onClick={() => run(() => api.post(`/decision-evaluation/${id}/freeze`))}>{isAR ? 'تجميد الأساس' : 'Freeze Baseline'}</button>
           )}
