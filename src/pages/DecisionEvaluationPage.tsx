@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useLang } from '../contexts/LangContext'
+import { useAuth } from '../contexts/AuthContext'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -515,12 +516,17 @@ function CompareTab({ id, candidates, scores, assessment, api, isAR }: any) {
 }
 
 function DecisionTab({ id, assessment, api, isAR, onChanged }: any) {
+  const { user } = useAuth()
   const [rationale, setRationale] = useState('')
   const [busy, setBusy] = useState(false)
   const [targetModule, setTargetModule] = useState('EA_REPOSITORY')
 
-  const canDecide = assessment.status === 'COMPLETED' || assessment.status === 'PENDING_APPROVAL'
-  const canPublish = assessment.status === 'APPROVED'
+  // UI convenience only — the server independently enforces the real
+  // permission (DecisionEvaluation.ApproveAssessments / .PublishDecisions)
+  // plus separation-of-duties, regardless of what this hides or shows.
+  const canSeeApprovalActions = user?.role === 'REVIEWER' || user?.role === 'TENANT_ADMIN'
+  const canDecide = canSeeApprovalActions && (assessment.status === 'COMPLETED' || assessment.status === 'PENDING_APPROVAL')
+  const canPublish = canSeeApprovalActions && assessment.status === 'APPROVED'
 
   const decide = async (action: string) => {
     if (!rationale.trim()) { alert(isAR ? 'التبرير مطلوب' : 'Rationale is required'); return }
