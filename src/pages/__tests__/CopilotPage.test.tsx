@@ -303,4 +303,213 @@ describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
 
     expect(await screen.findByText('🔍 1 source ▼')).toBeInTheDocument();
   });
+
+  it('shows a clear "did not complete" warning for a failed architect response, instead of presenting the apology text as a real answer (Copilot Phase 4)', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/consult': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'architect_response', architectCode: 'BUSINESS', architectName: 'Business Architect', content: 'I encountered an issue processing your request. Please try again.', evidence: [], failed: true },
+        { type: 'done', conversationId: 'conv-1' },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('Consult'));
+    const input = screen.getByPlaceholderText(/Ask all selected architects/);
+    fireEvent.change(input, { target: { value: 'Compare our options' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByText('⚠️ did not complete')).toBeInTheDocument();
+  });
+
+  it('a real (non-failed) architect response never shows the "did not complete" warning', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/consult': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'architect_response', architectCode: 'BUSINESS', architectName: 'Business Architect', content: 'Here is a real analysis.', evidence: [] },
+        { type: 'done', conversationId: 'conv-1' },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('Consult'));
+    const input = screen.getByPlaceholderText(/Ask all selected architects/);
+    fireEvent.change(input, { target: { value: 'Compare our options' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await screen.findByText('Here is a real analysis.');
+    expect(screen.queryByText('⚠️ did not complete')).not.toBeInTheDocument();
+  });
+});
+
+describe('CopilotPage - Task Playbooks (Copilot Phase 2)', () => {
+  const PLAYBOOKS = [
+    { id: 'ARCHITECTURE_IMPACT_ANALYSIS', name: 'Architecture Impact Analysis', description: 'Assess ripple effects.', requiredInputs: ['subject'], optionalInputs: ['scopeRefId'] },
+    { id: 'DUPLICATION_REUSE_ANALYSIS', name: 'Application/Technology Duplication and Reuse Analysis', description: 'Find overlap.', requiredInputs: ['subject'], optionalInputs: [] },
+  ];
+
+  it('lists available playbooks and lets the user pick one, showing its input form', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+
+    expect(await screen.findByText('Architecture Impact Analysis')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Architecture Impact Analysis'));
+
+    expect(await screen.findByText(/subject \*/)).toBeInTheDocument();
+    expect(screen.getByText(/scopeRefId \(optional\)/)).toBeInTheDocument();
+  });
+
+  it('previews the resolved architects and evidence before running, without spending an AI call', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS,
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview': (opts: any) => ({
+        missingInputs: [], resolvedArchitects: [{ code: 'BUSINESS', name: 'Business Architect', avatar: '💼' }],
+        missingArchitects: [], willRunChiefSynthesis: false,
+        evidencePreview: { items: [{ sourceType: 'EA_ASSET', sourceId: 'a1', title: 'Payment Gateway', excerpt: 'Core service', sourceAuthorityLevel: 'AUTHORITATIVE' }], conflicts: [] },
+      }),
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+    fireEvent.click(await screen.findByText('Architecture Impact Analysis'));
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'migrating core banking' } });
+    fireEvent.click(screen.getByText('Preview'));
+
+    expect(await screen.findByText('💼 Business Architect')).toBeInTheDocument();
+    expect(await screen.findByText('🔍 1 source ▼')).toBeInTheDocument();
+
+    const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview'));
+    expect(JSON.parse(postCall[1].body).inputs.subject).toBe('migrating core banking');
+  });
+
+  it('runs the playbook and renders each domain response plus the Chief synthesis and suggested next step', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS,
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview': { missingInputs: [], resolvedArchitects: [{ code: 'BUSINESS', name: 'Business Architect', avatar: '💼' }], missingArchitects: [], willRunChiefSynthesis: true, evidencePreview: null },
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/run': {
+        playbookId: 'ARCHITECTURE_IMPACT_ANALYSIS', conversationId: 'conv-1',
+        domainResponses: [{ architectCode: 'BUSINESS', architectName: '💼 Business Architect', content: 'Business impact analysis text.', evidence: [] }],
+        chiefResponse: { architectCode: 'CHIEF', architectName: '🏛 Chief Architect', content: 'Consolidated recommendation text.' },
+        targetModule: 'GOVERNANCE_REVIEW',
+      },
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+    fireEvent.click(await screen.findByText('Architecture Impact Analysis'));
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Preview'));
+    fireEvent.click(await screen.findByText('Run Playbook'));
+
+    expect(await screen.findByText('Business impact analysis text.')).toBeInTheDocument();
+    expect(await screen.findByText('Consolidated recommendation text.')).toBeInTheDocument();
+    expect(await screen.findByText(/Suggested next step.*governance review/i)).toBeInTheDocument();
+  });
+
+  it('disables the Run button while any required input is still missing', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS,
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview': { missingInputs: ['subject'], resolvedArchitects: [], missingArchitects: [], willRunChiefSynthesis: false, evidencePreview: null },
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+    fireEvent.click(await screen.findByText('Architecture Impact Analysis'));
+    fireEvent.click(screen.getByText('Preview'));
+
+    const runButton = await screen.findByText('Run Playbook');
+    expect(runButton).toBeDisabled();
+  });
+});
+
+describe('CopilotPage - Action Draft review (Copilot Phase 3)', () => {
+  const DRAFT_PENDING = {
+    id: 'draft-1', status: 'PENDING_APPROVAL', targetModule: 'EA_REPOSITORY', targetEntityType: 'EA_ASSET', proposedActionType: 'CREATE',
+    proposingArchitectCode: 'APPLICATION', confidence: 0.8, payload: { name: 'Proposed Service' }, assumptions: ['No existing duplicate found'], missingInformation: [],
+  };
+
+  it('shows "No action drafts yet" when there are none', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/action-drafts': [] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    expect(await screen.findByText('No action drafts yet. An architect can propose one while helping with a task.')).toBeInTheDocument();
+  });
+
+  it('lists a draft with its status, proposing architect, and payload', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/action-drafts': [DRAFT_PENDING] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    expect(await screen.findByText('EA_REPOSITORY · EA_ASSET · CREATE')).toBeInTheDocument();
+    expect(screen.getByText('PENDING APPROVAL')).toBeInTheDocument();
+    expect(screen.getByText(/Proposed by APPLICATION/)).toBeInTheDocument();
+    expect(screen.getByText(/Proposed Service/)).toBeInTheDocument();
+  });
+
+  it('approving a PENDING_APPROVAL draft calls the approve endpoint and refreshes the list', async () => {
+    let approved = false;
+    (global.fetch as jest.Mock) = jest.fn().mockImplementation((url: string, options?: any) => {
+      if (options?.method === 'POST' && url.includes('/approve')) { approved = true; return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...DRAFT_PENDING, status: 'APPROVED' }) }); }
+      if (url.includes('/copilot/action-drafts')) return Promise.resolve({ ok: true, json: () => Promise.resolve(approved ? [{ ...DRAFT_PENDING, status: 'APPROVED' }] : [DRAFT_PENDING]) });
+      if (url.includes('/copilot/architects')) return Promise.resolve({ ok: true, json: () => Promise.resolve(ARCHITECTS) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    fireEvent.click(await screen.findByText('Approve'));
+
+    await waitFor(() => {
+      const approveCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/approve'));
+      expect(approveCall).toBeDefined();
+    });
+    expect(await screen.findByText('APPROVED')).toBeInTheDocument();
+  });
+
+  it('rejecting prompts for a reason and includes it in the request body', async () => {
+    (global.fetch as jest.Mock) = jest.fn().mockImplementation((url: string, options?: any) => {
+      if (options?.method === 'POST' && url.includes('/reject')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...DRAFT_PENDING, status: 'REJECTED' }) });
+      if (url.includes('/copilot/action-drafts')) return Promise.resolve({ ok: true, json: () => Promise.resolve([DRAFT_PENDING]) });
+      if (url.includes('/copilot/architects')) return Promise.resolve({ ok: true, json: () => Promise.resolve(ARCHITECTS) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    fireEvent.click(await screen.findByText('Reject'));
+    fireEvent.change(screen.getByPlaceholderText('Reason (optional)'), { target: { value: 'not needed' } });
+    fireEvent.click(screen.getByText('Confirm Reject'));
+
+    await waitFor(() => {
+      const rejectCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/reject'));
+      expect(rejectCall).toBeDefined();
+    });
+    const rejectCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/reject'));
+    expect(JSON.parse(rejectCall![1].body).reason).toBe('not needed');
+  });
+
+  it('shows an Execute button for an APPROVED draft, and a final EXECUTED state', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/action-drafts': [{ ...DRAFT_PENDING, status: 'APPROVED' }] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    expect(await screen.findByText('Execute')).toBeInTheDocument();
+  });
+
+  it('shows the real execution result for an EXECUTED draft, not just a generic success message', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [],
+      '/copilot/action-drafts': [{ ...DRAFT_PENDING, status: 'EXECUTED', executionResult: { success: true, entityId: 'new-asset-42' } }],
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('📝 Drafts'));
+    expect(await screen.findByText(/created new-asset-42/)).toBeInTheDocument();
+  });
 });

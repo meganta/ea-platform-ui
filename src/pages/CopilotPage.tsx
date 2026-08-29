@@ -31,7 +31,7 @@ interface EvidenceItem {
   score: number
   targetRef: { type: string; id: string }
 }
-interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[] }
+interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[]; remainingSpeech?: string | null; failed?: boolean }
 interface Architect { id: string; code: string; name: string; role: string; domain?: string; avatar: string; description?: string; isChief: boolean; aiModel: string; isActive: boolean }
 
 // Phase 1: authority-level color coding, matching the same caveat
@@ -380,6 +380,262 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
   )
 }
 
+/** Phase 2: Task-mode UI — playbook picker, input form, a read-only preview step (spec requires reviewing the auto-selected architects/sources before execution), and structured run results. Mirrors MeetingAssistant's pattern (a self-contained sidebar-tab view, not folded into the Single/Consult chat toggle, since a playbook run is form-driven rather than a chat turn). */
+function PlaybookRunner({ api }: { api: any }) {
+  const [playbooks, setPlaybooks] = useState<any[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [inputs, setInputs] = useState<Record<string, string>>({})
+  const [preview, setPreview] = useState<any | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [result, setResult] = useState<any | null>(null)
+  const [running, setRunning] = useState(false)
+  const [architectOverride, setArchitectOverride] = useState<string[] | null>(null)
+
+  useEffect(() => { api.get('/copilot/playbooks').then((d: any) => setPlaybooks(Array.isArray(d) ? d : [])) }, [api])
+
+  const selected = playbooks.find(p => p.id === selectedId)
+  const allFields = selected ? [...selected.requiredInputs, ...selected.optionalInputs] : []
+
+  function selectPlaybook(p: any) {
+    setSelectedId(p.id); setInputs({}); setPreview(null); setResult(null); setArchitectOverride(null)
+  }
+
+  async function runPreview() {
+    if (!selected) return
+    setPreviewLoading(true)
+    try {
+      const p = await api.post(`/copilot/playbooks/${selected.id}/preview`, { inputs })
+      setPreview(p)
+      setArchitectOverride(p.resolvedArchitects?.map((a: any) => a.code) ?? null)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  async function runPlaybook() {
+    if (!selected) return
+    setRunning(true)
+    try {
+      const r = await api.post(`/copilot/playbooks/${selected.id}/run`, { inputs, architectOverride })
+      setResult(r)
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  function toggleOverride(code: string) {
+    setArchitectOverride(prev => {
+      const cur = prev ?? []
+      return cur.includes(code) ? cur.filter(c => c !== code) : [...cur, code]
+    })
+  }
+
+  return (
+    <div style={{ padding: 20, maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontWeight: 700, fontSize: 16 }}>🧭 Task Playbooks</div>
+
+      {!selected ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {playbooks.map(p => (
+            <div key={p.id} onClick={() => selectPlaybook(p)} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--navy-light)' }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2 }}>{p.description}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <button onClick={() => setSelectedId(null)} style={{ alignSelf: 'flex-start', fontSize: 11, background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0 }}>← Back to playbooks</button>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{selected.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{selected.description}</div>
+
+          {allFields.map(key => (
+            <div key={key}>
+              <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>
+                {key}{selected.requiredInputs.includes(key) ? ' *' : ' (optional)'}
+              </label>
+              <textarea
+                value={inputs[key] || ''}
+                onChange={e => { setInputs(prev => ({ ...prev, [key]: e.target.value })); setPreview(null); setResult(null) }}
+                rows={key === 'subject' ? 3 : 1}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 13, resize: 'vertical' }}
+              />
+            </div>
+          ))}
+
+          <button onClick={runPreview} disabled={previewLoading} style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: previewLoading ? 'default' : 'pointer' }}>
+            {previewLoading ? 'Loading preview...' : 'Preview'}
+          </button>
+
+          {preview && (
+            <div style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {preview.missingInputs.length > 0 && (
+                <div style={{ fontSize: 12, color: '#f97316' }}>Missing required input(s): {preview.missingInputs.join(', ')}</div>
+              )}
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 5 }}>Architects that will run — click to include/exclude:</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {preview.resolvedArchitects.map((a: any) => {
+                    const on = (architectOverride ?? []).includes(a.code)
+                    return (
+                      <span key={a.code} onClick={() => toggleOverride(a.code)} style={{ padding: '4px 10px', borderRadius: 999, fontSize: 11, cursor: 'pointer', background: on ? 'var(--accent)' : 'var(--navy-light)', color: on ? 'var(--navy)' : 'var(--text-dim)', border: '1px solid var(--border)' }}>
+                        {a.avatar} {a.name}
+                      </span>
+                    )
+                  })}
+                </div>
+                {preview.missingArchitects.length > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>Not available for this tenant: {preview.missingArchitects.join(', ')}</div>
+                )}
+                {preview.willRunChiefSynthesis && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>🏛 Chief Architect will synthesize these responses</div>}
+              </div>
+              {preview.evidencePreview && preview.evidencePreview.items.length > 0 && (
+                <EvidenceDrawer evidence={preview.evidencePreview.items} />
+              )}
+              <button onClick={runPlaybook} disabled={running || preview.missingInputs.length > 0} style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: (running || preview.missingInputs.length > 0) ? 'default' : 'pointer', opacity: (running || preview.missingInputs.length > 0) ? 0.6 : 1 }}>
+                {running ? 'Running...' : 'Run Playbook'}
+              </button>
+            </div>
+          )}
+
+          {result && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {result.domainResponses.map((r: any) => (
+                <div key={r.architectCode} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>{r.architectName}</div>
+                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{r.content}</div>
+                  <EvidenceDrawer evidence={r.evidence} />
+                </div>
+              ))}
+              {result.chiefResponse && (
+                <div style={{ padding: 12, borderRadius: 8, border: '1px solid var(--accent)' }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>🏛 {result.chiefResponse.architectName} — Synthesis</div>
+                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{result.chiefResponse.content}</div>
+                </div>
+              )}
+              {result.targetModule && (
+                <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+                  Suggested next step: take this to {result.targetModule.replace(/_/g, ' ').toLowerCase()} for a formal assessment. This is a preparatory analysis only — nothing has been submitted or decided automatically.
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+const ACTION_DRAFT_STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
+  DRAFT: { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },
+  PENDING_APPROVAL: { bg: 'rgba(234,179,8,0.15)', fg: '#eab308' },
+  APPROVED: { bg: 'rgba(59,130,246,0.15)', fg: '#3b82f6' },
+  REJECTED: { bg: 'rgba(239,68,68,0.15)', fg: '#ef4444' },
+  EXPIRED: { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8' },
+  EXECUTED: { bg: 'rgba(34,197,94,0.15)', fg: '#22c55e' },
+}
+
+/** Phase 3: review/approval UI for Copilot Action Drafts — the human side of the create(DRAFT)->submit(PENDING_APPROVAL)->approve(APPROVED)->execute(EXECUTED) lifecycle the backend already enforces. No draft can move forward without an explicit click here; this component never auto-advances anything. */
+function ActionDraftReview({ api }: { api: any }) {
+  const [drafts, setDrafts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [rejectingId, setRejectingId] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+
+  const load = () => {
+    setLoading(true)
+    api.get('/copilot/action-drafts').then((d: any) => setDrafts(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+  }
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function act(id: string, action: string, body?: any) {
+    setBusyId(id)
+    try {
+      await api.post(`/copilot/action-drafts/${id}/${action}`, body)
+      load()
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  function confirmReject(id: string) {
+    act(id, 'reject', { reason: rejectReason || undefined })
+    setRejectingId(null)
+    setRejectReason('')
+  }
+
+  return (
+    <div style={{ padding: 20, maxWidth: 720 }}>
+      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>📝 Action Drafts</div>
+
+      {loading ? (
+        <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading...</div>
+      ) : drafts.length === 0 ? (
+        <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>No action drafts yet. An architect can propose one while helping with a task.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {drafts.map(d => {
+            const style = ACTION_DRAFT_STATUS_STYLE[d.status] || ACTION_DRAFT_STATUS_STYLE.DRAFT
+            const busy = busyId === d.id
+            return (
+              <div key={d.id} style={{ padding: 14, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--navy-light)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>{d.targetModule} · {d.targetEntityType} · {d.proposedActionType}</div>
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 9px', borderRadius: 999, background: style.bg, color: style.fg, whiteSpace: 'nowrap' }}>{d.status.replace(/_/g, ' ')}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
+                  Proposed by {d.proposingArchitectCode}{d.confidence != null && ` · confidence ${Math.round(d.confidence * 100)}%`}
+                </div>
+                <pre style={{ fontSize: 11.5, background: 'var(--navy)', padding: 8, borderRadius: 6, marginTop: 8, overflow: 'auto', maxHeight: 160 }}>{JSON.stringify(d.payload, null, 2)}</pre>
+                {d.assumptions?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>Assumptions: {d.assumptions.join('; ')}</div>}
+                {d.missingInformation?.length > 0 && <div style={{ fontSize: 11, color: '#eab308', marginTop: 4 }}>Missing information: {d.missingInformation.join('; ')}</div>}
+
+                <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {d.status === 'DRAFT' && (
+                    <button onClick={() => act(d.id, 'submit')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>
+                      Submit for Approval
+                    </button>
+                  )}
+                  {d.status === 'PENDING_APPROVAL' && (
+                    <>
+                      <button onClick={() => act(d.id, 'approve')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, background: 'var(--accent)', color: 'var(--navy)', border: 'none', cursor: busy ? 'default' : 'pointer' }}>
+                        Approve
+                      </button>
+                      <button onClick={() => setRejectingId(d.id)} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 600, fontSize: 12, background: 'none', border: '1px solid #ef4444', color: '#ef4444', cursor: busy ? 'default' : 'pointer' }}>
+                        Reject
+                      </button>
+                    </>
+                  )}
+                  {d.status === 'APPROVED' && (
+                    <button onClick={() => act(d.id, 'execute')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, background: '#3b82f6', color: 'white', border: 'none', cursor: busy ? 'default' : 'pointer' }}>
+                      {busy ? 'Executing...' : 'Execute'}
+                    </button>
+                  )}
+                  {d.status === 'EXECUTED' && (
+                    <div style={{ fontSize: 12, color: '#22c55e' }}>✅ Executed{d.executionResult?.entityId ? ` — created ${d.executionResult.entityId}` : ''}</div>
+                  )}
+                  {d.status === 'REJECTED' && (
+                    <div style={{ fontSize: 12, color: '#ef4444' }}>❌ Rejected{d.rejectionReason ? `: ${d.rejectionReason}` : ''}</div>
+                  )}
+                </div>
+
+                {rejectingId === d.id && (
+                  <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                    <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Reason (optional)" style={{ flex: 1, padding: '6px 10px', borderRadius: 6, fontSize: 12 }} />
+                    <button onClick={() => confirmReject(d.id)} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer' }}>Confirm Reject</button>
+                    <button onClick={() => { setRejectingId(null); setRejectReason('') }} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, background: 'none', border: '1px solid var(--border)', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function CopilotPage() {
   const api = useApi()
   const [architects, setArchitects] = useState<Architect[]>([])
@@ -392,7 +648,7 @@ export default function CopilotPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [includeChief, setIncludeChief] = useState(true)
-  const [sidebarTab, setSidebarTab] = useState<'architects' | 'history' | 'meetings'>('architects')
+  const [sidebarTab, setSidebarTab] = useState<'architects' | 'history' | 'meetings' | 'playbooks' | 'actiondrafts'>('architects')
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -528,6 +784,11 @@ export default function CopilotPage() {
         id: processingId + 'a', role: 'architect', content: data.architectText,
         architectCode: arch?.code, architectName: arch?.name, architectAvatar: arch?.avatar,
         timestamp: new Date(),
+        // Phase 6: the spoken audio may be a sentence-boundary-aware
+        // excerpt of a long answer (never mid-word) — remainingText is
+        // whatever wasn't spoken, so "Speak more" can pick up exactly
+        // where the audio left off.
+        remainingSpeech: data.remainingText ?? null,
       }])
 
       if (data.conversationId) setActiveConvId(data.conversationId)
@@ -547,6 +808,26 @@ export default function CopilotPage() {
       setMessages(m => [...m, { id: Date.now() + 'err', role: 'system', content: 'Voice processing failed: ' + e.message, timestamp: new Date() }])
     } finally {
       setVoiceLoading(false)
+    }
+  }
+
+  // Phase 6: continues speaking a message's held-back remainder (see
+  // voice.service.ts's sentence-boundary splitting) by calling the same
+  // synthesize endpoint again with just that text. Chains correctly if
+  // the remainder is itself still too long to speak in one go - each
+  // response's own remainingText replaces the message's, so repeated
+  // clicks work through the whole answer in order.
+  const speakMore = async (msg: Msg) => {
+    if (!msg.remainingSpeech) return
+    try {
+      const res = await api.post('/copilot/voice/synthesize', { text: msg.remainingSpeech, architectCode: msg.architectCode || 'CHIEF' })
+      if (res.audioBase64 && audioPlayerRef.current) {
+        audioPlayerRef.current.src = `data:audio/mpeg;base64,${res.audioBase64}`
+        audioPlayerRef.current.play().catch(() => {})
+      }
+      setMessages(m => m.map(x => x.id === msg.id ? { ...x, remainingSpeech: res.remainingText ?? null } : x))
+    } catch (e) {
+      console.error('Speak more failed:', e)
     }
   }
 
@@ -575,7 +856,7 @@ export default function CopilotPage() {
         if (d.type === 'meta') setActiveConvId(d.conversationId)
         if (d.type === 'architect_response') {
           const arch = architects.find(a => a.code === d.architectCode)
-          setMessages(m => [...m, { id: Date.now() + d.architectCode, role: 'architect', content: d.content, architectCode: d.architectCode, architectName: d.architectName || arch?.name, architectAvatar: arch?.avatar || '🤖', timestamp: new Date(), evidence: d.evidence }])
+          setMessages(m => [...m, { id: Date.now() + d.architectCode, role: 'architect', content: d.content, architectCode: d.architectCode, architectName: d.architectName || arch?.name, architectAvatar: arch?.avatar || '🤖', timestamp: new Date(), evidence: d.evidence, failed: !!d.failed }])
         }
         if (d.type === 'chief_start') {
           const chief = architects.find(a => a.isChief)
@@ -618,9 +899,9 @@ export default function CopilotPage() {
 
         {/* Sidebar tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-          {(['architects', 'history', 'meetings'] as const).map(t => (
+          {(['architects', 'history', 'meetings', 'playbooks', 'actiondrafts'] as const).map(t => (
             <button key={t} style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSidebarTab(t)}>
-              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : '📋 Meetings'}
+              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : t === 'meetings' ? '📋 Meetings' : t === 'playbooks' ? '🧭 Playbooks' : '📝 Drafts'}
             </button>
           ))}
         </div>
@@ -687,6 +968,14 @@ export default function CopilotPage() {
         <div style={{ flex: 1, overflow: 'auto' }}>
           <MeetingAssistant api={api} architects={architects} />
         </div>
+      ) : sidebarTab === 'playbooks' ? (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <PlaybookRunner api={api} />
+        </div>
+      ) : sidebarTab === 'actiondrafts' ? (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <ActionDraftReview api={api} />
+        </div>
       ) : (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Chat header */}
@@ -741,15 +1030,27 @@ export default function CopilotPage() {
               {/* Bubble */}
               <div style={{ maxWidth: '75%' }}>
                 {m.role !== 'user' && m.architectName && (
-                  <div style={{ fontSize: 11, fontWeight: 600, color: archColor(m.architectCode), marginBottom: 4 }}>{m.architectName}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: archColor(m.architectCode), marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {m.architectName}
+                    {m.failed && (
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
+                        ⚠️ did not complete
+                      </span>
+                    )}
+                  </div>
                 )}
-                <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', background: m.role === 'user' ? 'var(--accent)' : 'var(--navy-light)', color: m.role === 'user' ? 'var(--navy)' : 'var(--text)', fontSize: 13, lineHeight: 1.7, border: m.role !== 'user' ? `1px solid ${archColor(m.architectCode)}33` : 'none', whiteSpace: 'pre-wrap' }}>
+                <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', background: m.role === 'user' ? 'var(--accent)' : 'var(--navy-light)', color: m.role === 'user' ? 'var(--navy)' : 'var(--text)', fontSize: 13, lineHeight: 1.7, border: m.failed ? '1px solid #f97316' : (m.role !== 'user' ? `1px solid ${archColor(m.architectCode)}33` : 'none'), whiteSpace: 'pre-wrap' }}>
                   {m.content || <span style={{ opacity: 0.5 }}><span className="typing-dot" style={{ animation: 'blink 1s infinite' }}>•</span><span style={{ animationDelay: '0.2s', animation: 'blink 1s infinite' }}> •</span><span style={{ animationDelay: '0.4s', animation: 'blink 1s infinite' }}> •</span></span>}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>
                   {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
                 {m.role === 'architect' && <EvidenceDrawer evidence={m.evidence} />}
+                {m.role === 'architect' && m.remainingSpeech && (
+                  <button onClick={() => speakMore(m)} style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)', background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '3px 9px', cursor: 'pointer' }}>
+                    🔊 Speak more
+                  </button>
+                )}
               </div>
             </div>
           ))}
