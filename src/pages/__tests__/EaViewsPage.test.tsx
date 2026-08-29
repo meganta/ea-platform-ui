@@ -1289,6 +1289,110 @@ describe('EaViewsPage - Scenario switching (Phase 5A)', () => {
   });
 });
 
+describe('EaViewsPage - Comparison mode (Phase 5B)', () => {
+  const scenarioList = [
+    { id: 'current', name: 'Current Architecture', type: 'CURRENT', status: 'APPROVED', horizonDate: null, sequence: null, parentScenarioId: null },
+    { id: 'targetA', name: 'Target A', type: 'TARGET', status: 'APPROVED', horizonDate: '2028-01-01', sequence: 1, parentScenarioId: 'current' },
+    { id: 'targetB', name: 'Target B', type: 'TARGET', status: 'APPROVED', horizonDate: '2028-01-01', sequence: 1, parentScenarioId: 'current' },
+  ];
+  const baseDatasetResponse = {
+    legacy: { nodes: [], edges: [], metadata: {} },
+    dataset: { context: { scenario: { id: 'current' } }, objects: [], relationships: [], paths: [], hierarchies: [], metrics: [], provenance: { truncated: false } },
+    eligibility: { eligible: [{ visualization: 'TABLE', eligible: true, score: 0.7, reasons: [] }], ineligible: [] },
+  };
+
+  function comparisonResult(rightName: string, addedCount: number) {
+    return {
+      context: { leftScenario: { id: 'current', name: 'Current Architecture' }, rightScenario: { id: rightName === 'Target A' ? 'targetA' : 'targetB', name: rightName } },
+      objects: { added: Array.from({ length: addedCount }, (_, i) => ({ id: `added${i}`, changeType: 'ADDED', right: { id: `added${i}`, name: `Added ${rightName} ${i}`, semanticType: 'Application', domain: 'APPLICATION' } })), removed: [], modified: [], unchanged: [] },
+      relationships: { added: [], removed: [], unchanged: [] },
+      leftPaths: [], rightPaths: [],
+      metrics: { objectCounts: { added: addedCount, removed: 0, modified: 0, unchanged: 0 }, relationshipCounts: { added: 0, removed: 0, unchanged: 0 } },
+      warnings: [], provenance: { leftTruncated: false, rightTruncated: false },
+    };
+  }
+
+  async function openComparisonView(compareRoute: any) {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Comparable View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': scenarioList,
+      '/ea-views/v1/dataset': baseDatasetResponse,
+      '/ea-views/v1/compare': compareRoute,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Comparable View'));
+    await screen.findByText('Current Architecture');
+    fireEvent.click(screen.getByText(/⇄ Compare/));
+  }
+
+  // ── Mandatory comparison race-condition test ────────────────────────
+  it('fast Target A -> Target B comparison requests: Target B resolving first is never overwritten by a later-resolving, stale Target A response', async () => {
+    let resolveA: (v: any) => void = () => {};
+    let resolveB: (v: any) => void = () => {};
+    const promiseA = new Promise(r => { resolveA = r; });
+    const promiseB = new Promise(r => { resolveB = r; });
+    await openComparisonView((options: any) => {
+      const body = JSON.parse(options.body);
+      if (body.rightScenarioId === 'targetA') return promiseA;
+      if (body.rightScenarioId === 'targetB') return promiseB;
+      return comparisonResult('Target A', 0);
+    });
+
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    fireEvent.change(selects[0], { target: { value: 'current' } });
+    fireEvent.change(selects[1], { target: { value: 'targetA' } });
+    fireEvent.click(screen.getByText(/^Compare/)); // request A - deliberately never resolved yet
+    fireEvent.change(selects[1], { target: { value: 'targetB' } });
+    fireEvent.click(screen.getByText(/^Compare/)); // request B, before A has resolved
+
+    resolveB(comparisonResult('Target B', 5));
+    await screen.findByText(/\+5 Added/);
+
+    resolveA(comparisonResult('Target A', 2));
+    await new Promise(r => setTimeout(r, 0));
+    expect(screen.getByText(/\+5 Added/)).toBeInTheDocument(); // B's result still displayed
+    expect(screen.queryByText(/\+2 Added/)).not.toBeInTheDocument(); // A's stale response never committed
+  });
+
+  it('a failed comparison request retains the previously loaded comparison and shows an error, without pretending it succeeded', async () => {
+    let callCount = 0;
+    await openComparisonView((options: any) => {
+      callCount++;
+      if (callCount === 1) return comparisonResult('Target A', 3);
+      return Promise.reject(new Error('network error'));
+    });
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    fireEvent.change(selects[0], { target: { value: 'current' } });
+    fireEvent.change(selects[1], { target: { value: 'targetA' } });
+    fireEvent.click(screen.getByText(/^Compare/));
+    await screen.findByText(/\+3 Added/);
+
+    fireEvent.change(selects[1], { target: { value: 'targetB' } });
+    fireEvent.click(screen.getByText(/^Compare/));
+    await waitFor(() => expect(screen.getByText(/Failed to load comparison/)).toBeInTheDocument());
+    // the previous, valid comparison result is still fully displayed
+    expect(screen.getByText(/\+3 Added/)).toBeInTheDocument();
+  });
+
+  it('shows the summary header with object/relationship counts after a successful comparison', async () => {
+    await openComparisonView(comparisonResult('Target A', 4));
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    fireEvent.change(selects[0], { target: { value: 'current' } });
+    fireEvent.change(selects[1], { target: { value: 'targetA' } });
+    fireEvent.click(screen.getByText(/^Compare/));
+    expect(await screen.findByText(/\+4 Added/)).toBeInTheDocument();
+    expect(screen.getByText(/0 Unchanged/)).toBeInTheDocument();
+  });
+
+  it('exiting comparison mode returns to the normal single-scenario view', async () => {
+    await openComparisonView(comparisonResult('Target A', 1));
+    fireEvent.click(screen.getByText(/✕ Exit Comparison/));
+    expect(screen.queryByText(/✕ Exit Comparison/)).not.toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - Object Context View entry point', () => {
   it('reads the objectContext query param on mount and opens the standalone dependency viewer', async () => {
     mockSearchParams = new URLSearchParams('objectContext=asset-123');

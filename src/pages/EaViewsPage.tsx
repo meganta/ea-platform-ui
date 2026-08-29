@@ -12,6 +12,7 @@ import { determineTableMode, buildRelationshipTable, buildMatrix } from './eavie
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
 import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters, ExpandDirection } from './eaviews/graphDisclosureUtils'
 import { buildScenarioLineageTree, getScenarioLineagePath, chooseVisualizationAfterScenarioSwitch } from './eaviews/scenarioSelectorUtils'
+import { buildChangeSummaryRows, buildRelationshipChangeRows, buildComparisonMatrix, applyComparisonFilters } from './eaviews/comparisonUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -369,6 +370,28 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // for PATH) - never re-queried, reused directly from the already-built
   // matrix.
   const [matrixDrilldown, setMatrixDrilldown] = useState<any>(null)
+  // ── Comparison mode (Phase 5B) ────────────────────────────────────────
+  //
+  // Entirely separate from the single-scenario viewer state above -
+  // comparisonMode toggles a distinct rendering path, never mutating
+  // dataset/eligibility/committedScenarioId. Race protection uses the
+  // exact same ref-token pattern as switchScenario (Section F/3 -
+  // "highest-risk part") - a comparison request's response only commits
+  // if its captured token still matches the latest issued one.
+  const [comparisonMode, setComparisonMode] = useState(false)
+  const [comparisonLeftId, setComparisonLeftId] = useState<string | null>(null)
+  const [comparisonRightId, setComparisonRightId] = useState<string | null>(null)
+  const [comparisonData, setComparisonData] = useState<any>(null)
+  const [comparisonLoading, setComparisonLoading] = useState(false)
+  const [comparisonError, setComparisonError] = useState<string | null>(null)
+  const [comparisonView, setComparisonView] = useState<'TABLE' | 'MATRIX'>('TABLE')
+  // Section 21: default emphasizes changes - UNCHANGED excluded from the
+  // initial filter set (unlike the empty-set-means-"show all" convention
+  // used elsewhere in this component for object/relationship-type
+  // filters), since a comparison view's whole purpose is surfacing what
+  // changed. The user can still check UNCHANGED explicitly.
+  const [comparisonChangeFilter, setComparisonChangeFilter] = useState<Set<string>>(new Set(['ADDED', 'REMOVED', 'MODIFIED']))
+  const comparisonRequestTokenRef = React.useRef(0)
   const [loading, setLoading] = useState(true)
   const [vizMode, setVizMode] = useState<string>(view.visualization || 'GRAPH')
   const [filterDomain, setFilterDomain] = useState('')
@@ -619,6 +642,31 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     } finally {
       setSavingDefaultScenario(false)
     }
+  }
+
+  // ── Comparison request (Phase 5B) ────────────────────────────────────
+  //
+  // One /compare request per pair - never per-renderer (Section 25/5).
+  // Race protection mirrors switchScenario exactly: a token captured at
+  // request time only commits if it's still the latest issued when the
+  // response arrives, so rapidly changing the left/right pair can never
+  // let an earlier, slower request overwrite a later, faster one.
+  const runComparison = (leftId: string, rightId: string) => {
+    const myToken = ++comparisonRequestTokenRef.current
+    setComparisonLoading(true)
+    setComparisonError(null)
+    api.post(`/ea-views/${view.id}/compare`, { leftScenarioId: leftId, rightScenarioId: rightId }).then((d: any) => {
+      if (myToken !== comparisonRequestTokenRef.current) return // superseded by a newer comparison request
+      if (!d?.objects) { setComparisonError('Failed to load comparison. Showing the previous result.'); return }
+      setComparisonData(d)
+      setComparisonLeftId(leftId)
+      setComparisonRightId(rightId)
+    }).catch(() => {
+      if (myToken !== comparisonRequestTokenRef.current) return
+      setComparisonError('Failed to load comparison. Showing the previous result.')
+    }).finally(() => {
+      if (myToken === comparisonRequestTokenRef.current) setComparisonLoading(false)
+    })
   }
 
   useEffect(() => {
@@ -1375,6 +1423,129 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     </div>
   )
 
+  // ── Comparison (Phase 5B) ─────────────────────────────────────────────
+  //
+  // A distinct rendering path, never touching the single-scenario viewer
+  // state above. Table (Section 12, "one of the strongest comparison
+  // renderers") and Matrix (Section 16) are implemented; Capability Map/
+  // Heatmap/Tree/Cards comparison-specific treatments are deferred (see
+  // completion report) - the underlying ComparisonDataset already
+  // supports building them the same way, but doing so wasn't completed
+  // in this pass given the phase's overall scope.
+  const renderComparison = () => {
+    const CHANGE_COLOR: Record<string, string> = { ADDED: '#2ecc71', REMOVED: '#e74c3c', MODIFIED: '#f39c12', UNCHANGED: '#7f8c8d' }
+    return (
+      <div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' as const }}>
+          <label style={S.label}>Left</label>
+          <select style={{ ...S.input, maxWidth: 200 }} value={comparisonLeftId ?? ''} onChange={e => setComparisonLeftId(e.target.value || null)}>
+            <option value="">Select…</option>
+            {scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <span style={{ color: 'var(--text-dim)' }}>vs</span>
+          <label style={S.label}>Right</label>
+          <select style={{ ...S.input, maxWidth: 200 }} value={comparisonRightId ?? ''} onChange={e => setComparisonRightId(e.target.value || null)}>
+            <option value="">Select…</option>
+            {scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <button style={S.btn('primary')} disabled={!comparisonLeftId || !comparisonRightId} onClick={() => comparisonLeftId && comparisonRightId && runComparison(comparisonLeftId, comparisonRightId)}>
+            Compare{comparisonLoading ? ' ⏳' : ''}
+          </button>
+          <button style={{ ...S.btn(), marginLeft: 'auto' }} onClick={() => { setComparisonMode(false); setComparisonData(null) }}>✕ Exit Comparison</button>
+        </div>
+        {comparisonError && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 12 }}>⚠ {comparisonError}</div>}
+        {!comparisonData ? (
+          <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Choose two scenarios and click Compare to see what changed architecturally between them.</div>
+        ) : (() => {
+          const oc = comparisonData.objects, rc = comparisonData.relationships
+          const filtered = applyComparisonFilters(comparisonData, { changeTypes: [...comparisonChangeFilter] as any })
+          return (
+            <div>
+              {/* Section 11: summary header */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
+                <strong>{comparisonData.context?.leftScenario?.name}</strong><span style={{ color: 'var(--text-dim)' }}>→</span><strong>{comparisonData.context?.rightScenario?.name}</strong>
+              </div>
+              <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' as const, fontSize: 12 }}>
+                <span>Objects: <span style={{ color: CHANGE_COLOR.ADDED }}>+{oc.added.length} Added</span> <span style={{ color: CHANGE_COLOR.REMOVED }}>−{oc.removed.length} Removed</span> <span style={{ color: CHANGE_COLOR.MODIFIED }}>~{oc.modified.length} Modified</span> <span style={{ color: 'var(--text-dim)' }}>{oc.unchanged.length} Unchanged</span></span>
+                <span>Relationships: <span style={{ color: CHANGE_COLOR.ADDED }}>+{rc.added.length} Added</span> <span style={{ color: CHANGE_COLOR.REMOVED }}>−{rc.removed.length} Removed</span></span>
+              </div>
+              {(comparisonData.warnings ?? []).map((w: any) => <div key={w.code} style={{ fontSize: 12, color: '#f39c12', marginBottom: 8 }}>⚠ {w.message}</div>)}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' as const }}>
+                <button style={comparisonView === 'TABLE' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('TABLE')}>Table</button>
+                <button style={comparisonView === 'MATRIX' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('MATRIX')}>Matrix</button>
+                {(['ADDED', 'REMOVED', 'MODIFIED', 'UNCHANGED'] as const).map(ct => (
+                  <label key={ct} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={comparisonChangeFilter.has(ct)} onChange={() => setComparisonChangeFilter(prev => { const next = new Set(prev); next.has(ct) ? next.delete(ct) : next.add(ct); return next })} />
+                    <span style={{ color: CHANGE_COLOR[ct] }}>{ct}</span>
+                  </label>
+                ))}
+              </div>
+              {comparisonView === 'TABLE' ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
+                    <thead><tr>{['Object', 'Type', 'Change', 'Changed Properties', 'Before', 'After'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)' }}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {buildChangeSummaryRows({ objects: filtered }, comparisonChangeFilter.has('UNCHANGED')).map((row, i) => (
+                        <tr key={row.id} style={{ background: i % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontWeight: 500 }}>{row.name}</td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-dim)' }}>{row.type}</td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}><span style={S.badge(CHANGE_COLOR[row.changeType])}>{row.changeType}</span></td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12 }}>{row.changedProperties.join(', ')}</td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, color: 'var(--text-dim)' }}>{row.before}</td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12 }}>{row.after}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Relationship Changes</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead><tr>{['Source', 'Relationship', 'Target', 'Change'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)' }}>{h}</th>)}</tr></thead>
+                    <tbody>
+                      {buildRelationshipChangeRows(comparisonData).map((row, i) => (
+                        <tr key={row.key} style={{ background: i % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>{row.source}</td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontStyle: 'italic', color: 'var(--text-dim)' }}>{row.relationship}</td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}>{row.target}</td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)' }}><span style={S.badge(CHANGE_COLOR[row.changeType])}>{row.changeType}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (() => {
+                const m = buildComparisonMatrix(comparisonData)
+                if (!m.eligible) return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{m.reason}</div>
+                return (
+                  <div>
+                    {m.relationMode === 'PATH' && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>Path-based comparison ({m.rowType} × {m.columnType}) - counts real configured-path instances on each side, not direct relationships.</div>}
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ borderCollapse: 'collapse' }}>
+                        <thead><tr><th style={{ padding: '6px 10px', background: 'var(--navy-mid)', fontSize: 11 }}>{m.rowType} ↓ / {m.columnType} →</th>{(m.columns ?? []).map(c => <th key={c.id} style={{ padding: '6px 10px', background: 'var(--navy-mid)', fontSize: 11 }}>{c.name}</th>)}</tr></thead>
+                        <tbody>
+                          {(m.rows ?? []).map(r => (
+                            <tr key={r.id}>
+                              <td style={{ padding: '6px 10px', fontWeight: 600, fontSize: 12 }}>{r.name}</td>
+                              {(m.columns ?? []).map(c => {
+                                const cell = m.cells?.get(`${r.id}::${c.id}`)
+                                if (!cell || (cell.beforeCount === 0 && cell.afterCount === 0)) return <td key={c.id} style={{ padding: '6px 10px', borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)' }} />
+                                const deltaColor = cell.delta > 0 ? CHANGE_COLOR.ADDED : cell.delta < 0 ? CHANGE_COLOR.REMOVED : 'var(--text-dim)'
+                                return <td key={c.id} style={{ padding: '6px 10px', borderLeft: '1px solid var(--border)', borderBottom: '1px solid var(--border)', textAlign: 'center', fontSize: 11 }}>{cell.beforeCount} → {cell.afterCount} <span style={{ color: deltaColor }}>({cell.delta >= 0 ? '+' : ''}{cell.delta})</span></td>
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          )
+        })()}
+      </div>
+    )
+  }
+
   // ── Graph ────────────────────────────────────────────────────────────────────
   // ── Graph visible subset (Phase 4C) ──────────────────────────────────
   //
@@ -1644,6 +1815,9 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           </div>
         </div>
         <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
+          {!isRoadmap && !isDashboard && (
+            <button style={comparisonMode ? S.btn('primary') : S.btn()} onClick={() => setComparisonMode(m => !m)} title="Compare two architecture scenarios">⇄ Compare</button>
+          )}
           <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={openVersionHistory}>🕐 History</button>
@@ -1750,6 +1924,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         )
       ) : (
       <>
+      {!comparisonMode && (<>
       {/* Viz mode selector */}
       <div style={{ display:'flex', gap:2, background:'var(--navy-light)', borderRadius:8, padding:3, marginBottom:16, width:'fit-content' }}>
         {['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE'].map(m => (
@@ -1802,6 +1977,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           ))}
         </div>
       )}
+      </>)}
 
       {/* Share panel */}
       {showSharePanel && shareData && (
@@ -1818,6 +1994,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
 
       {/* Visualization */}
       {loading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:60 }}>Loading view data...</div>
+        : comparisonMode ? renderComparison()
         : vizMode === 'GRAPH' ? renderGraph()
         : vizMode === 'CAPABILITY_MAP' ? renderCapabilityMap()
         : vizMode === 'HEATMAP' ? renderHeatmap()
