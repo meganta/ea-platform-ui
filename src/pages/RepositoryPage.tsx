@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 
@@ -289,6 +289,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
 export default function RepositoryPage() {
   const { t } = useLang()
   const api = useApi()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [config, setConfig] = useState<any>(null)
   const [assets, setAssets] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
@@ -314,6 +315,24 @@ export default function RepositoryPage() {
   }
 
   useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Deep-link support (Copilot Phase 1's evidence drawer links here as
+  // ?assetId=<id>) - fetches the asset directly by id rather than relying
+  // on it being present in the currently-loaded/filtered `assets` list,
+  // so the link works regardless of filters or pagination. Clears the
+  // query param once handled so it doesn't re-trigger on an unrelated
+  // re-render or linger in the URL after the modal is closed.
+  useEffect(() => {
+    const assetId = searchParams.get('assetId')
+    if (!assetId) return
+    api.get(`/ea-repository/assets/${assetId}`)
+      .then((fresh: any) => { if (fresh) setSelectedAsset(fresh) })
+      .catch(() => {}) // asset may have been deleted, or id is stale/invalid - fail silently, no modal opens
+      .finally(() => {
+        searchParams.delete('assetId')
+        setSearchParams(searchParams, { replace: true })
+      })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const createAsset = async (form: any) => {
     await api.post('/ea-repository/assets', form)

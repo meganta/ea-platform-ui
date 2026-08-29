@@ -14,8 +14,81 @@ function useApi() {
   }, [token])
 }
 
-interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date }
+interface EvidenceItem {
+  sourceType: 'EA_ASSET' | 'GOVERNANCE_REVIEW'
+  sourceId: string
+  title: string
+  excerpt: string
+  assetType?: string
+  domain?: string | null
+  version: string | null
+  status: string
+  validityClassification: 'CURRENT' | 'FUTURE' | 'EXPIRED' | 'SUPERSEDED' | 'UNKNOWN'
+  sourceAuthorityLevel: 'AUTHORITATIVE' | 'ADVISORY' | 'HISTORICAL' | 'UNVALIDATED'
+  effectiveFrom: string | null
+  effectiveUntil: string | null
+  retrievalReason: string
+  score: number
+  targetRef: { type: string; id: string }
+}
+interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[] }
 interface Architect { id: string; code: string; name: string; role: string; domain?: string; avatar: string; description?: string; isChief: boolean; aiModel: string; isActive: boolean }
+
+// Phase 1: authority-level color coding, matching the same caveat
+// language ArchitectEngineService's evidence-validity.ts reuse already
+// produces server-side (an item with no bracketed caveat is
+// AUTHORITATIVE) — colors are purely a visual echo of that same
+// classification, not a separate judgment made in the frontend.
+const AUTHORITY_STYLE: Record<EvidenceItem['sourceAuthorityLevel'], { bg: string; fg: string; label: string }> = {
+  AUTHORITATIVE: { bg: 'rgba(34,197,94,0.15)', fg: '#22c55e', label: 'Authoritative' },
+  ADVISORY: { bg: 'rgba(234,179,8,0.15)', fg: '#eab308', label: 'Advisory / Draft' },
+  HISTORICAL: { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8', label: 'Historical' },
+  UNVALIDATED: { bg: 'rgba(249,115,22,0.15)', fg: '#f97316', label: 'Validity Unknown' },
+}
+
+function openEvidenceSource(item: EvidenceItem) {
+  // Real deep link for EA_ASSET (RepositoryPage reads ?assetId= and opens
+  // the actual asset detail modal - see that page's own change). No
+  // equivalent query-param handling exists yet on GovernancePage, so a
+  // GOVERNANCE_REVIEW item opens the review list rather than a fake/
+  // non-functional deep link to the specific review - a real follow-up,
+  // not silently pretended to already work.
+  if (item.sourceType === 'EA_ASSET') window.open(`/repository?assetId=${item.sourceId}`, '_blank')
+  else window.open('/governance', '_blank')
+}
+
+/** Expandable "N sources" panel shown under an architect message that has evidence — the Phase 1 evidence-grounded Copilot's one visible surface so far (inline citation markers in the response text itself are a further follow-up). */
+function EvidenceDrawer({ evidence }: { evidence?: EvidenceItem[] }) {
+  const [open, setOpen] = useState(false)
+  if (!evidence || evidence.length === 0) return null
+  return (
+    <div style={{ marginTop: 6 }}>
+      <button onClick={() => setOpen(o => !o)} style={{ fontSize: 11, color: 'var(--text-dim)', background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '3px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+        🔍 {evidence.length} source{evidence.length === 1 ? '' : 's'} {open ? '▲' : '▼'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 480 }}>
+          {evidence.map((item, i) => {
+            const style = AUTHORITY_STYLE[item.sourceAuthorityLevel] || AUTHORITY_STYLE.UNVALIDATED
+            return (
+              <div key={item.sourceId + i} style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--navy-light)', border: '1px solid var(--border)', fontSize: 12 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
+                  <span style={{ flexShrink: 0, fontSize: 10, padding: '2px 7px', borderRadius: 999, background: style.bg, color: style.fg }}>{style.label}</span>
+                </div>
+                <div style={{ color: 'var(--text-dim)', marginTop: 3, fontSize: 11.5, lineHeight: 1.5 }}>{item.excerpt}</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>{item.sourceType === 'EA_ASSET' ? (item.assetType || 'Asset') : 'Governance Review'}</span>
+                  <button onClick={() => openEvidenceSource(item)} style={{ fontSize: 10.5, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View source →</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const MODEL_LABEL: Record<string, string> = { haiku: '⚡ Fast', sonnet: '🧠 Smart' }
 const DOMAIN_COLOR: Record<string, string> = { CHIEF: '#f39c12', BUSINESS: '#3498db', BENEFICIARY: '#2980b9', APPLICATION: '#e67e22', INTEGRATION: '#16a085', DATA: '#1abc9c', TECHNOLOGY: '#e74c3c', SECURITY: '#9b59b6' }
@@ -492,7 +565,7 @@ export default function CopilotPage() {
       await streamSse('/copilot/chat', { message: msg, architectCode: selectedArchitect.code, conversationId: activeConvId }, (d) => {
         if (d.type === 'meta') setActiveConvId(d.conversationId)
         if (d.type === 'text') setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, content: msg2.content + d.content } : msg2))
-        if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations() }
+        if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations(); setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, evidence: d.evidence } : msg2)) }
       })
     } else {
       // Multi-architect consultation
@@ -502,7 +575,7 @@ export default function CopilotPage() {
         if (d.type === 'meta') setActiveConvId(d.conversationId)
         if (d.type === 'architect_response') {
           const arch = architects.find(a => a.code === d.architectCode)
-          setMessages(m => [...m, { id: Date.now() + d.architectCode, role: 'architect', content: d.content, architectCode: d.architectCode, architectName: d.architectName || arch?.name, architectAvatar: arch?.avatar || '🤖', timestamp: new Date() }])
+          setMessages(m => [...m, { id: Date.now() + d.architectCode, role: 'architect', content: d.content, architectCode: d.architectCode, architectName: d.architectName || arch?.name, architectAvatar: arch?.avatar || '🤖', timestamp: new Date(), evidence: d.evidence }])
         }
         if (d.type === 'chief_start') {
           const chief = architects.find(a => a.isChief)
@@ -676,6 +749,7 @@ export default function CopilotPage() {
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>
                   {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
+                {m.role === 'architect' && <EvidenceDrawer evidence={m.evidence} />}
               </div>
             </div>
           ))}
