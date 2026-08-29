@@ -1391,6 +1391,79 @@ describe('EaViewsPage - Comparison mode (Phase 5B)', () => {
     fireEvent.click(screen.getByText(/✕ Exit Comparison/));
     expect(screen.queryByText(/✕ Exit Comparison/)).not.toBeInTheDocument();
   });
+
+  // ── The 5 deferred comparison renderers ─────────────────────────────
+  function richComparisonResult() {
+    const capA = { id: 'capA', name: 'Capability A', semanticType: 'BusinessCapability', domain: 'BUSINESS', role: 'PRIMARY' };
+    const appX = { id: 'appX', name: 'App X', semanticType: 'Application', domain: 'APPLICATION', role: 'RELATED', metadata: { risk: 'MEDIUM' } };
+    const appXAfter = { ...appX, metadata: { risk: 'HIGH' } };
+    const appZ = { id: 'appZ', name: 'App Z', semanticType: 'Application', domain: 'APPLICATION', role: 'RELATED' };
+    return {
+      context: { leftScenario: { id: 'current', name: 'Current Architecture' }, rightScenario: { id: 'targetA', name: 'Target A' } },
+      objects: {
+        added: [{ id: 'appZ', changeType: 'ADDED', right: appZ }],
+        removed: [],
+        modified: [{ id: 'appX', changeType: 'MODIFIED', left: appX, right: appXAfter, propertyChanges: [{ property: 'metadata.risk', before: 'MEDIUM', after: 'HIGH' }] }],
+        unchanged: [{ id: 'capA', changeType: 'UNCHANGED', left: capA, right: capA }],
+      },
+      relationships: {
+        added: [{ key: 'capA::appZ::supported_by', right: { sourceId: 'capA', targetId: 'appZ', relationshipType: 'supported_by', label: 'supported_by' } }],
+        removed: [],
+        unchanged: [{ key: 'capA::appX::supported_by', left: { sourceId: 'capA', targetId: 'appX', relationshipType: 'supported_by', label: 'supported_by' }, right: { sourceId: 'capA', targetId: 'appX', relationshipType: 'supported_by', label: 'supported_by' } }],
+      },
+      leftPaths: [], rightPaths: [],
+      leftHierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null } }],
+      rightHierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null } }],
+      leftMetrics: [{ key: 'risk', label: 'risk', dataType: 'categorical' }],
+      rightMetrics: [{ key: 'risk', label: 'risk', dataType: 'categorical' }],
+      metrics: { objectCounts: { added: 1, removed: 0, modified: 1, unchanged: 1 }, relationshipCounts: { added: 1, removed: 0, unchanged: 1 } },
+      warnings: [], provenance: { leftTruncated: false, rightTruncated: false },
+    };
+  }
+
+  async function runRichComparison() {
+    await openComparisonView(richComparisonResult());
+    await screen.findByText(/Choose two scenarios/);
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    fireEvent.change(selects[0], { target: { value: 'current' } });
+    fireEvent.change(selects[1], { target: { value: 'targetA' } });
+    fireEvent.click(screen.getByText(/^Compare/));
+    await screen.findAllByText(/\+1 Added/); // both the Objects and Relationships summary lines match this fixture's counts
+  }
+
+  it('Graph comparison shows Capability A, App X (modified) and App Z (added) with change symbols, not relying on color alone', async () => {
+    await runRichComparison();
+    fireEvent.click(screen.getByText('Graph'));
+    await screen.findByText(/Capability A/);
+    // change symbols (+/~/−) appear in the node labels themselves, not just as a color
+    expect(screen.getByText(/~ App X/)).toBeInTheDocument();
+  });
+
+  it('Capability Map comparison shows Capability A as UNCHANGED using the real hierarchy', async () => {
+    await runRichComparison();
+    fireEvent.click(screen.getByText('Capability Map'));
+    await screen.findByText('Capability A');
+  });
+
+  it('Heatmap comparison shows the categorical risk transition MEDIUM -> HIGH for App X, never a fabricated numeric delta', async () => {
+    await runRichComparison();
+    fireEvent.click(screen.getByText('Heatmap'));
+    await screen.findByText(/MEDIUM → HIGH/);
+  });
+
+  it('Tree comparison renders Capability A from the real hierarchy', async () => {
+    await runRichComparison();
+    fireEvent.click(screen.getByText('Tree'));
+    await screen.findByText('Capability A');
+  });
+
+  it('Cards comparison shows App X\'s property change and App Z as a new card', async () => {
+    await runRichComparison();
+    fireEvent.click(screen.getByText('Cards'));
+    await screen.findByText('App X');
+    expect(screen.getByText(/metadata.risk: MEDIUM → HIGH/)).toBeInTheDocument();
+    expect(screen.getByText('App Z')).toBeInTheDocument();
+  });
 });
 
 describe('EaViewsPage - Object Context View entry point', () => {

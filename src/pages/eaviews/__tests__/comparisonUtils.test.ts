@@ -1,4 +1,4 @@
-import { buildChangeSummaryRows, buildRelationshipChangeRows, buildComparisonMatrix, applyComparisonFilters } from '../comparisonUtils'
+import { buildChangeSummaryRows, buildRelationshipChangeRows, buildComparisonMatrix, applyComparisonFilters, buildComparisonGraphDataset, buildComparisonCapabilityMap, buildHeatmapComparison, buildComparisonTree, buildComparisonCards } from '../comparisonUtils'
 
 describe('comparisonUtils', () => {
   const capA = { id: 'capA', name: 'Capability A', semanticType: 'BusinessCapability', domain: 'BUSINESS' }
@@ -188,5 +188,125 @@ describe('comparisonUtils', () => {
   it('an empty filters object returns everything, including UNCHANGED', () => {
     const filtered = applyComparisonFilters(acceptanceComparison, {})
     expect(filtered.unchanged.length).toBe(acceptanceComparison.objects.unchanged.length)
+  })
+
+  // ── Graph comparison ─────────────────────────────────────────────────
+
+  it('buildComparisonGraphDataset annotates every object/relationship with its change type, and is shaped for graphDisclosureUtils', () => {
+    const result = buildComparisonGraphDataset(acceptanceComparison)
+    expect(result.objects.find((o: any) => o.id === 'appZ')?._comparisonChangeType).toBe('ADDED')
+    expect(result.objects.find((o: any) => o.id === 'appY')?._comparisonChangeType).toBe('REMOVED')
+    expect(result.objects.find((o: any) => o.id === 'appX')?._comparisonChangeType).toBe('MODIFIED')
+    expect(result.relationships.find((r: any) => r.id === 'appX::kubernetes::hosted_on')?._comparisonChangeType).toBe('ADDED')
+    expect(result.relationships.find((r: any) => r.id === 'appX::techLegacy::hosted_on')?._comparisonChangeType).toBe('REMOVED')
+    // shape is directly usable by buildGraphIndexes: objects have .id, relationships have .sourceId/.targetId
+    expect(result.relationships.every((r: any) => 'sourceId' in r && 'targetId' in r)).toBe(true)
+  })
+
+  it('buildComparisonGraphDataset retains a REMOVED object fully, even though it does not exist on the right side', () => {
+    const result = buildComparisonGraphDataset(acceptanceComparison)
+    const removedObj = result.objects.find((o: any) => o.id === 'appY')
+    expect(removedObj).toMatchObject({ name: 'App Y' })
+  })
+
+  // ── Capability Map comparison ────────────────────────────────────────
+
+  it('buildComparisonCapabilityMap uses the REAL hierarchy, never inferring structure from relationships', () => {
+    const comparison = {
+      ...acceptanceComparison,
+      leftHierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null, capB: 'capA' } }],
+      rightHierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null, capB: 'capA', capC: 'capA' } }],
+    }
+    const result = buildComparisonCapabilityMap(comparison)
+    expect(result.eligible).toBe(true)
+    const capC = result.nodes?.find(n => n.id === 'capC')
+    expect(capC?.onlyInSide).toBe('RIGHT')
+  })
+
+  it('buildComparisonCapabilityMap is ineligible with a clear reason when no hierarchy exists on either side', () => {
+    const result = buildComparisonCapabilityMap({ ...acceptanceComparison, leftHierarchies: [], rightHierarchies: [] })
+    expect(result.eligible).toBe(false)
+    expect(result.reason).toBeTruthy()
+  })
+
+  // ── Heatmap comparison ────────────────────────────────────────────────
+
+  it('buildHeatmapComparison shows a real numeric before/after/delta for a numeric metric', () => {
+    const comparison = {
+      objects: { added: [], removed: [], modified: [{ id: 'app1', changeType: 'MODIFIED', left: { id: 'app1', name: 'App 1', metadata: { score: 10 } }, right: { id: 'app1', name: 'App 1', metadata: { score: 25 } } }], unchanged: [] },
+      relationships: { added: [], removed: [], unchanged: [] }, leftPaths: [], rightPaths: [],
+      leftMetrics: [{ key: 'score', dataType: 'numeric' }], rightMetrics: [{ key: 'score', dataType: 'numeric' }],
+    }
+    const result = buildHeatmapComparison(comparison, 'score')
+    expect(result.eligible).toBe(true)
+    expect(result.cells?.[0]).toEqual({ objectId: 'app1', name: 'App 1', dataType: 'numeric', before: 10, after: 25, delta: 15 })
+  })
+
+  it('buildHeatmapComparison shows a before->after transition for a categorical metric, NEVER a fabricated numeric delta', () => {
+    const comparison = {
+      objects: { added: [], removed: [], modified: [{ id: 'app1', changeType: 'MODIFIED', left: { id: 'app1', name: 'App 1', metadata: { risk: 'MEDIUM' } }, right: { id: 'app1', name: 'App 1', metadata: { risk: 'HIGH' } } }], unchanged: [] },
+      relationships: { added: [], removed: [], unchanged: [] }, leftPaths: [], rightPaths: [],
+      leftMetrics: [{ key: 'risk', dataType: 'categorical' }], rightMetrics: [{ key: 'risk', dataType: 'categorical' }],
+    }
+    const result = buildHeatmapComparison(comparison, 'risk')
+    expect(result.eligible).toBe(true)
+    const cell = result.cells?.[0]
+    expect(cell).toMatchObject({ dataType: 'categorical', before: 'MEDIUM', after: 'HIGH', transitioned: true })
+    expect(cell).not.toHaveProperty('delta')
+  })
+
+  it('buildHeatmapComparison is ineligible with a deterministic reason when the metric exists on only one side', () => {
+    const comparison = { objects: { added: [], removed: [], modified: [], unchanged: [] }, relationships: { added: [], removed: [], unchanged: [] }, leftPaths: [], rightPaths: [], leftMetrics: [{ key: 'risk', dataType: 'categorical' }], rightMetrics: [] }
+    const result = buildHeatmapComparison(comparison, 'risk')
+    expect(result.eligible).toBe(false)
+    expect(result.reason).toContain('risk')
+  })
+
+  it('buildHeatmapComparison is ineligible when the metric type is incompatible between sides', () => {
+    const comparison = { objects: { added: [], removed: [], modified: [], unchanged: [] }, relationships: { added: [], removed: [], unchanged: [] }, leftPaths: [], rightPaths: [], leftMetrics: [{ key: 'risk', dataType: 'categorical' }], rightMetrics: [{ key: 'risk', dataType: 'numeric' }] }
+    const result = buildHeatmapComparison(comparison, 'risk')
+    expect(result.eligible).toBe(false)
+  })
+
+  // ── Tree comparison ───────────────────────────────────────────────────
+
+  it('buildComparisonTree places a structurally-moved node under its NEW parent and flags it as moved', () => {
+    const comparison = {
+      ...acceptanceComparison,
+      leftHierarchies: [{ parentByObjectId: { capA: null, capB: 'capA', capD: 'capB' } }],
+      rightHierarchies: [{ parentByObjectId: { capA: null, capB: 'capA', capD: 'capA' } }],
+    }
+    const result = buildComparisonTree(comparison)
+    expect(result.eligible).toBe(true)
+    const capA = result.roots?.find(n => n.id === 'capA')
+    const capD = capA?.children.find(n => n.id === 'capD')
+    expect(capD?.moved).toBe(true)
+    expect(capD?.leftParentId).toBe('capB')
+    expect(capD?.rightParentId).toBe('capA')
+  })
+
+  it('buildComparisonTree never duplicates a node - it appears exactly once in the tree', () => {
+    const comparison = { ...acceptanceComparison, leftHierarchies: [{ parentByObjectId: { capA: null, capB: 'capA' } }], rightHierarchies: [{ parentByObjectId: { capA: null, capB: 'capA' } }] }
+    const result = buildComparisonTree(comparison)
+    const countOccurrences = (nodes: any[], id: string): number => nodes.reduce((sum, n) => sum + (n.id === id ? 1 : 0) + countOccurrences(n.children, id), 0)
+    expect(countOccurrences(result.roots ?? [], 'capB')).toBe(1)
+  })
+
+  // ── Cards comparison ──────────────────────────────────────────────────
+
+  it('buildComparisonCards shows App X as MODIFIED with its property change and relationship changes', () => {
+    const cards = buildComparisonCards(acceptanceComparison)
+    const appXCard = cards.find(c => c.id === 'appX')
+    expect(appXCard?.changeType).toBe('MODIFIED')
+    expect(appXCard?.propertyChanges).toEqual([{ property: 'metadata.hostingModel', before: 'ON_PREM', after: 'CONTAINER' }])
+    expect(appXCard?.relationshipChanges).toEqual(expect.arrayContaining([
+      { relationship: 'hosted_on', target: 'Kubernetes', changeType: 'ADDED' },
+      { relationship: 'hosted_on', target: 'Tech Legacy', changeType: 'REMOVED' },
+    ]))
+  })
+
+  it('buildComparisonCards excludes UNCHANGED objects by default', () => {
+    const cards = buildComparisonCards(acceptanceComparison)
+    expect(cards.find(c => c.id === 'capA')).toBeUndefined()
   })
 })

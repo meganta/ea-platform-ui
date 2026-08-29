@@ -12,7 +12,7 @@ import { determineTableMode, buildRelationshipTable, buildMatrix } from './eavie
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
 import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters, ExpandDirection } from './eaviews/graphDisclosureUtils'
 import { buildScenarioLineageTree, getScenarioLineagePath, chooseVisualizationAfterScenarioSwitch } from './eaviews/scenarioSelectorUtils'
-import { buildChangeSummaryRows, buildRelationshipChangeRows, buildComparisonMatrix, applyComparisonFilters } from './eaviews/comparisonUtils'
+import { buildChangeSummaryRows, buildRelationshipChangeRows, buildComparisonMatrix, applyComparisonFilters, buildComparisonGraphDataset, buildComparisonCapabilityMap, buildHeatmapComparison, buildComparisonTree, buildComparisonCards, CHANGE_TYPE_SYMBOL } from './eaviews/comparisonUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -384,7 +384,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [comparisonData, setComparisonData] = useState<any>(null)
   const [comparisonLoading, setComparisonLoading] = useState(false)
   const [comparisonError, setComparisonError] = useState<string | null>(null)
-  const [comparisonView, setComparisonView] = useState<'TABLE' | 'MATRIX'>('TABLE')
+  const [comparisonView, setComparisonView] = useState<'TABLE' | 'MATRIX' | 'GRAPH' | 'CAPABILITY_MAP' | 'HEATMAP' | 'TREE' | 'CARDS'>('TABLE')
   // Section 21: default emphasizes changes - UNCHANGED excluded from the
   // initial filter set (unlike the empty-set-means-"show all" convention
   // used elsewhere in this component for object/relationship-type
@@ -392,6 +392,9 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // changed. The user can still check UNCHANGED explicitly.
   const [comparisonChangeFilter, setComparisonChangeFilter] = useState<Set<string>>(new Set(['ADDED', 'REMOVED', 'MODIFIED']))
   const comparisonRequestTokenRef = React.useRef(0)
+  const [comparisonGraphVisible, setComparisonGraphVisible] = useState<any>(null)
+  const [comparisonGraphFocusId, setComparisonGraphFocusId] = useState<string | null>(null)
+  const [comparisonHeatmapMetric, setComparisonHeatmapMetric] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [vizMode, setVizMode] = useState<string>(view.visualization || 'GRAPH')
   const [filterDomain, setFilterDomain] = useState('')
@@ -673,6 +676,19 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     api.get('/ea-views/saved-filters').then((f: any) => setSavedFilters(Array.isArray(f) ? f : [])).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Comparison Graph: initialize progressive disclosure fresh for each
+  // newly-loaded comparison (Section 13/14) - reuses the exact same
+  // Phase 4C functions the single-scenario Graph uses, over the dataset
+  // shape buildComparisonGraphDataset produces.
+  useEffect(() => {
+    if (!comparisonData) { setComparisonGraphVisible(null); setComparisonGraphFocusId(null); return }
+    const cgd = buildComparisonGraphDataset(comparisonData)
+    const indexes = buildGraphIndexes(cgd)
+    const focusId = chooseFocusObject(cgd, null)
+    setComparisonGraphFocusId(focusId)
+    setComparisonGraphVisible(focusId ? computeInitialVisibleSet(indexes, focusId) : null)
+  }, [comparisonData])
 
   const applySavedFilter = (filterId: string) => {
     const f = savedFilters.find((sf: any) => sf.id === filterId)
@@ -1473,6 +1489,11 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
               <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center', flexWrap: 'wrap' as const }}>
                 <button style={comparisonView === 'TABLE' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('TABLE')}>Table</button>
                 <button style={comparisonView === 'MATRIX' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('MATRIX')}>Matrix</button>
+                <button style={comparisonView === 'GRAPH' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('GRAPH')}>Graph</button>
+                <button style={comparisonView === 'CAPABILITY_MAP' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('CAPABILITY_MAP')}>Capability Map</button>
+                <button style={comparisonView === 'HEATMAP' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('HEATMAP')}>Heatmap</button>
+                <button style={comparisonView === 'TREE' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('TREE')}>Tree</button>
+                <button style={comparisonView === 'CARDS' ? S.btn('primary') : S.btn()} onClick={() => setComparisonView('CARDS')}>Cards</button>
                 {(['ADDED', 'REMOVED', 'MODIFIED', 'UNCHANGED'] as const).map(ct => (
                   <label key={ct} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}>
                     <input type="checkbox" checked={comparisonChangeFilter.has(ct)} onChange={() => setComparisonChangeFilter(prev => { const next = new Set(prev); next.has(ct) ? next.delete(ct) : next.add(ct); return next })} />
@@ -1512,7 +1533,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                     </tbody>
                   </table>
                 </div>
-              ) : (() => {
+              ) : comparisonView === 'MATRIX' ? (() => {
                 const m = buildComparisonMatrix(comparisonData)
                 if (!m.eligible) return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{m.reason}</div>
                 return (
@@ -1536,6 +1557,120 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                )
+              })() : comparisonView === 'GRAPH' ? (() => {
+                const cgd = buildComparisonGraphDataset(comparisonData)
+                const indexes = buildGraphIndexes(cgd)
+                if (!comparisonGraphFocusId || !comparisonGraphVisible) return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>No objects to compare.</div>
+                const visibleObjects = cgd.objects.filter((o: any) => comparisonGraphVisible.visibleObjectIds.has(o.id))
+                const visibleRels = cgd.relationships.filter((r: any) => comparisonGraphVisible.visibleRelationshipIds.has(r.id))
+                const positions: Record<string, { x: number; y: number }> = {}
+                visibleObjects.forEach((o: any, i: number) => { positions[o.id] = { x: 80 + (i % 5) * 150, y: 60 + Math.floor(i / 5) * 100 } })
+                return (
+                  <div>
+                    <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+                      Showing {visibleObjects.length} of {cgd.objects.length} objects. Legend: <span style={{ color: CHANGE_COLOR.ADDED }}>+ Added</span> <span style={{ color: CHANGE_COLOR.REMOVED }}>− Removed</span> <span style={{ color: CHANGE_COLOR.MODIFIED }}>~ Modified</span> <span style={{ color: 'var(--text-dim)' }}>Unchanged</span>
+                      <button style={{ ...S.btn(), fontSize: 11, marginLeft: 12 }} onClick={() => setComparisonGraphVisible((prev: any) => expandAllNextPathHops(indexes, prev))}>Expand next hop</button>
+                    </div>
+                    <svg viewBox="0 0 800 400" style={{ width: '100%', height: 400, background: 'var(--navy-light)', borderRadius: 8 }}>
+                      {visibleRels.map((r: any) => {
+                        const from = positions[r.sourceId], to = positions[r.targetId]
+                        if (!from || !to) return null
+                        const color = CHANGE_COLOR[r._comparisonChangeType] || 'var(--text-dim)'
+                        return <line key={r.id} x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke={color} strokeWidth={2} strokeDasharray={r._comparisonChangeType === 'REMOVED' ? '4,3' : undefined} />
+                      })}
+                      {visibleObjects.map((o: any) => {
+                        const pos = positions[o.id]
+                        const color = CHANGE_COLOR[o._comparisonChangeType] || 'var(--text-dim)'
+                        return (
+                          <g key={o.id} onClick={() => setSelected(o)} style={{ cursor: 'pointer' }}>
+                            <circle cx={pos.x} cy={pos.y} r={26} fill="var(--navy)" stroke={color} strokeWidth={3} />
+                            <text x={pos.x} y={pos.y - 34} textAnchor="middle" fontSize={11} fill="var(--text)">{CHANGE_TYPE_SYMBOL[o._comparisonChangeType]} {o.name}</text>
+                          </g>
+                        )
+                      })}
+                    </svg>
+                  </div>
+                )
+              })() : comparisonView === 'CAPABILITY_MAP' ? (() => {
+                const cm = buildComparisonCapabilityMap(comparisonData)
+                if (!cm.eligible) return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{cm.reason}</div>
+                return (
+                  <div>
+                    {(cm.nodes ?? []).sort((a, b) => a.depth - b.depth).map(n => (
+                      <div key={n.id} style={{ marginLeft: n.depth * 24, padding: '6px 10px', borderLeft: `3px solid ${CHANGE_COLOR[n.changeType]}`, marginBottom: 4, background: 'var(--navy-light)', borderRadius: 4, fontSize: 13 }}>
+                        <span style={S.badge(CHANGE_COLOR[n.changeType])}>{CHANGE_TYPE_SYMBOL[n.changeType]}</span> {n.name}
+                        {n.onlyInSide && <span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>(only in {n.onlyInSide === 'LEFT' ? comparisonData.context?.leftScenario?.name : comparisonData.context?.rightScenario?.name})</span>}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })() : comparisonView === 'HEATMAP' ? (() => {
+                const availableMetrics = (comparisonData.leftMetrics ?? []).filter((m: any) => (comparisonData.rightMetrics ?? []).some((rm: any) => rm.key === m.key))
+                const activeMetric = comparisonHeatmapMetric || availableMetrics[0]?.key || ''
+                const hm = activeMetric ? buildHeatmapComparison(comparisonData, activeMetric) : { eligible: false, reason: 'No comparable metric is available on both sides.' }
+                return (
+                  <div>
+                    <div style={{ marginBottom: 12 }}>
+                      <label style={S.label}>Metric</label>
+                      <select style={{ ...S.input, maxWidth: 200 }} value={activeMetric} onChange={e => setComparisonHeatmapMetric(e.target.value)}>
+                        {availableMetrics.map((m: any) => <option key={m.key} value={m.key}>{m.label || m.key}</option>)}
+                      </select>
+                    </div>
+                    {!hm.eligible ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{hm.reason}</div> : (
+                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                        <thead><tr>{['Object', 'Before', 'After', 'Change'].map(h => <th key={h} style={{ padding: '6px 10px', background: 'var(--navy-mid)', textAlign: 'left', fontSize: 11 }}>{h}</th>)}</tr></thead>
+                        <tbody>
+                          {(hm.cells ?? []).map(c => (
+                            <tr key={c.objectId}>
+                              <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', fontSize: 12 }}>{c.name}</td>
+                              <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', fontSize: 12 }}>{String(c.before ?? '—')}</td>
+                              <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', fontSize: 12 }}>{String(c.after ?? '—')}</td>
+                              <td style={{ padding: '6px 10px', borderBottom: '1px solid var(--border)', fontSize: 12 }}>{c.dataType === 'numeric' ? (c.delta !== undefined ? `${c.delta >= 0 ? '+' : ''}${c.delta}` : '—') : (c.transitioned ? `${c.before} → ${c.after}` : 'no change')}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )
+              })() : comparisonView === 'TREE' ? (() => {
+                const t = buildComparisonTree(comparisonData)
+                if (!t.eligible) return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{t.reason}</div>
+                const renderNode = (n: any): React.ReactNode => (
+                  <div key={n.id} style={{ marginLeft: 20 }}>
+                    <div style={{ padding: '4px 8px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={S.badge(CHANGE_COLOR[n.changeType])}>{CHANGE_TYPE_SYMBOL[n.changeType]}</span>
+                      <span style={{ fontSize: 13 }}>{n.name}</span>
+                      {n.moved && <span style={{ fontSize: 11, color: '#f39c12' }}>(moved)</span>}
+                    </div>
+                    {n.children.map((c: any) => renderNode(c))}
+                  </div>
+                )
+                return <div>{(t.roots ?? []).map(n => renderNode(n))}</div>
+              })() : (() => {
+                const cards = buildComparisonCards(comparisonData, comparisonChangeFilter.has('UNCHANGED'))
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+                    {cards.map(card => (
+                      <div key={card.id} style={{ ...S.card, padding: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <strong style={{ fontSize: 13 }}>{card.name}</strong>
+                          <span style={S.badge(CHANGE_COLOR[card.changeType])}>{card.changeType}</span>
+                        </div>
+                        {card.propertyChanges.length > 0 && (
+                          <div style={{ fontSize: 12, marginBottom: 6 }}>
+                            {card.propertyChanges.map(p => <div key={p.property}>{p.property}: {String(p.before)} → {String(p.after)}</div>)}
+                          </div>
+                        )}
+                        {card.relationshipChanges.length > 0 && (
+                          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                            {card.relationshipChanges.map((r, i) => <div key={i}>{r.changeType === 'ADDED' ? '+' : '−'} {r.relationship} {r.target}</div>)}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )
               })()}
