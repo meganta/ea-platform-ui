@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -55,6 +55,53 @@ function openEvidenceSource(item: EvidenceItem) {
   // not silently pretended to already work.
   if (item.sourceType === 'EA_ASSET') window.open(`/repository?assetId=${item.sourceId}`, '_blank')
   else window.open('/governance', '_blank')
+}
+
+// Escapes regex special characters in an evidence title before building a
+// match pattern from it - titles are tenant-controlled free text (an
+// asset name), not something safe to interpolate into a RegExp as-is.
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * Phase 1 follow-up: connects an architect's response TEXT to the
+ * evidence that grounded it, rather than leaving the drawer as the only
+ * link between the two. Purely a frontend text-match against each
+ * evidence item's title (no model behavior change, no new backend data) -
+ * genuinely simpler than asking the model to emit citation markers, and
+ * still gives a real, clickable connection: any place in the response
+ * where an evidence item's title appears verbatim becomes a dotted-
+ * underline link back to that source. Titles under 3 characters are
+ * skipped (too likely to match unrelated substrings); longer titles are
+ * matched before shorter ones so a more specific title isn't shadowed by
+ * a shorter one that happens to be a substring of it.
+ */
+function renderContentWithCitations(content: string, evidence?: EvidenceItem[]): ReactNode {
+  if (!evidence || evidence.length === 0) return content
+  const candidates = [...evidence]
+    .filter(e => e.title && e.title.trim().length >= 3)
+    .sort((a, b) => b.title.length - a.title.length)
+  if (candidates.length === 0) return content
+
+  const pattern = new RegExp(`(${candidates.map(e => escapeRegExp(e.title)).join('|')})`, 'gi')
+  const parts = content.split(pattern)
+  if (parts.length <= 1) return content // no match found at all
+
+  return parts.map((part, i) => {
+    const matched = candidates.find(e => e.title.toLowerCase() === part.toLowerCase())
+    if (!matched) return part
+    return (
+      <span
+        key={i}
+        onClick={() => openEvidenceSource(matched)}
+        title={`Source: ${matched.title}`}
+        style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer', color: 'inherit', fontWeight: 500 }}
+      >
+        {part}
+      </span>
+    )
+  })
 }
 
 /** Expandable "N sources" panel shown under an architect message that has evidence — the Phase 1 evidence-grounded Copilot's one visible surface so far (inline citation markers in the response text itself are a further follow-up). */
@@ -501,16 +548,30 @@ function PlaybookRunner({ api }: { api: any }) {
           {result && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {result.domainResponses.map((r: any) => (
-                <div key={r.architectCode} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
-                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>{r.architectName}</div>
-                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{r.content}</div>
+                <div key={r.architectCode} style={{ padding: 12, borderRadius: 8, border: r.failed ? '1px solid #f97316' : '1px solid var(--border)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {r.architectName}
+                    {r.failed && (
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
+                        ⚠️ did not complete
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{renderContentWithCitations(r.content, r.evidence)}</div>
                   <EvidenceDrawer evidence={r.evidence} />
                 </div>
               ))}
               {result.chiefResponse && (
-                <div style={{ padding: 12, borderRadius: 8, border: '1px solid var(--accent)' }}>
-                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>🏛 {result.chiefResponse.architectName} — Synthesis</div>
-                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{result.chiefResponse.content}</div>
+                <div style={{ padding: 12, borderRadius: 8, border: result.chiefResponse.failed ? '1px solid #f97316' : '1px solid var(--accent)' }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    🏛 {result.chiefResponse.architectName} — Synthesis
+                    {result.chiefResponse.failed && (
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
+                        ⚠️ did not complete
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{renderContentWithCitations(result.chiefResponse.content, result.chiefResponse.evidence)}</div>
                 </div>
               )}
               {result.targetModule && (
@@ -1040,7 +1101,7 @@ export default function CopilotPage() {
                   </div>
                 )}
                 <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', background: m.role === 'user' ? 'var(--accent)' : 'var(--navy-light)', color: m.role === 'user' ? 'var(--navy)' : 'var(--text)', fontSize: 13, lineHeight: 1.7, border: m.failed ? '1px solid #f97316' : (m.role !== 'user' ? `1px solid ${archColor(m.architectCode)}33` : 'none'), whiteSpace: 'pre-wrap' }}>
-                  {m.content || <span style={{ opacity: 0.5 }}><span className="typing-dot" style={{ animation: 'blink 1s infinite' }}>•</span><span style={{ animationDelay: '0.2s', animation: 'blink 1s infinite' }}> •</span><span style={{ animationDelay: '0.4s', animation: 'blink 1s infinite' }}> •</span></span>}
+                  {m.content ? (m.role === 'architect' ? renderContentWithCitations(m.content, m.evidence) : m.content) : <span style={{ opacity: 0.5 }}><span className="typing-dot" style={{ animation: 'blink 1s infinite' }}>•</span><span style={{ animationDelay: '0.2s', animation: 'blink 1s infinite' }}> •</span><span style={{ animationDelay: '0.4s', animation: 'blink 1s infinite' }}> •</span></span>}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>
                   {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -285,6 +285,46 @@ describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
     expect(screen.queryByText(/🔍.*source/)).not.toBeInTheDocument();
   });
 
+  it('renders an inline citation link where the response text mentions an evidence item\'s title, and clicking it opens the same source as the drawer would', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'text', content: 'Your Payment Gateway already handles this use case.' },
+        { type: 'done', conversationId: 'conv-1', evidence: AUTHORITATIVE_EVIDENCE },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'Does anything already cover this?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    const citation = await screen.findByTitle('Source: Payment Gateway');
+    expect(citation).toHaveTextContent('Payment Gateway');
+    fireEvent.click(citation);
+    expect(openSpy).toHaveBeenCalledWith('/repository?assetId=asset-1', '_blank');
+  });
+
+  it('renders plain text with no citation link when the response never mentions any evidence item\'s title', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'text', content: 'A generic recommendation with no specific asset named.' },
+        { type: 'done', conversationId: 'conv-1', evidence: AUTHORITATIVE_EVIDENCE },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'Give me a general recommendation' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await screen.findByText('A generic recommendation with no specific asset named.');
+    expect(screen.queryByTitle('Source: Payment Gateway')).not.toBeInTheDocument();
+  });
+
   it('shows a sources toggle per architect response in consult mode', async () => {
     mockFetchWithSse(
       { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
@@ -409,6 +449,29 @@ describe('CopilotPage - Task Playbooks (Copilot Phase 2)', () => {
     expect(await screen.findByText('Business impact analysis text.')).toBeInTheDocument();
     expect(await screen.findByText('Consolidated recommendation text.')).toBeInTheDocument();
     expect(await screen.findByText(/Suggested next step.*governance review/i)).toBeInTheDocument();
+  });
+
+  it('shows the "did not complete" warning for a failed domain response or Chief synthesis in a playbook run too (Copilot Phase 4/6 gap fix)', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS,
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview': { missingInputs: [], resolvedArchitects: [{ code: 'BUSINESS', name: 'Business Architect', avatar: '💼' }], missingArchitects: [], willRunChiefSynthesis: true, evidencePreview: null },
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/run': {
+        playbookId: 'ARCHITECTURE_IMPACT_ANALYSIS', conversationId: 'conv-1',
+        domainResponses: [{ architectCode: 'BUSINESS', architectName: '💼 Business Architect', content: 'I encountered an issue processing your request. Please try again.', evidence: [], failed: true }],
+        chiefResponse: { architectCode: 'CHIEF', architectName: '🏛 Chief Architect', content: 'AI Copilot execution has been disabled by your tenant administrator.', failed: true },
+      },
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+    fireEvent.click(await screen.findByText('Architecture Impact Analysis'));
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Preview'));
+    fireEvent.click(await screen.findByText('Run Playbook'));
+
+    await screen.findByText('I encountered an issue processing your request. Please try again.');
+    const warnings = await screen.findAllByText('⚠️ did not complete');
+    expect(warnings).toHaveLength(2); // one for the domain response, one for the chief synthesis
   });
 
   it('disables the Run button while any required input is still missing', async () => {
