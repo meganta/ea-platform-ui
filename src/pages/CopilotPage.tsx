@@ -380,6 +380,152 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
   )
 }
 
+/** Phase 2: Task-mode UI — playbook picker, input form, a read-only preview step (spec requires reviewing the auto-selected architects/sources before execution), and structured run results. Mirrors MeetingAssistant's pattern (a self-contained sidebar-tab view, not folded into the Single/Consult chat toggle, since a playbook run is form-driven rather than a chat turn). */
+function PlaybookRunner({ api }: { api: any }) {
+  const [playbooks, setPlaybooks] = useState<any[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [inputs, setInputs] = useState<Record<string, string>>({})
+  const [preview, setPreview] = useState<any | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [result, setResult] = useState<any | null>(null)
+  const [running, setRunning] = useState(false)
+  const [architectOverride, setArchitectOverride] = useState<string[] | null>(null)
+
+  useEffect(() => { api.get('/copilot/playbooks').then((d: any) => setPlaybooks(Array.isArray(d) ? d : [])) }, [api])
+
+  const selected = playbooks.find(p => p.id === selectedId)
+  const allFields = selected ? [...selected.requiredInputs, ...selected.optionalInputs] : []
+
+  function selectPlaybook(p: any) {
+    setSelectedId(p.id); setInputs({}); setPreview(null); setResult(null); setArchitectOverride(null)
+  }
+
+  async function runPreview() {
+    if (!selected) return
+    setPreviewLoading(true)
+    try {
+      const p = await api.post(`/copilot/playbooks/${selected.id}/preview`, { inputs })
+      setPreview(p)
+      setArchitectOverride(p.resolvedArchitects?.map((a: any) => a.code) ?? null)
+    } finally {
+      setPreviewLoading(false)
+    }
+  }
+
+  async function runPlaybook() {
+    if (!selected) return
+    setRunning(true)
+    try {
+      const r = await api.post(`/copilot/playbooks/${selected.id}/run`, { inputs, architectOverride })
+      setResult(r)
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  function toggleOverride(code: string) {
+    setArchitectOverride(prev => {
+      const cur = prev ?? []
+      return cur.includes(code) ? cur.filter(c => c !== code) : [...cur, code]
+    })
+  }
+
+  return (
+    <div style={{ padding: 20, maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ fontWeight: 700, fontSize: 16 }}>🧭 Task Playbooks</div>
+
+      {!selected ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {playbooks.map(p => (
+            <div key={p.id} onClick={() => selectPlaybook(p)} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--navy-light)' }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2 }}>{p.description}</div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <button onClick={() => setSelectedId(null)} style={{ alignSelf: 'flex-start', fontSize: 11, background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0 }}>← Back to playbooks</button>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{selected.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{selected.description}</div>
+
+          {allFields.map(key => (
+            <div key={key}>
+              <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>
+                {key}{selected.requiredInputs.includes(key) ? ' *' : ' (optional)'}
+              </label>
+              <textarea
+                value={inputs[key] || ''}
+                onChange={e => { setInputs(prev => ({ ...prev, [key]: e.target.value })); setPreview(null); setResult(null) }}
+                rows={key === 'subject' ? 3 : 1}
+                style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 13, resize: 'vertical' }}
+              />
+            </div>
+          ))}
+
+          <button onClick={runPreview} disabled={previewLoading} style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: previewLoading ? 'default' : 'pointer' }}>
+            {previewLoading ? 'Loading preview...' : 'Preview'}
+          </button>
+
+          {preview && (
+            <div style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {preview.missingInputs.length > 0 && (
+                <div style={{ fontSize: 12, color: '#f97316' }}>Missing required input(s): {preview.missingInputs.join(', ')}</div>
+              )}
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 5 }}>Architects that will run — click to include/exclude:</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {preview.resolvedArchitects.map((a: any) => {
+                    const on = (architectOverride ?? []).includes(a.code)
+                    return (
+                      <span key={a.code} onClick={() => toggleOverride(a.code)} style={{ padding: '4px 10px', borderRadius: 999, fontSize: 11, cursor: 'pointer', background: on ? 'var(--accent)' : 'var(--navy-light)', color: on ? 'var(--navy)' : 'var(--text-dim)', border: '1px solid var(--border)' }}>
+                        {a.avatar} {a.name}
+                      </span>
+                    )
+                  })}
+                </div>
+                {preview.missingArchitects.length > 0 && (
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>Not available for this tenant: {preview.missingArchitects.join(', ')}</div>
+                )}
+                {preview.willRunChiefSynthesis && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>🏛 Chief Architect will synthesize these responses</div>}
+              </div>
+              {preview.evidencePreview && preview.evidencePreview.items.length > 0 && (
+                <EvidenceDrawer evidence={preview.evidencePreview.items} />
+              )}
+              <button onClick={runPlaybook} disabled={running || preview.missingInputs.length > 0} style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: (running || preview.missingInputs.length > 0) ? 'default' : 'pointer', opacity: (running || preview.missingInputs.length > 0) ? 0.6 : 1 }}>
+                {running ? 'Running...' : 'Run Playbook'}
+              </button>
+            </div>
+          )}
+
+          {result && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {result.domainResponses.map((r: any) => (
+                <div key={r.architectCode} style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)' }}>
+                  <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>{r.architectName}</div>
+                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{r.content}</div>
+                  <EvidenceDrawer evidence={r.evidence} />
+                </div>
+              ))}
+              {result.chiefResponse && (
+                <div style={{ padding: 12, borderRadius: 8, border: '1px solid var(--accent)' }}>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6 }}>🏛 {result.chiefResponse.architectName} — Synthesis</div>
+                  <div style={{ fontSize: 13, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{result.chiefResponse.content}</div>
+                </div>
+              )}
+              {result.targetModule && (
+                <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
+                  Suggested next step: take this to {result.targetModule.replace(/_/g, ' ').toLowerCase()} for a formal assessment. This is a preparatory analysis only — nothing has been submitted or decided automatically.
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function CopilotPage() {
   const api = useApi()
   const [architects, setArchitects] = useState<Architect[]>([])
@@ -392,7 +538,7 @@ export default function CopilotPage() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [includeChief, setIncludeChief] = useState(true)
-  const [sidebarTab, setSidebarTab] = useState<'architects' | 'history' | 'meetings'>('architects')
+  const [sidebarTab, setSidebarTab] = useState<'architects' | 'history' | 'meetings' | 'playbooks'>('architects')
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
@@ -618,9 +764,9 @@ export default function CopilotPage() {
 
         {/* Sidebar tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
-          {(['architects', 'history', 'meetings'] as const).map(t => (
+          {(['architects', 'history', 'meetings', 'playbooks'] as const).map(t => (
             <button key={t} style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSidebarTab(t)}>
-              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : '📋 Meetings'}
+              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : t === 'meetings' ? '📋 Meetings' : '🧭 Playbooks'}
             </button>
           ))}
         </div>
@@ -686,6 +832,10 @@ export default function CopilotPage() {
       {sidebarTab === 'meetings' ? (
         <div style={{ flex: 1, overflow: 'auto' }}>
           <MeetingAssistant api={api} architects={architects} />
+        </div>
+      ) : sidebarTab === 'playbooks' ? (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <PlaybookRunner api={api} />
         </div>
       ) : (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>

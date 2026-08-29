@@ -304,3 +304,86 @@ describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
     expect(await screen.findByText('🔍 1 source ▼')).toBeInTheDocument();
   });
 });
+
+describe('CopilotPage - Task Playbooks (Copilot Phase 2)', () => {
+  const PLAYBOOKS = [
+    { id: 'ARCHITECTURE_IMPACT_ANALYSIS', name: 'Architecture Impact Analysis', description: 'Assess ripple effects.', requiredInputs: ['subject'], optionalInputs: ['scopeRefId'] },
+    { id: 'DUPLICATION_REUSE_ANALYSIS', name: 'Application/Technology Duplication and Reuse Analysis', description: 'Find overlap.', requiredInputs: ['subject'], optionalInputs: [] },
+  ];
+
+  it('lists available playbooks and lets the user pick one, showing its input form', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+
+    expect(await screen.findByText('Architecture Impact Analysis')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Architecture Impact Analysis'));
+
+    expect(await screen.findByText(/subject \*/)).toBeInTheDocument();
+    expect(screen.getByText(/scopeRefId \(optional\)/)).toBeInTheDocument();
+  });
+
+  it('previews the resolved architects and evidence before running, without spending an AI call', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS,
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview': (opts: any) => ({
+        missingInputs: [], resolvedArchitects: [{ code: 'BUSINESS', name: 'Business Architect', avatar: '💼' }],
+        missingArchitects: [], willRunChiefSynthesis: false,
+        evidencePreview: { items: [{ sourceType: 'EA_ASSET', sourceId: 'a1', title: 'Payment Gateway', excerpt: 'Core service', sourceAuthorityLevel: 'AUTHORITATIVE' }], conflicts: [] },
+      }),
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+    fireEvent.click(await screen.findByText('Architecture Impact Analysis'));
+
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'migrating core banking' } });
+    fireEvent.click(screen.getByText('Preview'));
+
+    expect(await screen.findByText('💼 Business Architect')).toBeInTheDocument();
+    expect(await screen.findByText('🔍 1 source ▼')).toBeInTheDocument();
+
+    const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview'));
+    expect(JSON.parse(postCall[1].body).inputs.subject).toBe('migrating core banking');
+  });
+
+  it('runs the playbook and renders each domain response plus the Chief synthesis and suggested next step', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS,
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview': { missingInputs: [], resolvedArchitects: [{ code: 'BUSINESS', name: 'Business Architect', avatar: '💼' }], missingArchitects: [], willRunChiefSynthesis: true, evidencePreview: null },
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/run': {
+        playbookId: 'ARCHITECTURE_IMPACT_ANALYSIS', conversationId: 'conv-1',
+        domainResponses: [{ architectCode: 'BUSINESS', architectName: '💼 Business Architect', content: 'Business impact analysis text.', evidence: [] }],
+        chiefResponse: { architectCode: 'CHIEF', architectName: '🏛 Chief Architect', content: 'Consolidated recommendation text.' },
+        targetModule: 'GOVERNANCE_REVIEW',
+      },
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+    fireEvent.click(await screen.findByText('Architecture Impact Analysis'));
+    fireEvent.change(screen.getAllByRole('textbox')[0], { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Preview'));
+    fireEvent.click(await screen.findByText('Run Playbook'));
+
+    expect(await screen.findByText('Business impact analysis text.')).toBeInTheDocument();
+    expect(await screen.findByText('Consolidated recommendation text.')).toBeInTheDocument();
+    expect(await screen.findByText(/Suggested next step.*governance review/i)).toBeInTheDocument();
+  });
+
+  it('disables the Run button while any required input is still missing', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS, '/copilot/conversations': [], '/copilot/playbooks': PLAYBOOKS,
+      '/copilot/playbooks/ARCHITECTURE_IMPACT_ANALYSIS/preview': { missingInputs: ['subject'], resolvedArchitects: [], missingArchitects: [], willRunChiefSynthesis: false, evidencePreview: null },
+    });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('🧭 Playbooks'));
+    fireEvent.click(await screen.findByText('Architecture Impact Analysis'));
+    fireEvent.click(screen.getByText('Preview'));
+
+    const runButton = await screen.findByText('Run Playbook');
+    expect(runButton).toBeDisabled();
+  });
+});
