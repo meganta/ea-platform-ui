@@ -31,7 +31,7 @@ interface EvidenceItem {
   score: number
   targetRef: { type: string; id: string }
 }
-interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[]; remainingSpeech?: string | null }
+interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[]; remainingSpeech?: string | null; failed?: boolean }
 interface Architect { id: string; code: string; name: string; role: string; domain?: string; avatar: string; description?: string; isChief: boolean; aiModel: string; isActive: boolean }
 
 // Phase 1: authority-level color coding, matching the same caveat
@@ -746,7 +746,7 @@ export default function CopilotPage() {
         if (d.type === 'meta') setActiveConvId(d.conversationId)
         if (d.type === 'architect_response') {
           const arch = architects.find(a => a.code === d.architectCode)
-          setMessages(m => [...m, { id: Date.now() + d.architectCode, role: 'architect', content: d.content, architectCode: d.architectCode, architectName: d.architectName || arch?.name, architectAvatar: arch?.avatar || '🤖', timestamp: new Date(), evidence: d.evidence }])
+          setMessages(m => [...m, { id: Date.now() + d.architectCode, role: 'architect', content: d.content, architectCode: d.architectCode, architectName: d.architectName || arch?.name, architectAvatar: arch?.avatar || '🤖', timestamp: new Date(), evidence: d.evidence, failed: !!d.failed }])
         }
         if (d.type === 'chief_start') {
           const chief = architects.find(a => a.isChief)
@@ -916,9 +916,16 @@ export default function CopilotPage() {
               {/* Bubble */}
               <div style={{ maxWidth: '75%' }}>
                 {m.role !== 'user' && m.architectName && (
-                  <div style={{ fontSize: 11, fontWeight: 600, color: archColor(m.architectCode), marginBottom: 4 }}>{m.architectName}</div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: archColor(m.architectCode), marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {m.architectName}
+                    {m.failed && (
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
+                        ⚠️ did not complete
+                      </span>
+                    )}
+                  </div>
                 )}
-                <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', background: m.role === 'user' ? 'var(--accent)' : 'var(--navy-light)', color: m.role === 'user' ? 'var(--navy)' : 'var(--text)', fontSize: 13, lineHeight: 1.7, border: m.role !== 'user' ? `1px solid ${archColor(m.architectCode)}33` : 'none', whiteSpace: 'pre-wrap' }}>
+                <div style={{ padding: '10px 14px', borderRadius: m.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', background: m.role === 'user' ? 'var(--accent)' : 'var(--navy-light)', color: m.role === 'user' ? 'var(--navy)' : 'var(--text)', fontSize: 13, lineHeight: 1.7, border: m.failed ? '1px solid #f97316' : (m.role !== 'user' ? `1px solid ${archColor(m.architectCode)}33` : 'none'), whiteSpace: 'pre-wrap' }}>
                   {m.content || <span style={{ opacity: 0.5 }}><span className="typing-dot" style={{ animation: 'blink 1s infinite' }}>•</span><span style={{ animationDelay: '0.2s', animation: 'blink 1s infinite' }}> •</span><span style={{ animationDelay: '0.4s', animation: 'blink 1s infinite' }}> •</span></span>}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>

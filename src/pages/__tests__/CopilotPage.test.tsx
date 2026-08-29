@@ -303,6 +303,45 @@ describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
 
     expect(await screen.findByText('🔍 1 source ▼')).toBeInTheDocument();
   });
+
+  it('shows a clear "did not complete" warning for a failed architect response, instead of presenting the apology text as a real answer (Copilot Phase 4)', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/consult': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'architect_response', architectCode: 'BUSINESS', architectName: 'Business Architect', content: 'I encountered an issue processing your request. Please try again.', evidence: [], failed: true },
+        { type: 'done', conversationId: 'conv-1' },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('Consult'));
+    const input = screen.getByPlaceholderText(/Ask all selected architects/);
+    fireEvent.change(input, { target: { value: 'Compare our options' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByText('⚠️ did not complete')).toBeInTheDocument();
+  });
+
+  it('a real (non-failed) architect response never shows the "did not complete" warning', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/consult': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'architect_response', architectCode: 'BUSINESS', architectName: 'Business Architect', content: 'Here is a real analysis.', evidence: [] },
+        { type: 'done', conversationId: 'conv-1' },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('Consult'));
+    const input = screen.getByPlaceholderText(/Ask all selected architects/);
+    fireEvent.change(input, { target: { value: 'Compare our options' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await screen.findByText('Here is a real analysis.');
+    expect(screen.queryByText('⚠️ did not complete')).not.toBeInTheDocument();
+  });
 });
 
 describe('CopilotPage - Task Playbooks (Copilot Phase 2)', () => {
