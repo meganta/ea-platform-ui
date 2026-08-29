@@ -12,7 +12,14 @@ function useApi() {
       .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || `HTTP ${r.status}`); return d })
     const patch = (p: string, b: any) => fetch(`${API}${p}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(b) })
       .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || `HTTP ${r.status}`); return d })
-    return { get, post, patch }
+    const postFile = (p: string, file: File, extraFields?: Record<string, string>) => {
+      const form = new FormData()
+      form.append('file', file)
+      if (extraFields) Object.entries(extraFields).forEach(([k, v]) => form.append(k, v))
+      return fetch(`${API}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form })
+        .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || `HTTP ${r.status}`); return d })
+    }
+    return { get, post, patch, postFile }
   }, [])
 }
 
@@ -124,15 +131,20 @@ export default function DecisionEvaluationPage() {
 }
 
 function CreateAssessmentModal({ api, isAR, onClose, onCreated }: any) {
-  const [form, setForm] = useState({ title: '', purpose: '', profile: 'GENERIC_TECHNOLOGY', useCase: '', scope: '' })
+  const [form, setForm] = useState({ title: '', purpose: '', profile: 'GENERIC_TECHNOLOGY', useCase: '', scope: '', templateId: '' })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [templates, setTemplates] = useState<any[]>([])
+
+  useEffect(() => {
+    api.get(`/decision-evaluation/templates?profile=${form.profile}`).then(setTemplates).catch(() => setTemplates([]))
+  }, [api, form.profile])
 
   const submit = async () => {
     if (!form.title.trim() || !form.purpose.trim()) { setError(isAR ? 'العنوان والغرض مطلوبان' : 'Title and purpose are required'); return }
     setSaving(true); setError(null)
     try {
-      const created = await api.post('/decision-evaluation', form)
+      const created = await api.post('/decision-evaluation', { ...form, templateId: form.templateId || undefined })
       onCreated(created.id)
     } catch (e: any) { setError(e.message) } finally { setSaving(false) }
   }
@@ -146,8 +158,13 @@ function CreateAssessmentModal({ api, isAR, onClose, onCreated }: any) {
         <label style={S.label}>{isAR ? 'الغرض' : 'Purpose'}</label>
         <input style={S.input} value={form.purpose} onChange={e => setForm({ ...form, purpose: e.target.value })} placeholder={isAR ? 'ما القرار المطلوب؟' : 'What decision is this for?'} />
         <label style={S.label}>{isAR ? 'نوع التقييم' : 'Assessment Type'}</label>
-        <select style={S.input} value={form.profile} onChange={e => setForm({ ...form, profile: e.target.value })}>
+        <select style={S.input} value={form.profile} onChange={e => setForm({ ...form, profile: e.target.value, templateId: '' })}>
           {Object.entries(PROFILES).map(([k, v]) => <option key={k} value={k}>{v.icon} {isAR ? v.ar : v.en}</option>)}
+        </select>
+        <label style={S.label}>{isAR ? 'القالب (اختياري)' : 'Template (optional)'}</label>
+        <select style={S.input} value={form.templateId} onChange={e => setForm({ ...form, templateId: e.target.value })}>
+          <option value="">{isAR ? 'استخدام المعايير الافتراضية' : 'Use default criteria'}</option>
+          {templates.map((t: any) => <option key={t.id} value={t.id}>{t.name}{t.isArchMindDefault ? '' : ` (${isAR ? 'خاص بالمستأجر' : 'tenant'})`}</option>)}
         </select>
         <label style={S.label}>{isAR ? 'حالة الاستخدام / السياق' : 'Use case / context'}</label>
         <textarea style={{ ...S.input, minHeight: 70 }} value={form.useCase} onChange={e => setForm({ ...form, useCase: e.target.value })} placeholder={isAR ? 'اختياري لكن موصى به بشدة — السياق المحدد للمستأجر يحسّن دقة التقييم' : 'Optional but strongly recommended — tenant-specific context sharpens the assessment'} />
@@ -161,12 +178,31 @@ function CreateAssessmentModal({ api, isAR, onClose, onCreated }: any) {
   )
 }
 
+function NewVersionModal({ isAR, onClose, onConfirm }: any) {
+  const [reason, setReason] = useState('')
+  return (
+    <div style={S.modalBackdrop} onClick={onClose}>
+      <div style={S.modal} onClick={e => e.stopPropagation()}>
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{isAR ? 'إصدار جديد' : 'New Version'}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>{isAR ? 'سيتم إنشاء نسخة جديدة قابلة للتعديل من المعايير، وتعليم هذا التقييم كمُستبدَل. جميع النتائج الحالية تبقى محفوظة للتدقيق.' : 'Creates a new, editable version of the criteria and marks this assessment as superseded. All current results are preserved for audit.'}</div>
+        <label style={S.label}>{isAR ? 'سبب التغيير' : 'Reason for the change'}</label>
+        <textarea style={{ ...S.input, minHeight: 70 }} value={reason} onChange={e => setReason(e.target.value)} />
+        <div style={{ ...S.row, justifyContent: 'flex-end', marginTop: 8 }}>
+          <button style={S.btn()} onClick={onClose}>{isAR ? 'إلغاء' : 'Cancel'}</button>
+          <button style={S.btn('primary')} disabled={!reason.trim()} onClick={() => onConfirm(reason)}>{isAR ? 'إنشاء' : 'Create'}</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AssessmentDetail({ id, onBack, api, isAR }: any) {
   const [tab, setTab] = useState<'overview' | 'criteria' | 'candidates' | 'compare' | 'decision'>('overview')
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [showNewVersion, setShowNewVersion] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
@@ -225,8 +261,25 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
           {(status === 'EVIDENCE_REVIEW' || status === 'ASSESSING' || status === 'COMPLETED') && (
             <button style={S.btn('primary')} disabled={busy} onClick={() => run(() => api.post(`/decision-evaluation/${id}/compare`))}>{isAR ? 'احتساب المقارنة' : 'Compute Comparison'}</button>
           )}
+          {status !== 'DRAFT' && status !== 'CRITERIA_REVIEW' && status !== 'SUPERSEDED' && status !== 'CANCELLED' && (
+            <button style={S.btn()} disabled={busy} onClick={() => setShowNewVersion(true)}>{isAR ? 'إصدار جديد' : 'New Version'}</button>
+          )}
         </div>
       </div>
+      {showNewVersion && (
+        <NewVersionModal
+          isAR={isAR}
+          onClose={() => setShowNewVersion(false)}
+          onConfirm={(reason: string) => {
+            setShowNewVersion(false)
+            setBusy(true)
+            api.post(`/decision-evaluation/${id}/version`, { reason })
+              .then(() => { alert(isAR ? 'تم إنشاء إصدار جديد. يمكنك فتحه من القائمة.' : 'New version created — open it from the list.'); onBack() })
+              .catch((e: any) => setError(e.message))
+              .finally(() => setBusy(false))
+          }}
+        />
+      )}
       {error && <div style={{ padding: '8px 28px', color: '#e74c3c', fontSize: 13 }}>{error}</div>}
       <div style={S.tabs}>
         {(['overview', 'criteria', 'candidates', 'compare', 'decision'] as const).map(t => (
@@ -243,7 +296,7 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
         {tab === 'overview' && <OverviewTab assessment={assessment} isAR={isAR} />}
         {tab === 'criteria' && <CriteriaTab id={id} groups={groups} criteria={criteria} status={status} api={api} isAR={isAR} onChanged={load} />}
         {tab === 'candidates' && <CandidatesTab id={id} candidates={candidates} status={status} api={api} isAR={isAR} onChanged={load} />}
-        {tab === 'compare' && <CompareTab candidates={candidates} scores={scores} assessment={assessment} isAR={isAR} />}
+        {tab === 'compare' && <CompareTab id={id} candidates={candidates} scores={scores} assessment={assessment} api={api} isAR={isAR} />}
         {tab === 'decision' && <DecisionTab id={id} assessment={assessment} api={api} isAR={isAR} onChanged={load} />}
       </div>
     </div>
@@ -319,15 +372,36 @@ function CriteriaTab({ id, groups, criteria, status, api, isAR, onChanged }: any
 
 function CandidatesTab({ id, candidates, status, api, isAR, onChanged }: any) {
   const canAdd = status === 'DRAFT' || status === 'CRITERIA_REVIEW' || status === 'BASELINE_FROZEN'
+  const canUploadDocs = status !== 'APPROVED' && status !== 'CANCELLED' && status !== 'SUPERSEDED'
   const [name, setName] = useState('')
   const [vendor, setVendor] = useState('')
   const [adding, setAdding] = useState(false)
+  const [uploadingFor, setUploadingFor] = useState<string | null>(null)
+  const [uploadingBaseline, setUploadingBaseline] = useState(false)
 
   const addCandidate = async () => {
     if (!name.trim()) return
     setAdding(true)
     try { await api.post(`/decision-evaluation/${id}/candidates`, { name, vendorOrSource: vendor || undefined }); setName(''); setVendor(''); await onChanged() }
     catch (e: any) { alert(e.message) } finally { setAdding(false) }
+  }
+
+  const uploadCandidateDoc = async (candidateId: string, file: File) => {
+    setUploadingFor(candidateId)
+    try {
+      const result = await api.postFile(`/decision-evaluation/${id}/candidates/${candidateId}/documents`, file, { label: file.name })
+      if (!result.isProcessed) alert((isAR ? 'تعذّر استخراج المحتوى: ' : 'Could not extract content: ') + (result.processingError || ''))
+      await onChanged()
+    } catch (e: any) { alert(e.message) } finally { setUploadingFor(null) }
+  }
+
+  const uploadBaselineDoc = async (file: File) => {
+    setUploadingBaseline(true)
+    try {
+      const result = await api.postFile(`/decision-evaluation/${id}/baseline-documents`, file, { label: file.name })
+      if (!result.isProcessed) alert((isAR ? 'تعذّر استخراج المحتوى: ' : 'Could not extract content: ') + (result.processingError || ''))
+      await onChanged()
+    } catch (e: any) { alert(e.message) } finally { setUploadingBaseline(false) }
   }
 
   return (
@@ -342,12 +416,25 @@ function CandidatesTab({ id, candidates, status, api, isAR, onChanged }: any) {
           </div>
         </div>
       )}
+      {canUploadDocs && (
+        <div style={S.card}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>{isAR ? 'وثيقة الأساس (RFP/SOW)' : 'Baseline document (RFP/SOW)'}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? 'تُستخرج وتُقطّع تلقائيًا كسياق مشترك لكل المرشحين' : 'Automatically extracted and chunked as shared context for every candidate'}</div>
+          <input type="file" disabled={uploadingBaseline} onChange={e => e.target.files?.[0] && uploadBaselineDoc(e.target.files[0])} />
+        </div>
+      )}
       <div style={S.grid}>
         {(candidates || []).map((c: any) => (
           <div key={c.id} style={S.card}>
             <div style={{ fontWeight: 700 }}>{c.name}</div>
             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{c.neutralLabel}{c.vendorOrSource ? ` · ${c.vendorOrSource}` : ''}</div>
             {c.isDisqualified && <span style={{ ...S.badge('#e74c3c'), marginTop: 8, display: 'inline-block' }}>{isAR ? 'مستبعد' : 'Disqualified'}</span>}
+            {canUploadDocs && (
+              <div style={{ marginTop: 10 }}>
+                <label style={S.label}>{isAR ? 'رفع مستند (عرض فني، ورقة بيانات...)' : 'Upload document (proposal, datasheet...)'}</label>
+                <input type="file" disabled={uploadingFor === c.id} onChange={e => e.target.files?.[0] && uploadCandidateDoc(c.id, e.target.files[0])} />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -356,7 +443,16 @@ function CandidatesTab({ id, candidates, status, api, isAR, onChanged }: any) {
   )
 }
 
-function CompareTab({ candidates, scores, assessment, isAR }: any) {
+function CompareTab({ id, candidates, scores, assessment, api, isAR }: any) {
+  const [sensitivity, setSensitivity] = useState<any>(null)
+  const [runningSensitivity, setRunningSensitivity] = useState(false)
+
+  const runSensitivity = async () => {
+    setRunningSensitivity(true)
+    try { setSensitivity(await api.post(`/decision-evaluation/${id}/sensitivity`, { variationPercent: 10 })) }
+    catch (e: any) { alert(e.message) } finally { setRunningSensitivity(false) }
+  }
+
   if (!scores || scores.length === 0) {
     return <div style={{ ...S.card, color: 'var(--text-dim)' }}>{isAR ? 'لم يتم احتساب المقارنة بعد. شغّل التقييم ثم اضغط "احتساب المقارنة".' : 'Comparison not computed yet. Run the assessment, then click "Compute Comparison".'}</div>
   }
@@ -397,6 +493,22 @@ function CompareTab({ candidates, scores, assessment, isAR }: any) {
             ))}
           </tbody>
         </table>
+      </div>
+      <div style={S.card}>
+        <div style={{ ...S.row, justifyContent: 'space-between' }}>
+          <div style={{ fontWeight: 700 }}>{isAR ? 'تحليل الحساسية' : 'Sensitivity Analysis'}</div>
+          <button style={S.btn()} disabled={runningSensitivity} onClick={runSensitivity}>{runningSensitivity ? '...' : (isAR ? 'تشغيل (±10%)' : 'Run (±10%)')}</button>
+        </div>
+        {sensitivity && (
+          <div style={{ marginTop: 10, fontSize: 13 }}>
+            <span style={S.badge(sensitivity.rankingEverChanges ? '#f59e0b' : '#22c55e')}>
+              {sensitivity.rankingEverChanges ? (isAR ? 'الترتيب حسّاس لتغييرات الوزن' : 'Ranking is sensitive to weight changes') : (isAR ? 'الترتيب مستقر' : 'Ranking is stable')}
+            </span>
+            {sensitivity.mostInfluentialCriterionIds?.length > 0 && (
+              <div style={{ marginTop: 8, color: 'var(--text-dim)' }}>{isAR ? 'أكثر المعايير تأثيرًا:' : 'Most influential criteria:'} {sensitivity.mostInfluentialCriterionIds.length}</div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )

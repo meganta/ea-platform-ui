@@ -70,4 +70,43 @@ describe('DecisionEvaluationPage', () => {
     fireEvent.click(screen.getByText('Compare'));
     expect(await screen.findByText(/Comparison not computed yet/i)).toBeInTheDocument();
   });
+
+  it('loads templates for the selected profile into the create modal picker', async () => {
+    mockFetch({
+      '/decision-evaluation/templates?profile=GENERIC_TECHNOLOGY': [{ id: 't1', name: 'Our Standard Rubric', isArchMindDefault: false }],
+      '/decision-evaluation': [],
+    });
+    render(<DecisionEvaluationPage />);
+    fireEvent.click(await screen.findByText(/New Assessment/i));
+    expect(await screen.findByText(/Our Standard Rubric/i)).toBeInTheDocument();
+  });
+
+  it('shows the New Version button once an assessment has moved past DRAFT/CRITERIA_REVIEW', async () => {
+    const frozenAssessment = { ...ASSESSMENT, status: 'BASELINE_FROZEN' };
+    mockFetch({ '/decision-evaluation/a1': { ...ASSESSMENT_DETAIL, assessment: frozenAssessment }, '/decision-evaluation': [frozenAssessment] });
+    render(<DecisionEvaluationPage />);
+    fireEvent.click(await screen.findByText('Database selection'));
+    expect(await screen.findByText('New Version')).toBeInTheDocument();
+  });
+
+  it('does not show the New Version button while still in DRAFT', async () => {
+    mockFetch({ '/decision-evaluation/a1': ASSESSMENT_DETAIL, '/decision-evaluation': [ASSESSMENT] });
+    render(<DecisionEvaluationPage />);
+    fireEvent.click(await screen.findByText('Database selection'));
+    await waitFor(() => screen.getByText('Freeze Baseline'));
+    expect(screen.queryByText('New Version')).not.toBeInTheDocument();
+  });
+
+  it('offers a sensitivity analysis run button once scores exist', async () => {
+    const scoredAssessment = { ...ASSESSMENT, status: 'COMPLETED', outcome: 'RECOMMENDED' };
+    const candidate = { id: 'cand1', name: 'PostgreSQL', neutralLabel: 'Candidate A' };
+    mockFetch({
+      '/decision-evaluation/a1': { ...ASSESSMENT_DETAIL, assessment: scoredAssessment, candidates: [candidate], scores: [{ candidateId: 'cand1', overallScore: 90, rank: 1, mandatoryGatesPassed: true, evidenceCoveragePercent: 100 }] },
+      '/decision-evaluation': [scoredAssessment],
+    });
+    render(<DecisionEvaluationPage />);
+    fireEvent.click(await screen.findByText('Database selection'));
+    fireEvent.click(await screen.findByText('Compare'));
+    expect(await screen.findByText(/Run \(±10%\)/i)).toBeInTheDocument();
+  });
 });
