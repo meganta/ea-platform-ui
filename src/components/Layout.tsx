@@ -60,6 +60,7 @@ export default function Layout() {
           <NavLink to="/adm" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ {t('nav.adm')}</NavLink>
           <NavLink to="/copilot" className={({isActive})=>`nav-item${isActive?' active':''}`}>💬 {t('nav.copilot')}</NavLink>
           <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Governance</NavLink>
+          <NavLink to="/decision-evaluation" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚖ {locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'}</NavLink>
           <NavLink to="/strategy" className={({isActive})=>`nav-item${isActive?' active':''}`}>🎯 Strategy</NavLink>
           <NavLink to="/ea-planning" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗓 EA Planning</NavLink>
           <NavLink to="/innovation" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔭 {t('nav.innovation')}</NavLink>
