@@ -176,3 +176,131 @@ describe('CopilotPage - MeetingAssistant', () => {
     });
   });
 });
+
+// Phase 1: evidence-grounded Copilot's evidence drawer. No prior test in
+// this file exercised the streaming send() flow at all (streamSse() reads
+// a real ReadableStream via res.body.getReader(), which the plain
+// {ok, json} shape mockFetch() returns cannot satisfy) - this is the
+// first coverage for that path, built around a minimal fake reader
+// emitting the same `data: {...}\n\n` SSE framing the real backend sends.
+function makeSseBody(events: any[]) {
+  const chunks = events.map(e => `data: ${JSON.stringify(e)}\n\n`);
+  let i = 0;
+  return {
+    getReader: () => ({
+      read: () => {
+        if (i < chunks.length) {
+          const chunk = new TextEncoder().encode(chunks[i]);
+          i += 1;
+          return Promise.resolve({ done: false, value: chunk });
+        }
+        return Promise.resolve({ done: true, value: undefined });
+      },
+    }),
+  };
+}
+
+function mockFetchWithSse(jsonRoutes: Record<string, any>, sseRoutes: Record<string, any[]>) {
+  const sortedJsonPatterns = Object.keys(jsonRoutes).sort((a, b) => b.length - a.length);
+  global.fetch = jest.fn().mockImplementation((url: string, options?: any) => {
+    for (const pattern of Object.keys(sseRoutes)) {
+      if (url.includes(pattern)) return Promise.resolve({ ok: true, body: makeSseBody(sseRoutes[pattern]) });
+    }
+    for (const pattern of sortedJsonPatterns) {
+      if (url.includes(pattern)) {
+        const value = typeof jsonRoutes[pattern] === 'function' ? jsonRoutes[pattern](options) : jsonRoutes[pattern];
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(value) });
+      }
+    }
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+  }) as any;
+}
+
+const AUTHORITATIVE_EVIDENCE = [
+  { sourceType: 'EA_ASSET', sourceId: 'asset-1', title: 'Payment Gateway', excerpt: 'Core payment processing service', assetType: 'APPLICATION', domain: 'APPLICATION', version: '1.0', status: 'APPROVED', validityClassification: 'CURRENT', sourceAuthorityLevel: 'AUTHORITATIVE', effectiveFrom: null, effectiveUntil: null, retrievalReason: 'EXACT_NAME_MATCH', score: 1.0, targetRef: { type: 'EA_ASSET', id: 'asset-1' } },
+];
+
+describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
+  const openSpy = jest.fn();
+  beforeEach(() => { window.open = openSpy; openSpy.mockClear(); });
+
+  it('shows a sources toggle after a single-architect chat response arrives with evidence, and none when there is no evidence', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'text', content: 'The payment gateway is our core service.' },
+        { type: 'done', conversationId: 'conv-1', evidence: AUTHORITATIVE_EVIDENCE },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'Tell me about the payment gateway' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByText('🔍 1 source ▼')).toBeInTheDocument();
+  });
+
+  it('expands the drawer on click to show the evidence item, its authority label, and a working source link', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'text', content: 'answer' },
+        { type: 'done', conversationId: 'conv-1', evidence: AUTHORITATIVE_EVIDENCE },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'Tell me about the payment gateway' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    fireEvent.click(await screen.findByText('🔍 1 source ▼'));
+    expect(await screen.findByText('Payment Gateway')).toBeInTheDocument();
+    expect(screen.getByText('Authoritative')).toBeInTheDocument();
+    expect(screen.getByText('Core payment processing service')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('View source →'));
+    expect(openSpy).toHaveBeenCalledWith('/repository?assetId=asset-1', '_blank');
+  });
+
+  it('shows no sources toggle at all when the response has no evidence (most generic questions)', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'text', content: 'A generic best-practice answer.' },
+        { type: 'done', conversationId: 'conv-1', evidence: [] },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'What is TOGAF?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await screen.findByText('A generic best-practice answer.');
+    expect(screen.queryByText(/🔍.*source/)).not.toBeInTheDocument();
+  });
+
+  it('shows a sources toggle per architect response in consult mode', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/consult': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'architect_response', architectCode: 'BUSINESS', architectName: 'Business Architect', content: 'Business perspective.', evidence: AUTHORITATIVE_EVIDENCE },
+        { type: 'done', conversationId: 'conv-1' },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByText('Consult'));
+    const input = screen.getByPlaceholderText(/Ask all selected architects/);
+    fireEvent.change(input, { target: { value: 'Compare our options' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByText('🔍 1 source ▼')).toBeInTheDocument();
+  });
+});

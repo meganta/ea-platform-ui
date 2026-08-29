@@ -6,16 +6,24 @@ jest.mock('../../contexts/LangContext', () => ({
 }));
 
 // RepositoryPage now uses useNavigate (the "Show Dependencies" / Object
-// Context View entry point) - mocked per this codebase's established
-// pattern (see DashboardPage.test.tsx) rather than wrapping every render()
-// in a real Router.
+// Context View entry point) and useSearchParams (Copilot Phase 1's
+// evidence-drawer deep link, ?assetId=<id>) - both mocked per this
+// codebase's established pattern (see DashboardPage.test.tsx) rather
+// than wrapping every render() in a real Router. mockSearchParams
+// defaults to an empty URLSearchParams so the deep-link effect's
+// `.get('assetId')` returns null and existing tests are unaffected
+// unless a test explicitly sets it.
 const mockNavigate = jest.fn();
+let mockSearchParams = new URLSearchParams();
+const mockSetSearchParams = jest.fn();
 jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
+  useSearchParams: () => [mockSearchParams, mockSetSearchParams],
 }), { virtual: true });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSearchParams = new URLSearchParams();
   localStorage.setItem('ea_token', 'fake-token');
 });
 
@@ -241,5 +249,53 @@ describe('RepositoryPage - connector provenance display (HRDF demo: ManageEngine
     render(<RepositoryPage />);
     fireEvent.click(await screen.findByText('Bare Server'));
     await waitFor(() => expect(screen.queryByText(/SYNCED FROM/)).not.toBeInTheDocument());
+  });
+});
+
+describe('RepositoryPage - evidence-drawer deep link (Copilot Phase 1, ?assetId=<id>)', () => {
+  it('opens the asset detail modal directly when ?assetId is present, fetching that asset by id', async () => {
+    mockSearchParams = new URLSearchParams('assetId=a1');
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ id: 'a1', name: 'Core Banking' }), asset({ id: 'a2', name: 'CRM Platform' })],
+      '/ea-repository/assets/a1': asset({ id: 'a1', name: 'Core Banking' }),
+    });
+    render(<RepositoryPage />);
+    // The modal-only "Delete Asset" button only renders once AssetDetail
+    // is actually open - distinguishes this from the asset merely
+    // appearing in the background list, which loads regardless.
+    expect(await screen.findByText('Delete Asset')).toBeInTheDocument();
+  });
+
+  it('clears the assetId query param after handling it, so it does not linger or re-trigger', async () => {
+    mockSearchParams = new URLSearchParams('assetId=a1');
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ id: 'a1', name: 'Core Banking' })],
+      '/ea-repository/assets/a1': asset({ id: 'a1', name: 'Core Banking' }),
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Delete Asset');
+    expect(mockSetSearchParams).toHaveBeenCalled();
+  });
+
+  it('fails silently (no modal, no crash) when the linked asset no longer exists', async () => {
+    mockSearchParams = new URLSearchParams('assetId=deleted-asset');
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/ea-repository/assets/deleted-asset')) return Promise.reject(new Error('not found'));
+      if (url.includes('/ea-repository/framework-config')) return Promise.resolve({ ok: true, json: () => Promise.resolve(CONFIG) });
+      if (url.includes('/ea-repository/assets')) return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+    render(<RepositoryPage />);
+    await waitFor(() => expect(mockSetSearchParams).toHaveBeenCalled());
+    expect(screen.queryByText('Delete Asset')).not.toBeInTheDocument();
+  });
+
+  it('does not attempt any deep-link fetch when no assetId is present (the normal case)', async () => {
+    mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {}, '/ea-repository/assets': [asset()] });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    expect(mockSetSearchParams).not.toHaveBeenCalled();
   });
 });
