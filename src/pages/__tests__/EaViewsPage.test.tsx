@@ -1621,6 +1621,247 @@ describe('EaViewsPage - Scenario Authoring (Phase 5C)', () => {
   });
 });
 
+describe('EaViewsPage - AI Assist (Phase 5D)', () => {
+  const draftTargetScenario = { id: 'target-1', name: 'Target 2028', type: 'TARGET', status: 'DRAFT', horizonDate: null, sequence: null, parentScenarioId: 'current' };
+  const draftCurrentScenario = { id: 'current', name: 'Current Architecture', type: 'CURRENT', status: 'DRAFT', horizonDate: null, sequence: null, parentScenarioId: null };
+
+  function makeAiDataset() {
+    const capA = { id: 'capA', name: 'Capability A', assetType: 'GovCapability', semanticType: 'BusinessCapability', domain: 'BUSINESS', role: 'PRIMARY', status: 'APPROVED', tags: [], metadata: {} };
+    const appX = { id: 'appX', name: 'App X', assetType: 'Application', semanticType: 'Application', domain: 'APPLICATION', role: 'RELATED', status: 'APPROVED', tags: [], metadata: {} };
+    return {
+      legacy: { nodes: [capA, appX], edges: [], metadata: {} },
+      dataset: { context: { scenario: { id: 'target-1' } }, objects: [capA, appX], relationships: [{ id: 'r1', sourceId: 'capA', targetId: 'appX', relationshipType: 'supported_by', label: 'supported_by' }], paths: [], hierarchies: [], metrics: [], provenance: { truncated: false } },
+      eligibility: { eligible: [{ visualization: 'TABLE', eligible: true, score: 0.7, reasons: [] }], ineligible: [] },
+    };
+  }
+
+  async function openAiAssist(extraRoutes: any = {}) {
+    mockSearchParams = new URLSearchParams('scenario=target-1');
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'AI View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': [draftCurrentScenario, draftTargetScenario],
+      '/ea-views/v1/dataset': makeAiDataset(),
+      ...extraRoutes,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('AI View'));
+    await screen.findByText('App X');
+    fireEvent.click(screen.getByText(/🤖 AI Assist/));
+  }
+
+  // ── Acceptance 1: claims are never visually identical across classifications ──
+  it('a FACT claim and an UNVERIFIED claim show distinct, non-identical labels', async () => {
+    const explanation = { claims: [{ text: 'App X is approved', classification: 'FACT', evidenceRefs: [{ kind: 'OBJECT', id: 'appX' }] }, { text: 'Something unverifiable', classification: 'UNVERIFIED', evidenceRefs: [] }] };
+    await openAiAssist({ '/ea-views/v1/ai/explain': explanation });
+    fireEvent.click(screen.getByText('Generate Explanation'));
+    expect(await screen.findByText(/Fact/)).toBeInTheDocument();
+    expect(screen.getByText(/Unverified/)).toBeInTheDocument();
+  });
+
+  it('a GENERAL_GUIDANCE claim is labeled distinctly from FACT/INFERENCE, not conflated with tenant-specific evidence', async () => {
+    const explanation = { claims: [{ text: 'Best practice: avoid single points of failure', classification: 'GENERAL_GUIDANCE', evidenceRefs: [] }] };
+    await openAiAssist({ '/ea-views/v1/ai/explain': explanation });
+    fireEvent.click(screen.getByText('Generate Explanation'));
+    expect(await screen.findByText(/General guidance/)).toBeInTheDocument();
+  });
+
+  // ── Acceptance 2: evidence click-to-highlight resolves only real evidence ──
+  it('clicking a valid evidence chip selects the real, corresponding loaded object', async () => {
+    const explanation = { claims: [{ text: 'App X is approved', classification: 'FACT', evidenceRefs: [{ kind: 'OBJECT', id: 'appX' }] }] };
+    await openAiAssist({ '/ea-views/v1/ai/explain': explanation });
+    fireEvent.click(screen.getByText('Generate Explanation'));
+    await screen.findByText(/App X is approved/);
+    fireEvent.click(screen.getByText('App X', { selector: 'span' }));
+    // the highlight panel combines an emoji marker with the name in one
+    // text node ("📍 App X") - matched via regex rather than exact text,
+    // since testing-library treats that as one combined-text unit.
+    expect(await screen.findByText(/📍.*App X/)).toBeInTheDocument();
+  });
+
+  it('an evidence ref that does not resolve against the loaded dataset renders as non-clickable and never selects an unrelated item', async () => {
+    const explanation = { claims: [{ text: 'Ghost object claim', classification: 'FACT', evidenceRefs: [{ kind: 'OBJECT', id: 'ghost-id-not-in-dataset' }] }] };
+    await openAiAssist({ '/ea-views/v1/ai/explain': explanation });
+    fireEvent.click(screen.getByText('Generate Explanation'));
+    const chip = await screen.findByText('ghost-id-not-in-dataset');
+    fireEvent.click(chip);
+    // clicking it must not cause "Capability A" (the other real object) to become selected
+    await new Promise(r => setTimeout(r, 0));
+    expect(screen.queryAllByText('Capability A').length).toBe(0); // never appeared as selected, since it was never clicked and nothing highlighted it
+  });
+
+  // ── Acceptance 9: race safety on AI requests ──────────────────────────
+  it('a later explain request wins over an earlier, slower-resolving one', async () => {
+    let resolveFirst: (v: any) => void = () => {};
+    const firstPromise = new Promise(r => { resolveFirst = r; });
+    let callCount = 0;
+    await openAiAssist({
+      '/ea-views/v1/ai/explain': () => {
+        callCount++;
+        if (callCount === 1) return firstPromise;
+        return { claims: [{ text: 'Second, faster response', classification: 'FACT', evidenceRefs: [] }] };
+      },
+    });
+    fireEvent.click(screen.getByText('Generate Explanation')); // request 1, deliberately never resolved yet
+    fireEvent.click(screen.getByText('Generate Explanation')); // request 2, resolves immediately
+    await screen.findByText('Second, faster response');
+    resolveFirst({ claims: [{ text: 'First, stale response', classification: 'FACT', evidenceRefs: [] }] });
+    await new Promise(r => setTimeout(r, 0));
+    expect(screen.getByText('Second, faster response')).toBeInTheDocument();
+    expect(screen.queryByText('First, stale response')).not.toBeInTheDocument();
+  });
+
+  it('navigating to a different View clears a previously-shown AI explanation, never leaving stale evidence displayed against different data', async () => {
+    const explanation = { claims: [{ text: 'Old view claim', classification: 'FACT', evidenceRefs: [{ kind: 'OBJECT', id: 'appX' }] }] };
+    mockSearchParams = new URLSearchParams('scenario=target-1');
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'AI View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'CURRENT' }, { id: 'v2', name: 'Other View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': [draftCurrentScenario, draftTargetScenario],
+      '/ea-views/v1/dataset': makeAiDataset(),
+      '/ea-views/v2/dataset': makeAiDataset(),
+      '/ea-views/v1/ai/explain': explanation,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('AI View'));
+    await screen.findByText('App X');
+    fireEvent.click(screen.getByText(/🤖 AI Assist/));
+    fireEvent.click(screen.getByText('Generate Explanation'));
+    await screen.findByText('Old view claim');
+
+    // navigate back and open a genuinely different View - this changes
+    // view.id, the reset effect's real dependency (not merely toggling
+    // the AI Assist mode, which does not).
+    fireEvent.click(screen.getByText('← Back'));
+    fireEvent.click(await screen.findByText('Other View'));
+    await screen.findByText('App X');
+    expect(screen.queryByText('Old view claim')).not.toBeInTheDocument();
+  });
+
+  // ── Acceptances 3, 5: proposal lifecycle gating ────────────────────────
+  it('a proposal with an ERROR-level validation issue cannot be approved - the Approve button is disabled', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'VALIDATED', proposedChanges: [{ changeType: 'REMOVE_ASSET', assetId: 'appX', rationale: 'x', evidenceRefs: [] }], validationIssues: [{ severity: 'ERROR', message: 'not grounded', changeIndex: 0 }], assumptions: [], missingInformation: [] };
+    await openAiAssist({ '/ea-views/v1/ai/propose': proposal });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'remove unused apps' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    await screen.findByText('VALIDATED');
+    expect(screen.getByText('Approve')).toBeDisabled();
+  });
+
+  it('a REJECTED_BY_VALIDATION proposal cannot be approved either, even with zero displayed issues at the top level', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'REJECTED_BY_VALIDATION', proposedChanges: [], validationIssues: [{ severity: 'ERROR', message: 'x', changeIndex: 0 }], assumptions: [], missingInformation: [] };
+    await openAiAssist({ '/ea-views/v1/ai/propose': proposal });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    await screen.findByText('REJECTED_BY_VALIDATION');
+    expect(screen.getByText('Approve')).toBeDisabled();
+  });
+
+  it('a REJECTED proposal cannot be executed - the Execute button is disabled', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'REJECTED', proposedChanges: [], validationIssues: [], assumptions: [], missingInformation: [] };
+    await openAiAssist({ '/ea-views/v1/ai/propose': proposal });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    await screen.findByText('REJECTED');
+    expect(screen.getByText('Execute')).toBeDisabled();
+  });
+
+  it('an APPLIED proposal cannot be executed again, and cannot be rejected', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'APPLIED', proposedChanges: [], validationIssues: [], assumptions: [], missingInformation: [] };
+    await openAiAssist({ '/ea-views/v1/ai/propose': proposal });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    await screen.findByText('APPLIED');
+    expect(screen.getByText('Execute')).toBeDisabled();
+    expect(screen.getByText('Reject')).toBeDisabled();
+  });
+
+  it('a VALIDATED proposal with no ERROR issues CAN be approved', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'VALIDATED', proposedChanges: [{ changeType: 'REMOVE_ASSET', assetId: 'appX', rationale: 'x', evidenceRefs: [{ kind: 'OBJECT', id: 'appX' }] }], validationIssues: [], assumptions: [], missingInformation: [] };
+    await openAiAssist({ '/ea-views/v1/ai/propose': proposal });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    await screen.findByText('VALIDATED');
+    expect(screen.getByText('Approve')).not.toBeDisabled();
+  });
+
+  // ── Acceptance 4: stale proposal requires revalidation ────────────────
+  it('a stale-fingerprint execution failure shows a clear error and re-syncs the displayed status to the backend\'s own rejection', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'APPROVED', proposedChanges: [], validationIssues: [], assumptions: [], missingInformation: [] };
+    const staleError = { statusCode: 400, message: 'The architecture has changed since this proposal was approved. It has been marked for revalidation and cannot be applied as-is.' };
+    const rejectedProposal = { ...proposal, status: 'REJECTED', rejectionReason: 'stale' };
+    await openAiAssist({
+      '/ea-views/v1/ai/propose': proposal,
+      '/ea-views/scenarios/target-1/proposals/proposal-1/execute': staleError,
+      '/ea-views/scenarios/target-1/proposals/proposal-1': rejectedProposal,
+    });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    await screen.findByText('APPROVED');
+    fireEvent.click(screen.getByText('Execute'));
+    await screen.findByText(/architecture has changed/);
+    await waitFor(() => expect(screen.getByText('REJECTED')).toBeInTheDocument());
+  });
+
+  // ── Acceptance: successful execution refreshes via the existing mechanism ──
+  it('a successful execution shows a success notice and refreshes the scenario via the existing switchScenario data flow', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'APPROVED', proposedChanges: [], validationIssues: [], assumptions: [], missingInformation: [] };
+    const appliedProposal = { ...proposal, status: 'APPLIED' };
+    await openAiAssist({
+      '/ea-views/v1/ai/propose': proposal,
+      '/ea-views/scenarios/target-1/proposals/proposal-1/execute': appliedProposal,
+    });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    await screen.findByText('APPROVED');
+    fireEvent.click(screen.getByText('Execute'));
+    await screen.findByText(/applied successfully/);
+    await waitFor(() => expect(screen.getByText('APPLIED')).toBeInTheDocument());
+    // switchScenario's own /dataset re-fetch is the refresh mechanism - a second dataset POST is issued
+    const datasetCalls = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/v1/dataset'));
+    expect(datasetCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  // ── Acceptance 7: AI Assist never mutates the repository/scenario directly ──
+  it('generating a proposal never calls any authoring endpoint directly - only the propose endpoint, returning a review-only proposal object', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'VALIDATED', proposedChanges: [{ changeType: 'REMOVE_ASSET', assetId: 'appX', rationale: 'x', evidenceRefs: [{ kind: 'OBJECT', id: 'appX' }] }], validationIssues: [], assumptions: [], missingInformation: [] };
+    await openAiAssist({ '/ea-views/v1/ai/propose': proposal });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'remove App X' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    await screen.findByText('VALIDATED');
+    const authoringCalls = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/assets/') && c[0].includes('/remove'));
+    expect(authoringCalls).toHaveLength(0); // no direct authoring call was ever made merely from generating the proposal
+  });
+
+  // ── Assumptions/missing information/confidence visibility ─────────────
+  it('shows assumptions, missing information, and confidence prominently alongside the proposal', async () => {
+    const proposal = { id: 'proposal-1', scenarioId: 'target-1', status: 'VALIDATED', confidence: 0.72, assumptions: ['Assumes App X is unused'], missingInformation: ['No usage metrics available'], proposedChanges: [{ changeType: 'REMOVE_ASSET', assetId: 'appX', rationale: 'x', evidenceRefs: [{ kind: 'OBJECT', id: 'appX' }] }], validationIssues: [] };
+    await openAiAssist({ '/ea-views/v1/ai/propose': proposal });
+    fireEvent.click(screen.getByText('Propose Changes'));
+    fireEvent.change(screen.getByPlaceholderText(/Describe the change/), { target: { value: 'x' } });
+    fireEvent.click(screen.getByText('Generate Proposal'));
+    expect(await screen.findByText(/72%/)).toBeInTheDocument();
+    expect(screen.getByText(/Assumes App X is unused/)).toBeInTheDocument();
+    expect(screen.getByText(/No usage metrics available/)).toBeInTheDocument();
+  });
+
+  it('exiting AI Assist mode returns to the normal single-scenario view', async () => {
+    await openAiAssist();
+    fireEvent.click(screen.getByText(/✕ Exit AI Assist/));
+    expect(screen.queryByText(/✕ Exit AI Assist/)).not.toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - Object Context View entry point', () => {
   it('reads the objectContext query param on mount and opens the standalone dependency viewer', async () => {
     mockSearchParams = new URLSearchParams('objectContext=asset-123');

@@ -14,6 +14,7 @@ import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandN
 import { buildScenarioLineageTree, getScenarioLineagePath, chooseVisualizationAfterScenarioSwitch } from './eaviews/scenarioSelectorUtils'
 import { buildChangeSummaryRows, buildRelationshipChangeRows, buildComparisonMatrix, applyComparisonFilters, buildComparisonGraphDataset, buildComparisonCapabilityMap, buildHeatmapComparison, buildComparisonTree, buildComparisonCards, CHANGE_TYPE_SYMBOL } from './eaviews/comparisonUtils'
 import { buildPropertyFieldDisplay, requiresCurrentEditConfirmation, isScenarioLocked, determineAssetActions, canIntroduce, buildRelationshipAuthoringRows } from './eaviews/authoringUtils'
+import { resolveEvidenceRef, buildProposedChangeRows, canApproveProposal, CLAIM_STYLE } from './eaviews/aiAssistUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -437,6 +438,29 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [addRelForm, setAddRelForm] = useState<{ sourceId: string; targetId: string; relationshipType: string }>({ sourceId: '', targetId: '', relationshipType: '' })
   const [showNewScenarioForm, setShowNewScenarioForm] = useState(false)
   const [newScenarioForm, setNewScenarioForm] = useState<{ name: string; type: 'TRANSITION' | 'TARGET' | 'BASELINE'; parentScenarioId: string; horizonDate: string }>({ name: '', type: 'TARGET', parentScenarioId: '', horizonDate: '' })
+  // ── AI Assist (Phase 5D) ──────────────────────────────────────────────
+  //
+  // Entirely separate from comparisonMode/authoringMode above - never
+  // active at the same time (mutually exclusive toggle buttons). Race
+  // safety (requirement 9) uses the identical ref-token pattern already
+  // proven for switchScenario/runComparison - a response only commits if
+  // its captured token still matches the latest issued one, and switching
+  // the active scenario/view invalidates any in-flight or stale AI
+  // result outright (never leaves a stale explanation's evidenceRefs
+  // pointing at a dataset that's since changed - requirement 2).
+  const [aiAssistMode, setAiAssistMode] = useState(false)
+  const [aiTab, setAiTab] = useState<'explain' | 'risks' | 'gaps' | 'question' | 'propose'>('explain')
+  const [aiAssistQuestion, setAiAssistQuestion] = useState('')
+  const [aiExplanation, setAiExplanation] = useState<any>(null)
+  const [aiAssistLoading, setAiAssistLoading] = useState(false)
+  const [aiAssistError, setAiAssistError] = useState<string | null>(null)
+  const aiRequestTokenRef = React.useRef(0)
+  const [aiProposalInstruction, setAiProposalInstruction] = useState('')
+  const [aiCurrentProposal, setAiCurrentProposal] = useState<any>(null)
+  const [aiProposalBusy, setAiProposalBusy] = useState(false)
+  const [aiProposalError, setAiProposalError] = useState<string | null>(null)
+  const [aiProposalNotice, setAiProposalNotice] = useState<string | null>(null)
+  const [aiComparisonExplanation, setAiComparisonExplanation] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [vizMode, setVizMode] = useState<string>(view.visualization || 'GRAPH')
   const [filterDomain, setFilterDomain] = useState('')
@@ -784,6 +808,141 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     api.get(`/repository/assets?search=${encodeURIComponent(query)}`).then((r: any) => setIntroduceResults(Array.isArray(r) ? r : [])).catch(() => setIntroduceResults([]))
   }
 
+  // ── AI Assist actions (Phase 5D) ──────────────────────────────────────
+  //
+  // Every response is checked for NestJS's standard {statusCode,...}
+  // error shape (api.post never rejects on an HTTP error status) - the
+  // established pattern from every prior authoring/comparison action in
+  // this file, reused rather than inventing a second error-detection
+  // convention just for AI calls.
+  const runAiExplain = (action: 'explain' | 'risks' | 'gaps' | 'question') => {
+    const myToken = ++aiRequestTokenRef.current
+    setAiTab(action)
+    setAiAssistLoading(true)
+    setAiAssistError(null)
+    api.post(`/ea-views/${view.id}/ai/explain`, { action, question: action === 'question' ? aiAssistQuestion : undefined }).then((d: any) => {
+      if (myToken !== aiRequestTokenRef.current) return // superseded by a newer AI request or scenario/view switch
+      if (d?.statusCode) { setAiAssistError(d.message || 'The AI assistant could not generate a response.'); return }
+      setAiExplanation(d)
+    }).catch(() => {
+      if (myToken !== aiRequestTokenRef.current) return
+      setAiAssistError('The AI assistant could not generate a response.')
+    }).finally(() => {
+      if (myToken === aiRequestTokenRef.current) setAiAssistLoading(false)
+    })
+  }
+
+  // Requirement 8: uses the View's already-loaded comparisonData's own
+  // left/right scenario ids - the exact ComparisonDataset the backend
+  // already computed, never a frontend reconstruction of comparison
+  // semantics. Only callable once a real comparison has actually been
+  // run (comparisonMode's own Compare button), matching Phase 5B's
+  // existing data flow rather than triggering a second, independent
+  // comparison fetch.
+  const runAiExplainComparison = () => {
+    if (!comparisonLeftId || !comparisonRightId) return
+    const myToken = ++aiRequestTokenRef.current
+    setAiAssistLoading(true)
+    setAiAssistError(null)
+    api.post(`/ea-views/${view.id}/ai/compare-explain`, { leftScenarioId: comparisonLeftId, rightScenarioId: comparisonRightId }).then((d: any) => {
+      if (myToken !== aiRequestTokenRef.current) return
+      if (d?.statusCode) { setAiAssistError(d.message || 'The AI assistant could not generate a comparison explanation.'); return }
+      setAiComparisonExplanation(d)
+    }).catch(() => {
+      if (myToken !== aiRequestTokenRef.current) return
+      setAiAssistError('The AI assistant could not generate a comparison explanation.')
+    }).finally(() => {
+      if (myToken === aiRequestTokenRef.current) setAiAssistLoading(false)
+    })
+  }
+
+  // Generates a ScenarioChangeProposal only - never writes a scenario
+  // delta itself (requirement 7: AI Assist must never accidentally allow
+  // repository-base mutations; only this structured proposal object is
+  // ever produced here, and it requires a separate, explicit
+  // approve/execute step below to become a real change).
+  const runAiPropose = () => {
+    if (!committedScenarioId || !aiProposalInstruction.trim()) return
+    const myToken = ++aiRequestTokenRef.current
+    setAiProposalBusy(true)
+    setAiProposalError(null)
+    setAiProposalNotice(null)
+    api.post(`/ea-views/${view.id}/ai/propose`, { scenarioId: committedScenarioId, instruction: aiProposalInstruction }).then((d: any) => {
+      if (myToken !== aiRequestTokenRef.current) return
+      if (d?.statusCode) { setAiProposalError(d.message || 'The AI assistant could not generate a valid proposal.'); return }
+      setAiCurrentProposal(d)
+    }).catch(() => {
+      if (myToken !== aiRequestTokenRef.current) return
+      setAiProposalError('The AI assistant could not generate a valid proposal.')
+    }).finally(() => {
+      if (myToken === aiRequestTokenRef.current) setAiProposalBusy(false)
+    })
+  }
+
+  const approveAiProposal = () => {
+    if (!aiCurrentProposal) return
+    setAiProposalBusy(true)
+    setAiProposalError(null)
+    api.post(`/ea-views/scenarios/${aiCurrentProposal.scenarioId}/proposals/${aiCurrentProposal.id}/approve`).then((d: any) => {
+      if (d?.statusCode) { setAiProposalError(d.message || 'Failed to approve the proposal.'); return }
+      setAiCurrentProposal(d)
+    }).catch(() => setAiProposalError('Failed to approve the proposal.'))
+      .finally(() => setAiProposalBusy(false))
+  }
+
+  const rejectAiProposal = () => {
+    if (!aiCurrentProposal) return
+    setAiProposalBusy(true)
+    setAiProposalError(null)
+    api.post(`/ea-views/scenarios/${aiCurrentProposal.scenarioId}/proposals/${aiCurrentProposal.id}/reject`, {}).then((d: any) => {
+      if (d?.statusCode) { setAiProposalError(d.message || 'Failed to reject the proposal.'); return }
+      setAiCurrentProposal(d)
+    }).catch(() => setAiProposalError('Failed to reject the proposal.'))
+      .finally(() => setAiProposalBusy(false))
+  }
+
+  // Requirement: "refresh of the active scenario/view using the existing
+  // proven refresh mechanisms rather than creating another refresh path" -
+  // on success, calls switchScenario() exactly the way Phase 5A/5C's own
+  // authoring actions already do, reusing its proven race-protection and
+  // atomic commit rather than a third, parallel refresh implementation.
+  // On failure (including a stale-fingerprint rejection - requirement 4),
+  // the proposal's own status may have already changed on the backend
+  // (executeProposal's own catch path writes REJECTED before re-throwing) -
+  // re-fetched here so the displayed status never lags behind what the
+  // backend actually recorded.
+  const executeAiProposal = () => {
+    if (!aiCurrentProposal) return
+    setAiProposalBusy(true)
+    setAiProposalError(null)
+    setAiProposalNotice(null)
+    const proposalId = aiCurrentProposal.id
+    const scenarioId = aiCurrentProposal.scenarioId
+    api.post(`/ea-views/scenarios/${scenarioId}/proposals/${proposalId}/execute`).then((d: any) => {
+      if (d?.statusCode) {
+        setAiProposalError(d.message || 'Failed to execute the proposal.')
+        api.get(`/ea-views/scenarios/${scenarioId}/proposals/${proposalId}`).then((refreshed: any) => { if (!refreshed?.statusCode) setAiCurrentProposal(refreshed) })
+        return
+      }
+      setAiCurrentProposal(d)
+      setAiProposalNotice('The proposal was applied successfully. Refreshing the scenario…')
+      if (committedScenarioId) switchScenario(committedScenarioId)
+    }).catch(() => setAiProposalError('Failed to execute the proposal.'))
+      .finally(() => setAiProposalBusy(false))
+  }
+
+  // Requirement 2: resolves an evidenceRef only against the actually-
+  // loaded dataset, never fetching or guessing - reuses the existing
+  // detail-panel state (`selected`) rather than building a second
+  // highlighting mechanism. A ref that fails to resolve (e.g. a
+  // COMPARISON_CLASSIFICATION ref this single-dataset resolver doesn't
+  // cover) simply does nothing - it never falls back to selecting an
+  // unrelated item.
+  const highlightEvidence = (ref: any) => {
+    const resolved = resolveEvidenceRef(ref, dataset)
+    if (resolved) setSelected(resolved)
+  }
+
   useEffect(() => {
     api.get('/ea-views/saved-filters').then((f: any) => setSavedFilters(Array.isArray(f) ? f : [])).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -807,6 +966,15 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // never silently carry over to a later Current-editing session
   // (Section: preventing accidental editing of Current architecture).
   useEffect(() => { setAuthoringConfirmedCurrent(false); setAuthoringError(null); setAuthoringWarnings([]) }, [authoringMode, committedScenarioId])
+
+  // Invalidates any AI result the moment the active scenario changes -
+  // an explanation's evidenceRefs are only ever resolved against the
+  // dataset that was loaded when it was generated (requirement 2:
+  // "unresolved evidence must not silently highlight an unrelated
+  // item"). A stale explanation left visible against a since-switched
+  // scenario would risk exactly that, so it's cleared outright rather
+  // than kept and re-resolved against different data.
+  useEffect(() => { setAiExplanation(null); setAiComparisonExplanation(null); setAiCurrentProposal(null); setAiAssistError(null); setAiProposalError(null); setAiProposalNotice(null) }, [committedScenarioId, view.id])
 
   // Fetches the current scenario's removed-asset list whenever authoring
   // mode is on and the resolved dataset changes - a removed asset never
@@ -1606,9 +1774,24 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           return (
             <div>
               {/* Section 11: summary header */}
-              <div style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13, alignItems: 'center' }}>
                 <strong>{comparisonData.context?.leftScenario?.name}</strong><span style={{ color: 'var(--text-dim)' }}>→</span><strong>{comparisonData.context?.rightScenario?.name}</strong>
+                <button style={{ ...S.btn(), fontSize: 11, marginLeft: 12 }} disabled={aiAssistLoading} onClick={runAiExplainComparison}>{aiAssistLoading ? '🤖 Explaining…' : '🤖 Explain Changes'}</button>
               </div>
+              {aiAssistError && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 10 }}>⚠ {aiAssistError}</div>}
+              {aiComparisonExplanation && (
+                <div style={{ marginBottom: 16 }}>
+                  {(aiComparisonExplanation.claims ?? []).map((c: any, i: number) => {
+                    const style = CLAIM_STYLE[c.classification as keyof typeof CLAIM_STYLE]
+                    return (
+                      <div key={i} style={{ ...S.card, padding: 10, marginBottom: 6, borderLeft: `3px solid ${style?.color || '#7f8c8d'}` }}>
+                        <span style={S.badge(style?.color || '#7f8c8d')}>{style?.icon} {style?.label || c.classification}</span>
+                        <div style={{ fontSize: 13, marginTop: 4 }}>{c.text}</div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' as const, fontSize: 12 }}>
                 <span>Objects: <span style={{ color: CHANGE_COLOR.ADDED }}>+{oc.added.length} Added</span> <span style={{ color: CHANGE_COLOR.REMOVED }}>−{oc.removed.length} Removed</span> <span style={{ color: CHANGE_COLOR.MODIFIED }}>~{oc.modified.length} Modified</span> <span style={{ color: 'var(--text-dim)' }}>{oc.unchanged.length} Unchanged</span></span>
                 <span>Relationships: <span style={{ color: CHANGE_COLOR.ADDED }}>+{rc.added.length} Added</span> <span style={{ color: CHANGE_COLOR.REMOVED }}>−{rc.removed.length} Removed</span></span>
@@ -1990,6 +2173,132 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     )
   }
 
+  // ── AI Assist (Phase 5D) ────────────────────────────────────────────────
+  const renderAiAssist = () => {
+    const CLASS_COLOR: Record<string, string> = { FACT: CLAIM_STYLE.FACT.color, INFERENCE: CLAIM_STYLE.INFERENCE.color, GENERAL_GUIDANCE: CLAIM_STYLE.GENERAL_GUIDANCE.color, UNVERIFIED: CLAIM_STYLE.UNVERIFIED.color }
+    const objectById = new Map<string, any>((dataset?.objects ?? []).map((o: any) => [o.id, o]))
+    const renderClaims = (explanation: any) => (
+      <div>
+        {explanation.domainPerspective && (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10, fontStyle: 'italic' }}>Perspective: {explanation.domainPerspective.note}</div>
+        )}
+        {(explanation.claims ?? []).map((c: any, i: number) => (
+          <div key={i} style={{ ...S.card, padding: 10, marginBottom: 8, borderLeft: `3px solid ${CLASS_COLOR[c.classification] || '#7f8c8d'}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={S.badge(CLASS_COLOR[c.classification] || '#7f8c8d')}>{CLAIM_STYLE[c.classification as keyof typeof CLAIM_STYLE]?.icon} {CLAIM_STYLE[c.classification as keyof typeof CLAIM_STYLE]?.label || c.classification}</span>
+            </div>
+            <div style={{ fontSize: 13, marginBottom: (c.evidenceRefs ?? []).length > 0 ? 6 : 0 }}>{c.text}</div>
+            {(c.evidenceRefs ?? []).length > 0 && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+                {c.evidenceRefs.map((ref: any, ri: number) => {
+                  const resolved = resolveEvidenceRef(ref, dataset)
+                  return (
+                    <span
+                      key={ri}
+                      onClick={() => resolved && highlightEvidence(ref)}
+                      style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: resolved ? 'var(--navy-light)' : 'transparent', border: '1px solid var(--border)', cursor: resolved ? 'pointer' : 'default', color: resolved ? 'var(--text)' : 'var(--text-dim)', textDecoration: resolved ? 'underline' : 'none' }}
+                      title={resolved ? 'Click to highlight' : 'Evidence not available in the current view'}
+                    >
+                      {resolved?.name || resolved?.key || ref.id}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    )
+
+    return (
+      <div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' as const }}>
+          {(['explain', 'risks', 'gaps', 'question', 'propose'] as const).map(tab => (
+            <button key={tab} style={aiTab === tab ? S.btn('primary') : S.btn()} onClick={() => setAiTab(tab)}>
+              {tab === 'explain' ? 'Explain' : tab === 'risks' ? 'Risks' : tab === 'gaps' ? 'Gaps' : tab === 'question' ? 'Ask' : 'Propose Changes'}
+            </button>
+          ))}
+          <button style={{ ...S.btn(), marginLeft: 'auto' }} onClick={() => setAiAssistMode(false)}>✕ Exit AI Assist</button>
+        </div>
+
+        {/* Self-contained highlight display - the graph renderer's own
+            detail panel is scoped to that renderer only, so evidence
+            click-to-highlight needs its own display here rather than
+            depending on a component this panel never renders. */}
+        {selected && (
+          <div style={{ ...S.card, padding: 12, marginBottom: 14, border: '1px solid #3498db' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div><strong style={{ fontSize: 13 }}>📍 {selected.name}</strong><span style={{ fontSize: 11, color: 'var(--text-dim)', marginLeft: 8 }}>{selected.semanticType || selected.assetType || selected.relationshipType}</span></div>
+              <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => setSelected(null)}>✕</button>
+            </div>
+          </div>
+        )}
+
+        {aiTab !== 'propose' ? (
+          <div>
+            {aiTab === 'question' && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+                <input style={{ ...S.input, flex: 1 }} placeholder="Ask a question about this architecture…" value={aiAssistQuestion} onChange={e => setAiAssistQuestion(e.target.value)} />
+                <button style={S.btn('primary')} disabled={!aiAssistQuestion.trim()} onClick={() => runAiExplain('question')}>Ask</button>
+              </div>
+            )}
+            {aiTab !== 'question' && (
+              <button style={{ ...S.btn('primary'), marginBottom: 14 }} onClick={() => runAiExplain(aiTab as any)}>
+                {`Generate ${aiTab === 'explain' ? 'Explanation' : aiTab === 'risks' ? 'Risk Analysis' : 'Gap Analysis'}`}
+              </button>
+            )}
+            {aiAssistLoading && <span style={{ fontSize: 12, color: 'var(--text-dim)', marginLeft: 8 }}>⏳ Generating…</span>}
+            {aiAssistError && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 12 }}>⚠ {aiAssistError}</div>}
+            {aiExplanation ? renderClaims(aiExplanation) : !aiAssistLoading && <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{aiTab === 'question' ? 'Ask a question to get started.' : 'Click Generate to get started.'}</div>}
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <input style={{ ...S.input, flex: 1 }} placeholder="Describe the change you'd like to propose…" value={aiProposalInstruction} onChange={e => setAiProposalInstruction(e.target.value)} disabled={isScenarioLocked(activeScenarioObj)} />
+              <button style={S.btn('primary')} disabled={!aiProposalInstruction.trim() || aiProposalBusy || isScenarioLocked(activeScenarioObj)} onClick={runAiPropose}>{aiProposalBusy ? 'Generating…' : 'Generate Proposal'}</button>
+            </div>
+            {isScenarioLocked(activeScenarioObj) && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>This scenario is {activeScenarioObj?.status} and locked - revert to Draft in ✎ Author to propose changes.</div>}
+            {aiProposalError && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 12 }}>⚠ {aiProposalError}</div>}
+            {aiProposalNotice && <div style={{ fontSize: 12, color: '#2ecc71', marginBottom: 12 }}>✓ {aiProposalNotice}</div>}
+
+            {aiCurrentProposal && (() => {
+              const rows = buildProposedChangeRows(aiCurrentProposal, objectById)
+              const canApprove = canApproveProposal(aiCurrentProposal)
+              const status = aiCurrentProposal.status
+              return (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <span style={S.badge(status === 'APPLIED' ? '#2ecc71' : status === 'REJECTED' || status === 'REJECTED_BY_VALIDATION' ? '#e74c3c' : status === 'APPROVED' ? '#3498db' : '#f39c12')}>{status}</span>
+                    {typeof aiCurrentProposal.confidence === 'number' && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Confidence: {Math.round(aiCurrentProposal.confidence * 100)}%</span>}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Proposed Changes</div>
+                  {rows.map(row => (
+                    <div key={row.index} style={{ ...S.card, padding: 10, marginBottom: 8 }}>
+                      <div style={{ fontWeight: 500, fontSize: 13, marginBottom: 4 }}>{row.summary}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: row.issues.length > 0 ? 6 : 0 }}>{row.rationale} · {row.evidenceCount} evidence reference{row.evidenceCount === 1 ? '' : 's'}</div>
+                      {row.issues.map((iss, i) => <div key={i} style={{ fontSize: 12, color: iss.severity === 'ERROR' ? '#e74c3c' : '#f39c12' }}>{iss.severity === 'ERROR' ? '✕' : '⚠'} {iss.message}</div>)}
+                    </div>
+                  ))}
+                  {(aiCurrentProposal.assumptions ?? []).length > 0 && (
+                    <div style={{ fontSize: 12, marginBottom: 8 }}><strong>Assumptions:</strong> {aiCurrentProposal.assumptions.join('; ')}</div>
+                  )}
+                  {(aiCurrentProposal.missingInformation ?? []).length > 0 && (
+                    <div style={{ fontSize: 12, marginBottom: 12, color: '#f39c12' }}><strong>Missing information:</strong> {aiCurrentProposal.missingInformation.join('; ')}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button style={S.btn('primary')} disabled={!canApprove || aiProposalBusy} onClick={approveAiProposal} title={!canApprove && status === 'VALIDATED' ? 'Cannot approve - unresolved ERROR-level issues' : undefined}>Approve</button>
+                    <button style={S.btn()} disabled={status === 'APPLIED' || aiProposalBusy} onClick={rejectAiProposal}>Reject</button>
+                    <button style={S.btn('primary')} disabled={status !== 'APPROVED' || aiProposalBusy} onClick={executeAiProposal}>{aiProposalBusy ? 'Applying…' : 'Execute'}</button>
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── Graph visible subset (Phase 4C) ──────────────────────────────────
   //
   // graphVisibleState (progressive disclosure) -> relationship/object-type
@@ -2259,8 +2568,9 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         </div>
         <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
           {!isRoadmap && !isDashboard && (<>
-            <button style={comparisonMode ? S.btn('primary') : S.btn()} onClick={() => setComparisonMode(m => !m)} title="Compare two architecture scenarios">⇄ Compare</button>
-            <button style={authoringMode ? S.btn('primary') : S.btn()} onClick={() => setAuthoringMode(m => !m)} title="Author changes to this Architecture Scenario">✎ Author</button>
+            <button style={comparisonMode ? S.btn('primary') : S.btn()} onClick={() => { setComparisonMode(m => !m); setAuthoringMode(false); setAiAssistMode(false) }} title="Compare two architecture scenarios">⇄ Compare</button>
+            <button style={authoringMode ? S.btn('primary') : S.btn()} onClick={() => { setAuthoringMode(m => !m); setComparisonMode(false); setAiAssistMode(false) }} title="Author changes to this Architecture Scenario">✎ Author</button>
+            <button style={aiAssistMode ? S.btn('primary') : S.btn()} onClick={() => { setAiAssistMode(m => !m); setComparisonMode(false); setAuthoringMode(false) }} title="Ask the AI assistant about this architecture">🤖 AI Assist</button>
           </>)}
           <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
@@ -2368,7 +2678,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         )
       ) : (
       <>
-      {!comparisonMode && !authoringMode && (<>
+      {!comparisonMode && !authoringMode && !aiAssistMode && (<>
       {/* Viz mode selector */}
       <div style={{ display:'flex', gap:2, background:'var(--navy-light)', borderRadius:8, padding:3, marginBottom:16, width:'fit-content' }}>
         {['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE'].map(m => (
@@ -2440,6 +2750,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       {loading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:60 }}>Loading view data...</div>
         : comparisonMode ? renderComparison()
         : authoringMode ? renderAuthoring()
+        : aiAssistMode ? renderAiAssist()
         : vizMode === 'GRAPH' ? renderGraph()
         : vizMode === 'CAPABILITY_MAP' ? renderCapabilityMap()
         : vizMode === 'HEATMAP' ? renderHeatmap()
