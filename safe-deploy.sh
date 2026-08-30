@@ -41,6 +41,9 @@ echo "✅ Proceeding with deploy..."
 echo ""
 
 # Build
+echo "📦 Installing dependencies (in case package-lock.json changed since your last install)..."
+npm install --legacy-peer-deps
+
 echo "🔨 Building..."
 REACT_APP_API_URL=$API_URL npm run build
 

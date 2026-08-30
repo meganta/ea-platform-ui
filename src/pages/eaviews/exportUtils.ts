@@ -299,7 +299,17 @@ function drawPdfTable(doc: any, headers: string[], rows: string[][], meta: Expor
       y = writePdfHeader(doc, meta, pageWidth)
       doc.setFontSize(9)
     }
-    row.forEach((cell, i) => doc.text(String(cell ?? '').slice(0, maxCellChars), margin + i * colWidth + 2, y))
+    // Real lint fix (no-loop-func), not just a suppression: capture the
+    // current row's y into its own const before the closure, rather than
+    // having row.forEach's callback reference the outer `y` that this
+    // same loop mutates on every iteration. The forEach itself already
+    // runs synchronously and completes before `y` changes, so this was
+    // never an actual runtime bug - but the pattern is exactly what the
+    // rule exists to catch (a closure over a loop-mutated variable), and
+    // fixing it properly here also makes the code correct even if it's
+    // ever refactored to something deferred later.
+    const rowY = y
+    row.forEach((cell, i) => doc.text(String(cell ?? '').slice(0, maxCellChars), margin + i * colWidth + 2, rowY))
     y += rowHeight
   }
 }
