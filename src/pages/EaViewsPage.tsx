@@ -13,6 +13,7 @@ import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabili
 import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters, ExpandDirection } from './eaviews/graphDisclosureUtils'
 import { buildScenarioLineageTree, getScenarioLineagePath, chooseVisualizationAfterScenarioSwitch } from './eaviews/scenarioSelectorUtils'
 import { buildChangeSummaryRows, buildRelationshipChangeRows, buildComparisonMatrix, applyComparisonFilters, buildComparisonGraphDataset, buildComparisonCapabilityMap, buildHeatmapComparison, buildComparisonTree, buildComparisonCards, CHANGE_TYPE_SYMBOL } from './eaviews/comparisonUtils'
+import { buildPropertyFieldDisplay, requiresCurrentEditConfirmation, isScenarioLocked, determineAssetActions, canIntroduce, buildRelationshipAuthoringRows } from './eaviews/authoringUtils'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -412,6 +413,30 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [comparisonGraphVisible, setComparisonGraphVisible] = useState<any>(null)
   const [comparisonGraphFocusId, setComparisonGraphFocusId] = useState<string | null>(null)
   const [comparisonHeatmapMetric, setComparisonHeatmapMetric] = useState<string>('')
+  // ── Scenario Authoring (Phase 5C) ────────────────────────────────────
+  //
+  // Entirely separate from comparisonMode above - never active at the
+  // same time (the toggle buttons are mutually exclusive in the UI).
+  // authoringConfirmedCurrent is the single gate for "preventing
+  // accidental editing of Current architecture" (Section: Current-edit
+  // safeguard) - reset whenever authoring mode is entered/exited or the
+  // active scenario changes, so confirming once doesn't silently carry
+  // over to a later Current-editing session.
+  const [authoringMode, setAuthoringMode] = useState(false)
+  const [authoringConfirmedCurrent, setAuthoringConfirmedCurrent] = useState(false)
+  const [authoringBusy, setAuthoringBusy] = useState(false)
+  const [authoringError, setAuthoringError] = useState<string | null>(null)
+  const [authoringWarnings, setAuthoringWarnings] = useState<any[]>([])
+  const [removedAssets, setRemovedAssets] = useState<any[]>([])
+  const [editingPropertiesFor, setEditingPropertiesFor] = useState<any>(null)
+  const [propertyFormValues, setPropertyFormValues] = useState<Record<string, string>>({})
+  const [showIntroducePicker, setShowIntroducePicker] = useState(false)
+  const [introduceSearch, setIntroduceSearch] = useState('')
+  const [introduceResults, setIntroduceResults] = useState<any[]>([])
+  const [showAddRelForm, setShowAddRelForm] = useState(false)
+  const [addRelForm, setAddRelForm] = useState<{ sourceId: string; targetId: string; relationshipType: string }>({ sourceId: '', targetId: '', relationshipType: '' })
+  const [showNewScenarioForm, setShowNewScenarioForm] = useState(false)
+  const [newScenarioForm, setNewScenarioForm] = useState<{ name: string; type: 'TRANSITION' | 'TARGET' | 'BASELINE'; parentScenarioId: string; horizonDate: string }>({ name: '', type: 'TARGET', parentScenarioId: '', horizonDate: '' })
   const [loading, setLoading] = useState(true)
   const [vizMode, setVizMode] = useState<string>(view.visualization || 'GRAPH')
   const [filterDomain, setFilterDomain] = useState('')
@@ -689,6 +714,76 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     })
   }
 
+  // ── Authoring actions (Phase 5C) ─────────────────────────────────────
+  //
+  // A single wrapper for every mutating call: enforces the Current-edit
+  // confirmation gate (Section: preventing accidental editing) before
+  // anything is sent, then on success refreshes via the exact same
+  // switchScenario() used for normal scenario switching - reusing its
+  // proven race-protection and atomic commit rather than building a
+  // second, parallel refresh path (Section: "every authoring action
+  // refreshes the resolved scenario/view correctly"). The backend's own
+  // presence-check-before-action (already proven in Phase 5C's backend
+  // tests) is what actually prevents duplicate/contradictory deltas;
+  // this wrapper's job is only to surface the result, never to
+  // second-guess it.
+  const activeScenarioObj = scenarios.find((s: any) => s.id === committedScenarioId)
+
+  const runAuthoringAction = async (action: () => Promise<any>) => {
+    if (requiresCurrentEditConfirmation(activeScenarioObj) && !authoringConfirmedCurrent) {
+      setAuthoringError('Confirm editing Current architecture first (see the warning banner above).')
+      return
+    }
+    setAuthoringBusy(true)
+    setAuthoringError(null)
+    try {
+      const result = await action()
+      if (result?.statusCode) {
+        // NestJS's standard error response shape - api.post/patch/del
+        // never reject on an HTTP error status, so this is how a
+        // validation/lifecycle/tenant-ownership failure actually surfaces.
+        setAuthoringError(Array.isArray(result?.issues) ? result.issues.map((i: any) => i.message).join('; ') : (result?.message || 'The action failed.'))
+        return
+      }
+      setAuthoringWarnings(result?.warnings ?? [])
+      if (committedScenarioId) switchScenario(committedScenarioId)
+    } catch {
+      setAuthoringError('The action failed. Nothing was changed.')
+    } finally {
+      setAuthoringBusy(false)
+    }
+  }
+
+  const introduceAsset = (assetId: string) => runAuthoringAction(() => api.post(`/ea-views/scenarios/${committedScenarioId}/assets/${assetId}/introduce`))
+  const removeAssetFromScenario = (assetId: string) => runAuthoringAction(() => api.post(`/ea-views/scenarios/${committedScenarioId}/assets/${assetId}/remove`))
+  const restoreAssetInScenario = (assetId: string) => runAuthoringAction(() => api.post(`/ea-views/scenarios/${committedScenarioId}/assets/${assetId}/restore`))
+  const undoAssetDelta = (assetId: string) => runAuthoringAction(() => api.del(`/ea-views/scenarios/${committedScenarioId}/assets/${assetId}`))
+  const savePropertyOverrides = (assetId: string, overrides: Record<string, any>) => runAuthoringAction(() => api.patch(`/ea-views/scenarios/${committedScenarioId}/assets/${assetId}/properties`, { overrides }))
+  const addScenarioRelationship = (sourceId: string, targetId: string, relationshipType: string) => runAuthoringAction(() => api.post(`/ea-views/scenarios/${committedScenarioId}/relationships`, { sourceId, targetId, relationshipType }))
+  const removeScenarioRelationship = (sourceId: string, targetId: string, relationshipType: string) => runAuthoringAction(() => api.del(`/ea-views/scenarios/${committedScenarioId}/relationships`, { sourceId, targetId, relationshipType }))
+  const setScenarioLifecycleStatus = (status: 'DRAFT' | 'APPROVED') => runAuthoringAction(() => api.patch(`/ea-views/scenarios/${committedScenarioId}/status`, { status }))
+
+  const createScenario = async () => {
+    setAuthoringBusy(true); setAuthoringError(null)
+    try {
+      const result = await api.post('/ea-views/scenarios', { ...newScenarioForm, horizonDate: newScenarioForm.horizonDate || undefined })
+      if (!result?.id) { setAuthoringError(result?.message || 'Failed to create scenario.'); return }
+      setShowNewScenarioForm(false)
+      setNewScenarioForm({ name: '', type: 'TARGET', parentScenarioId: '', horizonDate: '' })
+      api.get('/ea-views/scenarios').then((s: any) => { if (Array.isArray(s)) setScenarios(s) })
+      switchScenario(result.id)
+    } catch {
+      setAuthoringError('Failed to create scenario.')
+    } finally {
+      setAuthoringBusy(false)
+    }
+  }
+
+  const searchRepositoryToIntroduce = (query: string) => {
+    setIntroduceSearch(query)
+    api.get(`/repository/assets?search=${encodeURIComponent(query)}`).then((r: any) => setIntroduceResults(Array.isArray(r) ? r : [])).catch(() => setIntroduceResults([]))
+  }
+
   useEffect(() => {
     api.get('/ea-views/saved-filters').then((f: any) => setSavedFilters(Array.isArray(f) ? f : [])).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -706,6 +801,22 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     setComparisonGraphFocusId(focusId)
     setComparisonGraphVisible(focusId ? computeInitialVisibleSet(indexes, focusId) : null)
   }, [comparisonData])
+
+  // Resets the Current-edit confirmation whenever authoring mode is
+  // entered/exited or the active scenario changes - confirming once must
+  // never silently carry over to a later Current-editing session
+  // (Section: preventing accidental editing of Current architecture).
+  useEffect(() => { setAuthoringConfirmedCurrent(false); setAuthoringError(null); setAuthoringWarnings([]) }, [authoringMode, committedScenarioId])
+
+  // Fetches the current scenario's removed-asset list whenever authoring
+  // mode is on and the resolved dataset changes - a removed asset never
+  // appears in `dataset.objects` at all (Section: Restore needs
+  // something to restore), so this is the only source for the Restore
+  // picker.
+  useEffect(() => {
+    if (!authoringMode || !committedScenarioId) { setRemovedAssets([]); return }
+    api.get(`/ea-views/scenarios/${committedScenarioId}/removed-assets`).then((r: any) => setRemovedAssets(Array.isArray(r) ? r : [])).catch(() => setRemovedAssets([]))
+  }, [authoringMode, committedScenarioId, dataset]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const applySavedFilter = (filterId: string) => {
     const f = savedFilters.find((sf: any) => sf.id === filterId)
@@ -1698,7 +1809,187 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     )
   }
 
-  // ── Graph ────────────────────────────────────────────────────────────────────
+  // ── Authoring (Phase 5C) ────────────────────────────────────────────────
+  const renderAuthoring = () => {
+    if (!committedScenarioId || !activeScenarioObj) return <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Select a scenario to author.</div>
+    const locked = isScenarioLocked(activeScenarioObj)
+    const needsCurrentConfirm = requiresCurrentEditConfirmation(activeScenarioObj) && !authoringConfirmedCurrent
+    const objects = dataset?.objects ?? []
+    const relationships = buildRelationshipAuthoringRows(dataset?.relationships ?? [])
+    const objectById = new Map<string, any>(objects.map((o: any) => [o.id, o]))
+    const nameOf = (id: string) => objectById.get(id)?.name ?? id
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' as const }}>
+          <strong style={{ fontSize: 15 }}>{activeScenarioObj.name}</strong>
+          <span style={S.badge(activeScenarioObj.type === 'CURRENT' ? '#2ecc71' : '#3498db')}>{activeScenarioObj.type}</span>
+          <span style={S.badge(locked ? '#e74c3c' : '#f39c12')}>{activeScenarioObj.status}</span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            {!locked && <button style={S.btn()} onClick={() => setScenarioLifecycleStatus('APPROVED')} disabled={authoringBusy}>Approve</button>}
+            {locked && <button style={S.btn('primary')} onClick={() => setScenarioLifecycleStatus('DRAFT')} disabled={authoringBusy}>Revert to Draft</button>}
+            <button style={S.btn()} onClick={() => setShowNewScenarioForm(v => !v)}>+ New Scenario</button>
+            <button style={{ ...S.btn(), marginLeft: 8 }} onClick={() => setAuthoringMode(false)}>✕ Exit Authoring</button>
+          </div>
+        </div>
+
+        {showNewScenarioForm && (
+          <div style={{ ...S.card, padding: 14, marginBottom: 16 }}>
+            <div style={S.grid2}>
+              <div><label style={S.label}>Name</label><input style={S.input} value={newScenarioForm.name} onChange={e => setNewScenarioForm(f => ({ ...f, name: e.target.value }))} /></div>
+              <div><label style={S.label}>Type</label>
+                <select style={S.input} value={newScenarioForm.type} onChange={e => setNewScenarioForm(f => ({ ...f, type: e.target.value as any }))}>
+                  {['TRANSITION', 'TARGET', 'BASELINE'].map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div><label style={S.label}>Parent Scenario</label>
+                <select style={S.input} value={newScenarioForm.parentScenarioId} onChange={e => setNewScenarioForm(f => ({ ...f, parentScenarioId: e.target.value }))}>
+                  <option value="">Select…</option>
+                  {scenarios.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div><label style={S.label}>Horizon Date (optional)</label><input type="date" style={S.input} value={newScenarioForm.horizonDate} onChange={e => setNewScenarioForm(f => ({ ...f, horizonDate: e.target.value }))} /></div>
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+              <button style={S.btn('primary')} disabled={!newScenarioForm.name || !newScenarioForm.parentScenarioId || authoringBusy} onClick={createScenario}>Create</button>
+              <button style={S.btn()} onClick={() => setShowNewScenarioForm(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {needsCurrentConfirm && (
+          <div style={{ ...S.card, padding: 14, marginBottom: 16, border: '1px solid #e74c3c', background: '#e74c3c11' }}>
+            <div style={{ fontWeight: 600, marginBottom: 6, color: '#e74c3c' }}>⚠ You are about to edit the Current architecture</div>
+            <div style={{ fontSize: 13, marginBottom: 10 }}>Changes made here are inherited by every Transition/Target scenario descended from Current, not just this one. This is different from editing a Target scenario, which stays isolated to that branch.</div>
+            <button style={S.btn('primary')} onClick={() => setAuthoringConfirmedCurrent(true)}>I understand, continue editing Current</button>
+          </div>
+        )}
+
+        {authoringError && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 10 }}>⚠ {authoringError}</div>}
+        {authoringWarnings.map((w: any, i: number) => <div key={i} style={{ fontSize: 12, color: '#f39c12', marginBottom: 6 }}>ℹ {w.message}</div>)}
+        {locked && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>This scenario is {activeScenarioObj.status} and locked. Revert to Draft to make further changes.</div>}
+
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Objects</div>
+        <div style={{ marginBottom: 16 }}>
+          {objects.map((o: any) => {
+            const actions = determineAssetActions(true, locked)
+            const fields = buildPropertyFieldDisplay(o)
+            const isEditing = editingPropertiesFor?.id === o.id
+            return (
+              <div key={o.id} style={{ ...S.card, padding: 10, marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <strong style={{ fontSize: 13, flex: 1 }}>{o.name}</strong>
+                  <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{o.semanticType || o.assetType}</span>
+                  {actions.canEditProperties && <button style={{ ...S.btn(), fontSize: 11 }} disabled={locked} onClick={() => { setEditingPropertiesFor(o); setPropertyFormValues(Object.fromEntries(fields.map(f => [f.key, String(f.value)]))) }}>✎ Edit</button>}
+                  {actions.canRemove && <button style={{ ...S.btn('danger'), fontSize: 11 }} disabled={locked || authoringBusy} onClick={() => removeAssetFromScenario(o.id)}>✕ Remove</button>}
+                  <button style={{ ...S.btn(), fontSize: 11 }} disabled={locked || authoringBusy} onClick={() => undoAssetDelta(o.id)} title="Undo all scenario changes to this asset">↩ Undo</button>
+                </div>
+                {isEditing && (
+                  <div style={{ marginTop: 10, borderTop: '1px solid var(--border)', paddingTop: 10 }}>
+                    {fields.map(f => (
+                      <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, width: 140 }}>{f.key}</span>
+                        <input style={{ ...S.input, flex: 1 }} value={propertyFormValues[f.key] ?? ''} onChange={e => setPropertyFormValues(v => ({ ...v, [f.key]: e.target.value }))} />
+                        <span style={S.badge(f.provenance === 'scenarioOverride' ? '#f39c12' : '#7f8c8d')}>{f.provenance === 'scenarioOverride' ? 'Overridden here' : f.provenance === 'repository' ? 'Inherited' : '—'}</span>
+                      </div>
+                    ))}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                      <button style={S.btn('primary')} disabled={authoringBusy} onClick={() => {
+                        // Only send fields that actually changed, coerced
+                        // back to their original type - propertyFormValues
+                        // are all strings (from the text input), but a
+                        // numeric/boolean attribute needs its real type or
+                        // the backend's own INTEGER/BOOLEAN validation
+                        // would incorrectly reject an unchanged, correctly-
+                        // typed value that merely round-tripped through a
+                        // text input.
+                        const changedOverrides: Record<string, any> = {}
+                        for (const f of fields) {
+                          const raw = propertyFormValues[f.key]
+                          if (raw === String(f.value)) continue
+                          if (typeof f.value === 'number') changedOverrides[f.key] = Number(raw)
+                          else if (typeof f.value === 'boolean') changedOverrides[f.key] = raw === 'true'
+                          else changedOverrides[f.key] = raw
+                        }
+                        if (Object.keys(changedOverrides).length > 0) savePropertyOverrides(o.id, changedOverrides)
+                        setEditingPropertiesFor(null)
+                      }}>Save</button>
+                      <button style={S.btn()} onClick={() => setEditingPropertiesFor(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        <button style={{ ...S.btn(), marginBottom: 16 }} disabled={locked} onClick={() => setShowIntroducePicker(v => !v)}>+ Introduce Asset</button>
+        {showIntroducePicker && (
+          <div style={{ ...S.card, padding: 12, marginBottom: 16 }}>
+            <input style={S.input} placeholder="🔍 Search repository assets…" value={introduceSearch} onChange={e => searchRepositoryToIntroduce(e.target.value)} />
+            <div style={{ marginTop: 8, maxHeight: 200, overflowY: 'auto' as const }}>
+              {introduceResults.filter((a: any) => !objectById.has(a.id)).map((a: any) => (
+                <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                  <span style={{ fontSize: 13, flex: 1 }}>{a.name}</span>
+                  <button style={{ ...S.btn('primary'), fontSize: 11 }} disabled={!canIntroduce(false, locked) || authoringBusy} onClick={() => introduceAsset(a.id)}>+ Introduce</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {removedAssets.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Removed in this Scenario</div>
+            {removedAssets.map((a: any) => (
+              <div key={a.id} style={{ ...S.card, padding: 10, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 13, flex: 1, textDecoration: 'line-through', color: 'var(--text-dim)' }}>{a.name}</span>
+                <span style={S.badge('#e74c3c')}>Removed here</span>
+                <button style={{ ...S.btn('primary'), fontSize: 11 }} disabled={locked || authoringBusy} onClick={() => restoreAssetInScenario(a.id)}>↺ Restore</button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Relationships</div>
+        <div style={{ marginBottom: 12 }}>
+          {relationships.map(r => (
+            <div key={r.key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 13 }}>
+              <span>{nameOf(r.sourceId)}</span>
+              <span style={{ color: 'var(--text-dim)', fontStyle: 'italic', fontSize: 12 }}>{r.label || r.relationshipType}</span>
+              <span>{nameOf(r.targetId)}</span>
+              <button style={{ ...S.btn('danger'), fontSize: 11, marginLeft: 'auto' }} disabled={locked || authoringBusy} onClick={() => removeScenarioRelationship(r.sourceId, r.targetId, r.relationshipType)}>✕ Remove</button>
+            </div>
+          ))}
+        </div>
+        <button style={S.btn()} disabled={locked} onClick={() => setShowAddRelForm(v => !v)}>+ Add Relationship</button>
+        {showAddRelForm && (
+          <div style={{ ...S.card, padding: 12, marginTop: 8 }}>
+            <div style={S.grid3}>
+              <div><label style={S.label}>Source</label>
+                <select style={S.input} value={addRelForm.sourceId} onChange={e => setAddRelForm(f => ({ ...f, sourceId: e.target.value }))}>
+                  <option value="">Select…</option>
+                  {objects.map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+              </div>
+              <div><label style={S.label}>Target</label>
+                <select style={S.input} value={addRelForm.targetId} onChange={e => setAddRelForm(f => ({ ...f, targetId: e.target.value }))}>
+                  <option value="">Select…</option>
+                  {objects.map((o: any) => <option key={o.id} value={o.id}>{o.name}</option>)}
+                </select>
+              </div>
+              <div><label style={S.label}>Relationship Type</label><input style={S.input} value={addRelForm.relationshipType} onChange={e => setAddRelForm(f => ({ ...f, relationshipType: e.target.value }))} /></div>
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+              <button style={S.btn('primary')} disabled={!addRelForm.sourceId || !addRelForm.targetId || !addRelForm.relationshipType || authoringBusy} onClick={() => { addScenarioRelationship(addRelForm.sourceId, addRelForm.targetId, addRelForm.relationshipType); setShowAddRelForm(false); setAddRelForm({ sourceId: '', targetId: '', relationshipType: '' }) }}>Add</button>
+              <button style={S.btn()} onClick={() => setShowAddRelForm(false)}>Cancel</button>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   // ── Graph visible subset (Phase 4C) ──────────────────────────────────
   //
   // graphVisibleState (progressive disclosure) -> relationship/object-type
@@ -1967,9 +2258,10 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           </div>
         </div>
         <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
-          {!isRoadmap && !isDashboard && (
+          {!isRoadmap && !isDashboard && (<>
             <button style={comparisonMode ? S.btn('primary') : S.btn()} onClick={() => setComparisonMode(m => !m)} title="Compare two architecture scenarios">⇄ Compare</button>
-          )}
+            <button style={authoringMode ? S.btn('primary') : S.btn()} onClick={() => setAuthoringMode(m => !m)} title="Author changes to this Architecture Scenario">✎ Author</button>
+          </>)}
           <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
           <button style={{ ...S.btn(), fontSize:12 }} onClick={openVersionHistory}>🕐 History</button>
@@ -2076,7 +2368,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         )
       ) : (
       <>
-      {!comparisonMode && (<>
+      {!comparisonMode && !authoringMode && (<>
       {/* Viz mode selector */}
       <div style={{ display:'flex', gap:2, background:'var(--navy-light)', borderRadius:8, padding:3, marginBottom:16, width:'fit-content' }}>
         {['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE'].map(m => (
@@ -2147,6 +2439,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       {/* Visualization */}
       {loading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:60 }}>Loading view data...</div>
         : comparisonMode ? renderComparison()
+        : authoringMode ? renderAuthoring()
         : vizMode === 'GRAPH' ? renderGraph()
         : vizMode === 'CAPABILITY_MAP' ? renderCapabilityMap()
         : vizMode === 'HEATMAP' ? renderHeatmap()

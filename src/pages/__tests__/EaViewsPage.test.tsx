@@ -1466,6 +1466,161 @@ describe('EaViewsPage - Comparison mode (Phase 5B)', () => {
   });
 });
 
+describe('EaViewsPage - Scenario Authoring (Phase 5C)', () => {
+  const draftTargetScenario = { id: 'target-1', name: 'Target 2028', type: 'TARGET', status: 'DRAFT', horizonDate: null, sequence: null, parentScenarioId: 'current' };
+  const draftCurrentScenario = { id: 'current', name: 'Current Architecture', type: 'CURRENT', status: 'DRAFT', horizonDate: null, sequence: null, parentScenarioId: null };
+  const approvedTargetScenario = { ...draftTargetScenario, id: 'target-approved', status: 'APPROVED' };
+
+  function makeAuthoringDataset(scenario: any) {
+    const capA = { id: 'capA', name: 'Capability A', assetType: 'GovCapability', semanticType: 'BusinessCapability', domain: 'BUSINESS', role: 'PRIMARY', status: 'APPROVED', tags: [], metadata: {} };
+    const appX = { id: 'appX', name: 'App X', assetType: 'Application', semanticType: 'Application', domain: 'APPLICATION', role: 'RELATED', status: 'APPROVED', tags: [], metadata: { hostingModel: 'CLOUD', criticality: 'HIGH' }, metadataProvenance: { hostingModel: 'scenarioOverride', criticality: 'repository' } };
+    return {
+      legacy: { nodes: [capA, appX], edges: [], metadata: {} },
+      dataset: {
+        context: { scenario: { id: scenario.id, name: scenario.name, type: scenario.type } },
+        objects: [capA, appX],
+        relationships: [{ id: 'r1', sourceId: 'capA', targetId: 'appX', relationshipType: 'supported_by', label: 'supported_by' }],
+        paths: [], hierarchies: [], metrics: [], provenance: { truncated: false },
+      },
+      eligibility: { eligible: [{ visualization: 'TABLE', eligible: true, score: 0.7, reasons: [] }], ineligible: [] },
+    };
+  }
+
+  async function openAuthoring(scenario: any, extraRoutes: any = {}) {
+    // Loads directly into the target scenario via ?scenario=<id> (Phase
+    // 5A's own proven mechanism) rather than clicking through the
+    // ScenarioSelector dropdown - these tests exercise authoring itself,
+    // not scenario-switching UI, which is already covered by its own
+    // dedicated test suite.
+    mockSearchParams = scenario.id === 'current' ? new URLSearchParams() : new URLSearchParams(`scenario=${scenario.id}`);
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Authorable View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/scenarios': [draftCurrentScenario, draftTargetScenario, approvedTargetScenario],
+      '/ea-views/v1/dataset': makeAuthoringDataset(scenario),
+      [`/ea-views/scenarios/${scenario.id}/removed-assets`]: [],
+      ...extraRoutes,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Authorable View'));
+    await screen.findByText('App X');
+    fireEvent.click(screen.getByText(/✎ Author/));
+  }
+
+  it('shows the scenario name/type/status and Object provenance badges (Inherited vs Overridden)', async () => {
+    await openAuthoring(draftTargetScenario);
+    // "Target 2028" legitimately appears multiple times (scenario selector
+    // summary, lineage path, dropdown list) - getAllByText, not findByText.
+    expect(screen.getAllByText('Target 2028').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('TARGET').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('DRAFT').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByText('✎ Edit')[1]); // App X
+    expect(await screen.findByText('Overridden here')).toBeInTheDocument();
+    expect(screen.getByText('Inherited')).toBeInTheDocument();
+  });
+
+  it('editing Current requires explicit confirmation before any action proceeds - Remove is blocked until confirmed', async () => {
+    await openAuthoring(draftCurrentScenario, { '/ea-views/scenarios/current/assets/appX/remove': { delta: {}, warnings: [] } });
+    expect(await screen.findByText(/about to edit the Current architecture/)).toBeInTheDocument();
+    fireEvent.click(screen.getAllByText('✕ Remove')[1]);
+    expect(await screen.findByText(/Confirm editing Current architecture first/)).toBeInTheDocument();
+    const removeCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/appX/remove'));
+    expect(removeCall).toBeUndefined(); // never actually sent
+  });
+
+  it('after confirming, editing Current proceeds normally', async () => {
+    await openAuthoring(draftCurrentScenario, { '/ea-views/scenarios/current/assets/appX/remove': { delta: {}, warnings: [] } });
+    fireEvent.click(await screen.findByText('I understand, continue editing Current'));
+    fireEvent.click(screen.getAllByText('✕ Remove')[1]);
+    await waitFor(() => {
+      const removeCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/appX/remove'));
+      expect(removeCall).toBeDefined();
+    });
+  });
+
+  it('Remove posts to the correct endpoint and refreshes the resolved dataset afterward', async () => {
+    await openAuthoring(draftTargetScenario, { '/ea-views/scenarios/target-1/assets/appX/remove': { delta: {}, warnings: [] } });
+    fireEvent.click(screen.getAllByText('✕ Remove')[1]);
+    await waitFor(() => {
+      const removeCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/target-1/assets/appX/remove'));
+      expect(removeCall).toBeDefined();
+      expect(removeCall[1].method).toBe('POST');
+    });
+    // refresh: a second /dataset POST is issued after the action succeeds
+    const datasetCalls = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/v1/dataset'));
+    expect(datasetCalls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('a validation error from the backend is shown and no refresh/false-success is implied', async () => {
+    await openAuthoring(draftTargetScenario, { '/ea-views/scenarios/target-1/assets/appX/remove': { statusCode: 400, message: 'This asset is not present in the scenario - nothing to remove.' } });
+    fireEvent.click(screen.getAllByText('✕ Remove')[1]);
+    expect(await screen.findByText(/nothing to remove/)).toBeInTheDocument();
+  });
+
+  it('all edit controls are disabled on an APPROVED scenario, and a Revert to Draft button is offered instead of Approve', async () => {
+    await openAuthoring(approvedTargetScenario);
+    expect(await screen.findByText('APPROVED')).toBeInTheDocument();
+    expect(screen.getByText('Revert to Draft')).toBeInTheDocument();
+    expect(screen.queryByText('Approve')).not.toBeInTheDocument();
+    expect(screen.getAllByText('✕ Remove')[0]).toBeDisabled();
+  });
+
+  it('clicking Approve on a DRAFT scenario calls the status endpoint', async () => {
+    await openAuthoring(draftTargetScenario, { '/ea-views/scenarios/target-1/status': { ...draftTargetScenario, status: 'APPROVED' } });
+    fireEvent.click(screen.getByText('Approve'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/target-1/status'));
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body)).toEqual({ status: 'APPROVED' });
+    });
+  });
+
+  it('Undo calls the delete endpoint for that specific asset', async () => {
+    await openAuthoring(draftTargetScenario, { '/ea-views/scenarios/target-1/assets/appX': { undone: true } });
+    fireEvent.click(screen.getAllByText('↩ Undo')[1]);
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/target-1/assets/appX') && c[1].method === 'DELETE');
+      expect(call).toBeDefined();
+    });
+  });
+
+  it('Add Relationship form posts source/target/type to the relationships endpoint', async () => {
+    await openAuthoring(draftTargetScenario, { '/ea-views/scenarios/target-1/relationships': { delta: {}, warnings: [] } });
+    fireEvent.click(await screen.findByText('+ Add Relationship'));
+    const selects = screen.getAllByRole('combobox') as HTMLSelectElement[];
+    fireEvent.change(selects[0], { target: { value: 'capA' } });
+    fireEvent.change(selects[1], { target: { value: 'appX' } });
+    fireEvent.change(screen.getByDisplayValue(''), { target: { value: 'depends_on' } });
+    fireEvent.click(screen.getByText('Add'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/target-1/relationships') && c[1].method === 'POST');
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body)).toEqual({ sourceId: 'capA', targetId: 'appX', relationshipType: 'depends_on' });
+    });
+  });
+
+  it('Remove Relationship sends a body-based DELETE with the canonical key', async () => {
+    await openAuthoring(draftTargetScenario, { '/ea-views/scenarios/target-1/relationships': { delta: {}, warnings: [] } });
+    await screen.findByText('+ Add Relationship');
+    // 2 asset Remove buttons + 1 relationship Remove button - the
+    // relationship section renders last, so its button is last in DOM order.
+    const removeButtons = screen.getAllByText('✕ Remove');
+    fireEvent.click(removeButtons[removeButtons.length - 1]);
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/target-1/relationships') && c[1].method === 'DELETE');
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body)).toEqual({ sourceId: 'capA', targetId: 'appX', relationshipType: 'supported_by' });
+    });
+  });
+
+  it('exiting authoring mode returns to the normal single-scenario view', async () => {
+    await openAuthoring(draftTargetScenario);
+    fireEvent.click(screen.getByText(/✕ Exit Authoring/));
+    expect(screen.queryByText(/✕ Exit Authoring/)).not.toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - Object Context View entry point', () => {
   it('reads the objectContext query param on mount and opens the standalone dependency viewer', async () => {
     mockSearchParams = new URLSearchParams('objectContext=asset-123');
