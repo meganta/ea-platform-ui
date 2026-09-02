@@ -805,7 +805,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
 
   const searchRepositoryToIntroduce = (query: string) => {
     setIntroduceSearch(query)
-    api.get(`/repository/assets?search=${encodeURIComponent(query)}`).then((r: any) => setIntroduceResults(Array.isArray(r) ? r : [])).catch(() => setIntroduceResults([]))
+    api.get(`/ea-repository/assets?search=${encodeURIComponent(query)}`).then((r: any) => setIntroduceResults(Array.isArray(r) ? r : [])).catch(() => setIntroduceResults([]))
   }
 
   // ── AI Assist actions (Phase 5D) ──────────────────────────────────────
