@@ -53,14 +53,20 @@ describe('RepositoryPage - loading and listing', () => {
     expect(await screen.findByText('Core Banking')).toBeInTheDocument();
   });
 
-  it('filters by free-text search across English and Arabic names', async () => {
+  it('filters by free-text search across English and Arabic names - sends the search term as a server-side query param (debounced)', async () => {
     mockFetch({
       '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
-      '/ea-repository/assets': [asset({ id: 'a1', name: 'Core Banking' }), asset({ id: 'a2', name: 'CRM Platform' })],
+      '/ea-repository/assets': (url: string) => url.includes('search=banking')
+        ? [asset({ id: 'a1', name: 'Core Banking' })]
+        : [asset({ id: 'a1', name: 'Core Banking' }), asset({ id: 'a2', name: 'CRM Platform' })],
     });
     render(<RepositoryPage />);
     await screen.findByText('Core Banking');
+    expect(screen.getByText('CRM Platform')).toBeInTheDocument();
     fireEvent.change(screen.getByPlaceholderText('Search assets...'), { target: { value: 'banking' } });
+    // Search is debounced (300ms) before the request fires - findByText's
+    // own polling wait comfortably covers that delay.
+    await waitFor(() => expect(screen.queryByText('CRM Platform')).not.toBeInTheDocument());
     expect(screen.getByText('Core Banking')).toBeInTheDocument();
     expect(screen.queryByText('CRM Platform')).not.toBeInTheDocument();
   });
