@@ -32,7 +32,7 @@ function mockFetch(routes: Record<string, any>) {
   global.fetch = jest.fn().mockImplementation((url: string, options?: any) => {
     for (const pattern of sortedPatterns) {
       if (url.includes(pattern)) {
-        const value = typeof routes[pattern] === 'function' ? routes[pattern](options) : routes[pattern];
+        const value = typeof routes[pattern] === 'function' ? routes[pattern](url, options) : routes[pattern];
         return Promise.resolve({ ok: true, json: () => Promise.resolve(value) });
       }
     }
@@ -65,59 +65,67 @@ describe('RepositoryPage - loading and listing', () => {
     expect(screen.queryByText('CRM Platform')).not.toBeInTheDocument();
   });
 
-  it('filters by domain', async () => {
+  it('filters by domain - sends the selected domain as a server-side query param (filtering is server-side, item 2)', async () => {
     mockFetch({
       '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
-      '/ea-repository/assets': [asset({ id: 'a1', name: 'Core Banking', domain: 'APPLICATION' }), asset({ id: 'a2', name: 'Payments Capability', domain: 'BUSINESS' })],
+      '/ea-repository/assets': (url: string) => url.includes('domain=BUSINESS')
+        ? [asset({ id: 'a2', name: 'Payments Capability', domain: 'BUSINESS' })]
+        : [asset({ id: 'a1', name: 'Core Banking', domain: 'APPLICATION' })],
     });
     render(<RepositoryPage />);
     await screen.findByText('Core Banking');
     const selects = screen.getAllByRole('combobox');
     const domainSelect = selects.find(s => (s as HTMLSelectElement).querySelector('option[value="BUSINESS"]'))!;
     fireEvent.change(domainSelect, { target: { value: 'BUSINESS' } });
-    expect(screen.getByText('Payments Capability')).toBeInTheDocument();
+    expect(await screen.findByText('Payments Capability')).toBeInTheDocument();
     expect(screen.queryByText('Core Banking')).not.toBeInTheDocument();
   });
 
-  it('filters by status', async () => {
+  it('filters by status - sends the selected status as a server-side query param', async () => {
     mockFetch({
       '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
-      '/ea-repository/assets': [asset({ id: 'a1', name: 'Approved Asset', status: 'APPROVED' }), asset({ id: 'a2', name: 'Draft Asset', status: 'DRAFT' })],
+      '/ea-repository/assets': (url: string) => url.includes('status=DRAFT')
+        ? [asset({ id: 'a2', name: 'Draft Asset', status: 'DRAFT' })]
+        : [asset({ id: 'a1', name: 'Approved Asset', status: 'APPROVED' })],
     });
     render(<RepositoryPage />);
     await screen.findByText('Approved Asset');
     const selects = screen.getAllByRole('combobox');
     const statusSelect = selects.find(s => (s as HTMLSelectElement).querySelector('option[value="DRAFT"]'))!;
     fireEvent.change(statusSelect, { target: { value: 'DRAFT' } });
-    expect(screen.getByText('Draft Asset')).toBeInTheDocument();
+    expect(await screen.findByText('Draft Asset')).toBeInTheDocument();
     expect(screen.queryByText('Approved Asset')).not.toBeInTheDocument();
   });
 
   it('filters by source - proves the fix for a bug where this filter had working UI but was never actually applied', async () => {
     mockFetch({
       '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
-      '/ea-repository/assets': [asset({ id: 'a1', name: 'Manually Entered', source: 'MANUAL' }), asset({ id: 'a2', name: 'ADM Generated', source: 'ADM_OUTPUT' })],
+      '/ea-repository/assets': (url: string) => url.includes('source=ADM_OUTPUT')
+        ? [asset({ id: 'a2', name: 'ADM Generated', source: 'ADM_OUTPUT' })]
+        : [asset({ id: 'a1', name: 'Manually Entered', source: 'MANUAL' })],
     });
     render(<RepositoryPage />);
     await screen.findByText('Manually Entered');
     const selects = screen.getAllByRole('combobox');
     const sourceSelect = selects.find(s => (s as HTMLSelectElement).querySelector('option[value="ADM_OUTPUT"]'))!;
     fireEvent.change(sourceSelect, { target: { value: 'ADM_OUTPUT' } });
-    expect(screen.getByText('ADM Generated')).toBeInTheDocument();
+    expect(await screen.findByText('ADM Generated')).toBeInTheDocument();
     expect(screen.queryByText('Manually Entered')).not.toBeInTheDocument();
   });
 
   it('filters by asset type - proves the same fix for the second previously-inert filter', async () => {
     mockFetch({
       '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
-      '/ea-repository/assets': [asset({ id: 'a1', name: 'App Asset', assetType: 'APPLICATION' }), asset({ id: 'a2', name: 'Cap Asset', assetType: 'CAPABILITY' })],
+      '/ea-repository/assets': (url: string) => url.includes('assetType=CAPABILITY')
+        ? [asset({ id: 'a2', name: 'Cap Asset', assetType: 'CAPABILITY' })]
+        : [asset({ id: 'a1', name: 'App Asset', assetType: 'APPLICATION' })],
     });
     render(<RepositoryPage />);
     await screen.findByText('App Asset');
     const selects = screen.getAllByRole('combobox');
     const typeSelect = selects.find(s => (s as HTMLSelectElement).querySelector('option[value="CAPABILITY"]'))!;
     fireEvent.change(typeSelect, { target: { value: 'CAPABILITY' } });
-    expect(screen.getByText('Cap Asset')).toBeInTheDocument();
+    expect(await screen.findByText('Cap Asset')).toBeInTheDocument();
     expect(screen.queryByText('App Asset')).not.toBeInTheDocument();
   });
 

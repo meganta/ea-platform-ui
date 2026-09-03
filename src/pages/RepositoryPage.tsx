@@ -302,19 +302,50 @@ export default function RepositoryPage() {
   const [selectedAsset, setSelectedAsset] = useState<any>(null)
   const [editAsset, setEditAsset] = useState<any>(null)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  // EA Repository Production Readiness, item 2: server-side pagination -
+  // 50/page is a reasonable default for a fast initial load without
+  // building sophisticated page-size UX beyond what's needed.
+  const [page, setPage] = useState(1)
+  const pageSize = 50
+  const [total, setTotal] = useState(0)
+
+  // Debounces the search box specifically - a keystroke updates `search`
+  // (the input's own responsive value) immediately, but the actual API
+  // call (driven by debouncedSearch below) waits 300ms after typing
+  // stops, avoiding one request per character on a server-side search.
+  useEffect(() => {
+    const timer = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const load = async () => {
-    const [cfg, assetList, sum] = await Promise.all([
+    const [cfg, sum] = await Promise.all([
       api.get('/ea-repository/framework-config'),
-      api.get('/ea-repository/assets'),
       api.get('/ea-repository/summary'),
     ])
     setConfig(cfg)
-    setAssets(assetList)
     setSummary(sum)
+    const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
+    if (selectedDomain !== 'ALL') params.set('domain', selectedDomain)
+    if (selectedStatus !== 'ALL') params.set('status', selectedStatus)
+    if (selectedSource !== 'ALL') params.set('source', selectedSource)
+    if (selectedAssetType !== 'ALL') params.set('assetType', selectedAssetType)
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    const result = await api.get(`/ea-repository/assets?${params.toString()}`)
+    // Backward-compatible with the pre-pagination shape (a plain array) in
+    // case of a stale cached response during a rolling deploy - treats it
+    // as a single, already-complete page rather than crashing.
+    if (Array.isArray(result)) { setAssets(result); setTotal(result.length) }
+    else { setAssets(result.items || []); setTotal(result.total || 0) }
   }
 
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [page, selectedDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Resets to page 1 whenever a filter actually changes - a filter
+  // change while sitting on page 5 of the old result set should not
+  // silently show an empty/wrong page of the new, filtered set.
+  const changeFilter = (setter: (v: string) => void) => (value: string) => { setter(value); setPage(1) }
 
   // Deep-link support (Copilot Phase 1's evidence drawer links here as
   // ?assetId=<id>) - fetches the asset directly by id rather than relying
@@ -352,17 +383,22 @@ export default function RepositoryPage() {
     await load()
   }
 
-  const filtered = assets.filter(a => {
-    if (selectedDomain !== 'ALL' && a.domain !== selectedDomain) return false
-    if (selectedStatus !== 'ALL' && a.status !== selectedStatus) return false
-    if (selectedSource !== 'ALL' && a.source !== selectedSource) return false
-    if (selectedAssetType !== 'ALL' && a.assetType !== selectedAssetType) return false
-    if (search && !a.name.toLowerCase().includes(search.toLowerCase()) && !(a.nameAr || '').includes(search)) return false
-    return true
-  })
+  // Filtering/search is now server-side (item 2) - `assets` is already
+  // the current, filtered page of results, not the whole repository.
+  // `filtered` name kept for the smallest possible diff to the render
+  // logic below (groupByCycle, the table, the empty state).
+  const filtered = assets
 
   const domains = config?.enabledDomains || []
-  const repoAssetTypes: string[] = Array.from(new Set(assets.map((a:any) => a.assetType).filter(Boolean))).sort()
+  // EA Repository Production Readiness, item 2: object-type filter
+  // values come from the tenant Meta Model (config.allDomains, already
+  // Meta-Model-driven since Decision 3), not a hardcoded frontend list
+  // or a list derived from whatever happens to be on the current page.
+  // Scoped to the selected domain when one is chosen, otherwise every
+  // type across every domain.
+  const repoAssetTypes: string[] = selectedDomain !== 'ALL'
+    ? (config?.allDomains?.[selectedDomain] || [])
+    : Array.from(new Set(Object.values(config?.allDomains || {}).flat() as string[])).sort()
 
   // Group by cycle
   const groupedAssets: Record<string, any[]> = {}
@@ -412,13 +448,13 @@ export default function RepositoryPage() {
         {/* Filters */}
         <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
           <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
-          <select className="form-input" style={{ width: 140 }} value={selectedSource} onChange={e => setSelectedSource(e.target.value)}>
+          <select className="form-input" style={{ width: 140 }} value={selectedSource} onChange={e => changeFilter(setSelectedSource)(e.target.value)}>
             <option value="ALL">All Sources</option>
             <option value="ADM_OUTPUT">ADM Output</option>
             <option value="MANUAL">Manual</option>
             <option value="UPLOAD">Upload</option>
           </select>
-          <select className="form-input" style={{ width: 140 }} value={selectedAssetType} onChange={e => setSelectedAssetType(e.target.value)}>
+          <select className="form-input" style={{ width: 140 }} value={selectedAssetType} onChange={e => changeFilter(setSelectedAssetType)(e.target.value)}>
             <option value="ALL">All Types</option>
             {repoAssetTypes.map((t:any) => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
           </select>
@@ -427,13 +463,13 @@ export default function RepositoryPage() {
             Group by Cycle
           </label>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-            {filtered.length}/{assets.length}
+            {total > 0 ? `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}` : '0 of 0'}
           </div>
-          <select className="form-input" style={{ width: 140 }} value={selectedDomain} onChange={e => setSelectedDomain(e.target.value)}>
+          <select className="form-input" style={{ width: 140 }} value={selectedDomain} onChange={e => { changeFilter(setSelectedDomain)(e.target.value); setSelectedAssetType('ALL') }}>
             <option value="ALL">All Domains</option>
             {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
           </select>
-          <select className="form-input" style={{ width: 160 }} value={selectedStatus} onChange={e => setSelectedStatus(e.target.value)}>
+          <select className="form-input" style={{ width: 160 }} value={selectedStatus} onChange={e => changeFilter(setSelectedStatus)(e.target.value)}>
             <option value="ALL">All Statuses</option>
             {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
@@ -460,7 +496,7 @@ export default function RepositoryPage() {
                     <tr key={a.id} onClick={() => setSelectedAsset(a)} style={{ cursor: 'pointer' }}>
                       <td><div style={{ fontWeight: 500 }}>{a.name}</div>{a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}</td>
                       <td style={{ fontSize: 11 }}>{(a.domain||'').replace(/_/g,' ')}</td>
-                      <td style={{ fontSize: 11 }}>{(a.assetType||'').replace(/_/g,' ')}</td>
+                      <td style={{ fontSize: 11 }}>{a.canonicalDisplayLabel || (a.assetType||'').replace(/_/g,' ')}</td>
                       <td><span className={`badge ${STATUS_COLORS[a.status]||''}`}>{a.status}</span></td>
                       <td><button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} onClick={e => { e.stopPropagation(); deleteAsset(a.id) }}>🗑</button></td>
                     </tr>
@@ -500,7 +536,7 @@ export default function RepositoryPage() {
                     {a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}
                   </td>
                   <td><span style={{ fontSize: 11, padding: '2px 8px', background: 'rgba(3,105,161,0.08)', borderRadius: 2, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{a.domain}</span></td>
-                  <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.assetType?.replace(/_/g, ' ')}</td>
+                  <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.canonicalDisplayLabel || a.assetType?.replace(/_/g, ' ')}</td>
                   <td><span className={`badge ${STATUS_COLORS[a.status] || 'badge-draft'}`}>{a.status.replace(/_/g, ' ')}</span></td>
                   <td><span className={`badge ${SOURCE_COLORS[a.source] || 'badge-draft'}`} title={getSourceLabel(a).detail}>{getSourceLabel(a).label}</span></td>
                   <td style={{ fontSize: 12 }}>{a.owner || '—'}</td>
@@ -515,6 +551,18 @@ export default function RepositoryPage() {
               ))}
             </tbody>
           </table>
+          </div>
+        )}
+
+        {/* EA Repository Production Readiness, item 2: server-side
+            pagination controls - only shown for the normal (non-grouped)
+            view, since groupByCycle is a niche secondary display already
+            operating on the current page's results. */}
+        {!groupByCycle && total > pageSize && (
+          <div className="flex items-center justify-center gap-2 mt-4" style={{ fontSize: 12 }}>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹ Prev</button>
+            <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <button className="btn btn-secondary btn-sm" disabled={page * pageSize >= total} onClick={() => setPage(p => p + 1)}>Next ›</button>
           </div>
         )}
       </div>

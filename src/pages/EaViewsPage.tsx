@@ -3048,7 +3048,7 @@ function ViewsDashboard({ api, stats, onTab, onOpenView }: { api: any, stats: an
 function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: string; onBack: () => void }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [depth, setDepth] = useState(2)
+  const [depth, setDepth] = useState(1) // EA Repository Production Readiness: default changed from 2 to 1 hop
   const [direction, setDirection] = useState<'BOTH'|'UPSTREAM'|'DOWNSTREAM'>('BOTH')
   const [relTypeFilter, setRelTypeFilter] = useState<Set<string>>(new Set())
   const [positions, setPositions] = useState<Record<string,{x:number,y:number}>>({})
