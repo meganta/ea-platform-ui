@@ -765,7 +765,8 @@ export default function CopilotPage() {
       headers: { Authorization: `Bearer ${api.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    const reader = res.body!.getReader()
+    if (!res.ok || !res.body) throw new Error(`Copilot request failed (${res.status})`)
+    const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
     while (true) {
@@ -899,21 +900,25 @@ export default function CopilotPage() {
     const userMsg: Msg = { id: Date.now() + 'u', role: 'user', content: msg, timestamp: new Date() }
     setMessages(m => [...m, userMsg])
 
-    if (mode === 'single' && selectedArchitect) {
-      // Single architect — streaming
-      const streamingId = Date.now() + 'a'
-      setMessages(m => [...m, { id: streamingId, role: 'architect', content: '', architectCode: selectedArchitect.code, architectName: selectedArchitect.name, architectAvatar: selectedArchitect.avatar, timestamp: new Date() }])
+    let pendingResponseId: any
+    try {
+      if (mode === 'single' && selectedArchitect) {
+        // Single architect — streaming
+        const streamingId = Date.now() + 'a'
+        pendingResponseId = streamingId
+        setMessages(m => [...m, { id: streamingId, role: 'architect', content: '', architectCode: selectedArchitect.code, architectName: selectedArchitect.name, architectAvatar: selectedArchitect.avatar, timestamp: new Date() }])
 
-      await streamSse('/copilot/chat', { message: msg, architectCode: selectedArchitect.code, conversationId: activeConvId }, (d) => {
-        if (d.type === 'meta') setActiveConvId(d.conversationId)
-        if (d.type === 'text') setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, content: msg2.content + d.content } : msg2))
-        if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations(); setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, evidence: d.evidence } : msg2)) }
-      })
-    } else {
-      // Multi-architect consultation
-      const codes = consultArchitects.length > 0 ? consultArchitects : architects.filter(a => !a.isChief).map(a => a.code).slice(0, 3)
+        await streamSse('/copilot/chat', { message: msg, architectCode: selectedArchitect.code, conversationId: activeConvId }, (d) => {
+          if (d.type === 'meta') setActiveConvId(d.conversationId)
+          if (d.type === 'text') setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, content: msg2.content + d.content } : msg2))
+          if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations(); setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, evidence: d.evidence } : msg2)) }
+          if (d.type === 'error') setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, content: d.error || 'Copilot could not complete this request. Please try again.', failed: true } : msg2))
+        })
+      } else {
+        // Multi-architect consultation
+        const codes = consultArchitects.length > 0 ? consultArchitects : architects.filter(a => !a.isChief).map(a => a.code).slice(0, 3)
 
-      await streamSse('/copilot/consult', { message: msg, architectCodes: codes, includeChief, conversationId: activeConvId }, (d) => {
+        await streamSse('/copilot/consult', { message: msg, architectCodes: codes, includeChief, conversationId: activeConvId }, (d) => {
         if (d.type === 'meta') setActiveConvId(d.conversationId)
         if (d.type === 'architect_response') {
           const arch = architects.find(a => a.code === d.architectCode)
@@ -929,9 +934,16 @@ export default function CopilotPage() {
           return m
         })
         if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations() }
-      })
+        if (d.type === 'error') setMessages(m => [...m, { id: Date.now() + 'err', role: 'system', content: d.error || 'Copilot could not complete this request. Please try again.', timestamp: new Date(), failed: true }])
+        })
+      }
+    } catch (e: any) {
+      setMessages(m => pendingResponseId
+        ? m.map(msg2 => msg2.id === pendingResponseId ? { ...msg2, content: 'Copilot could not complete this request. Please try again.', failed: true } : msg2)
+        : [...m, { id: Date.now() + 'err', role: 'system', content: 'Copilot could not complete this request. Please try again.', timestamp: new Date(), failed: true }])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const refreshConversations = () => {
