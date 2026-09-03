@@ -14,6 +14,27 @@ beforeEach(() => {
   localStorage.setItem('ea_token', 'fake-token');
 });
 
+describe('CopilotPage - controlled chat failure', () => {
+  it('renders the backend safe SSE error and leaves the composer usable', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'error', error: 'Copilot could not complete this request. Please try again.', requestId: 'request-1' },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'Can you help?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByText('Copilot could not complete this request. Please try again.')).toBeInTheDocument();
+    expect(await screen.findByText('⚠️ did not complete')).toBeInTheDocument();
+    await waitFor(() => expect(input).not.toBeDisabled());
+  });
+});
+
 function mockFetch(routes: Record<string, any>) {
   const sortedPatterns = Object.keys(routes).sort((a, b) => b.length - a.length);
   global.fetch = jest.fn().mockImplementation((url: string, options?: any) => {
