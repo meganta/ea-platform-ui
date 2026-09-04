@@ -99,7 +99,7 @@ function BrandingTab() {
             <div style={{ fontSize: 11, marginBottom: 3 }}>Logo</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
               {hasLogo
-                ? <img src={`${API_URL_LOCAL}/branding/logo?t=${logoCacheBust}`} alt="Logo" style={{ maxHeight: 40, maxWidth: 100, objectFit: 'contain' }} />
+                ? <img src={`${API_URL_LOCAL}/branding/logo?t=${logoCacheBust}`} alt={t("settings.logo")} style={{ maxHeight: 40, maxWidth: 100, objectFit: 'contain' }} />
                 : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No logo uploaded</div>}
               <label className="btn btn-secondary" style={{ fontSize: 11, cursor: 'pointer', marginLeft: 'auto' }}>
                 {uploadingLogo ? 'Uploading…' : 'Upload'}
@@ -112,7 +112,7 @@ function BrandingTab() {
             <div style={{ fontSize: 11, marginBottom: 3 }}>Favicon</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
               {hasFavicon
-                ? <img src={`${API_URL_LOCAL}/branding/favicon?t=${faviconCacheBust}`} alt="Favicon" style={{ maxHeight: 24, maxWidth: 24, objectFit: 'contain' }} />
+                ? <img src={`${API_URL_LOCAL}/branding/favicon?t=${faviconCacheBust}`} alt={t("settings.favicon")} style={{ maxHeight: 24, maxWidth: 24, objectFit: 'contain' }} />
                 : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No favicon uploaded</div>}
               <label className="btn btn-secondary" style={{ fontSize: 11, cursor: 'pointer', marginLeft: 'auto' }}>
                 {uploadingFavicon ? 'Uploading…' : 'Upload'}
