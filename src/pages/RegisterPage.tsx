@@ -164,7 +164,7 @@ export default function RegisterPage() {
               <div className="form-group">
                 <label className="form-label" htmlFor="org-framework">{isAR?'الإطار المرجعي':'EA Framework'}</label>
                 <select id="org-framework" className="form-input" value={org.frameworkType} onChange={setO('frameworkType')}>
-                  <option value="NORA">NORA</option>
+                  <option value={t("framework.nora")}>NORA</option>
                   <option value="CUSTOM">{isAR?'مخصص':'Custom'}</option>
                 </select>
               </div>
