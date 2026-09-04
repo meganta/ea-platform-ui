@@ -36,6 +36,7 @@ const DOMAIN_COLOR: Record<string, string> = {
 const domainColor = (d?: string) => DOMAIN_COLOR[d || 'GENERAL'] || '#7f8c8d'
 
 export default function GlossaryPage() {
+  const { t } = useLang()
   const api = useApi()
   const [terms, setTerms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
