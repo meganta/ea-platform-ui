@@ -4,6 +4,7 @@ import { LangProvider } from './contexts/LangContext'
 import { BrandingProvider } from './contexts/BrandingContext'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import InviteAcceptPage from './pages/InviteAcceptPage'
 import Layout from './components/Layout'
 import DashboardPage from './pages/DashboardPage'
 import AdmPage from './pages/AdmPage'
@@ -19,19 +20,21 @@ import ReportsPage from './pages/ReportsPage'
 import SharedViewPage from './pages/SharedViewPage'
 import AccessGovernancePage from './pages/AccessGovernancePage'
 import SetupAssistantPage from './pages/SetupAssistantPage'
+import UsersPage from './pages/UsersPage'
 import StrategyPage from './pages/StrategyPage'
-import EaPlanningPage from './pages/EaPlanningPage'
-import GlossaryPage from './pages/GlossaryPage'
 import InnovationPage from './pages/InnovationPage'
 import NotificationsPage from './pages/NotificationsPage'
 import BillingPage from './pages/BillingPage'
 import DecisionEvaluationPage from './pages/DecisionEvaluationPage'
+import EaPlanningPage from './pages/EaPlanningPage'
+import GlossaryPage from './pages/GlossaryPage'
 import './styles.css'
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+function ProtectedRoute({ children, permission }: { children: React.ReactNode; permission?: string }) {
+  const { user, loading, hasPermission } = useAuth()
   if (loading) return <div className="loading-screen"><div className="spinner"/></div>
   if (!user) return <Navigate to="/login" replace />
+  if (permission && !hasPermission(permission)) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
@@ -44,28 +47,31 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/invite/:token" element={<InviteAcceptPage />} />
             <Route path="/shared/:token" element={<SharedViewPage />} />
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<DashboardPage />} />
-              <Route path="adm" element={<AdmPage />} />
-              <Route path="copilot" element={<CopilotPage />} />
-              <Route path="repository" element={<RepositoryPage />} />
-              <Route path="knowledge" element={<KnowledgePage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="governance" element={<GovernancePage />} />
-              <Route path="meta-model" element={<MetaModelPage />} />
-              <Route path="ea-views" element={<EaViewsPage />} />
-              <Route path="connector-hub" element={<ConnectorHubPage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="access-governance" element={<AccessGovernancePage />} />
+              <Route path="adm" element={<ProtectedRoute permission="Repository.View"><AdmPage /></ProtectedRoute>} />
+              <Route path="copilot" element={<ProtectedRoute permission="AIArchitect.Use"><CopilotPage /></ProtectedRoute>} />
+              <Route path="repository" element={<ProtectedRoute permission="Repository.View"><RepositoryPage /></ProtectedRoute>} />
+              <Route path="knowledge" element={<ProtectedRoute permission="Repository.View"><KnowledgePage /></ProtectedRoute>} />
+              <Route path="glossary" element={<ProtectedRoute permission="Repository.View"><GlossaryPage /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute permission="Users.View"><SettingsPage /></ProtectedRoute>} />
+              <Route path="governance" element={<ProtectedRoute permission="Reviews.View"><GovernancePage /></ProtectedRoute>} />
+              <Route path="meta-model" element={<ProtectedRoute permission="MetaModel.View"><MetaModelPage /></ProtectedRoute>} />
+              <Route path="ea-views" element={<ProtectedRoute permission="Views.View"><EaViewsPage /></ProtectedRoute>} />
+              <Route path="connector-hub" element={<ProtectedRoute permission="Repository.View"><ConnectorHubPage /></ProtectedRoute>} />
+              <Route path="reports" element={<ProtectedRoute permission="Repository.View"><ReportsPage /></ProtectedRoute>} />
+              <Route path="access-governance" element={<ProtectedRoute permission="Roles.View"><AccessGovernancePage /></ProtectedRoute>} />
+              <Route path="users" element={<ProtectedRoute permission="Users.View"><UsersPage /></ProtectedRoute>} />
               <Route path="setup" element={<SetupAssistantPage />} />
-              <Route path="strategy" element={<StrategyPage />} />
-              <Route path="ea-planning" element={<EaPlanningPage />} />
-              <Route path="glossary" element={<GlossaryPage />} />
-              <Route path="innovation" element={<InnovationPage />} />
+              <Route path="setup-assistant" element={<SetupAssistantPage />} />
+              <Route path="strategy" element={<ProtectedRoute permission="Repository.View"><StrategyPage /></ProtectedRoute>} />
+              <Route path="innovation" element={<ProtectedRoute permission="Repository.View"><InnovationPage /></ProtectedRoute>} />
               <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="billing" element={<BillingPage />} />
-              <Route path="decision-evaluation" element={<DecisionEvaluationPage />} />
+              <Route path="billing" element={<ProtectedRoute permission="Users.View"><BillingPage /></ProtectedRoute>} />
+              <Route path="decision-evaluation" element={<ProtectedRoute permission="Reviews.View"><DecisionEvaluationPage /></ProtectedRoute>} />
+              <Route path="ea-planning" element={<ProtectedRoute permission="Repository.View"><EaPlanningPage /></ProtectedRoute>} />
             </Route>
           </Routes>
         </BrowserRouter>
@@ -74,4 +80,3 @@ export default function App() {
     </LangProvider>
   )
 }
-
