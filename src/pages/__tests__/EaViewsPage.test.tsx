@@ -1984,6 +1984,39 @@ describe('EaViewsPage - Object Context View entry point', () => {
   });
 });
 
+// EA Repository Production Readiness, item 9: the direct Dependency
+// Explorer entry point (search-then-view), separate from the
+// query-param-driven entry point tested above.
+describe('EaViewsPage - Dependency Explorer direct entry point (Production Readiness item 9)', () => {
+  it('lets the user search for and select an object, then opens the same dependency viewer used by the Repository deep-link', async () => {
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-repository/assets': (url: string) => url.includes('search=payments')
+        ? [{ id: 'asset-1', name: 'Payments API', canonicalDisplayLabel: 'Integration Interface', assetType: 'Interface' }]
+        : [],
+      '/ea-views/object-context/asset-1': {
+        nodes: [{ id: 'asset-1', name: 'Payments API', assetType: 'Interface', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }],
+        edges: [], metadata: { totalNodes: 1, domains: ['APPLICATION'], executedAt: '2026-01-01T00:00:00Z' }, truncated: false,
+      },
+    });
+    render(<EaViewsPage />);
+    await screen.findByText('🗺 EA Views & Viewpoints Studio');
+    fireEvent.click(screen.getByText('🕸 Dependency Explorer'));
+    fireEvent.change(await screen.findByPlaceholderText('Search by name...'), { target: { value: 'payments' } });
+    fireEvent.click(await screen.findByText('Payments API'));
+    expect(await screen.findByText('Dependencies of Payments API')).toBeInTheDocument();
+  });
+
+  it('shows nothing (not an error) before any search term is entered', async () => {
+    mockFetch({ '/ea-views/stats': {} });
+    render(<EaViewsPage />);
+    await screen.findByText('🗺 EA Views & Viewpoints Studio');
+    fireEvent.click(screen.getByText('🕸 Dependency Explorer'));
+    expect(await screen.findByPlaceholderText('Search by name...')).toBeInTheDocument();
+    expect(screen.queryByText(/No matching objects found/)).not.toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - ViewBuilder Path Builder wiring', () => {
   it('the Path Builder only appears once a root object type is selected (progressive disclosure)', async () => {
     mockFetch({ '/ea-views/stats': {} });

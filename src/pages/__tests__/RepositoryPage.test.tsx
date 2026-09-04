@@ -87,6 +87,21 @@ describe('RepositoryPage - loading and listing', () => {
     expect(screen.queryByText('Core Banking')).not.toBeInTheDocument();
   });
 
+  // EA Repository Production Readiness, item 3.
+  it('filters by ArchMind operating domain via the quick-filter pills - sends operatingDomain as a server-side query param', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': (url: string) => url.includes('operatingDomain=DATA_ARCHITECTURE')
+        ? [asset({ id: 'a2', name: 'Data Entity Asset' })]
+        : [asset({ id: 'a1', name: 'Core Banking' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('Data Architecture'));
+    expect(await screen.findByText('Data Entity Asset')).toBeInTheDocument();
+    expect(screen.queryByText('Core Banking')).not.toBeInTheDocument();
+  });
+
   it('filters by status - sends the selected status as a server-side query param', async () => {
     mockFetch({
       '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
@@ -169,6 +184,31 @@ describe('RepositoryPage - CRUD', () => {
     });
   });
 
+  // EA Repository Production Readiness, item 5: the same form/component
+  // renders whatever attributes the tenant's Meta Model declares for the
+  // selected object type - no per-type hardcoded form.
+  it('renders dynamic Meta Model attribute fields once an object type is selected, and includes them in the save payload', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [], '/ea-repository/summary': {},
+      '/ea-repository/object-types/APPLICATION/attributes': { attributes: [{ code: 'criticality', name: 'Criticality', attributeType: 'ENUM', isRequired: false, enumValues: [{ value: 'HIGH', label: 'High' }, { value: 'LOW', label: 'Low' }] }] },
+    });
+    render(<RepositoryPage />);
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    fireEvent.click(screen.getAllByText('+ New Asset')[0]);
+    fireEvent.change(screen.getByLabelText(/Name \(English\)/), { target: { value: 'New App' } });
+    fireEvent.change(screen.getByLabelText(/Domain/), { target: { value: 'APPLICATION' } });
+    fireEvent.change(screen.getByLabelText(/Asset Type/), { target: { value: 'APPLICATION' } });
+
+    const criticalitySelect = await screen.findByLabelText('Criticality');
+    fireEvent.change(criticalitySelect, { target: { value: 'HIGH' } });
+    fireEvent.click(screen.getByText('Save Asset'));
+
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/ea-repository/assets'));
+      expect(JSON.parse(postCall[1].body).metadata).toEqual({ criticality: 'HIGH' });
+    });
+  });
+
   it('deletes an asset after confirmation', async () => {
     mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
     const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
@@ -186,12 +226,12 @@ describe('RepositoryPage - CRUD', () => {
     confirmSpy.mockRestore();
   });
 
-  it('"Show Dependencies" navigates to EA Views with the object-context query param for this asset', async () => {
+  it('"Explore Dependencies" navigates to EA Views with the object-context query param for this asset', async () => {
     mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
     render(<RepositoryPage />);
     await screen.findByText('Core Banking');
     fireEvent.click(screen.getByText('Core Banking'));
-    fireEvent.click(await screen.findByText(/Show Dependencies/));
+    fireEvent.click(await screen.findByText(/Explore Dependencies/));
     expect(mockNavigate).toHaveBeenCalledWith('/ea-views?objectContext=a1');
   });
 });
