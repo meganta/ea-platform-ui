@@ -3045,6 +3045,58 @@ function ViewsDashboard({ api, stats, onTab, onOpenView }: { api: any, stats: an
 // an ad-hoc "show me this object's dependencies" query. This is a smaller,
 // standalone viewer: fetch, force-layout, pan/zoom/click - the exploration
 // primitives, without the full Studio chrome around them.
+// EA Repository Production Readiness, item 9: direct Dependency
+// Explorer entry point - search for/select an architecture object,
+// then hand off entirely to ObjectContextViewer (no second graph
+// engine, reuses the exact same component the Repository's own
+// "Explore Dependencies" button opens).
+function DependencyExplorerEntry({ api, onBack }: { api: any; onBack: () => void }) {
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+  const [results, setResults] = useState<any[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), 300)
+    return () => clearTimeout(timer)
+  }, [query])
+
+  useEffect(() => {
+    if (!debouncedQuery.trim()) { setResults([]); return }
+    api.get(`/ea-repository/assets?search=${encodeURIComponent(debouncedQuery)}&pageSize=15&page=1`)
+      .then((r: any) => setResults(Array.isArray(r) ? r : (r.items || [])))
+      .catch(() => setResults([]))
+  }, [debouncedQuery, api])
+
+  if (selectedId) {
+    return <ObjectContextViewer api={api} assetId={selectedId} onBack={() => setSelectedId(null)} />
+  }
+
+  return (
+    <div style={S.page}>
+      <div className="flex items-center justify-between mb-4">
+        <div style={{ fontSize: 18, fontWeight: 600 }}>🕸 Dependency Explorer</div>
+        <button style={S.btn('secondary')} onClick={onBack}>← Back</button>
+      </div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 12 }}>Search for an architecture object to view its dependencies (1-hop by default, expandable).</div>
+      <input className="form-input" style={{ width: '100%', maxWidth: 480 }} placeholder="Search by name..." value={query} onChange={e => setQuery(e.target.value)} autoFocus />
+      {results.length > 0 && (
+        <div style={{ marginTop: 12, maxWidth: 480 }}>
+          {results.map((r: any) => (
+            <div key={r.id} style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => setSelectedId(r.id)}>
+              <div style={{ fontSize: 13 }}>{r.name}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{r.canonicalDisplayLabel || r.assetType}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {debouncedQuery.trim() && results.length === 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 12 }}>No matching objects found.</div>
+      )}
+    </div>
+  )
+}
+
 function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: string; onBack: () => void }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -3300,6 +3352,11 @@ export default function EaViewsPage() {
     { id:'my-views', label:'📋 My Views' },
     { id:'packs', label:'📦 Architecture Packs' },
     { id:'snapshots', label:'📸 Snapshots' },
+    // EA Repository Production Readiness, item 9: a direct entry point,
+    // not reachable only via an object's own "Explore Dependencies"
+    // button in the Repository. Reuses ObjectContextViewer entirely
+    // (via DependencyExplorerEntry below) - no second graph engine.
+    { id:'dependency-explorer', label:'🕸 Dependency Explorer' },
   ]
 
   return (
@@ -3340,6 +3397,7 @@ export default function EaViewsPage() {
         {tab === 'builder' && <ViewBuilder api={api} viewpoint={selectedViewpoint} onCreated={handleViewCreated} onCancel={()=>setTab('my-views')} />}
         {tab === 'viewer' && activeView && <ViewViewer api={api} view={activeView} onBack={()=>setTab('my-views')} onRefresh={loadStats} />}
         {tab === 'object-context' && objectContextId && <ObjectContextViewer api={api} assetId={objectContextId} onBack={() => { setTab('dashboard'); setSearchParams({}) }} />}
+        {tab === 'dependency-explorer' && <DependencyExplorerEntry api={api} onBack={() => setTab('dashboard')} />}
       </div>
     </div>
   )

@@ -5,6 +5,20 @@ import HelpTip from '../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
+// EA Repository Production Readiness, item 3: ArchMind's six operating
+// domains - a fixed, cross-tenant platform constant (not tenant/
+// framework-varying data like assetType/domain, which correctly comes
+// from the Meta Model instead), mirroring the exact same codes already
+// defined server-side in libs/database/src/canonical-taxonomy.ts.
+const OPERATING_DOMAINS = [
+  { code: 'BUSINESS_ARCHITECTURE', name: 'Business Architecture' },
+  { code: 'BENEFICIARY_EXPERIENCE', name: 'Beneficiary Experience' },
+  { code: 'APPLICATION_INTEGRATION', name: 'Applications & Integration' },
+  { code: 'DATA_ARCHITECTURE', name: 'Data Architecture' },
+  { code: 'INFRASTRUCTURE', name: 'Infrastructure & Technology' },
+  { code: 'SECURITY_ARCHITECTURE', name: 'Security Architecture' },
+]
+
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: 'badge-draft',
   UNDER_REVIEW: 'badge-review',
@@ -70,12 +84,26 @@ function useApi() {
   return { get, post, put, del, upload }
 }
 
-function AssetModal({ asset, config, onClose, onSave, t }: any) {
-  const [form, setForm] = useState(asset || { name: '', nameAr: '', description: '', domain: '', assetType: '', status: 'DRAFT', owner: '', tags: [] })
+function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
+  const [form, setForm] = useState(asset || { name: '', nameAr: '', description: '', domain: '', assetType: '', status: 'DRAFT', owner: '', tags: [], metadata: {} })
   const [loading, setLoading] = useState(false)
   const set = (k: string) => (e: any) => setForm((f: any) => ({ ...f, [k]: e.target.value }))
+  const setMeta = (code: string) => (e: any) => setForm((f: any) => ({ ...f, metadata: { ...(f.metadata || {}), [code]: e.target.value } }))
   const domains = config?.enabledDomains || []
   const assetTypes = config?.allDomains?.[form.domain] || []
+
+  // EA Repository Production Readiness, item 5: the form's attribute
+  // fields are dynamically driven by the tenant's real Meta Model
+  // (GET /ea-repository/object-types/:assetType/attributes), never a
+  // per-object-type hardcoded form. Re-fetched whenever the selected
+  // assetType changes.
+  const [metaAttributes, setMetaAttributes] = useState<any[]>([])
+  useEffect(() => {
+    if (!form.assetType) { setMetaAttributes([]); return }
+    api.get(`/ea-repository/object-types/${encodeURIComponent(form.assetType)}/attributes`)
+      .then((r: any) => setMetaAttributes(Array.isArray(r?.attributes) ? r.attributes : []))
+      .catch(() => setMetaAttributes([]))
+  }, [form.assetType, api])
 
   const submit = async (e: any) => {
     e.preventDefault(); setLoading(true)
@@ -117,6 +145,34 @@ function AssetModal({ asset, config, onClose, onSave, t }: any) {
             </div>
             <div className="form-group"><label className="form-label" htmlFor="asset-owner">Owner</label><input id="asset-owner" className="form-input" value={form.owner || ''} onChange={set('owner')} /></div>
           </div>
+
+          {/* EA Repository Production Readiness, item 5: dynamic Meta
+              Model attribute fields - the same component/form for every
+              object type, driven entirely by metaAttributes. An enum
+              attribute renders as a select (using its declared values),
+              anything else as a plain text input. */}
+          {metaAttributes.length > 0 && (
+            <>
+              <div className="divider" />
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>META MODEL ATTRIBUTES</div>
+              <div className="grid-2" style={{ gap: 12 }}>
+                {metaAttributes.map((attr: any) => (
+                  <div className="form-group" key={attr.code}>
+                    <label className="form-label" htmlFor={`asset-attr-${attr.code}`}>{attr.name}{attr.isRequired ? ' *' : ''}</label>
+                    {attr.enumValues?.length > 0 ? (
+                      <select id={`asset-attr-${attr.code}`} className="form-input" value={form.metadata?.[attr.code] || ''} onChange={setMeta(attr.code)} required={attr.isRequired} disabled={attr.isReadOnly}>
+                        <option value="">Select...</option>
+                        {attr.enumValues.map((ev: any) => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
+                      </select>
+                    ) : (
+                      <input id={`asset-attr-${attr.code}`} className="form-input" value={form.metadata?.[attr.code] || ''} onChange={setMeta(attr.code)} required={attr.isRequired} disabled={attr.isReadOnly} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : 'Save Asset'}</button>
@@ -184,8 +240,8 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
         </div>
 
         <div className="grid-2" style={{ gap: 12, marginBottom: 16 }}>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>DOMAIN</div><div style={{ fontSize: 13 }}>{asset.domain}</div></div>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>ASSET TYPE</div><div style={{ fontSize: 13 }}>{asset.assetType?.replace(/_/g, ' ')}</div></div>
+          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>DOMAIN</div><div style={{ fontSize: 13 }}>{asset.operatingDomainDisplayName || asset.domain}{asset.operatingDomainDisplayName && asset.operatingDomainDisplayName !== asset.domain && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}> ({asset.domain})</span>}</div></div>
+          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>ASSET TYPE</div><div style={{ fontSize: 13 }}>{asset.canonicalDisplayLabel || asset.assetType?.replace(/_/g, ' ')}</div></div>
           <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>OWNER</div><div style={{ fontSize: 13 }}>{asset.owner || '—'}</div></div>
           <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>VERSION</div><div style={{ fontSize: 13, fontFamily: 'var(--font-mono)' }}>{asset.version}</div></div>
         </div>
@@ -194,6 +250,44 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>DESCRIPTION</div>
             <div style={{ fontSize: 13, lineHeight: 1.6 }}>{asset.description}</div>
+          </div>
+        )}
+
+        {/* EA Repository Production Readiness, item 4: Meta Model
+            Attributes - driven entirely by the real Meta Model attribute
+            definitions (asset.metaModelAttributes, from getAsset), never
+            a per-object-type hardcoded form. An attribute with no stored
+            value is shown cleanly as "—", never invented. */}
+        {asset.metaModelAttributes?.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>META MODEL ATTRIBUTES</div>
+            <div className="grid-2" style={{ gap: 8 }}>
+              {asset.metaModelAttributes.map((attr: any) => (
+                <div key={attr.code}>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{attr.name}</div>
+                  <div style={{ fontSize: 13, color: attr.hasValue ? 'var(--text)' : 'var(--text-dim)' }}>{attr.hasValue ? String(attr.value) : '—'}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Item 4: Relationships - real Repository relationships, using
+            the canonical relationship definition's directional label
+            where resolvable (asset.relationships, from getAsset),
+            falling back to the legacy relationshipType string
+            otherwise - stays fully compatible with an unresolved
+            legacy relationship, never hides it. */}
+        {asset.relationships?.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>RELATIONSHIPS ({asset.relationships.length})</div>
+            {asset.relationships.map((rel: any) => (
+              <div key={rel.id} style={{ fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{rel.direction === 'OUTGOING' ? '→' : '←'}</span>
+                <span style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>{rel.displayLabel}</span>
+                <span>{rel.relatedAsset?.canonicalDisplayLabel ? `${rel.relatedAsset.name} (${rel.relatedAsset.canonicalDisplayLabel})` : rel.relatedAsset?.name}</span>
+              </div>
+            ))}
           </div>
         )}
 
@@ -278,7 +372,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
 
         <div className="flex gap-2 mt-4">
           <button className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Close</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/ea-views?objectContext=${asset.id}`)} title="Explore this object's relationships and dependencies in EA Views">🕸 Show Dependencies</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/ea-views?objectContext=${asset.id}`)} title="Explore this object's relationships and dependencies in EA Views">🕸 Explore Dependencies</button>
           <button className="btn btn-danger btn-sm" onClick={() => { onDelete(asset.id); onClose() }}>Delete Asset</button>
         </div>
       </div>
@@ -294,6 +388,12 @@ export default function RepositoryPage() {
   const [assets, setAssets] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL')
+  // EA Repository Production Readiness, item 3: the six ArchMind
+  // operating domains, for navigation - a separate axis from the
+  // NORA-native `domain` filter above, which stays as-is (framework-
+  // native domains like Strategy/Motivation/Governance are never
+  // deleted or hidden).
+  const [selectedOperatingDomain, setSelectedOperatingDomain] = useState<string>('ALL')
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL')
   const [selectedSource, setSelectedSource] = useState<string>('ALL')
   const [selectedAssetType, setSelectedAssetType] = useState<string>('ALL')
@@ -328,6 +428,7 @@ export default function RepositoryPage() {
     setSummary(sum)
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
     if (selectedDomain !== 'ALL') params.set('domain', selectedDomain)
+    if (selectedOperatingDomain !== 'ALL') params.set('operatingDomain', selectedOperatingDomain)
     if (selectedStatus !== 'ALL') params.set('status', selectedStatus)
     if (selectedSource !== 'ALL') params.set('source', selectedSource)
     if (selectedAssetType !== 'ALL') params.set('assetType', selectedAssetType)
@@ -340,7 +441,7 @@ export default function RepositoryPage() {
     else { setAssets(result.items || []); setTotal(result.total || 0) }
   }
 
-  useEffect(() => { load() }, [page, selectedDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [page, selectedDomain, selectedOperatingDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resets to page 1 whenever a filter actually changes - a filter
   // change while sitting on page 5 of the old result set should not
@@ -444,6 +545,28 @@ export default function RepositoryPage() {
             ))}
           </div>
         )}
+
+        {/* EA Repository Production Readiness, item 3: navigation around
+            the six ArchMind operating domains - a separate axis from the
+            NORA-native domain filter below (which stays exactly as-is).
+            An asset with no operatingDomain (the 19 unmatched types)
+            simply doesn't appear under any pill here - handled
+            gracefully, not forced into one. */}
+        <div className="flex gap-2 mb-3" style={{ flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-sm"
+            style={{ background: selectedOperatingDomain === 'ALL' ? 'var(--accent)' : 'transparent', color: selectedOperatingDomain === 'ALL' ? '#fff' : 'var(--text)', border: '1px solid var(--border)' }}
+            onClick={() => changeFilter(setSelectedOperatingDomain)('ALL')}
+          >All</button>
+          {OPERATING_DOMAINS.map(d => (
+            <button
+              key={d.code}
+              className="btn btn-sm"
+              style={{ background: selectedOperatingDomain === d.code ? 'var(--accent)' : 'transparent', color: selectedOperatingDomain === d.code ? '#fff' : 'var(--text)', border: '1px solid var(--border)' }}
+              onClick={() => changeFilter(setSelectedOperatingDomain)(d.code)}
+            >{d.name}</button>
+          ))}
+        </div>
 
         {/* Filters */}
         <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
@@ -567,8 +690,8 @@ export default function RepositoryPage() {
         )}
       </div>
 
-      {showAdd && <AssetModal config={config} onClose={() => setShowAdd(false)} onSave={createAsset} t={t} />}
-      {editAsset && <AssetModal asset={editAsset} config={config} onClose={() => setEditAsset(null)} onSave={updateAsset} t={t} />}
+      {showAdd && <AssetModal config={config} onClose={() => setShowAdd(false)} onSave={createAsset} t={t} api={api} />}
+      {editAsset && <AssetModal asset={editAsset} config={config} onClose={() => setEditAsset(null)} onSave={updateAsset} t={t} api={api} />}
       {selectedAsset && <AssetDetail asset={selectedAsset} onClose={() => setSelectedAsset(null)} onDelete={deleteAsset} api={api} t={t} />}
     </div>
   )
