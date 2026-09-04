@@ -20,6 +20,7 @@ interface SharedViewSummary {
 }
 
 export default function SharedViewPage() {
+  const { t } = useLang()
   const { token } = useParams<{ token: string }>()
   const [view, setView] = useState<SharedViewSummary | null>(null)
   const [error, setError] = useState('')
