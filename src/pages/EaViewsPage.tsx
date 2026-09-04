@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { RoadmapConfigPanel, RoadmapTimeline } from './eaviews/RoadmapView'
 import { DashboardBuilder, DashboardGrid, DashboardWidget } from './eaviews/DashboardBuilder'
@@ -1609,7 +1610,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {['Name','Type','Domain','Status','Owner','Tags'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>{h}</th>)}
+              {[{t("common.name")},{t("common.type")},'Domain',{t("common.status")},'Owner','Tags'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -1815,7 +1816,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
               {comparisonView === 'TABLE' ? (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-                    <thead><tr>{['Object', 'Type', 'Change', 'Changed Properties', 'Before', 'After'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)' }}>{h}</th>)}</tr></thead>
+                    <thead><tr>{['Object', {t("common.type")}, 'Change', 'Changed Properties', 'Before', 'After'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)' }}>{h}</th>)}</tr></thead>
                     <tbody>
                       {buildChangeSummaryRows({ objects: filtered }, comparisonChangeFilter.has('UNCHANGED')).map((row, i) => (
                         <tr key={row.id} style={{ background: i % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>
@@ -2466,7 +2467,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         return (
         <div style={{ width: 260, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, marginLeft:12, padding:16, overflowY:'auto' as const, flexShrink:0 }}>
           <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>{selected.name}</div>
-          {[{l:'Type',v:(selected.semanticType || selected.assetType)?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:'Status',v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
+          {[{l:{t("common.type")},v:(selected.semanticType || selected.assetType)?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:{t("common.status")},v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
             <div key={f.l} style={{ marginBottom:10 }}><div style={S.label}>{f.l}</div><div style={{fontSize:13}}>{f.v}</div></div>
           ))}
           {selected.description && <><div style={S.label}>Description</div><div style={{fontSize:12,color:'var(--text-dim)',lineHeight:1.6}}>{selected.description}</div></>}
@@ -3289,7 +3290,7 @@ function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: stri
         {selected && (
           <div style={{ width: 240, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, marginLeft:12, padding:16, overflowY:'auto' as const, flexShrink:0 }}>
             <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>{selected.name}</div>
-            {[{l:'Type',v:selected.assetType?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:'Status',v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
+            {[{l:{t("common.type")},v:selected.assetType?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:{t("common.status")},v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
               <div key={f.l} style={{ marginBottom:10 }}><div style={S.label}>{f.l}</div><div style={{fontSize:13}}>{f.v}</div></div>
             ))}
             <button style={{...S.btn(),marginTop:16,fontSize:12,width:'100%'}} onClick={()=>setSelected(null)}>Close</button>
@@ -3301,6 +3302,7 @@ function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: stri
 }
 
 export default function EaViewsPage() {
+  const { t } = useLang()
   const api = useViewsApi()
   const [tab, setTab] = useState('dashboard')
   const [stats, setStats] = useState<any>(null)
