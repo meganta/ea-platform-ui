@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -1289,7 +1290,7 @@ function EnumDesigner({ api }: { api: any }) {
       // (the normal state right after a publish) - previously this threw
       // on the very first line whenever no draft existed, with no
       // .catch() anywhere in the chain, leaving the Enums tab stuck on
-      // "Loading..." forever. Matches the same fallback the backend's
+      // {t("common.loading")} forever. Matches the same fallback the backend's
       // Domains/Object Types/Relationships list() methods now use (see
       // TenantMetaModelService.getCurrentVersionForViewing()).
       let version
@@ -1419,10 +1420,10 @@ function SharedAttributeLibrary({ api }: { api: any }) {
 
   const SYSTEM_ATTRS = [
     { code: 'owner', name: 'Owner', nameAr: 'المالك', attributeType: 'USER', description: 'Person responsible for this element' },
-    { code: 'status', name: 'Status', nameAr: 'الحالة', attributeType: 'LIFECYCLE_STATUS', description: 'Current lifecycle status' },
+    { code: 'status', name: {t("common.status")}, nameAr: 'الحالة', attributeType: 'LIFECYCLE_STATUS', description: 'Current lifecycle status' },
     { code: 'maturity', name: 'Maturity Level', nameAr: 'مستوى النضج', attributeType: 'MATURITY_SCORE', description: 'Maturity score 1-5' },
     { code: 'tags', name: 'Tags', nameAr: 'الوسوم', attributeType: 'TEXT', description: 'Classification tags' },
-    { code: 'description', name: 'Description', nameAr: 'الوصف', attributeType: 'LONG_TEXT', description: 'Detailed description' },
+    { code: 'description', name: {t("common.description")}, nameAr: 'الوصف', attributeType: 'LONG_TEXT', description: 'Detailed description' },
     { code: 'startDate', name: 'Start Date', nameAr: 'تاريخ البدء', attributeType: 'DATE', description: 'When this element became active' },
     { code: 'endDate', name: 'End Date', nameAr: 'تاريخ الانتهاء', attributeType: 'DATE', description: 'When this element will be retired' },
     { code: 'costCenter', name: 'Cost Center', nameAr: 'مركز التكلفة', attributeType: 'TEXT', description: 'Financial cost center code' },
@@ -1532,6 +1533,7 @@ function AuditHistory({ api }: { api: any }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MetaModelPage() {
+  const { t } = useLang()
   const api = useMetaApi()
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
