@@ -39,6 +39,7 @@ const DOMAINS = ['BUSINESS', 'BENEFICIARY_EXPERIENCE', 'APPLICATIONS', 'DATA', '
 const PRIORITY_COLOR: Record<string, string> = { HIGH: '#e74c3c', MEDIUM: '#f39c12', LOW: '#2ecc71' }
 
 export default function EaPlanningPage() {
+  const { t } = useLang()
   const api = useApi()
   const [tab, setTab] = useState<'dashboard'|'plans'>('dashboard')
   const [dashboard, setDashboard] = useState<any>(null)
