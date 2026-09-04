@@ -8,8 +8,16 @@ import NotificationBell from './NotificationBell'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
+interface NavItem {
+  to: string
+  label: string
+  icon: string
+  permission: string | null
+  adminOnly?: boolean
+}
+
 export default function Layout() {
-  const { user, logout } = useAuth()
+  const { user, logout, hasPermission } = useAuth()
   const { t, locale, setLocale } = useLang()
   const { branding, logoUrl } = useBranding()
   const [logoFailed, setLogoFailed] = useState(false)
@@ -20,13 +28,6 @@ export default function Layout() {
   const location = useLocation()
   const orgName = locale === 'AR' ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
 
-  // Auto-show the onboarding assistant once per session for tenants that
-  // haven't completed setup - checked once on mount (not per navigation),
-  // and skipped entirely if the user is already on the full-page /setup
-  // route to avoid a modal stacked on top of the same content. Dismissing
-  // (✕) hides it for the rest of this session without marking setup
-  // complete server-side - it reappears on the next login if still
-  // incomplete, rather than being permanently silenced by one dismissal.
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
 
   useEffect(() => {
@@ -40,8 +41,40 @@ export default function Layout() {
         if (profile && !profile.setupCompleted) setShowSetupModal(true)
       })
       .catch(() => setSetupChecked(true))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const navItems: NavItem[] = [
+    { to: '/', label: t('nav.dashboard'), icon: '⬛', permission: null },
+    { to: '/adm', label: t('nav.adm'), icon: '⚙', permission: 'Repository.View' },
+    { to: '/copilot', label: t('nav.copilot'), icon: '💬', permission: 'AIArchitect.Use' },
+    { to: '/governance', label: '🏛 Governance', icon: '', permission: 'Reviews.View' },
+    { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'Reviews.View' },
+    { to: '/strategy', label: '🎯 Strategy', icon: '', permission: 'Repository.View' },
+    { to: '/ea-planning', label: '🗓 EA Planning', icon: '', permission: 'Repository.View' },
+    { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Repository.View' },
+    { to: '/notifications', label: '🔔 ' + t('nav.notifications'), icon: '', permission: null },
+    { to: '/billing', label: '💳 ' + t('nav.billing'), icon: '', permission: 'Users.View' },
+    { to: '/meta-model', label: '🧩 Meta-Model', icon: '', permission: 'MetaModel.View' },
+    { to: '/ea-views', label: '🗺 EA Views', icon: '', permission: 'Views.View' },
+    { to: '/connector-hub', label: '🔌 Connectors', icon: '', permission: 'Repository.View' },
+    { to: '/reports', label: '📊 ' + (locale === 'AR' ? 'التقارير' : 'Reports'), icon: '', permission: 'Repository.View' },
+    { to: '/repository', label: '🗄 ' + t('nav.repository'), icon: '', permission: 'Repository.View' },
+    { to: '/knowledge', label: '📚 ' + t('nav.knowledge'), icon: '', permission: 'Repository.View' },
+    { to: '/glossary', label: '📖 Glossary', icon: '', permission: 'Repository.View' },
+    { to: '/users', label: '👥 Users', icon: '', permission: 'Users.View' },
+    { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View' },
+    { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Users.View' },
+    { to: '/setup', label: '🏛 Setup Assistant', icon: '', permission: null },
+  ]
+
+  const visibleNav = navItems.filter(item => {
+    if (item.permission === null) return true
+    return hasPermission(item.permission)
+  })
+
+  const mainNav = visibleNav.filter(n => !['/repository', '/knowledge', '/glossary', '/users', '/access-governance', '/settings', '/setup'].includes(n.to))
+  const repoNav = visibleNav.filter(n => ['/repository', '/knowledge', '/glossary'].includes(n.to))
+  const adminNav = visibleNav.filter(n => ['/users', '/access-governance', '/settings', '/setup'].includes(n.to))
 
   return (
     <div className="layout">
@@ -56,28 +89,31 @@ export default function Layout() {
         </div>
         <nav className="sidebar-nav">
           <div className="nav-label">{t('nav.main')}</div>
-          <NavLink to="/" end className={({isActive})=>`nav-item${isActive?' active':''}`}>⬛ {t('nav.dashboard')}</NavLink>
-          <NavLink to="/adm" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ {t('nav.adm')}</NavLink>
-          <NavLink to="/copilot" className={({isActive})=>`nav-item${isActive?' active':''}`}>💬 {t('nav.copilot')}</NavLink>
-          <NavLink to="/governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Governance</NavLink>
-          <NavLink to="/decision-evaluation" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚖ {locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'}</NavLink>
-          <NavLink to="/strategy" className={({isActive})=>`nav-item${isActive?' active':''}`}>🎯 Strategy</NavLink>
-          <NavLink to="/ea-planning" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗓 EA Planning</NavLink>
-          <NavLink to="/innovation" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔭 {t('nav.innovation')}</NavLink>
-          <NavLink to="/notifications" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔔 {t('nav.notifications')}</NavLink>
-          <NavLink to="/billing" className={({isActive})=>`nav-item${isActive?' active':''}`}>💳 {t('nav.billing')}</NavLink>
-          <NavLink to="/meta-model" className={({isActive})=>`nav-item${isActive?' active':''}`}>🧩 Meta-Model</NavLink>
-          <NavLink to="/ea-views" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗺 EA Views</NavLink>
-          <NavLink to="/connector-hub" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔌 Connectors</NavLink>
-          <NavLink to="/reports" className={({isActive})=>`nav-item${isActive?' active':''}`}>📊 {locale === 'AR' ? 'التقارير' : 'Reports'}</NavLink>
-          <div className="nav-label" style={{marginTop:8}}>{t('nav.repo_section')}</div>
-          <NavLink to="/repository" className={({isActive})=>`nav-item${isActive?' active':''}`}>🗄 {t('nav.repository')}</NavLink>
-          <NavLink to="/knowledge" className={({isActive})=>`nav-item${isActive?' active':''}`}>📚 {t('nav.knowledge')}</NavLink>
-          <NavLink to="/glossary" className={({isActive})=>`nav-item${isActive?' active':''}`}>📖 Glossary</NavLink>
-          <div className="nav-label" style={{marginTop:8}}>Admin</div>
-          <NavLink to="/access-governance" className={({isActive})=>`nav-item${isActive?' active':''}`}>🔐 Access Governance</NavLink>
-          <NavLink to="/settings" className={({isActive})=>`nav-item${isActive?' active':''}`}>⚙ Settings</NavLink>
-          <NavLink to="/setup" className={({isActive})=>`nav-item${isActive?' active':''}`}>🏛 Setup Assistant</NavLink>
+          {mainNav.map(item => (
+            <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
+              {item.icon ? item.icon + ' ' : ''}{item.label}
+            </NavLink>
+          ))}
+          {repoNav.length > 0 && (
+            <>
+              <div className="nav-label" style={{marginTop:8}}>{t('nav.repo_section')}</div>
+              {repoNav.map(item => (
+                <NavLink key={item.to} to={item.to} className={({isActive})=>`nav-item${isActive?' active':''}`}>
+                  {item.icon ? item.icon + ' ' : ''}{item.label}
+                </NavLink>
+              ))}
+            </>
+          )}
+          {adminNav.length > 0 && (
+            <>
+              <div className="nav-label" style={{marginTop:8}}>Admin</div>
+              {adminNav.map(item => (
+                <NavLink key={item.to} to={item.to} className={({isActive})=>`nav-item${isActive?' active':''}`}>
+                  {item.icon ? item.icon + ' ' : ''}{item.label}
+                </NavLink>
+              ))}
+            </>
+          )}
         </nav>
         <div className="sidebar-footer">
           <div className="flex items-center gap-2" style={{marginBottom:8}}>
