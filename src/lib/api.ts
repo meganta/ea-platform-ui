@@ -3,6 +3,7 @@ let authToken: string | null = localStorage.getItem('ea_token')
 export const setToken = (t: string) => { authToken = t; localStorage.setItem('ea_token', t) }
 export const clearToken = () => { authToken = null; localStorage.removeItem('ea_token') }
 export const getToken = () => authToken
+
 async function req(method: string, path: string, body?: any) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`
@@ -11,9 +12,23 @@ async function req(method: string, path: string, body?: any) {
   if (res.status === 204) return null
   return res.json()
 }
+
 export const api = {
   login: (email: string, password: string, tenantSlug: string) => req('POST', '/auth/login', { email, password, tenantSlug }),
   me: () => req('GET', '/auth/me'),
+  getMe: () => req('GET', '/users/me'),
+  updateMe: (data: any) => req('PUT', '/users/me', data),
+  changeMyPassword: (data: any) => req('PUT', '/users/me/password', data),
+  getUsers: () => req('GET', '/users'),
+  createUser: (data: any) => req('POST', '/users', data),
+  updateUser: (id: string, data: any) => req('PUT', `/users/${id}`, data),
+  deactivateUser: (id: string) => req('DELETE', `/users/${id}`),
+  resetPassword: (id: string, newPassword: string) => req('PUT', `/users/${id}/password`, { newPassword }),
+  inviteUser: (data: any) => req('POST', '/users/invite', data),
+  getInvitations: () => req('GET', '/users/invitations'),
+  cancelInvitation: (id: string) => req('DELETE', `/users/invitations/${id}`),
+  acceptInvitation: (token: string, data: any) => req('POST', `/users/invite/${token}/accept`, data),
+  getMyPermissions: () => req('GET', '/access-governance/users/me/effective-permissions'),
   getCycles: () => req('GET', '/adm/cycles'),
   createCycle: (data: any) => req('POST', '/adm/cycles', data),
   getCycle: (id: string) => req('GET', `/adm/cycles/${id}`),
