@@ -1991,9 +1991,7 @@ describe('EaViewsPage - Dependency Explorer direct entry point (Production Readi
   it('lets the user search for and select an object, then opens the same dependency viewer used by the Repository deep-link', async () => {
     mockFetch({
       '/ea-views/stats': {},
-      '/ea-repository/assets': (url: string) => url.includes('search=payments')
-        ? [{ id: 'asset-1', name: 'Payments API', canonicalDisplayLabel: 'Integration Interface', assetType: 'Interface' }]
-        : [],
+      '/ea-repository/assets': [{ id: 'asset-1', name: 'Payments API', canonicalDisplayLabel: 'Integration Interface', assetType: 'Interface' }],
       '/ea-views/object-context/asset-1': {
         nodes: [{ id: 'asset-1', name: 'Payments API', assetType: 'Interface', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} }],
         edges: [], metadata: { totalNodes: 1, domains: ['APPLICATION'], executedAt: '2026-01-01T00:00:00Z' }, truncated: false,
