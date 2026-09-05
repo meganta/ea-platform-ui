@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { API_BASE } from '../lib/api'
+import { useLang } from '../contexts/LangContext'
 
 interface SharedViewSummary {
   id: string

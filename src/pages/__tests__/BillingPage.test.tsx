@@ -245,7 +245,7 @@ describe('BillingPage - Admin Catalog tab', () => {
     });
     render(<BillingPage />);
     fireEvent.click(await screen.findByText('bill.tab_catalog'));
-    fireEvent.click(await screen.findByText('Active'));
+    fireEvent.click(await screen.findByText('common.active'));
     await waitFor(() => {
       const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/commercial/admin/plans/plan1'));
       expect(putCall).toBeDefined();

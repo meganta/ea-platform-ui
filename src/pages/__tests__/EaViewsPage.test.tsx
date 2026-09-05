@@ -1265,6 +1265,36 @@ describe('EaViewsPage - Scenario switching (Phase 5A)', () => {
     expect(screen.getByText('Tech K')).toBeInTheDocument(); // Target A's column present instead
   });
 
+  // Live bug report fix: the Matrix used to show a fixed 30-row slice
+  // with a "Showing X of Y" label but no actual way to page through the
+  // rest. Proves real pagination now works: more than 30 row-type
+  // objects, a Next click reveals a row from beyond the first page.
+  it('Matrix rows are paginated with working Next/Prev controls, not silently capped at 30 with no way to see the rest', async () => {
+    const capabilities = Array.from({ length: 35 }, (_, i) => ({
+      id: `cap${i}`, name: `Capability ${i}`, role: 'PRIMARY', assetType: 'GovCapability', semanticType: 'BusinessCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {},
+    }));
+    const tech = { id: 'tech1', name: 'Tech Component', role: 'RELATED', assetType: 'TechComponent', semanticType: 'TechComponent', domain: 'TECHNOLOGY', status: 'APPROVED', tags: [], metadata: {} };
+    const relationships = capabilities.map((c, i) => ({ id: `rel${i}`, sourceId: c.id, targetId: 'tech1', relationshipType: 'supported_by', label: 'supported by' }));
+    const directMatrixEligibility = { eligible: [{ visualization: 'MATRIX', eligible: true, score: 0.9, reasons: [], recommendedConfig: { rowType: 'BusinessCapability', columnType: 'TechComponent', relationMode: 'DIRECT', relationshipTypes: ['supported_by'] } }], ineligible: [] };
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Big Matrix View', visualization: 'MATRIX', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/dataset': {
+        legacy: { nodes: [...capabilities, tech], edges: relationships, metadata: {} },
+        dataset: { context: {}, objects: [...capabilities, tech], relationships, paths: [], hierarchies: [], metrics: [], provenance: { truncated: false } },
+        eligibility: directMatrixEligibility,
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Big Matrix View'));
+    await screen.findByText('Capability 0');
+    expect(screen.queryByText('Capability 34')).not.toBeInTheDocument(); // beyond the first 30-row page
+    expect(screen.getByText(/Showing 30 of 35/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('›'));
+    expect(await screen.findByText('Capability 34')).toBeInTheDocument(); // now visible on page 2
+  });
+
   it('HEATMAP metric selection resets to the new scenario\'s recommended metric when the previous one is unavailable', async () => {
     const currentHeatmapResponse = { ...currentResponse, eligibility: { eligible: [{ visualization: 'HEATMAP', eligible: true, score: 0.7, reasons: [], recommendedConfig: { metricKey: 'riskLevel' } }], ineligible: [] }, dataset: { ...currentResponse.dataset, metrics: [{ key: 'riskLevel', label: 'riskLevel', dataType: 'categorical', coveragePercent: 100, distinctValues: ['HIGH'] }], hierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null }, source: 'metadata.parentId' }] } };
     const targetAHeatmapResponse = { ...targetAResponse, eligibility: { eligible: [{ visualization: 'HEATMAP', eligible: true, score: 0.7, reasons: [], recommendedConfig: { metricKey: 'maturity' } }], ineligible: [] }, dataset: { ...targetAResponse.dataset, metrics: [{ key: 'maturity', label: 'maturity', dataType: 'categorical', coveragePercent: 100, distinctValues: ['LOW'] }], hierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null }, source: 'metadata.parentId' }] } };
@@ -1987,6 +2017,7 @@ describe('EaViewsPage - Object Context View entry point', () => {
 // EA Repository Production Readiness, item 9: the direct Dependency
 // Explorer entry point (search-then-view), separate from the
 // query-param-driven entry point tested above.
+
 describe('EaViewsPage - Dependency Explorer direct entry point (Production Readiness item 9)', () => {
   it('lets the user search for and select an object, then opens the same dependency viewer used by the Repository deep-link', async () => {
     mockFetch({

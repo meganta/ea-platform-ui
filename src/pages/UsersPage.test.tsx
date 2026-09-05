@@ -39,7 +39,7 @@ describe('UsersPage', () => {
   it('shows invite button', async () => {
     (fetch as jest.Mock).mockImplementationOnce(mockFetch([])).mockImplementationOnce(mockFetch([]));
     render(<UsersPage />);
-    await waitFor(() => expect(screen.getByText('users.invite')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/users\.invite/)).toBeInTheDocument());
   });
 
   it('switches to invitations tab', async () => {
@@ -48,8 +48,8 @@ describe('UsersPage', () => {
       .mockImplementationOnce(mockFetch([{ id: 'inv-1', email: 'pending@acme.com', role: 'ARCHITECT', expiresAt: '2026-12-31T00:00:00Z' }]));
 
     render(<UsersPage />);
-    await waitFor(() => expect(screen.getByText('users.tab_users')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('users.tab_invitations'));
+    await waitFor(() => expect(screen.getByText(/users\.tab_users/)).toBeInTheDocument());
+    fireEvent.click(screen.getByText(/users\.tab_invitations/));
     await waitFor(() => expect(screen.getByText('pending@acme.com')).toBeInTheDocument());
   });
 });

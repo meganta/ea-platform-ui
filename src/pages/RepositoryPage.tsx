@@ -17,6 +17,15 @@ const OPERATING_DOMAINS = [
   { code: 'DATA_ARCHITECTURE', name: 'Data Architecture' },
   { code: 'INFRASTRUCTURE', name: 'Infrastructure & Technology' },
   { code: 'SECURITY_ARCHITECTURE', name: 'Security Architecture' },
+  // Not a 7th operating domain - a deliberately separate category.
+  // NORA 2.0's Strategy, Motivation, and Governance domains do not
+  // correspond to any real ArchMind operating domain; confirmed by
+  // explicit platform-owner correction that all three belong together
+  // under one unified Strategy Layer, not spread across three
+  // semantically-incorrect domain buckets. Mirrors the exact same code
+  // (STRATEGY_LAYER) already defined server-side in
+  // libs/database/src/canonical-taxonomy.ts.
+  { code: 'STRATEGY_LAYER', name: 'Strategy Layer' },
 ]
 
 const STATUS_COLORS: Record<string, string> = {
@@ -530,56 +539,68 @@ export default function RepositoryPage() {
       </div>
 
       <div className="page-body">
-        {/* Summary cards */}
+        {/* Summary cards - one per ArchMind operating domain (plus the
+            separate Strategy Layer category), driven entirely by
+            summary.byDomain (now resolved server-side via the Meta
+            Model, not the raw, inconsistent EaAsset.domain column -
+            fixed the exact reported bugs: duplicate APPLICATION/
+            APPLICATIONS cards, and GOVERNANCE/MOTIVATION shown as if
+            they were real operating domains). Clicking a card sets
+            selectedOperatingDomain (previously and incorrectly set
+            selectedDomain here, the wrong filter entirely). Replaces
+            the separate operating-domain pill row this same page used
+            to also have - consolidated into these cards instead of two
+            overlapping domain-filter UIs. */}
         {summary && (
           <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-            <div className="stat-card" style={{ flex: 1, minWidth: 120 }}>
+            <div
+              className="stat-card"
+              style={{ flex: 1, minWidth: 120, cursor: 'pointer', outline: selectedOperatingDomain === 'ALL' ? '2px solid var(--accent)' : undefined }}
+              onClick={() => changeFilter(setSelectedOperatingDomain)('ALL')}
+            >
               <div className="stat-value">{summary.total}</div>
-              <div className="stat-label">Total Assets</div>
+              <div className="stat-label">Show All</div>
             </div>
-            {summary.byDomain?.map((d: any) => (
-              <div key={d.domain} className="stat-card" style={{ flex: 1, minWidth: 120, cursor: 'pointer' }} onClick={() => setSelectedDomain(d.domain)}>
-                <div className="stat-value" style={{ fontSize: 24 }}>{d.count}</div>
-                <div className="stat-label">{d.domain.replace(/_/g, ' ')}</div>
-              </div>
-            ))}
+            {OPERATING_DOMAINS.map(d => {
+              const match = summary.byDomain?.find((row: any) => row.domain === d.code)
+              return (
+                <div
+                  key={d.code}
+                  className="stat-card"
+                  style={{ flex: 1, minWidth: 120, cursor: 'pointer', outline: selectedOperatingDomain === d.code ? '2px solid var(--accent)' : undefined }}
+                  onClick={() => changeFilter(setSelectedOperatingDomain)(d.code)}
+                >
+                  <div className="stat-value" style={{ fontSize: 24 }}>{match?.count || 0}</div>
+                  <div className="stat-label">{d.name}</div>
+                </div>
+              )
+            })}
           </div>
         )}
 
-        {/* EA Repository Production Readiness, item 3: navigation around
-            the six ArchMind operating domains - a separate axis from the
-            NORA-native domain filter below (which stays exactly as-is).
-            An asset with no operatingDomain (the 19 unmatched types)
-            simply doesn't appear under any pill here - handled
-            gracefully, not forced into one. */}
-        <div className="flex gap-2 mb-3" style={{ flexWrap: 'wrap' }}>
-          <button
-            className="btn btn-sm"
-            style={{ background: selectedOperatingDomain === 'ALL' ? 'var(--accent)' : 'transparent', color: selectedOperatingDomain === 'ALL' ? '#fff' : 'var(--text)', border: '1px solid var(--border)' }}
-            onClick={() => changeFilter(setSelectedOperatingDomain)('ALL')}
-          >All</button>
-          {OPERATING_DOMAINS.map(d => (
-            <button
-              key={d.code}
-              className="btn btn-sm"
-              style={{ background: selectedOperatingDomain === d.code ? 'var(--accent)' : 'transparent', color: selectedOperatingDomain === d.code ? '#fff' : 'var(--text)', border: '1px solid var(--border)' }}
-              onClick={() => changeFilter(setSelectedOperatingDomain)(d.code)}
-            >{d.name}</button>
-          ))}
-        </div>
-
-        {/* Filters */}
+        {/* Filters - order per explicit request: Domain, then Object
+            Type, then Source, then Status (search stays first as the
+            free-text entry point, separate from the four dropdown
+            filters being ordered). */}
         <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
           <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
+          <select className="form-input" style={{ width: 140 }} value={selectedDomain} onChange={e => { changeFilter(setSelectedDomain)(e.target.value); setSelectedAssetType('ALL') }}>
+            <option value="ALL">All Domains</option>
+            {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
+          </select>
+          <select className="form-input" style={{ width: 140 }} value={selectedAssetType} onChange={e => changeFilter(setSelectedAssetType)(e.target.value)}>
+            <option value="ALL">All Types</option>
+            {repoAssetTypes.map((t:any) => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+          </select>
           <select className="form-input" style={{ width: 140 }} value={selectedSource} onChange={e => changeFilter(setSelectedSource)(e.target.value)}>
             <option value="ALL">All Sources</option>
             <option value="ADM_OUTPUT">ADM Output</option>
             <option value="MANUAL">Manual</option>
             <option value="UPLOAD">Upload</option>
           </select>
-          <select className="form-input" style={{ width: 140 }} value={selectedAssetType} onChange={e => changeFilter(setSelectedAssetType)(e.target.value)}>
-            <option value="ALL">All Types</option>
-            {repoAssetTypes.map((t:any) => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+          <select className="form-input" style={{ width: 160 }} value={selectedStatus} onChange={e => changeFilter(setSelectedStatus)(e.target.value)}>
+            <option value="ALL">All Statuses</option>
+            {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
           <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
             <input type="checkbox" checked={groupByCycle} onChange={e => setGroupByCycle(e.target.checked)} />
@@ -588,14 +609,6 @@ export default function RepositoryPage() {
           <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
             {total > 0 ? `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}` : '0 of 0'}
           </div>
-          <select className="form-input" style={{ width: 140 }} value={selectedDomain} onChange={e => { changeFilter(setSelectedDomain)(e.target.value); setSelectedAssetType('ALL') }}>
-            <option value="ALL">All Domains</option>
-            {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
-          </select>
-          <select className="form-input" style={{ width: 160 }} value={selectedStatus} onChange={e => changeFilter(setSelectedStatus)(e.target.value)}>
-            <option value="ALL">All Statuses</option>
-            {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
-          </select>
         </div>
 
         {/* Assets table */}

@@ -163,6 +163,62 @@ describe('RepositoryPage - loading and listing', () => {
   });
 });
 
+// Live bug report fix: the summary cards row used to show duplicate
+// cards for the same real concept (e.g. 'APPLICATION'/'APPLICATIONS'),
+// and treated NORA-native 'GOVERNANCE'/'MOTIVATION' as if they were
+// real ArchMind operating domains. Now driven by the fixed,
+// always-present OPERATING_DOMAINS list (merged with summary.byDomain's
+// resolved counts), not whatever raw values happen to be in the data.
+describe('RepositoryPage - summary cards (bug fix: no duplicates, correct domain set)', () => {
+  it('always renders exactly 8 cards (Show All + six operating domains + Strategy Layer), even when summary.byDomain has fewer entries than that', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()],
+      '/ea-repository/summary': { total: 42, byDomain: [{ domain: 'APPLICATION_INTEGRATION', operatingDomainDisplayName: 'Applications & Integration', count: 42 }] },
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Show All');
+    expect(screen.getByText('Business Architecture')).toBeInTheDocument();
+    expect(screen.getByText('Strategy Layer')).toBeInTheDocument();
+    expect(screen.getByText('Applications & Integration')).toBeInTheDocument();
+  });
+
+  it('shows a single card with the merged count for a domain the backend resolved from multiple raw assetType values (the exact reported duplicate-card bug)', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()],
+      '/ea-repository/summary': { total: 45, byDomain: [{ domain: 'APPLICATION_INTEGRATION', operatingDomainDisplayName: 'Applications & Integration', count: 30 }] },
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Show All');
+    expect(screen.getAllByText('Applications & Integration')).toHaveLength(1);
+    expect(screen.getByText('30')).toBeInTheDocument();
+  });
+
+  it('shows 0 (not missing) for an operating domain with no matching data', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()],
+      '/ea-repository/summary': { total: 5, byDomain: [{ domain: 'DATA_ARCHITECTURE', operatingDomainDisplayName: 'Data Architecture', count: 5 }] },
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Show All');
+    const securityCard = screen.getByText('Security Architecture').closest('.stat-card');
+    expect(securityCard).toHaveTextContent('0');
+  });
+
+  it('clicking a domain card sends operatingDomain (not the old, wrong domain param) as a server-side query param', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG,
+      '/ea-repository/assets': (url: string, options: any) => url.includes('operatingDomain=STRATEGY_LAYER')
+        ? [asset({ id: 'a2', name: 'Strategic Goal Asset' })]
+        : [asset({ id: 'a1', name: 'Core Banking' })],
+      '/ea-repository/summary': { total: 2, byDomain: [{ domain: 'STRATEGY_LAYER', operatingDomainDisplayName: 'Strategy Layer', count: 1 }] },
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('Strategy Layer'));
+    expect(await screen.findByText('Strategic Goal Asset')).toBeInTheDocument();
+  });
+});
+
 describe('RepositoryPage - CRUD', () => {
   it('creates a new asset via the modal', async () => {
     mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [], '/ea-repository/summary': {} });
