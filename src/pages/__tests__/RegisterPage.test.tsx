@@ -10,7 +10,7 @@ jest.mock('react-router-dom', () => ({
 }), { virtual: true });
 
 jest.mock('../../contexts/LangContext', () => ({
-  useLang: () => ({ locale: 'EN', setLocale: mockSetLocale }),
+  useLang: () => ({ locale: 'EN', setLocale: mockSetLocale, t: (k: string) => k }),
 }));
 
 beforeEach(() => {

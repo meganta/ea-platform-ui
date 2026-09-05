@@ -330,6 +330,7 @@ function MyViews({ api, onOpen, initialArchitectureState }: { api: any, onOpen: 
 
 // ── View Viewer (graph + matrix + heatmap + capability map) ───────────────────
 function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view: any, onBack: () => void, onRefresh: () => void }) {
+  const { t } = useLang()
   // publish()/approveView()/rejectView()/requestApproval() all return the
   // updated view from the backend, but the parent's onRefresh only
   // refreshes dashboard stats, not this specific view object it passed
@@ -1648,7 +1649,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
-              {[{t("common.name")},{t("common.type")},'Domain',{t("common.status")},'Owner','Tags'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>{h}</th>)}
+              {[t("common.name"),t("common.type"),'Domain',t("common.status"),'Owner','Tags'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>{h}</th>)}
             </tr>
           </thead>
           <tbody>

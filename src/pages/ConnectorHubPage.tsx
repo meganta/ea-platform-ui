@@ -377,9 +377,9 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
       {tab === 'overview' && (
         <div style={S.grid2}>
           {[
-            { label: {t("common.type")}, value: ct?.name || connector.connectorType },
+            { label: 'Type', value: ct?.name || connector.connectorType },
             { label: 'Direction', value: DIRECTION_LABEL[connector.direction] },
-            { label: {t("common.status")}, value: connector.status },
+            { label: 'Status', value: connector.status },
             { label: 'Auto Sync', value: connector.autoSync ? formatSyncInterval(connector.syncIntervalMin) : 'Disabled' },
             { label: 'Base URL', value: connector.baseUrl || '—' },
             { label: 'Last Sync', value: connector.lastSyncAt ? new Date(connector.lastSyncAt).toLocaleString() : 'Never' },
@@ -1299,7 +1299,7 @@ function PopulationStrategyTab({ api }: { api: any }) {
                 <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{t.code}</div>
               </div>
               <span style={S.badge(mode === 'MANUAL' ? '#7f8c8d' : mode === 'SYNC' ? '#2ecc71' : mode === 'HYBRID' ? '#f39c12' : mode === 'PUSH' ? '#8e44ad' : '#3498db')}>{modeInfo?.label || mode}</span>
-              <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => startEdit(t)}>{strategy ? {t("common.edit")} : 'Configure'}</button>
+              <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => startEdit(t)}>{strategy ? 'Edit' : 'Configure'}</button>
               {strategy && <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => remove(t.code)}>Reset</button>}
             </div>
           )

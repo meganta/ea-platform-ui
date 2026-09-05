@@ -7,7 +7,7 @@ const API_BASE = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omyw
 type Step = 'org' | 'admin' | 'done'
 
 export default function RegisterPage() {
-  const { locale, setLocale, t } = useLang()
+  const { locale, setLocale } = useLang()
   const nav = useNavigate()
   const isAR = locale === 'AR'
 
@@ -164,7 +164,7 @@ export default function RegisterPage() {
               <div className="form-group">
                 <label className="form-label" htmlFor="org-framework">{isAR?'الإطار المرجعي':'EA Framework'}</label>
                 <select id="org-framework" className="form-input" value={org.frameworkType} onChange={setO('frameworkType')}>
-                  <option value={t("framework.nora")}>NORA</option>
+                  <option value="NORA">NORA</option>
                   <option value="CUSTOM">{isAR?'مخصص':'Custom'}</option>
                 </select>
               </div>

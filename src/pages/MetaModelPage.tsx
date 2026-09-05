@@ -1420,10 +1420,10 @@ function SharedAttributeLibrary({ api }: { api: any }) {
 
   const SYSTEM_ATTRS = [
     { code: 'owner', name: 'Owner', nameAr: 'المالك', attributeType: 'USER', description: 'Person responsible for this element' },
-    { code: 'status', name: {t("common.status")}, nameAr: 'الحالة', attributeType: 'LIFECYCLE_STATUS', description: 'Current lifecycle status' },
+    { code: 'status', name: 'Status', nameAr: 'الحالة', attributeType: 'LIFECYCLE_STATUS', description: 'Current lifecycle status' },
     { code: 'maturity', name: 'Maturity Level', nameAr: 'مستوى النضج', attributeType: 'MATURITY_SCORE', description: 'Maturity score 1-5' },
     { code: 'tags', name: 'Tags', nameAr: 'الوسوم', attributeType: 'TEXT', description: 'Classification tags' },
-    { code: 'description', name: {t("common.description")}, nameAr: 'الوصف', attributeType: 'LONG_TEXT', description: 'Detailed description' },
+    { code: 'description', name: 'Description', nameAr: 'الوصف', attributeType: 'LONG_TEXT', description: 'Detailed description' },
     { code: 'startDate', name: 'Start Date', nameAr: 'تاريخ البدء', attributeType: 'DATE', description: 'When this element became active' },
     { code: 'endDate', name: 'End Date', nameAr: 'تاريخ الانتهاء', attributeType: 'DATE', description: 'When this element will be retired' },
     { code: 'costCenter', name: 'Cost Center', nameAr: 'مركز التكلفة', attributeType: 'TEXT', description: 'Financial cost center code' },
