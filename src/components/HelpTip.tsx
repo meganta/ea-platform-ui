@@ -1,23 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
+import { useLang } from '../contexts/LangContext'
 
-/**
- * A small "ⓘ" icon that, when clicked, shows a short, plain-language
- * explanation of whatever it's attached to - a page, a section, a button,
- * a setting. Written for a non-technical end user, not for developers or
- * architects: explain what something does and why it matters in everyday
- * language, not in the platform's internal terminology.
- *
- * Deliberately click-to-open rather than hover-only: hover tooltips don't
- * work on touch devices at all, and this platform is used on mobile too.
- *
- * Usage:
- *   <HelpTip text="This shows how healthy your review is overall. Green means things look good; red means something needs fixing before this can move forward." />
- *
- * Keep `text` to 1-3 short sentences. If something genuinely needs more
- * explanation than that, the UI itself probably needs simplifying, not a
- * longer tooltip.
- */
 export default function HelpTip({ text, placement = 'bottom' }: { text: string; placement?: 'top' | 'bottom' }) {
+  const { t } = useLang()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -39,7 +24,7 @@ export default function HelpTip({ text, placement = 'bottom' }: { text: string; 
     <span ref={ref} style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle' }}>
       <button
         type="button"
-        aria-label="More information"
+        aria-label={t('common.more_info')}
         onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
         style={{
           width: 16, height: 16, borderRadius: '50%', border: '1px solid var(--text-dim)',
