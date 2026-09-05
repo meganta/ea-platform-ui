@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useLang } from '../contexts/LangContext'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -37,7 +36,6 @@ const DOMAIN_COLOR: Record<string, string> = {
 const domainColor = (d?: string) => DOMAIN_COLOR[d || 'GENERAL'] || '#7f8c8d'
 
 export default function GlossaryPage() {
-  const { t } = useLang()
   const api = useApi()
   const [terms, setTerms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)

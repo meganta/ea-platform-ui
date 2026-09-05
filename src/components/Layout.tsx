@@ -41,7 +41,7 @@ export default function Layout() {
         if (profile && !profile.setupCompleted) setShowSetupModal(true)
       })
       .catch(() => setSetupChecked(true))
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const navItems: NavItem[] = [
     { to: '/', label: t('nav.dashboard'), icon: '⬛', permission: null },

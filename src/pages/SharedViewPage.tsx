@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { API_BASE } from '../lib/api'
-import { useLang } from '../contexts/LangContext'
 
 interface SharedViewSummary {
   id: string
@@ -21,7 +20,6 @@ interface SharedViewSummary {
 }
 
 export default function SharedViewPage() {
-  const { t } = useLang()
   const { token } = useParams<{ token: string }>()
   const [view, setView] = useState<SharedViewSummary | null>(null)
   const [error, setError] = useState('')

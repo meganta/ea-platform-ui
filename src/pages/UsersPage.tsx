@@ -29,7 +29,7 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 export default function UsersPage() {
-  const { t, locale } = useLang()
+  const { t } = useLang()
   const { hasPermission } = useAuth()
   const api = useApi()
   const [users, setUsers] = useState<any[]>([])

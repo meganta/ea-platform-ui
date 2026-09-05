@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -1533,7 +1532,6 @@ function AuditHistory({ api }: { api: any }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MetaModelPage() {
-  const { t } = useLang()
   const api = useMetaApi()
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)

@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
@@ -40,7 +39,6 @@ const RISK_COLORS: Record<string, string> = { NORMAL: '#64748B', SENSITIVE: '#f3
 const STATUS_COLORS: Record<string, string> = { PENDING: '#f39c12', APPROVED: '#27ae60', REJECTED: '#e74c3c', CANCELLED: '#64748B', ACTIVE: '#00b4d8', COMPLETED: '#27ae60' }
 
 export default function AccessGovernancePage() {
-  const { t } = useLang()
   const api = useApi()
   const { user } = useAuth()
   const isAdmin = user?.role === 'TENANT_ADMIN'

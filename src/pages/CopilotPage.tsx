@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useLang } from '../contexts/LangContext'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -699,7 +698,6 @@ function ActionDraftReview({ api }: { api: any }) {
 }
 
 export default function CopilotPage() {
-  const { t } = useLang()
   const api = useApi()
   const [architects, setArchitects] = useState<Architect[]>([])
   const [selectedArchitect, setSelectedArchitect] = useState<Architect | null>(null)

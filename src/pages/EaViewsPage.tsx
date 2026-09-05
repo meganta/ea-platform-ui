@@ -3342,7 +3342,6 @@ function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: stri
 }
 
 export default function EaViewsPage() {
-  const { t } = useLang()
   const api = useViewsApi()
   const [tab, setTab] = useState('dashboard')
   const [stats, setStats] = useState<any>(null)

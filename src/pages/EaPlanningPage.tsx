@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import HelpTip from '../components/HelpTip'
-import { useLang } from '../contexts/LangContext'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -40,7 +39,6 @@ const DOMAINS = ['BUSINESS', 'BENEFICIARY_EXPERIENCE', 'APPLICATIONS', 'DATA', '
 const PRIORITY_COLOR: Record<string, string> = { HIGH: '#e74c3c', MEDIUM: '#f39c12', LOW: '#2ecc71' }
 
 export default function EaPlanningPage() {
-  const { t } = useLang()
   const api = useApi()
   const [tab, setTab] = useState<'dashboard'|'plans'>('dashboard')
   const [dashboard, setDashboard] = useState<any>(null)

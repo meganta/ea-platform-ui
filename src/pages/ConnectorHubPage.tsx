@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -1311,7 +1310,6 @@ function PopulationStrategyTab({ api }: { api: any }) {
 }
 
 export default function ConnectorHubPage() {
-  const { t } = useLang()
   const api = useApi()
   const [tab, setTab] = useState('dashboard')
   const [stats, setStats] = useState<any>(null)

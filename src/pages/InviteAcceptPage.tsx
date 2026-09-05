@@ -8,8 +8,6 @@ export default function InviteAcceptPage() {
   const { token } = useParams<{ token: string }>()
   const nav = useNavigate()
   const [validating, setValidating] = useState(true)
-  const [valid, setValid] = useState(false)
-  const [invitation, setInvitation] = useState<any>(null)
   const [fullName, setFullName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -20,7 +18,6 @@ export default function InviteAcceptPage() {
     if (!token) { setValidating(false); setError('Invalid invitation link'); return }
     // We can't call a protected endpoint, so we just show the form.
     // The accept endpoint will validate the token server-side.
-    setValid(true)
     setValidating(false)
   }, [token])
 

@@ -14,6 +14,7 @@ function useApi() {
 
 
 function BrandingTab() {
+  const { t } = useLang()
   const { previewAccentColor, reload: reloadGlobalBranding } = useBranding()
   const [form, setForm] = useState({ organizationNameEn: '', organizationNameAr: '', primaryColor: '#00b4d8', secondaryColor: '#1a2332', accentColor: '#f39c12', fontFamily: '' })
   const [saving, setSaving] = useState(false)
