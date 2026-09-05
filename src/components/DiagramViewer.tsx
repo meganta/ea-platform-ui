@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -18,6 +19,7 @@ interface DiagramViewerProps {
 }
 
 export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps) {
+  const { t } = useLang()
   const [diagrams, setDiagrams] = useState<Diagram[]>([])
   const [selected, setSelected] = useState<Diagram | null>(null)
   const [mode, setMode] = useState<'visual' | 'source'>('visual')
@@ -74,11 +76,11 @@ export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps)
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => setCollapsed(c => !c)}
             style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: '1px solid var(--accent)', background: collapsed ? 'transparent' : 'rgba(3,105,161,0.1)', color: 'var(--accent)' }}>
-            {collapsed ? '▼ View' : '▲ Hide'}
+            {collapsed ? t("diagramviewer.view") : t("diagramviewer.hide")}
           </button>
           {!collapsed && <button onClick={() => setMode(m => m === 'visual' ? 'source' : 'visual')}
             style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)' }}>
-            {mode === 'visual' ? '< Source' : '👁 Visual'}
+            {mode === 'visual' ? t("diagramviewer.source") : t("diagramviewer.visual")}
           </button>}
           {selected && <>
             <button onClick={() => downloadSvg(selected)}
