@@ -1149,7 +1149,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
                 <span style={S.badge(v.changeType === 'AI_REVISIT' ? '#9b59b6' : '#3498db')}>{v.changeType === 'AI_REVISIT' ? (isAR ? 'مراجعة بالذكاء الاصطناعي' : 'AI Revisit') : (isAR ? 'تعديل يدوي' : 'Manual Edit')}</span>
                 <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(v.createdAt).toLocaleString()}</span>
               </div>
-              {v.changeReason && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>"{v.changeReason}"</div>}
+              {v.changeReason && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>{t("innovation.change_reason", { reason: v.changeReason })}</div>}
             </div>
           ))}
         </div>
