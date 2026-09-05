@@ -185,7 +185,7 @@ describe('RepositoryPage - summary cards (bug fix: no duplicates, correct domain
   it('shows a single card with the merged count for a domain the backend resolved from multiple raw assetType values (the exact reported duplicate-card bug)', async () => {
     mockFetch({
       '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()],
-      '/ea-repository/summary': { total: 30, byDomain: [{ domain: 'APPLICATION_INTEGRATION', operatingDomainDisplayName: 'Applications & Integration', count: 30 }] },
+      '/ea-repository/summary': { total: 45, byDomain: [{ domain: 'APPLICATION_INTEGRATION', operatingDomainDisplayName: 'Applications & Integration', count: 30 }] },
     });
     render(<RepositoryPage />);
     await screen.findByText('Show All');

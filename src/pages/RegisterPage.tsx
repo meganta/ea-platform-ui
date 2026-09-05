@@ -7,7 +7,7 @@ const API_BASE = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omyw
 type Step = 'org' | 'admin' | 'done'
 
 export default function RegisterPage() {
-  const { locale, setLocale } = useLang()
+  const { locale, setLocale, t } = useLang()
   const nav = useNavigate()
   const isAR = locale === 'AR'
 
