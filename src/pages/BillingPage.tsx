@@ -352,7 +352,7 @@ function CatalogTab({ api, isAR, t }: any) {
           <div key={p.id} style={{ ...S.card, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, fontSize: 13 }}><strong>{p.code}</strong> — {isAR && p.nameAr ? p.nameAr : p.name}</div>
             {p.isCore && <span style={S.badge('#3498db')}>{t('bill.is_core')}</span>}
-            <button style={{ ...S.btn(p.isActive ? 'secondary' : 'danger'), fontSize: 11 }} onClick={() => toggleProductActive(p)}>{p.isActive ? 'Active' : 'Inactive'}</button>
+            <button style={{ ...S.btn(p.isActive ? 'secondary' : 'danger'), fontSize: 11 }} onClick={() => toggleProductActive(p)}>{p.isActive ? t('common.active') : t('common.inactive')}</button>
           </div>
         ))}
       </div>
@@ -364,7 +364,7 @@ function CatalogTab({ api, isAR, t }: any) {
         {plans.map((p: any) => (
           <div key={p.id} style={{ ...S.card, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1, fontSize: 13 }}><strong>{p.code}</strong> — {isAR && p.nameAr ? p.nameAr : p.name} · {p.isCustom || p.priceMonthly == null ? t('bill.custom_pricing') : money(p.priceMonthly, p.currency, isAR)}</div>
-            <button style={{ ...S.btn(p.isActive ? 'secondary' : 'danger'), fontSize: 11 }} onClick={() => togglePlanActive(p)}>{p.isActive ? 'Active' : 'Inactive'}</button>
+            <button style={{ ...S.btn(p.isActive ? 'secondary' : 'danger'), fontSize: 11 }} onClick={() => togglePlanActive(p)}>{p.isActive ? t('common.active') : t('common.inactive')}</button>
           </div>
         ))}
       </div>
