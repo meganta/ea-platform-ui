@@ -2037,7 +2037,14 @@ describe('EaViewsPage - domain filter uses resolved operatingDomain, not raw dom
     await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
     fireEvent.click(screen.getAllByText('📋 My Views')[0]);
     fireEvent.click(await screen.findByText('Mixed Domain View'));
-    await screen.findByText(/objects/);
+    // Deliberately NOT waiting on /objects/ here (unlike other describe
+    // blocks in this file) - that text is already present as "0 / 0
+    // objects...Loading view data..." on the very first synchronous
+    // render, before the mocked dataset fetch resolves, so
+    // findByText(/objects/) matches immediately and the assertions
+    // below would run against empty, not-yet-loaded data. Each test
+    // instead waits for one of its own real node names, which only
+    // appears once the mocked fetch has actually resolved.
   }
 
   it('shows one merged domain option (not two) for two nodes with different raw domain values but the same resolved operatingDomain', async () => {
@@ -2051,12 +2058,8 @@ describe('EaViewsPage - domain filter uses resolved operatingDomain, not raw dom
         },
       },
     });
-    const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="APPLICATION_INTEGRATION"]'));
-    if (!domainSelect) {
-      console.log('DEBUG combobox count:', screen.getAllByRole('combobox').length);
-      screen.getAllByRole('combobox').forEach((s, i) => console.log(`DEBUG combobox ${i} options:`, Array.from((s as HTMLSelectElement).options).map(o => o.value)));
-      console.log('DEBUG full body text:', document.body.textContent);
-    }
+    await screen.findByText('App One');
+    const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="APPLICATION_INTEGRATION"]'))!;
     expect(domainSelect).toBeDefined();
     const options = Array.from((domainSelect as HTMLSelectElement).options).map(o => o.value);
     expect(options.filter(v => v === 'APPLICATION_INTEGRATION').length).toBe(1);
@@ -2074,6 +2077,7 @@ describe('EaViewsPage - domain filter uses resolved operatingDomain, not raw dom
         },
       },
     });
+    await screen.findByText('App One');
     const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="APPLICATION_INTEGRATION"]'))!;
     fireEvent.change(domainSelect, { target: { value: 'APPLICATION_INTEGRATION' } });
     expect(screen.getByText('App One')).toBeInTheDocument();
@@ -2087,6 +2091,7 @@ describe('EaViewsPage - domain filter uses resolved operatingDomain, not raw dom
         legacy: { nodes: [{ id: 'a1', name: 'Legacy Item', assetType: 'CUSTOM', domain: 'CUSTOM_DOMAIN', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {} },
       },
     });
+    await screen.findByText('Legacy Item');
     const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="CUSTOM_DOMAIN"]'))!;
     expect(domainSelect).toBeDefined();
     fireEvent.change(domainSelect, { target: { value: 'CUSTOM_DOMAIN' } });
