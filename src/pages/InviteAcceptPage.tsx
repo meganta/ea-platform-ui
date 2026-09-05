@@ -43,7 +43,7 @@ export default function InviteAcceptPage() {
           const tenantData = await tenantRes.json()
           const loginRes = await api.login(result.email, password, tenantData.slug)
           setToken(loginRes.accessToken)
-          nav('/')
+          nav('/app')
         } catch {
           nav('/login')
         }

@@ -28,13 +28,14 @@ import BillingPage from './pages/BillingPage'
 import DecisionEvaluationPage from './pages/DecisionEvaluationPage'
 import EaPlanningPage from './pages/EaPlanningPage'
 import GlossaryPage from './pages/GlossaryPage'
+import LandingPage from './pages/LandingPage'
 import './styles.css'
 
 function ProtectedRoute({ children, permission }: { children: React.ReactNode; permission?: string }) {
   const { user, loading, hasPermission } = useAuth()
   if (loading) return <div className="loading-screen"><div className="spinner"/></div>
   if (!user) return <Navigate to="/login" replace />
-  if (permission && !hasPermission(permission)) return <Navigate to="/" replace />
+  if (permission && !hasPermission(permission)) return <Navigate to="/app" replace />
   return <>{children}</>
 }
 
@@ -45,12 +46,13 @@ export default function App() {
         <BrandingProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/invite/:token" element={<InviteAcceptPage />} />
             <Route path="/shared/:token" element={<SharedViewPage />} />
-            <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route index element={<DashboardPage />} />
+            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route path="/app" element={<DashboardPage />} />
               <Route path="adm" element={<ProtectedRoute permission="Repository.View"><AdmPage /></ProtectedRoute>} />
               <Route path="copilot" element={<ProtectedRoute permission="AIArchitect.Use"><CopilotPage /></ProtectedRoute>} />
               <Route path="repository" element={<ProtectedRoute permission="Repository.View"><RepositoryPage /></ProtectedRoute>} />
