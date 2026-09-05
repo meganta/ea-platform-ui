@@ -45,7 +45,7 @@ export default function LoginPage() {
 
   const submit = async (e:FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true)
-    try { await login(form.email, form.password, form.tenantSlug); nav('/') }
+    try { await login(form.email, form.password, form.tenantSlug); nav('/app') }
     catch(err:any) { setError(err.message||'Login failed') }
     finally { setLoading(false) }
   }

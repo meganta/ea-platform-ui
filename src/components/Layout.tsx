@@ -44,7 +44,7 @@ export default function Layout() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const navItems: NavItem[] = [
-    { to: '/', label: t('nav.dashboard'), icon: '⬛', permission: null },
+    { to: '/app', label: t('nav.dashboard'), icon: '⬛', permission: null },
     { to: '/adm', label: t('nav.adm'), icon: '⚙', permission: 'Repository.View' },
     { to: '/copilot', label: t('nav.copilot'), icon: '💬', permission: 'AIArchitect.Use' },
     { to: '/governance', label: '🏛 Governance', icon: '', permission: 'Reviews.View' },
@@ -90,7 +90,7 @@ export default function Layout() {
         <nav className="sidebar-nav">
           <div className="nav-label">{t('nav.main')}</div>
           {mainNav.map(item => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
+            <NavLink key={item.to} to={item.to} end={item.to === '/app'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
               {item.icon ? item.icon + ' ' : ''}{item.label}
             </NavLink>
           ))}
