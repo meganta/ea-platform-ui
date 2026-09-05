@@ -1855,7 +1855,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
               {comparisonView === 'TABLE' ? (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-                    <thead><tr>{['Object', {t("common.type")}, 'Change', 'Changed Properties', 'Before', 'After'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)' }}>{h}</th>)}</tr></thead>
+                    <thead><tr>{['Object', t("common.type"), 'Change', 'Changed Properties', 'Before', 'After'].map(h => <th key={h} style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)' }}>{h}</th>)}</tr></thead>
                     <tbody>
                       {buildChangeSummaryRows({ objects: filtered }, comparisonChangeFilter.has('UNCHANGED')).map((row, i) => (
                         <tr key={row.id} style={{ background: i % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>
@@ -2506,7 +2506,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         return (
         <div style={{ width: 260, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, marginLeft:12, padding:16, overflowY:'auto' as const, flexShrink:0 }}>
           <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>{selected.name}</div>
-          {[{l:{t("common.type")},v:(selected.semanticType || selected.assetType)?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:{t("common.status")},v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
+          {[{l:t("common.type"),v:(selected.semanticType || selected.assetType)?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:t("common.status"),v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
             <div key={f.l} style={{ marginBottom:10 }}><div style={S.label}>{f.l}</div><div style={{fontSize:13}}>{f.v}</div></div>
           ))}
           {selected.description && <><div style={S.label}>Description</div><div style={{fontSize:12,color:'var(--text-dim)',lineHeight:1.6}}>{selected.description}</div></>}
@@ -3138,6 +3138,7 @@ function DependencyExplorerEntry({ api, onBack }: { api: any; onBack: () => void
 }
 
 function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: string; onBack: () => void }) {
+  const { t } = useLang()
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [depth, setDepth] = useState(1) // EA Repository Production Readiness: default changed from 2 to 1 hop
@@ -3329,7 +3330,7 @@ function ObjectContextViewer({ api, assetId, onBack }: { api: any; assetId: stri
         {selected && (
           <div style={{ width: 240, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, marginLeft:12, padding:16, overflowY:'auto' as const, flexShrink:0 }}>
             <div style={{ fontWeight:700, fontSize:14, marginBottom:12 }}>{selected.name}</div>
-            {[{l:{t("common.type")},v:selected.assetType?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:{t("common.status")},v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
+            {[{l:t("common.type"),v:selected.assetType?.replace(/_/g,' ')},{l:'Domain',v:selected.domain},{l:t("common.status"),v:selected.status},{l:'Owner',v:selected.owner||'—'}].map(f=>(
               <div key={f.l} style={{ marginBottom:10 }}><div style={S.label}>{f.l}</div><div style={{fontSize:13}}>{f.v}</div></div>
             ))}
             <button style={{...S.btn(),marginTop:16,fontSize:12,width:'100%'}} onClick={()=>setSelected(null)}>Close</button>

@@ -6,7 +6,7 @@ jest.mock('react-router-dom', () => ({
 }), { virtual: true });
 
 jest.mock('../../contexts/LangContext', () => ({
-  useLang: () => ({ isAR: false }),
+  useLang: () => ({ isAR: false, t: (k: string) => k }),
 }));
 
 function mockFetchJson(data: any) {
