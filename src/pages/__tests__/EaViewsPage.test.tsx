@@ -1265,6 +1265,36 @@ describe('EaViewsPage - Scenario switching (Phase 5A)', () => {
     expect(screen.getByText('Tech K')).toBeInTheDocument(); // Target A's column present instead
   });
 
+  // Live bug report fix: the Matrix used to show a fixed 30-row slice
+  // with a "Showing X of Y" label but no actual way to page through the
+  // rest. Proves real pagination now works: more than 30 row-type
+  // objects, a Next click reveals a row from beyond the first page.
+  it('Matrix rows are paginated with working Next/Prev controls, not silently capped at 30 with no way to see the rest', async () => {
+    const capabilities = Array.from({ length: 35 }, (_, i) => ({
+      id: `cap${i}`, name: `Capability ${i}`, role: 'PRIMARY', assetType: 'GovCapability', semanticType: 'BusinessCapability', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {},
+    }));
+    const tech = { id: 'tech1', name: 'Tech Component', role: 'RELATED', assetType: 'TechComponent', semanticType: 'TechComponent', domain: 'TECHNOLOGY', status: 'APPROVED', tags: [], metadata: {} };
+    const relationships = capabilities.map((c, i) => ({ id: `rel${i}`, sourceId: c.id, targetId: 'tech1', relationshipType: 'supported_by', label: 'supported by' }));
+    const directMatrixEligibility = { eligible: [{ visualization: 'MATRIX', eligible: true, score: 0.9, reasons: [], recommendedConfig: { rowType: 'BusinessCapability', columnType: 'TechComponent', relationMode: 'DIRECT', relationshipTypes: ['supported_by'] } }], ineligible: [] };
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Big Matrix View', visualization: 'MATRIX', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/dataset': {
+        legacy: { nodes: [...capabilities, tech], edges: relationships, metadata: {} },
+        dataset: { context: {}, objects: [...capabilities, tech], relationships, paths: [], hierarchies: [], metrics: [], provenance: { truncated: false } },
+        eligibility: directMatrixEligibility,
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Big Matrix View'));
+    await screen.findByText('Capability 0');
+    expect(screen.queryByText('Capability 34')).not.toBeInTheDocument(); // beyond the first 30-row page
+    expect(screen.getByText(/Showing 30 of 35/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('›'));
+    expect(await screen.findByText('Capability 34')).toBeInTheDocument(); // now visible on page 2
+  });
+
   it('HEATMAP metric selection resets to the new scenario\'s recommended metric when the previous one is unavailable', async () => {
     const currentHeatmapResponse = { ...currentResponse, eligibility: { eligible: [{ visualization: 'HEATMAP', eligible: true, score: 0.7, reasons: [], recommendedConfig: { metricKey: 'riskLevel' } }], ineligible: [] }, dataset: { ...currentResponse.dataset, metrics: [{ key: 'riskLevel', label: 'riskLevel', dataType: 'categorical', coveragePercent: 100, distinctValues: ['HIGH'] }], hierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null }, source: 'metadata.parentId' }] } };
     const targetAHeatmapResponse = { ...targetAResponse, eligibility: { eligible: [{ visualization: 'HEATMAP', eligible: true, score: 0.7, reasons: [], recommendedConfig: { metricKey: 'maturity' } }], ineligible: [] }, dataset: { ...targetAResponse.dataset, metrics: [{ key: 'maturity', label: 'maturity', dataType: 'categorical', coveragePercent: 100, distinctValues: ['LOW'] }], hierarchies: [{ rootIds: ['capA'], parentByObjectId: { capA: null }, source: 'metadata.parentId' }] } };
@@ -1987,6 +2017,78 @@ describe('EaViewsPage - Object Context View entry point', () => {
 // EA Repository Production Readiness, item 9: the direct Dependency
 // Explorer entry point (search-then-view), separate from the
 // query-param-driven entry point tested above.
+// Live bug report fix: the domain filter's dropdown/filtering logic
+// used to derive options from the raw, inconsistent n.domain value on
+// each node (the same EaAsset.domain column already fixed in the
+// Repository module) - duplicate-looking options for the same real
+// domain, and NORA-native Governance/Motivation shown as if they were
+// real ArchMind operating domains. Now uses n.operatingDomain
+// (resolved server-side via the same mechanism that already resolves
+// semanticType), falling back to raw domain only for a genuinely
+// unmatched type.
+describe('EaViewsPage - domain filter uses resolved operatingDomain, not raw domain (bug fix)', () => {
+  async function openView(extraRoutes: Record<string, any> = {}) {
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Mixed Domain View', visualization: 'GRAPH', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/saved-filters': [],
+      ...extraRoutes,
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Mixed Domain View'));
+    await screen.findByText(/objects/);
+  }
+
+  it('shows one merged domain option (not two) for two nodes with different raw domain values but the same resolved operatingDomain', async () => {
+    await openView({
+      '/ea-views/v1/dataset': {
+        legacy: {
+          nodes: [
+            { id: 'a1', name: 'App One', assetType: 'Application', operatingDomain: 'APPLICATION_INTEGRATION', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} },
+            { id: 'a2', name: 'App Two', assetType: 'APPLICATIONS', operatingDomain: 'APPLICATION_INTEGRATION', domain: 'APPLICATIONS', status: 'APPROVED', tags: [], metadata: {} },
+          ], edges: [], metadata: {},
+        },
+      },
+    });
+    const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="APPLICATION_INTEGRATION"]'))!;
+    expect(domainSelect).toBeDefined();
+    const options = Array.from((domainSelect as HTMLSelectElement).options).map(o => o.value);
+    expect(options.filter(v => v === 'APPLICATION_INTEGRATION').length).toBe(1);
+  });
+
+  it('filtering by the resolved operatingDomain correctly matches nodes regardless of their differing raw domain values', async () => {
+    await openView({
+      '/ea-views/v1/dataset': {
+        legacy: {
+          nodes: [
+            { id: 'a1', name: 'App One', assetType: 'Application', operatingDomain: 'APPLICATION_INTEGRATION', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} },
+            { id: 'a2', name: 'App Two', assetType: 'APPLICATIONS', operatingDomain: 'APPLICATION_INTEGRATION', domain: 'APPLICATIONS', status: 'APPROVED', tags: [], metadata: {} },
+            { id: 'a3', name: 'Strategy Item', assetType: 'KPI', operatingDomain: 'STRATEGY_LAYER', domain: 'STRATEGY', status: 'APPROVED', tags: [], metadata: {} },
+          ], edges: [], metadata: {},
+        },
+      },
+    });
+    const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="APPLICATION_INTEGRATION"]'))!;
+    fireEvent.change(domainSelect, { target: { value: 'APPLICATION_INTEGRATION' } });
+    expect(screen.getByText('App One')).toBeInTheDocument();
+    expect(screen.getByText('App Two')).toBeInTheDocument();
+    expect(screen.queryByText('Strategy Item')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the raw domain (never becomes unfilterable) for a node whose type has no resolved operatingDomain', async () => {
+    await openView({
+      '/ea-views/v1/dataset': {
+        legacy: { nodes: [{ id: 'a1', name: 'Legacy Item', assetType: 'CUSTOM', domain: 'CUSTOM_DOMAIN', status: 'APPROVED', tags: [], metadata: {} }], edges: [], metadata: {} },
+      },
+    });
+    const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="CUSTOM_DOMAIN"]'))!;
+    expect(domainSelect).toBeDefined();
+    fireEvent.change(domainSelect, { target: { value: 'CUSTOM_DOMAIN' } });
+    expect(screen.getByText('Legacy Item')).toBeInTheDocument();
+  });
+});
+
 describe('EaViewsPage - Dependency Explorer direct entry point (Production Readiness item 9)', () => {
   it('lets the user search for and select an object, then opens the same dependency viewer used by the Repository deep-link', async () => {
     mockFetch({

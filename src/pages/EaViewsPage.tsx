@@ -390,6 +390,14 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // for PATH) - never re-queried, reused directly from the already-built
   // matrix.
   const [matrixDrilldown, setMatrixDrilldown] = useState<any>(null)
+  // Live bug report fix: the Matrix view showed a fixed 30-row/20-column
+  // slice with a "Showing X of Y" label but no way to actually page
+  // through the rest - the exact reported "limited number of objects
+  // or doesn't have paging" bug. Independent row/column page state
+  // (matrix rows and columns are two different axes, each pageable on
+  // its own).
+  const [matrixRowPage, setMatrixRowPage] = useState(1)
+  const [matrixColPage, setMatrixColPage] = useState(1)
   // ── Comparison mode (Phase 5B) ────────────────────────────────────────
   //
   // Entirely separate from the single-scenario viewer state above -
@@ -1105,14 +1113,24 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   }
 
   // Filter nodes
+  // Live bug report fix: previously filtered/derived options from the
+  // raw n.domain value (the same inconsistent EaAsset.domain column
+  // already fixed in the Repository module - duplicate-looking options
+  // for the same real domain, and NORA-native GOVERNANCE/MOTIVATION
+  // shown as if they were real ArchMind operating domains). Now uses
+  // the resolved n.operatingDomain (added server-side in
+  // view-query.service.ts's toViewNodes, the same mechanism that
+  // already resolves semanticType) - falls back to the raw domain only
+  // for a node whose type has no meta-model match at all, so nothing
+  // becomes unfilterable.
   const filteredNodes = (data?.nodes || []).filter((n: any) =>
-    (!filterDomain || n.domain === filterDomain) &&
+    (!filterDomain || (n.operatingDomain || n.domain) === filterDomain) &&
     (!filterType || n.assetType === filterType) &&
     (!filterStatus || n.status === filterStatus) &&
     (!search || n.name.toLowerCase().includes(search.toLowerCase()))
   )
 
-  const domains = [...new Set((data?.nodes||[]).map((n: any) => n.domain))] as string[]
+  const domains = [...new Set((data?.nodes||[]).map((n: any) => n.operatingDomain || n.domain))] as string[]
   const types = [...new Set((data?.nodes||[]).map((n: any) => n.assetType))] as string[]
 
   // ── Graph progressive disclosure (Phase 4C) ──────────────────────────
@@ -1485,8 +1503,12 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     }
     const allRows = result.rows ?? []
     const allCols = result.columns ?? []
-    const rows = allRows.slice(0, MATRIX_ROW_LIMIT)
-    const cols = allCols.slice(0, MATRIX_COL_LIMIT)
+    const totalRowPages = Math.max(1, Math.ceil(allRows.length / MATRIX_ROW_LIMIT))
+    const totalColPages = Math.max(1, Math.ceil(allCols.length / MATRIX_COL_LIMIT))
+    const clampedRowPage = Math.min(matrixRowPage, totalRowPages)
+    const clampedColPage = Math.min(matrixColPage, totalColPages)
+    const rows = allRows.slice((clampedRowPage - 1) * MATRIX_ROW_LIMIT, clampedRowPage * MATRIX_ROW_LIMIT)
+    const cols = allCols.slice((clampedColPage - 1) * MATRIX_COL_LIMIT, clampedColPage * MATRIX_COL_LIMIT)
     const cell = (rowId: string, colId: string) => result.cells?.get(`${rowId}::${colId}`)
 
     return (
@@ -1497,8 +1519,24 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           </div>
         )}
         {(allRows.length > MATRIX_ROW_LIMIT || allCols.length > MATRIX_COL_LIMIT) && (
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
-            Showing {rows.length} of {allRows.length} {result.rowType} × {cols.length} of {allCols.length} {result.columnType}
+          <div className="flex items-center gap-3 flex-wrap" style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+            <span>Showing {rows.length} of {allRows.length} {result.rowType} × {cols.length} of {allCols.length} {result.columnType}</span>
+            {allRows.length > MATRIX_ROW_LIMIT && (
+              <span className="flex items-center gap-1">
+                Rows:
+                <button className="btn btn-secondary btn-sm" disabled={clampedRowPage <= 1} onClick={() => setMatrixRowPage(p => p - 1)}>‹</button>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>{clampedRowPage}/{totalRowPages}</span>
+                <button className="btn btn-secondary btn-sm" disabled={clampedRowPage >= totalRowPages} onClick={() => setMatrixRowPage(p => p + 1)}>›</button>
+              </span>
+            )}
+            {allCols.length > MATRIX_COL_LIMIT && (
+              <span className="flex items-center gap-1">
+                Columns:
+                <button className="btn btn-secondary btn-sm" disabled={clampedColPage <= 1} onClick={() => setMatrixColPage(p => p - 1)}>‹</button>
+                <span style={{ fontFamily: 'var(--font-mono)' }}>{clampedColPage}/{totalColPages}</span>
+                <button className="btn btn-secondary btn-sm" disabled={clampedColPage >= totalColPages} onClick={() => setMatrixColPage(p => p + 1)}>›</button>
+              </span>
+            )}
           </div>
         )}
         <div style={{ overflowX: 'auto' }}>
