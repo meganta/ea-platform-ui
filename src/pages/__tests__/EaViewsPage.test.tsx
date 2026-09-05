@@ -2051,7 +2051,12 @@ describe('EaViewsPage - domain filter uses resolved operatingDomain, not raw dom
         },
       },
     });
-    const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="APPLICATION_INTEGRATION"]'))!;
+    const domainSelect = screen.getAllByRole('combobox').find(s => (s as HTMLSelectElement).querySelector('option[value="APPLICATION_INTEGRATION"]'));
+    if (!domainSelect) {
+      console.log('DEBUG combobox count:', screen.getAllByRole('combobox').length);
+      screen.getAllByRole('combobox').forEach((s, i) => console.log(`DEBUG combobox ${i} options:`, Array.from((s as HTMLSelectElement).options).map(o => o.value)));
+      console.log('DEBUG full body text:', document.body.textContent);
+    }
     expect(domainSelect).toBeDefined();
     const options = Array.from((domainSelect as HTMLSelectElement).options).map(o => o.value);
     expect(options.filter(v => v === 'APPLICATION_INTEGRATION').length).toBe(1);
