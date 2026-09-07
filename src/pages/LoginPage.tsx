@@ -11,12 +11,19 @@ interface PublicBrandingSummary {
   hasLogo?: boolean
 }
 
+// Domain-bound tenants - visiting this hostname auto-selects the tenant,
+// no manual org entry needed.
+const HOSTNAME_TENANT_MAP: Record<string, string> = {
+  'hrdf.archmindworks.com': 'test-tenant',
+}
+
 export default function LoginPage() {
   const { login } = useAuth()
   const { t, locale, setLocale } = useLang()
   const nav = useNavigate()
   const [searchParams] = useSearchParams()
-  const [form, setForm] = useState({ email:'', password:'', tenantSlug: searchParams.get('org') || 'test-tenant' })
+  const boundTenant = HOSTNAME_TENANT_MAP[window.location.hostname]
+  const [form, setForm] = useState({ email:'', password:'', tenantSlug: boundTenant || searchParams.get('org') || 'test-tenant' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [orgBranding, setOrgBranding] = useState<PublicBrandingSummary | null>(null)
@@ -64,7 +71,7 @@ export default function LoginPage() {
         <div className="login-title">{t('auth.signin')}</div>
         {error && <div className="login-error">{error}</div>}
         <form onSubmit={submit}>
-          <div className="form-group"><label className="form-label" htmlFor="login-org">{t('auth.organization')}</label><input id="login-org" className="form-input" value={form.tenantSlug} onChange={set('tenantSlug')} required/></div>
+          {!boundTenant && <div className="form-group"><label className="form-label" htmlFor="login-org">{t('auth.organization')}</label><input id="login-org" className="form-input" value={form.tenantSlug} onChange={set('tenantSlug')} required/></div>}
           <div className="form-group"><label className="form-label" htmlFor="login-email">{t('auth.email')}</label><input id="login-email" className="form-input" type="email" value={form.email} onChange={set('email')} required/></div>
           <div className="form-group"><label className="form-label" htmlFor="login-password">{t('auth.password')}</label><input id="login-password" className="form-input" type="password" value={form.password} onChange={set('password')} required/></div>
           <button className="btn btn-primary" type="submit" disabled={loading} style={{width:'100%',justifyContent:'center',marginTop:8, ...(accentColor ? { background: accentColor, borderColor: accentColor } : {})}}>{loading?t('auth.signin_loading'):t('auth.signin')}</button>
