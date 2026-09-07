@@ -18,7 +18,7 @@ function mockFetch(routes: Record<string, any>) {
         // A route can be marked as a failure with { __fail: true, status }
         // to exercise error-handling paths, rather than always resolving ok.
         if (routeValue && typeof routeValue === 'object' && routeValue.__fail) {
-          return Promise.resolve({ ok: false, status: routeValue.status ?? 500, statusText: 'Error', json: () => Promise.resolve({}), text: () => Promise.resolve('{}') });
+          return Promise.resolve({ ok: false, status: routeValue.status ?? 500, statusText: 'Error', json: () => Promise.resolve(routeValue.message ? { message: routeValue.message } : {}), text: () => Promise.resolve(routeValue.message ? JSON.stringify({ message: routeValue.message }) : '{}') });
         }
         const value = typeof routeValue === 'function' ? routeValue(options) : routeValue;
         return Promise.resolve({ ok: true, json: () => Promise.resolve(value), text: () => Promise.resolve(JSON.stringify(value)) });
@@ -230,5 +230,39 @@ describe('MetaModelPage - EnumDesigner draft/published fallback', () => {
     render(<MetaModelPage />);
     fireEvent.click(await screen.findByText('🏷 Enums'));
     await waitFor(() => expect(screen.queryByText('Loading...')).not.toBeInTheDocument());
+  });
+});
+
+// Live bug report fix: same bug class as EnumDesigner above, in the
+// Designer tab's own graph fetch - previously had no .catch() at all,
+// so any rejection (most commonly this exact "no draft version" 404,
+// the normal state right after a publish) left it stuck on "Loading
+// graph..." forever, with no way out. The real fix is server-side
+// (ObjectTypeService.getGraphData now falls back to the published
+// version, same as list() already did) - this test covers the
+// frontend's own safety net for whatever other failure reason might
+// still occur, and proves it no longer hangs.
+describe('MetaModelPage - Designer tab error handling (bug fix)', () => {
+  it('shows an error message with a retry action instead of hanging forever when the graph fetch fails', async () => {
+    mockFetch({
+      '/meta-model/stats': STATS_WITH_MODEL,
+      '/meta-model/object-types/graph': { __fail: true, status: 404, message: 'No draft version found. Create a new version first.' },
+    });
+    render(<MetaModelPage />);
+    fireEvent.click(await screen.findByText('🎨 Designer'));
+    expect(await screen.findByText(/No draft version found/)).toBeInTheDocument();
+    expect(screen.queryByText('Loading graph...')).not.toBeInTheDocument();
+    expect(screen.getByText('+ Create Draft Version')).toBeInTheDocument();
+  });
+
+  it('loads and renders the graph normally when the fetch succeeds', async () => {
+    mockFetch({
+      '/meta-model/stats': STATS_WITH_MODEL,
+      '/meta-model/object-types/graph': { nodes: [{ id: 'ot1', code: 'App', name: 'Application', domain: 'Application' }], edges: [] },
+    });
+    render(<MetaModelPage />);
+    fireEvent.click(await screen.findByText('🎨 Designer'));
+    await waitFor(() => expect(screen.queryByText('Loading graph...')).not.toBeInTheDocument());
+    expect(screen.queryByText(/No draft version found/)).not.toBeInTheDocument();
   });
 });

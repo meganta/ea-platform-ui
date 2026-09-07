@@ -702,6 +702,8 @@ function RelationshipsManager({ api }: { api: any }) {
 function MetaModelDesigner({ api }: { api: any }) {
   const [graph, setGraph] = useState<{ nodes: any[], edges: any[] }>({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [creatingDraft, setCreatingDraft] = useState(false)
   const [selected, setSelected] = useState<any>(null)
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({})
   const [dragging, setDragging] = useState<{ id: string; ox: number; oy: number } | null>(null)
@@ -711,7 +713,9 @@ function MetaModelDesigner({ api }: { api: any }) {
   const [filterDomain, setFilterDomain] = useState<string>('')
   const svgRef = React.useRef<SVGSVGElement>(null)
 
-  useEffect(() => {
+  const loadGraph = React.useCallback(() => {
+    setLoading(true)
+    setLoadError(null)
     api.get('/meta-model/object-types/graph').then((g: any) => {
       if (g?.nodes) {
         setGraph(g)
@@ -728,8 +732,29 @@ function MetaModelDesigner({ api }: { api: any }) {
         setPositions(pos)
       }
       setLoading(false)
+    }).catch((err: any) => {
+      // Was previously unhandled entirely - a rejection here (e.g. the
+      // real, expected 404 "No draft version found" case) left loading
+      // stuck true forever, showing an infinite "Loading graph..." with
+      // no way out.
+      setLoadError(err?.message || err?.data?.message || 'Failed to load the graph.')
+      setLoading(false)
     })
   }, [api])
+
+  useEffect(() => { loadGraph() }, [loadGraph])
+
+  const createDraftVersion = async () => {
+    setCreatingDraft(true)
+    try {
+      await api.post('/meta-model/versions', { version: `draft-${Date.now()}` })
+      loadGraph()
+    } catch (err: any) {
+      setLoadError(err?.message || err?.data?.message || 'Failed to create a draft version.')
+    } finally {
+      setCreatingDraft(false)
+    }
+  }
 
   const domains = [...new Set(graph.nodes.map(n => n.domain).filter(Boolean))] as string[]
   const filtered = { nodes: graph.nodes.filter(n => !filterDomain || n.domain === filterDomain), edges: graph.edges.filter(e => !filterDomain || (graph.nodes.find(n => n.id === e.source)?.domain === filterDomain || graph.nodes.find(n => n.id === e.target)?.domain === filterDomain)) }
@@ -781,7 +806,17 @@ function MetaModelDesigner({ api }: { api: any }) {
           <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{filtered.nodes.length} types · {filtered.edges.length} relationships</span>
         </div>
 
-        {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>Loading graph...</div> : (
+        {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>Loading graph...</div> : loadError ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: 20, textAlign: 'center' }}>
+            <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{loadError}</div>
+            {loadError.toLowerCase().includes('draft version') && (
+              <button style={S.btn('primary')} onClick={createDraftVersion} disabled={creatingDraft}>
+                {creatingDraft ? 'Creating...' : '+ Create Draft Version'}
+              </button>
+            )}
+            <button style={S.btn()} onClick={loadGraph}>Retry</button>
+          </div>
+        ) : (
           <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: panStart ? 'grabbing' : dragging ? 'grabbing' : 'grab' }}
             onMouseDown={onSvgMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp} onMouseLeave={onMouseUp} onWheel={onWheel}>
             <defs>
