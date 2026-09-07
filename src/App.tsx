@@ -30,10 +30,11 @@ import EaPlanningPage from './pages/EaPlanningPage'
 import GlossaryPage from './pages/GlossaryPage'
 import './styles.css'
 
-function ProtectedRoute({ children, permission }: { children: React.ReactNode; permission?: string }) {
+function ProtectedRoute({ children, permission, superadminOnly }: { children: React.ReactNode; permission?: string; superadminOnly?: boolean }) {
   const { user, loading, hasPermission } = useAuth()
   if (loading) return <div className="loading-screen"><div className="spinner"/></div>
   if (!user) return <Navigate to="/login" replace />
+  if (superadminOnly && user.role !== 'SUPERADMIN') return <Navigate to="/" replace />
   if (permission && !hasPermission(permission)) return <Navigate to="/" replace />
   return <>{children}</>
 }
@@ -55,22 +56,22 @@ export default function App() {
               <Route path="copilot" element={<ProtectedRoute permission="AIArchitect.Use"><CopilotPage /></ProtectedRoute>} />
               <Route path="repository" element={<ProtectedRoute permission="Repository.View"><RepositoryPage /></ProtectedRoute>} />
               <Route path="knowledge" element={<ProtectedRoute permission="Repository.View"><KnowledgePage /></ProtectedRoute>} />
-              <Route path="glossary" element={<ProtectedRoute permission="Repository.View"><GlossaryPage /></ProtectedRoute>} />
-              <Route path="settings" element={<ProtectedRoute permission="Users.View"><SettingsPage /></ProtectedRoute>} />
+              <Route path="glossary" element={<ProtectedRoute permission="Repository.View" superadminOnly><GlossaryPage /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute permission="Users.View" superadminOnly><SettingsPage /></ProtectedRoute>} />
               <Route path="governance" element={<ProtectedRoute permission="Reviews.View"><GovernancePage /></ProtectedRoute>} />
               <Route path="meta-model" element={<ProtectedRoute permission="MetaModel.View"><MetaModelPage /></ProtectedRoute>} />
               <Route path="ea-views" element={<ProtectedRoute permission="Views.View"><EaViewsPage /></ProtectedRoute>} />
-              <Route path="connector-hub" element={<ProtectedRoute permission="Repository.View"><ConnectorHubPage /></ProtectedRoute>} />
+              <Route path="connector-hub" element={<ProtectedRoute permission="Repository.View" superadminOnly><ConnectorHubPage /></ProtectedRoute>} />
               <Route path="reports" element={<ProtectedRoute permission="Repository.View"><ReportsPage /></ProtectedRoute>} />
-              <Route path="access-governance" element={<ProtectedRoute permission="Roles.View"><AccessGovernancePage /></ProtectedRoute>} />
+              <Route path="access-governance" element={<ProtectedRoute permission="Roles.View" superadminOnly><AccessGovernancePage /></ProtectedRoute>} />
               <Route path="users" element={<ProtectedRoute permission="Users.View"><UsersPage /></ProtectedRoute>} />
-              <Route path="setup" element={<SetupAssistantPage />} />
+              <Route path="setup" element={<ProtectedRoute superadminOnly><SetupAssistantPage /></ProtectedRoute>} />
               <Route path="setup-assistant" element={<SetupAssistantPage />} />
-              <Route path="strategy" element={<ProtectedRoute permission="Repository.View"><StrategyPage /></ProtectedRoute>} />
+              <Route path="strategy" element={<ProtectedRoute permission="Repository.View" superadminOnly><StrategyPage /></ProtectedRoute>} />
               <Route path="innovation" element={<ProtectedRoute permission="Repository.View"><InnovationPage /></ProtectedRoute>} />
               <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="billing" element={<ProtectedRoute permission="Users.View"><BillingPage /></ProtectedRoute>} />
-              <Route path="decision-evaluation" element={<ProtectedRoute permission="Reviews.View"><DecisionEvaluationPage /></ProtectedRoute>} />
+              <Route path="billing" element={<ProtectedRoute permission="Users.View" superadminOnly><BillingPage /></ProtectedRoute>} />
+              <Route path="decision-evaluation" element={<ProtectedRoute permission="Reviews.View" superadminOnly><DecisionEvaluationPage /></ProtectedRoute>} />
               <Route path="ea-planning" element={<ProtectedRoute permission="Repository.View"><EaPlanningPage /></ProtectedRoute>} />
             </Route>
           </Routes>

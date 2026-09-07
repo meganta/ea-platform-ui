@@ -66,8 +66,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const hasPermission = useCallback((code: string) => {
     if (!user) return false
-    // Legacy role bypass: TENANT_ADMIN gets everything during migration
-    if (user.role === 'TENANT_ADMIN') return true
+    // Legacy role bypass: TENANT_ADMIN/SUPERADMIN get everything during migration
+    if (user.role === 'TENANT_ADMIN' || user.role === 'SUPERADMIN') return true
     // Platform admin gets everything
     if (user.isPlatformAdmin) return true
     return permissions.includes(code)

@@ -14,6 +14,7 @@ interface NavItem {
   icon: string
   permission: string | null
   adminOnly?: boolean
+  superadminOnly?: boolean
 }
 
 export default function Layout() {
@@ -48,26 +49,27 @@ export default function Layout() {
     { to: '/adm', label: t('nav.adm'), icon: '⚙', permission: 'Repository.View' },
     { to: '/copilot', label: t('nav.copilot'), icon: '💬', permission: 'AIArchitect.Use' },
     { to: '/governance', label: '🏛 Governance', icon: '', permission: 'Reviews.View' },
-    { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'Reviews.View' },
-    { to: '/strategy', label: '🎯 Strategy', icon: '', permission: 'Repository.View' },
+    { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'Reviews.View', superadminOnly: true },
+    { to: '/strategy', label: '🎯 Strategy', icon: '', permission: 'Repository.View', superadminOnly: true },
     { to: '/ea-planning', label: '🗓 EA Planning', icon: '', permission: 'Repository.View' },
     { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Repository.View' },
     { to: '/notifications', label: '🔔 ' + t('nav.notifications'), icon: '', permission: null },
-    { to: '/billing', label: '💳 ' + t('nav.billing'), icon: '', permission: 'Users.View' },
+    { to: '/billing', label: '💳 ' + t('nav.billing'), icon: '', permission: 'Users.View', superadminOnly: true },
     { to: '/meta-model', label: '🧩 Meta-Model', icon: '', permission: 'MetaModel.View' },
     { to: '/ea-views', label: '🗺 EA Views', icon: '', permission: 'Views.View' },
-    { to: '/connector-hub', label: '🔌 Connectors', icon: '', permission: 'Repository.View' },
+    { to: '/connector-hub', label: '🔌 Connectors', icon: '', permission: 'Repository.View', superadminOnly: true },
     { to: '/reports', label: '📊 ' + (locale === 'AR' ? 'التقارير' : 'Reports'), icon: '', permission: 'Repository.View' },
     { to: '/repository', label: '🗄 ' + t('nav.repository'), icon: '', permission: 'Repository.View' },
     { to: '/knowledge', label: '📚 ' + t('nav.knowledge'), icon: '', permission: 'Repository.View' },
-    { to: '/glossary', label: '📖 Glossary', icon: '', permission: 'Repository.View' },
+    { to: '/glossary', label: '📖 Glossary', icon: '', permission: 'Repository.View', superadminOnly: true },
     { to: '/users', label: '👥 Users', icon: '', permission: 'Users.View' },
-    { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View' },
-    { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Users.View' },
-    { to: '/setup', label: '🏛 Setup Assistant', icon: '', permission: null },
+    { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View', superadminOnly: true },
+    { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Users.View', superadminOnly: true },
+    { to: '/setup', label: '🏛 Setup Assistant', icon: '', permission: null, superadminOnly: true },
   ]
 
   const visibleNav = navItems.filter(item => {
+    if (item.superadminOnly && user?.role !== 'SUPERADMIN') return false
     if (item.permission === null) return true
     return hasPermission(item.permission)
   })
