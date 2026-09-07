@@ -271,6 +271,11 @@ describe('RepositoryPage - CRUD', () => {
     await screen.findByText('Core Banking');
     fireEvent.click(screen.getByText('✏'));
 
+    expect(screen.getByText('Edit Asset').closest('.modal')).toHaveStyle({
+      maxHeight: 'calc(100vh - 32px)',
+      overflowY: 'auto',
+      boxSizing: 'border-box',
+    });
     const domainSelect = screen.getByLabelText('Domain *') as HTMLSelectElement;
     expect(domainSelect.value).toBe('APPLICATION');
     expect(domainSelect.querySelector('option[value="APPLICATIONS"]')).not.toBeInTheDocument();

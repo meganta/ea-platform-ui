@@ -145,7 +145,11 @@ function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 560 }} onClick={e => e.stopPropagation()}>
+      <div
+        className="modal"
+        style={{ width: 560, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', boxSizing: 'border-box' }}
+        onClick={e => e.stopPropagation()}
+      >
         <div className="modal-title">{asset ? 'Edit Asset' : 'New EA Asset'}</div>
         <form onSubmit={submit}>
           <div className="grid-2" style={{ gap: 12 }}>
