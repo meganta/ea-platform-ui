@@ -41,6 +41,7 @@ function mockFetch(routes: Record<string, any>) {
 }
 
 const CONFIG = { enabledDomains: ['BUSINESS', 'APPLICATION'], allDomains: { BUSINESS: ['CAPABILITY'], APPLICATION: ['APPLICATION'] } };
+const LEGACY_APPLICATIONS_CONFIG = { enabledDomains: ['BUSINESS', 'APPLICATIONS'], allDomains: { BUSINESS: ['CAPABILITY'], APPLICATIONS: ['Application'] } };
 
 function asset(overrides: Partial<Record<string, any>> = {}) {
   return { id: 'a1', name: 'Core Banking', nameAr: null, domain: 'APPLICATION', status: 'APPROVED', source: 'MANUAL', assetType: 'APPLICATION', ...overrides };
@@ -85,6 +86,25 @@ describe('RepositoryPage - loading and listing', () => {
     fireEvent.change(domainSelect, { target: { value: 'BUSINESS' } });
     expect(await screen.findByText('Payments Capability')).toBeInTheDocument();
     expect(screen.queryByText('Core Banking')).not.toBeInTheDocument();
+  });
+
+  it('shows canonical APPLICATION in the domain filter when framework config still returns legacy APPLICATIONS', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': LEGACY_APPLICATIONS_CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': (url: string) => url.includes('domain=APPLICATION')
+        ? [asset({ assetType: 'Application' })]
+        : [asset({ assetType: 'Application' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+
+    const domainSelect = screen.getAllByRole('combobox')
+      .find(s => (s as HTMLSelectElement).querySelector('option[value="ALL"]') && (s as HTMLSelectElement).querySelector('option[value="APPLICATION"]'))!;
+    expect(domainSelect.querySelector('option[value="APPLICATIONS"]')).not.toBeInTheDocument();
+
+    fireEvent.change(domainSelect, { target: { value: 'APPLICATION' } });
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('domain=APPLICATION'))).toBe(true));
+    expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('domain=APPLICATIONS'))).toBe(false);
   });
 
   // EA Repository Production Readiness, item 3.
@@ -237,6 +257,30 @@ describe('RepositoryPage - CRUD', () => {
       const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/ea-repository/assets'));
       expect(postCall).toBeDefined();
       expect(JSON.parse(postCall[1].body).name).toBe('New App');
+    });
+  });
+
+  it('normalizes legacy APPLICATIONS in the edit modal and preserves its Application object type', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': LEGACY_APPLICATIONS_CONFIG,
+      '/ea-repository/assets': [asset({ domain: 'APPLICATIONS', assetType: 'Application' })],
+      '/ea-repository/summary': {},
+      '/ea-repository/object-types/Application/attributes': { attributes: [] },
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('✏'));
+
+    const domainSelect = screen.getByLabelText('Domain *') as HTMLSelectElement;
+    expect(domainSelect.value).toBe('APPLICATION');
+    expect(domainSelect.querySelector('option[value="APPLICATIONS"]')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Asset Type *')).toHaveValue('Application');
+
+    fireEvent.click(screen.getByText('Save Asset'));
+    await waitFor(() => {
+      const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT');
+      expect(putCall).toBeDefined();
+      expect(JSON.parse(putCall[1].body)).toEqual(expect.objectContaining({ domain: 'APPLICATION', assetType: 'Application' }));
     });
   });
 

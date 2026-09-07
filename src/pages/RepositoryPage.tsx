@@ -80,6 +80,27 @@ const SYNCED_ATTRIBUTE_LABELS: Record<string, string> = {
   dataFormat: 'Data Format', dataCategory: 'Data Category', canStoreOutsideKSA: 'Can Store Outside KSA',
 }
 
+// Some tenant framework configurations still expose the legacy plural
+// APPLICATIONS domain. Keep that compatibility at the config boundary so
+// Repository filters and edit payloads consistently use the canonical
+// APPLICATION domain without losing object types stored under the old key.
+function normalizeRepositoryDomain(domain: string): string {
+  return domain === 'APPLICATIONS' ? 'APPLICATION' : domain
+}
+
+function getRepositoryDomains(config: any): string[] {
+  return Array.from(new Set((config?.enabledDomains || []).map(normalizeRepositoryDomain)))
+}
+
+function getRepositoryAssetTypes(config: any, domain: string): string[] {
+  if (!domain) return []
+  const allDomains = config?.allDomains || {}
+  if (domain === 'APPLICATION') {
+    return Array.from(new Set([...(allDomains.APPLICATION || []), ...(allDomains.APPLICATIONS || [])]))
+  }
+  return allDomains[domain] || []
+}
+
 function useApi() {
   const token = () => localStorage.getItem('ea_token')
   const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
@@ -94,12 +115,15 @@ function useApi() {
 }
 
 function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
-  const [form, setForm] = useState(asset || { name: '', nameAr: '', description: '', domain: '', assetType: '', status: 'DRAFT', owner: '', tags: [], metadata: {} })
+  const [form, setForm] = useState(() => {
+    const initialForm = asset || { name: '', nameAr: '', description: '', domain: '', assetType: '', status: 'DRAFT', owner: '', tags: [], metadata: {} }
+    return { ...initialForm, domain: normalizeRepositoryDomain(initialForm.domain) }
+  })
   const [loading, setLoading] = useState(false)
   const set = (k: string) => (e: any) => setForm((f: any) => ({ ...f, [k]: e.target.value }))
   const setMeta = (code: string) => (e: any) => setForm((f: any) => ({ ...f, metadata: { ...(f.metadata || {}), [code]: e.target.value } }))
-  const domains = config?.enabledDomains || []
-  const assetTypes = config?.allDomains?.[form.domain] || []
+  const domains = getRepositoryDomains(config)
+  const assetTypes = getRepositoryAssetTypes(config, form.domain)
 
   // EA Repository Production Readiness, item 5: the form's attribute
   // fields are dynamically driven by the tenant's real Meta Model
@@ -499,7 +523,7 @@ export default function RepositoryPage() {
   // logic below (groupByCycle, the table, the empty state).
   const filtered = assets
 
-  const domains = config?.enabledDomains || []
+  const domains = getRepositoryDomains(config)
   // EA Repository Production Readiness, item 2: object-type filter
   // values come from the tenant Meta Model (config.allDomains, already
   // Meta-Model-driven since Decision 3), not a hardcoded frontend list
@@ -507,7 +531,7 @@ export default function RepositoryPage() {
   // Scoped to the selected domain when one is chosen, otherwise every
   // type across every domain.
   const repoAssetTypes: string[] = selectedDomain !== 'ALL'
-    ? (config?.allDomains?.[selectedDomain] || [])
+    ? getRepositoryAssetTypes(config, selectedDomain)
     : Array.from(new Set(Object.values(config?.allDomains || {}).flat() as string[])).sort()
 
   // Group by cycle
