@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
+import { useAuth } from '../contexts/AuthContext'
 import { api, getToken } from '../lib/api'
+import HelpTip from '../components/HelpTip'
 
 const GOV_API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -14,27 +16,65 @@ const DECISION_COLOR: Record<string, string> = {
   PENDING: '#64748B',
 }
 
+// Confirmed real gap, found while adding platform-wide module stats:
+// this dashboard fetched and displayed ADM/repository/knowledge and
+// governance data unconditionally, with no check against the same
+// permission codes Layout.tsx's own sidebar nav already gates module
+// visibility by. A user without a module's permission would still have
+// their browser fetch and render that module's data here, on the very
+// first page after login - the one place RBAC should be applied before
+// anywhere else, not after. Same permission codes as Layout.tsx's
+// navItems, not duplicated by guessing - kept in sync deliberately, not
+// independently invented, since a mismatch here would silently show or
+// hide the wrong modules relative to the sidebar the user actually sees.
+const MODULE_LINKS: Array<{ to: string; labelKey: string; icon: string; permission: string | null; superadminOnly?: boolean }> = [
+  { to: '/adm',               labelKey: 'nav.adm',         icon: '⚙',  permission: 'Repository.View' },
+  { to: '/governance',        labelKey: 'nav.governance',  icon: '🏛', permission: 'Reviews.View' },
+  { to: '/ea-planning',       labelKey: 'nav.ea_planning',  icon: '🗓', permission: 'Repository.View' },
+  { to: '/innovation',        labelKey: 'nav.innovation',  icon: '🔭', permission: 'Repository.View' },
+  { to: '/strategy',          labelKey: 'nav.strategy',     icon: '🎯', permission: 'Repository.View', superadminOnly: true },
+  { to: '/decision-evaluation', labelKey: 'nav.decision_evaluation', icon: '⚖', permission: 'Reviews.View', superadminOnly: true },
+  { to: '/meta-model',        labelKey: 'nav.meta_model',   icon: '🧩', permission: 'MetaModel.View' },
+  { to: '/ea-views',          labelKey: 'nav.ea_views',     icon: '🗺', permission: 'Views.View' },
+  { to: '/connector-hub',     labelKey: 'nav.connector_hub', icon: '🔌', permission: 'Repository.View', superadminOnly: true },
+  { to: '/repository',        labelKey: 'nav.repository',  icon: '🗄', permission: 'Repository.View' },
+  { to: '/knowledge',         labelKey: 'nav.knowledge',   icon: '📚', permission: 'Repository.View' },
+]
+
 export default function DashboardPage() {
   const nav = useNavigate()
   const { t, isAR } = useLang()
+  const { hasPermission } = useAuth()
   const [cycles, setCycles] = useState<any[]>([])
   const [capabilities, setCapabilities] = useState<any[]>([])
   const [docs, setDocs] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
   const [govStats, setGovStats] = useState<any>(null)
 
+  const canViewRepository = hasPermission('Repository.View')
+  const canViewReviews = hasPermission('Reviews.View')
+
   useEffect(() => {
-    api.getCycles().then(setCycles).catch(() => {})
-    api.getCapabilities().then(setCapabilities).catch(() => {})
-    api.getDocuments().then(setDocs).catch(() => {})
-    const token = getToken() || ''
-    // Load reviews list for recent reviews section
-    fetch(GOV_API + '/governance/reviews?page=1&limit=10', { headers: { Authorization: 'Bearer ' + token } })
-      .then(r => r.json()).then((r: any) => setReviews(Array.isArray(r?.data) ? r.data : (Array.isArray(r) ? r : []))).catch(() => {})
-    // Load aggregated stats from dedicated endpoint
-    fetch(GOV_API + '/governance/stats', { headers: { Authorization: 'Bearer ' + token } })
-      .then(r => r.json()).then(setGovStats).catch(() => {})
-  }, [])
+    // RBAC applied before fetching, not only before displaying - a user
+    // without a module's permission never has their browser request
+    // that module's data in the first place, matching Layout.tsx's own
+    // sidebar visibility rules rather than relying on the backend alone
+    // to reject an unauthorized request after the fact.
+    if (canViewRepository) {
+      api.getCycles().then(setCycles).catch(() => {})
+      api.getCapabilities().then(setCapabilities).catch(() => {})
+      api.getDocuments().then(setDocs).catch(() => {})
+    }
+    if (canViewReviews) {
+      const token = getToken() || ''
+      // Load reviews list for recent reviews section
+      fetch(GOV_API + '/governance/reviews?page=1&limit=10', { headers: { Authorization: 'Bearer ' + token } })
+        .then(r => r.json()).then((r: any) => setReviews(Array.isArray(r?.data) ? r.data : (Array.isArray(r) ? r : []))).catch(() => {})
+      // Load aggregated stats from dedicated endpoint
+      fetch(GOV_API + '/governance/stats', { headers: { Authorization: 'Bearer ' + token } })
+        .then(r => r.json()).then(setGovStats).catch(() => {})
+    }
+  }, [canViewRepository, canViewReviews])
 
   const activeCycles = cycles.filter(c => c.status === 'ACTIVE').length
   const readyDocs = docs.filter(d => d.status === 'READY').length
@@ -69,23 +109,48 @@ export default function DashboardPage() {
 
         {/* Platform stats */}
         <div className="grid-4 mb-6">
-          <div className="stat-card"><div className="stat-value">{cycles.length}</div><div className="stat-label">{t('dash.adm_cycles')}</div><div className="stat-delta">{activeCycles} {t('dash.active')}</div></div>
-          <div className="stat-card"><div className="stat-value">{capabilities.length}</div><div className="stat-label">{t('dash.capabilities')}</div></div>
-          <div className="stat-card"><div className="stat-value">{docs.length}</div><div className="stat-label">{t('dash.documents')}</div><div className="stat-delta">{readyDocs} {t('dash.indexed')}</div></div>
-          <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => nav('/governance')}>
-            <div className="stat-value">{statsTotal}</div>
-            <div className="stat-label">{t('gov.reviews')}</div>
-            <div className="stat-delta" style={{ color: statsPending > 0 ? '#f39c12' : 'var(--success)' }}>
-              {statsPending} {t('gov.pending')}
+          {canViewRepository && <>
+            <div className="stat-card"><div className="stat-value">{cycles.length}</div><div className="stat-label">{t('dash.adm_cycles')}</div><div className="stat-delta">{activeCycles} {t('dash.active')}</div></div>
+            <div className="stat-card"><div className="stat-value">{capabilities.length}</div><div className="stat-label">{t('dash.capabilities')}</div></div>
+            <div className="stat-card"><div className="stat-value">{docs.length}</div><div className="stat-label">{t('dash.documents')}</div><div className="stat-delta">{readyDocs} {t('dash.indexed')}</div></div>
+          </>}
+          {canViewReviews && (
+            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => nav('/governance')}>
+              <div className="stat-value">{statsTotal}</div>
+              <div className="stat-label">{t('gov.reviews')}</div>
+              <div className="stat-delta" style={{ color: statsPending > 0 ? '#f39c12' : 'var(--success)' }}>
+                {statsPending} {t('gov.pending')}
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* Your Modules — RBAC-aware overview: only modules the current
+            account has permission to access, matching the sidebar's own
+            visibility rules exactly (same permission codes, kept in
+            sync deliberately). */}
+        <div className="card mb-6">
+          <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
+            <div className="section-title">{t('dash.your_modules')}<HelpTip text={t('dash.your_modules_help')} /></div>
+          </div>
+          <div className="stat-grid-4">
+            {MODULE_LINKS.filter(m => m.permission === null || hasPermission(m.permission)).map(m => (
+              <div key={m.to} onClick={() => nav(m.to)} style={{
+                cursor: 'pointer', background: 'var(--navy-dark)', borderRadius: 8, padding: '12px 14px',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <span style={{ fontSize: 18 }}>{m.icon}</span>
+                <span style={{ fontSize: 12, fontWeight: 500 }}>{t(m.labelKey)}</span>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Governance Dashboard */}
-        {statsTotal > 0 && (
+        {canViewReviews && statsTotal > 0 && (
           <div className="card mb-6">
             <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
-              <div className="section-title">🏛 {t('gov.dashboard')}</div>
+              <div className="section-title">🏛 {t('gov.dashboard')}<HelpTip text={t('gov.dashboard_help')} /></div>
               <button onClick={() => nav('/governance')} style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
                 {t('gov.view_all')} →
               </button>
@@ -96,7 +161,7 @@ export default function DashboardPage() {
               {[
                 { label: t('gov.total_reviews'), value: statsTotal, sub: statsComplete + ' completed', color: '#64748B' },
                 { label: t('gov.avg_score'), value: statsAvgScore || '—', sub: scoreAvgs ? `C:${scoreAvgs.compliance} S:${scoreAvgs.strategic} R:${scoreAvgs.risk}` : '', color: statsAvgScore >= 70 ? '#2ecc71' : statsAvgScore >= 50 ? '#f39c12' : '#e74c3c' },
-                { label: 'Open Findings', value: statsOpenFindings, sub: statsCriticalOpen > 0 ? statsCriticalOpen + ' critical' : 'none critical', color: statsCriticalOpen > 0 ? '#e74c3c' : '#2ecc71' },
+                { label: t('gov.open_findings'), value: statsOpenFindings, sub: statsCriticalOpen > 0 ? statsCriticalOpen + ' ' + t('common.critical').toLowerCase() : t('gov.none_critical'), color: statsCriticalOpen > 0 ? '#e74c3c' : '#2ecc71' },
               ].map((s: any) => (
                 <div key={s.label} style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
                   <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
@@ -159,7 +224,7 @@ export default function DashboardPage() {
             {/* Score trend from monthly stats */}
             {monthlyTrend.length > 0 && monthlyTrend.some((m: any) => m.count > 0) && (
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.score_trend')} (last 6 months)</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.score_trend')} ({t('gov.last_6_months')})</div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 60 }}>
                   {monthlyTrend.map((m: any, i: number) => {
                     const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any) => x.count), 1)) * 48))
@@ -219,26 +284,28 @@ export default function DashboardPage() {
         )}
 
         <div className="grid-2 mb-6">
-          <div className="card">
-            <div className="section-title">⚙ {t('dash.active_cycles')}</div>
-            {cycles.length === 0
-              ? <div className="empty" style={{ padding: '24px 0' }}><div className="empty-title">{t('dash.no_cycles')}</div><button className="btn btn-primary btn-sm mt-4" onClick={() => nav('/adm')}>{t('dash.create_cycle')}</button></div>
-              : cycles.slice(0, 4).map(c => (
-                <div key={c.id} className="flex items-center justify-between" style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                  <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div><div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>Phase {c.currentPhase} · {c.frameworkType}</div></div>
-                  <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
-                </div>
-              ))
-            }
-          </div>
+          {canViewRepository && (
+            <div className="card">
+              <div className="section-title">⚙ {t('dash.active_cycles')}</div>
+              {cycles.length === 0
+                ? <div className="empty" style={{ padding: '24px 0' }}><div className="empty-title">{t('dash.no_cycles')}</div><button className="btn btn-primary btn-sm mt-4" onClick={() => nav('/adm')}>{t('dash.create_cycle')}</button></div>
+                : cycles.slice(0, 4).map(c => (
+                  <div key={c.id} className="flex items-center justify-between" style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                    <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div><div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>Phase {c.currentPhase} · {c.frameworkType}</div></div>
+                    <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
+                  </div>
+                ))
+              }
+            </div>
+          )}
           <div className="card">
             <div className="section-title">{t('dash.quick_actions')}</div>
             {[
-              { icon: '⚙', label: t('qa.adm'), sub: t('qa.adm_sub'), path: '/adm' },
-              { icon: '💬', label: t('qa.copilot'), sub: t('qa.copilot_sub'), path: '/copilot' },
-              { icon: '🗄', label: t('qa.repo'), sub: t('qa.repo_sub'), path: '/repository' },
-              { icon: '🏛', label: t('gov.dashboard'), sub: t('gov.start_review'), path: '/governance' },
-            ].map(a => (
+              { icon: '⚙', label: t('qa.adm'), sub: t('qa.adm_sub'), path: '/adm', permission: 'Repository.View' },
+              { icon: '💬', label: t('qa.copilot'), sub: t('qa.copilot_sub'), path: '/copilot', permission: 'AIArchitect.Use' },
+              { icon: '🗄', label: t('qa.repo'), sub: t('qa.repo_sub'), path: '/repository', permission: 'Repository.View' },
+              { icon: '🏛', label: t('gov.dashboard'), sub: t('gov.start_review'), path: '/governance', permission: 'Reviews.View' },
+            ].filter(a => hasPermission(a.permission)).map(a => (
               <button key={a.path} onClick={() => nav(a.path)} style={{ width: '100%', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'start', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 20 }}>{a.icon}</span>
                 <div><div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{a.label}</div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.sub}</div></div>

@@ -105,6 +105,23 @@ button { cursor: pointer; font-family: var(--font-body) }
 .card-subtitle { font-size:11px; color:var(--text-dim); font-family:var(--font-mono) }
 .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px }
 .grid-4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px }
+
+/* Confirmed real gap, found while improving DashboardPage: unlike
+   .stat-grid-3/4/5/6 above, .grid-2/.grid-4 never got the same
+   responsive treatment - a fixed repeat(4,1fr) squeezes unreadably
+   narrow on a phone instead of reflowing, same root problem the
+   stat-grid-* comment above already describes, just left unfixed here.
+   Affects 5 pages (DashboardPage, GovernancePage, EaPlanningPage,
+   ReportsPage, ConnectorHubPage) using .grid-4, and grid-2's 10 usages
+   across 4 files - fixed once here rather than per-page, matching how
+   stat-grid-* itself is a single, shared utility. Same breakpoints as
+   stat-grid-* for consistency across the platform. */
+@media (max-width: 900px) {
+  .grid-4 { grid-template-columns:repeat(2,1fr) }
+}
+@media (max-width: 600px) {
+  .grid-2, .grid-4 { grid-template-columns:1fr }
+}
 .stat-card { background:var(--navy-light); border:1px solid var(--border); border-radius:var(--radius); padding:20px; position:relative; overflow:hidden; box-shadow:var(--shadow-sm) }
 .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--accent) }
 .stat-value { font-family:var(--font-display); font-size:32px; font-weight:700; line-height:1 }

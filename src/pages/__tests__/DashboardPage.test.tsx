@@ -13,6 +13,13 @@ jest.mock('../../contexts/LangContext', () => ({
   }),
 }));
 
+const mockHasPermission = jest.fn((_code: string) => true);
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({
+    hasPermission: (code: string) => mockHasPermission(code),
+  }),
+}));
+
 const mockGetCycles = jest.fn();
 const mockGetCapabilities = jest.fn();
 const mockGetDocuments = jest.fn();
@@ -27,6 +34,7 @@ jest.mock('../../lib/api', () => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockHasPermission.mockReturnValue(true);
   mockGetCycles.mockResolvedValue([]);
   mockGetCapabilities.mockResolvedValue([]);
   mockGetDocuments.mockResolvedValue([]);
@@ -120,5 +128,88 @@ describe('DashboardPage', () => {
     });
     render(<DashboardPage />);
     expect(await screen.findByText('gov.dashboard')).toBeInTheDocument();
+  });
+
+  // Confirmed real gap, found while improving this page: "Open Findings",
+  // "X critical"/"none critical", and "(last 6 months)" were hardcoded
+  // English literals, not routed through t() - inconsistent with every
+  // other label on this page and with the platform's AR/EN convention.
+  it('uses translated labels for open-findings/critical-count/score-trend-period, not hardcoded English literals', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve({ data: [{ status: 'COMPLETED', title: 'R1', createdAt: new Date().toISOString() }] }) });
+      if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve({
+        summary: { totalReviews: 1, completedReviews: 1, openFindings: 3, criticalOpenFindings: 1 },
+        monthlyTrend: [{ label: 'Jan', count: 1, avgScore: 80 }],
+      }) });
+      return Promise.resolve({ json: () => Promise.resolve({}) });
+    });
+    render(<DashboardPage />);
+    expect(await screen.findByText('gov.open_findings')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === '1 common.critical'.toLowerCase() || el?.textContent === '1 common.critical')).toBeInTheDocument();
+    expect(screen.getByText(/gov.score_trend/)).toHaveTextContent('gov.last_6_months');
+  });
+
+  // Standing policy: every new page or feature includes a help tip
+  // explaining the feature in plain language - retrofitted here since
+  // the governance dashboard section had none.
+  it('shows a help tip explaining the governance dashboard stats, once the section renders', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve({ data: [{ status: 'COMPLETED' }] }) });
+      if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve({ summary: { totalReviews: 1 } }) });
+      return Promise.resolve({ json: () => Promise.resolve({}) });
+    });
+    render(<DashboardPage />);
+    await screen.findByText('gov.open_findings');
+    expect(screen.getAllByRole('button', { name: 'common.more_info' }).length).toBeGreaterThanOrEqual(1);
+  });
+
+  // "Put into consideration rbac for showing data" — the core of this
+  // round of changes: a user without a module's permission should never
+  // see (or have their browser fetch) that module's data here, matching
+  // the exact permission codes Layout.tsx's sidebar already gates
+  // module visibility by.
+  it('does not fetch or display repository-gated data (cycles/capabilities/documents) when the user lacks Repository.View', async () => {
+    mockHasPermission.mockImplementation((code: string) => code !== 'Repository.View');
+    render(<DashboardPage />);
+    await waitFor(() => expect(mockGetCycles).not.toHaveBeenCalled());
+    expect(mockGetCapabilities).not.toHaveBeenCalled();
+    expect(mockGetDocuments).not.toHaveBeenCalled();
+    expect(screen.queryByText('dash.adm_cycles')).not.toBeInTheDocument();
+    expect(screen.queryByText('dash.active_cycles')).not.toBeInTheDocument();
+  });
+
+  it('does not fetch or display governance review data when the user lacks Reviews.View', async () => {
+    mockHasPermission.mockImplementation((code: string) => code !== 'Reviews.View');
+    const fetchSpy = global.fetch as jest.Mock;
+    render(<DashboardPage />);
+    await waitFor(() => expect(mockGetCycles).toHaveBeenCalled()); // repository data still loads
+    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/governance/reviews'), expect.anything());
+    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/governance/stats'), expect.anything());
+    expect(screen.queryByText('gov.reviews')).not.toBeInTheDocument();
+  });
+
+  it('"Your Modules" only shows modules the user has permission for, filtering out the rest — same codes as the sidebar nav', async () => {
+    mockHasPermission.mockImplementation((code: string) => code === 'Repository.View');
+    render(<DashboardPage />);
+    expect(await screen.findByText('dash.your_modules')).toBeInTheDocument();
+    expect(screen.getByText('nav.adm')).toBeInTheDocument(); // Repository.View — shown
+    expect(screen.queryByText('nav.governance')).not.toBeInTheDocument(); // Reviews.View — hidden
+    expect(screen.queryByText('nav.meta_model')).not.toBeInTheDocument(); // MetaModel.View — hidden
+  });
+
+  it('a user with every permission sees every module in "Your Modules"', async () => {
+    render(<DashboardPage />);
+    expect(await screen.findByText('dash.your_modules')).toBeInTheDocument();
+    expect(screen.getByText('nav.adm')).toBeInTheDocument();
+    expect(screen.getByText('nav.governance')).toBeInTheDocument();
+    expect(screen.getByText('nav.meta_model')).toBeInTheDocument();
+    expect(screen.getByText('nav.ea_views')).toBeInTheDocument();
+  });
+
+  it('clicking a module card navigates to its page', async () => {
+    render(<DashboardPage />);
+    const admCard = await screen.findByText('nav.adm');
+    fireEvent.click(admCard);
+    expect(mockNavigate).toHaveBeenCalledWith('/adm');
   });
 });
