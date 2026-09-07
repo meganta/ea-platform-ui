@@ -44,15 +44,32 @@ const MODULE_LINKS: Array<{ to: string; labelKey: string; icon: string; permissi
 export default function DashboardPage() {
   const nav = useNavigate()
   const { t, isAR } = useLang()
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
   const [cycles, setCycles] = useState<any[]>([])
   const [capabilities, setCapabilities] = useState<any[]>([])
   const [docs, setDocs] = useState<any[]>([])
   const [reviews, setReviews] = useState<any[]>([])
   const [govStats, setGovStats] = useState<any>(null)
+  // One state slot per module beyond governance/repository, each filled
+  // only when the user actually has that module's permission (and, for
+  // superadmin-only modules, only when the user IS superadmin) - see
+  // moduleState below for the exact per-module gating and fetch.
+  const [innovationIdeas, setInnovationIdeas] = useState<any[] | null>(null)
+  const [strategyObjectives, setStrategyObjectives] = useState<any[] | null>(null)
+  const [decisions, setDecisions] = useState<any[] | null>(null)
+  const [metaModelTypes, setMetaModelTypes] = useState<any[] | null>(null)
+  const [eaViewsStats, setEaViewsStats] = useState<any>(null)
+  const [connectorStats, setConnectorStats] = useState<any>(null)
+  const [planningDashboard, setPlanningDashboard] = useState<any>(null)
 
   const canViewRepository = hasPermission('Repository.View')
   const canViewReviews = hasPermission('Reviews.View')
+  const isSuperadmin = user?.role === 'SUPERADMIN'
+  const canViewStrategy = canViewRepository && isSuperadmin // matches Layout.tsx: Repository.View + superadminOnly
+  const canViewDecisionEval = canViewReviews && isSuperadmin // matches Layout.tsx: Reviews.View + superadminOnly
+  const canViewConnectors = canViewRepository && isSuperadmin // matches Layout.tsx: Repository.View + superadminOnly
+  const canViewMetaModel = hasPermission('MetaModel.View')
+  const canViewEaViews = hasPermission('Views.View')
 
   useEffect(() => {
     // RBAC applied before fetching, not only before displaying - a user
@@ -74,7 +91,50 @@ export default function DashboardPage() {
       fetch(GOV_API + '/governance/stats', { headers: { Authorization: 'Bearer ' + token } })
         .then(r => r.json()).then(setGovStats).catch(() => {})
     }
-  }, [canViewRepository, canViewReviews])
+    // Each module below uses the SAME verified endpoint its own page
+    // fetches (InnovationPage/StrategyPage/DecisionEvaluationPage/
+    // MetaModelPage/EaViewsPage/ConnectorHubPage/EaPlanningPage - checked
+    // directly against each page's own code before wiring this, not
+    // guessed) - never a new, unverified endpoint invented for this
+    // dashboard specifically.
+    const token = getToken() || ''
+    const authGet = (path: string) => fetch(GOV_API + path, { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json())
+    if (canViewRepository) {
+      authGet('/innovation/ideas').then((d: any) => setInnovationIdeas(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
+      authGet('/ea-planning/dashboard').then(setPlanningDashboard).catch(() => {})
+    }
+    if (canViewStrategy) {
+      authGet('/strategy').then((d: any) => setStrategyObjectives(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
+    }
+    if (canViewDecisionEval) {
+      authGet('/decision-evaluation').then((d: any) => setDecisions(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
+    }
+    if (canViewMetaModel) {
+      authGet('/meta-model/object-types').then((d: any) => setMetaModelTypes(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
+    }
+    if (canViewEaViews) {
+      authGet('/ea-views/stats').then(setEaViewsStats).catch(() => {})
+    }
+    if (canViewConnectors) {
+      authGet('/connectors/stats').then(setConnectorStats).catch(() => {})
+    }
+  }, [canViewRepository, canViewReviews, canViewStrategy, canViewDecisionEval, canViewMetaModel, canViewEaViews, canViewConnectors])
+
+  // Real per-module state, not fabricated placeholders - null (not
+  // shown at all) for a module never fetched (no permission), a real
+  // number once its fetch resolves. Limited to modules that don't
+  // already have a dedicated card in the "Platform stats" row above
+  // (ADM/repository/knowledge/governance) - showing the same count
+  // twice on one page would be redundant, not more informative.
+  const moduleState: Record<string, { value: string; sub?: string } | null> = {
+    '/innovation':           innovationIdeas === null ? null : { value: String(innovationIdeas.length), sub: t('dash.mod_ideas') },
+    '/strategy':             strategyObjectives === null ? null : { value: String(strategyObjectives.length), sub: t('dash.mod_objectives') },
+    '/decision-evaluation':  decisions === null ? null : { value: String(decisions.length), sub: t('dash.mod_decisions') },
+    '/meta-model':           metaModelTypes === null ? null : { value: String(metaModelTypes.length), sub: t('dash.mod_object_types') },
+    '/ea-views':             eaViewsStats === null ? null : { value: String(eaViewsStats.total ?? 0), sub: t('dash.mod_views') },
+    '/connector-hub':        connectorStats === null ? null : { value: String(connectorStats.pendingConflicts ?? 0), sub: t('dash.mod_conflicts') },
+    '/ea-planning':          planningDashboard === null ? null : { value: String(planningDashboard.total ?? 0), sub: t('dash.mod_plans') },
+  }
 
   const activeCycles = cycles.filter(c => c.status === 'ACTIVE').length
   const readyDocs = docs.filter(d => d.status === 'READY').length
@@ -134,15 +194,23 @@ export default function DashboardPage() {
             <div className="section-title">{t('dash.your_modules')}<HelpTip text={t('dash.your_modules_help')} /></div>
           </div>
           <div className="stat-grid-4">
-            {MODULE_LINKS.filter(m => m.permission === null || hasPermission(m.permission)).map(m => (
-              <div key={m.to} onClick={() => nav(m.to)} style={{
-                cursor: 'pointer', background: 'var(--navy-dark)', borderRadius: 8, padding: '12px 14px',
-                display: 'flex', alignItems: 'center', gap: 10,
-              }}>
-                <span style={{ fontSize: 18 }}>{m.icon}</span>
-                <span style={{ fontSize: 12, fontWeight: 500 }}>{t(m.labelKey)}</span>
-              </div>
-            ))}
+            {MODULE_LINKS
+              .filter(m => (m.permission === null || hasPermission(m.permission)) && (!m.superadminOnly || isSuperadmin))
+              .map(m => {
+                const state = moduleState[m.to]
+                return (
+                  <div key={m.to} onClick={() => nav(m.to)} style={{
+                    cursor: 'pointer', background: 'var(--navy-dark)', borderRadius: 8, padding: '12px 14px',
+                    display: 'flex', alignItems: 'center', gap: 10,
+                  }}>
+                    <span style={{ fontSize: 18 }}>{m.icon}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>{t(m.labelKey)}</div>
+                      {state && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1 }}>{state.value} {state.sub}</div>}
+                    </div>
+                  </div>
+                )
+              })}
           </div>
         </div>
 

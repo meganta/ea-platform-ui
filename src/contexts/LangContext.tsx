@@ -93,6 +93,13 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'nav.connector_hub': { EN: 'Connectors', AR: 'الموصلات' },
   'dash.your_modules': { EN: 'Your Modules', AR: 'وحداتك' },
   'dash.your_modules_help': { EN: 'Shows only the modules your account has permission to access - the same access rules used across the platform.', AR: 'تعرض فقط الوحدات التي يملك حسابك صلاحية الوصول إليها - وفق نفس قواعد الصلاحيات المعتمدة في المنصة.' },
+  'dash.mod_ideas':       { EN: 'ideas', AR: 'أفكار' },
+  'dash.mod_objectives':  { EN: 'objectives', AR: 'أهداف' },
+  'dash.mod_decisions':   { EN: 'decisions', AR: 'قرارات' },
+  'dash.mod_object_types': { EN: 'object types', AR: 'أنواع الكائنات' },
+  'dash.mod_views':       { EN: 'views', AR: 'مخططات' },
+  'dash.mod_conflicts':   { EN: 'pending conflicts', AR: 'تعارضات معلقة' },
+  'dash.mod_plans':       { EN: 'plans', AR: 'خطط' },
   'nav.setup':         { EN: 'Setup Assistant', AR: 'مساعد الإعداد' },
   'nav.admin':         { EN: 'Admin', AR: 'الإدارة' },
   // Auth

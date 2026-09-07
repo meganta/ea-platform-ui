@@ -14,9 +14,11 @@ jest.mock('../../contexts/LangContext', () => ({
 }));
 
 const mockHasPermission = jest.fn((_code: string) => true);
+let mockUser: any = { role: 'SUPERADMIN' };
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({
     hasPermission: (code: string) => mockHasPermission(code),
+    user: mockUser,
   }),
 }));
 
@@ -35,6 +37,7 @@ jest.mock('../../lib/api', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockHasPermission.mockReturnValue(true);
+  mockUser = { role: 'SUPERADMIN' };
   mockGetCycles.mockResolvedValue([]);
   mockGetCapabilities.mockResolvedValue([]);
   mockGetDocuments.mockResolvedValue([]);
@@ -211,5 +214,52 @@ describe('DashboardPage', () => {
     const admCard = await screen.findByText('nav.adm');
     fireEvent.click(admCard);
     expect(mockNavigate).toHaveBeenCalledWith('/adm');
+  });
+
+  // Confirmed real gap, found and fixed while adding module state: the
+  // filter previously checked only hasPermission(), ignoring
+  // superadminOnly entirely - unlike Layout.tsx's own sidebar nav,
+  // which checks both. A non-superadmin user with Repository.View could
+  // have seen Strategy/Connector-Hub cards the sidebar itself would
+  // hide for that same user.
+  it('hides superadminOnly modules (Strategy, Decision & Evaluation, Connectors) for a non-superadmin user, even with the underlying permission granted', async () => {
+    mockUser = { role: 'TENANT_ADMIN' };
+    render(<DashboardPage />);
+    await screen.findByText('dash.your_modules');
+    expect(screen.queryByText('nav.strategy')).not.toBeInTheDocument();
+    expect(screen.queryByText('nav.decision_evaluation')).not.toBeInTheDocument();
+    expect(screen.queryByText('nav.connector_hub')).not.toBeInTheDocument();
+    // Non-superadmin-only modules are unaffected
+    expect(screen.getByText('nav.adm')).toBeInTheDocument();
+  });
+
+  it('shows superadminOnly modules for an actual SUPERADMIN user with the underlying permission', async () => {
+    mockUser = { role: 'SUPERADMIN' };
+    render(<DashboardPage />);
+    await screen.findByText('dash.your_modules');
+    expect(screen.getByText('nav.strategy')).toBeInTheDocument();
+    expect(screen.getByText('nav.connector_hub')).toBeInTheDocument();
+  });
+
+  // "Build the dashboard state for all modules based on rbac" — the
+  // module cards now show real counts from each module's own verified
+  // endpoint (the same one its own page fetches), not just a link.
+  it('shows real module state (a count fetched from each module\'s own endpoint) once loaded, for an RBAC-visible module', async () => {
+    (global.fetch as jest.Mock).mockImplementation((url: string) => {
+      if (url.includes('/innovation/ideas')) return Promise.resolve({ json: () => Promise.resolve([{ id: '1' }, { id: '2' }, { id: '3' }]) });
+      return Promise.resolve({ json: () => Promise.resolve({}) });
+    });
+    render(<DashboardPage />);
+    await screen.findByText('dash.your_modules');
+    expect(await screen.findByText((_, el) => el?.textContent === '3 dash.mod_ideas')).toBeInTheDocument();
+  });
+
+  it('does not fetch a superadminOnly module\'s state for a non-superadmin user, even with the underlying permission', async () => {
+    mockUser = { role: 'TENANT_ADMIN' };
+    const fetchSpy = global.fetch as jest.Mock;
+    render(<DashboardPage />);
+    await screen.findByText('dash.your_modules');
+    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/strategy'), expect.anything());
+    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/connectors/stats'), expect.anything());
   });
 });
