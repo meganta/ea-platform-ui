@@ -15,18 +15,19 @@ function useApi() {
 }
 
 interface EvidenceItem {
-  sourceType: 'EA_ASSET' | 'GOVERNANCE_REVIEW'
+  sourceType: 'EA_ASSET' | 'EA_RELATIONSHIP' | 'DERIVED_PATH' | 'GOVERNANCE_REVIEW' | 'DOCUMENT'
+  groundingType?: 'REPOSITORY_FACT' | 'REPOSITORY_RELATIONSHIP' | 'DERIVED_PATH' | 'DOCUMENT_EVIDENCE'
   sourceId: string
   title: string
   excerpt: string
   assetType?: string
   domain?: string | null
-  version: string | null
-  status: string
-  validityClassification: 'CURRENT' | 'FUTURE' | 'EXPIRED' | 'SUPERSEDED' | 'UNKNOWN'
+  version?: string | null
+  status?: string
+  validityClassification?: 'CURRENT' | 'FUTURE' | 'EXPIRED' | 'SUPERSEDED' | 'UNKNOWN'
   sourceAuthorityLevel: 'AUTHORITATIVE' | 'ADVISORY' | 'HISTORICAL' | 'UNVALIDATED'
-  effectiveFrom: string | null
-  effectiveUntil: string | null
+  effectiveFrom?: string | null
+  effectiveUntil?: string | null
   retrievalReason: string
   score: number
   targetRef: { type: string; id: string }
@@ -46,15 +47,29 @@ const AUTHORITY_STYLE: Record<EvidenceItem['sourceAuthorityLevel'], { bg: string
   UNVALIDATED: { bg: 'rgba(249,115,22,0.15)', fg: '#f97316', label: 'Validity Unknown' },
 }
 
-function openEvidenceSource(item: EvidenceItem) {
+function evidenceSourceUrl(item: EvidenceItem): string | null {
   // Real deep link for EA_ASSET (RepositoryPage reads ?assetId= and opens
   // the actual asset detail modal - see that page's own change). No
   // equivalent query-param handling exists yet on GovernancePage, so a
   // GOVERNANCE_REVIEW item opens the review list rather than a fake/
   // non-functional deep link to the specific review - a real follow-up,
   // not silently pretended to already work.
-  if (item.sourceType === 'EA_ASSET') window.open(`/repository?assetId=${item.sourceId}`, '_blank')
-  else window.open('/governance', '_blank')
+  if (item.targetRef?.type === 'EA_ASSET' || item.sourceType === 'EA_ASSET') return `/repository?assetId=${item.targetRef?.id || item.sourceId}`
+  if (item.sourceType === 'GOVERNANCE_REVIEW') return '/governance'
+  return null
+}
+
+function openEvidenceSource(item: EvidenceItem) {
+  const url = evidenceSourceUrl(item)
+  if (url) window.open(url, '_blank')
+}
+
+function evidenceTypeLabel(item: EvidenceItem): string {
+  if (item.groundingType === 'REPOSITORY_RELATIONSHIP' || item.sourceType === 'EA_RELATIONSHIP') return 'Repository relationship'
+  if (item.groundingType === 'DERIVED_PATH' || item.sourceType === 'DERIVED_PATH') return 'Derived repository path'
+  if (item.sourceType === 'DOCUMENT') return 'Tenant document'
+  if (item.sourceType === 'GOVERNANCE_REVIEW') return 'Governance review'
+  return `EA Repository · ${item.assetType || 'Asset'}`
 }
 
 // Escapes regex special characters in an evidence title before building a
@@ -91,6 +106,8 @@ function renderContentWithCitations(content: string, evidence?: EvidenceItem[]):
   return parts.map((part, i) => {
     const matched = candidates.find(e => e.title.toLowerCase() === part.toLowerCase())
     if (!matched) return part
+    const sourceUrl = evidenceSourceUrl(matched)
+    if (!sourceUrl) return part
     return (
       <span
         key={i}
@@ -125,8 +142,8 @@ function EvidenceDrawer({ evidence }: { evidence?: EvidenceItem[] }) {
                 </div>
                 <div style={{ color: 'var(--text-dim)', marginTop: 3, fontSize: 11.5, lineHeight: 1.5 }}>{item.excerpt}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>{item.sourceType === 'EA_ASSET' ? (item.assetType || 'Asset') : 'Governance Review'}</span>
-                  <button onClick={() => openEvidenceSource(item)} style={{ fontSize: 10.5, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View source →</button>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>{evidenceTypeLabel(item)}</span>
+                  {evidenceSourceUrl(item) && <button onClick={() => openEvidenceSource(item)} style={{ fontSize: 10.5, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View source →</button>}
                 </div>
               </div>
             )
@@ -748,6 +765,7 @@ export default function CopilotPage() {
         architectName: m.architectCode ? (archMap[m.architectCode]?.name || m.architectCode) : undefined,
         architectAvatar: m.architectCode ? (archMap[m.architectCode]?.avatar || '🤖') : undefined,
         timestamp: new Date(m.createdAt),
+        evidence: Array.isArray(m.evidenceRefs) ? m.evidenceRefs : undefined,
       })))
       setActiveConvId(convId)
     }
