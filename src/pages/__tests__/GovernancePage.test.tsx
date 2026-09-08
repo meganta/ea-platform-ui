@@ -435,3 +435,41 @@ describe('GovernancePage - report view: Domains & Findings tab, evidence validit
     await screen.findByText('Legacy Standard');
   });
 });
+
+describe('GovernancePage - report view: READY_FOR_REVIEW status must not be shown as a finalized decision (UI/DOCX consistency)', () => {
+  function makeReport(overrides: Partial<Record<string, any>> = {}) {
+    return {
+      decision: 'APPROVED_WITH_CONDITIONS', decisionRationale: 'Conditional approval pending resolution.',
+      executiveSummary: 'Summary text.', overallScore: 80,
+      strategicAlignment: { overallAlignmentPercentage: 60, objectives: [] },
+      financialOpportunities: { opportunities: [] },
+      ...overrides,
+    };
+  }
+
+  // Confirmed real gap, found while investigating a reported UI issue
+  // (the review-submission screen never navigating to the finished
+  // report): the decision box always showed the raw report.decision,
+  // regardless of review.status - "the cover and UI must display
+  // 'REQUIRES MANUAL REVIEW', not 'APPROVED WITH CONDITIONS'" was
+  // already fixed on the DOCX/export side, but never ported here.
+  it('shows "REQUIRES MANUAL REVIEW" as the primary decision-box label when the review status is READY_FOR_REVIEW, not the raw architectural decision', async () => {
+    const review = makeReview({ id: 'r1', status: 'READY_FOR_REVIEW', decision: 'APPROVED_WITH_CONDITIONS' });
+    mockReportView(review, makeReport());
+    render(<GovernancePage />);
+
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    expect(await screen.findByText((_, el) => el?.textContent === '⚠ gov.requires_manual_review')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === 'gov.proposed_decision: APPROVED WITH CONDITIONS')).toBeInTheDocument();
+  });
+
+  it('shows the raw decision as the primary label (unchanged) for a genuinely COMPLETED review', async () => {
+    const review = makeReview({ id: 'r1', status: 'COMPLETED', decision: 'APPROVED_WITH_CONDITIONS' });
+    mockReportView(review, makeReport());
+    render(<GovernancePage />);
+
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    expect(await screen.findByText('APPROVED WITH CONDITIONS')).toBeInTheDocument();
+    expect(screen.queryByText('gov.requires_manual_review')).not.toBeInTheDocument();
+  });
+});

@@ -577,10 +577,22 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
     engineTimerRef.current = setInterval(tickEngine, 7000)
 
     // Poll for completion — also detect DRAFT (pipeline crashed after start)
+    // Confirmed real bug, traced directly: this only ever checked for
+    // 'COMPLETED', never 'READY_FOR_REVIEW' - a status this same
+    // pipeline can finish in when an approval condition or executive-
+    // summary statement fails validation (backend governance work,
+    // checkpoint 29/31 era). A review finishing in that state has a
+    // real, finished report - it was never a crash, never a reason to
+    // keep polling - but this loop had no branch for it at all, so it
+    // matched neither COMPLETED nor DRAFT and polled every 4 seconds
+    // forever, leaving the UI stuck on this screen indefinitely. The
+    // user had to navigate back to the review list and reopen the
+    // review manually to see anything, since THAT code path (loading an
+    // existing review by id) was never gated on status the same way.
     let staleDraftCount = 0
     pollRef.current = setInterval(async () => {
       const r = await api.get('/governance/reviews/' + review.id).catch(() => null)
-      if (r?.status === 'COMPLETED') {
+      if (r?.status === 'COMPLETED' || r?.status === 'READY_FOR_REVIEW') {
         clearInterval(pollRef.current)
         clearInterval(engineTimerRef.current)
         setEngines(prev => prev.map(e => ({ ...e, done: true })))
@@ -1970,10 +1982,24 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       })()}
 
       {/* Decision Box */}
-      <div style={{ background: (DECISION_COLOR[report.decision] || '#64748B') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#64748B'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
-        <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#64748B', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
-        <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{isAR ? resolveText(report.decisionRationale) : report.decisionRationale}</div>
-      </div>
+      {/* "The cover and UI must display 'REQUIRES MANUAL REVIEW', not
+          'APPROVED WITH CONDITIONS'... UI and DOCX must behave
+          identically." This was fixed on the DOCX/export side
+          (governance-export.service.ts's buildCoverPageSection) but
+          never ported here, since no UI access existed at the time -
+          confirmed real gap, the review's raw decision was shown as the
+          dominant label here regardless of review.status. */}
+      {review?.status === 'READY_FOR_REVIEW' ? (
+        <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#e74c3c', marginBottom: 4 }}>⚠ {t('gov.requires_manual_review')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('gov.proposed_decision')}: {report.decision?.replace(/_/g, ' ')}</div>
+        </div>
+      ) : (
+        <div style={{ background: (DECISION_COLOR[report.decision] || '#64748B') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#64748B'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#64748B', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{isAR ? resolveText(report.decisionRationale) : report.decisionRationale}</div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--navy-light)' }}>

@@ -136,6 +136,8 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
 
   // ── Governance ────────────────────────────────────────────────────────────
   'gov.dashboard':            { EN: 'Governance Reviews', AR: 'مراجعات الحوكمة' },
+  'gov.requires_manual_review': { EN: 'REQUIRES MANUAL REVIEW', AR: 'يتطلب مراجعة يدوية' },
+  'gov.proposed_decision':    { EN: 'Proposed Decision', AR: 'القرار المقترح' },
   'gov.reviews':              { EN: 'Reviews', AR: 'المراجعات' },
   'gov.new_review':           { EN: '+ New Review', AR: '+ مراجعة جديدة' },
   'gov.start_review':         { EN: 'Start an architecture governance review', AR: 'ابدأ مراجعة حوكمة البنية المؤسسية' },
