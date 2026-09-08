@@ -141,6 +141,24 @@ describe('CopilotPage - conversation history', () => {
     expect(await screen.findByText('Three applications support this capability.')).toBeInTheDocument();
   });
 
+  it('restores persisted Repository evidence when a conversation is reopened', async () => {
+    mockFetch({
+      '/copilot/architects': ARCHITECTS,
+      '/copilot/conversations': [{ id: 'c1', title: 'Repository Chat', messageCount: 2, updatedAt: '2026-01-15T00:00:00Z' }],
+      '/copilot/conversations/c1/messages': [
+        { id: 'm1', role: 'user', content: 'Tell me about Job Matching Engine', createdAt: '2026-01-15T00:00:00Z' },
+        { id: 'm2', role: 'architect', content: 'Job Matching Engine is active.', architectCode: 'BUSINESS', createdAt: '2026-01-15T00:01:00Z', evidenceRefs: [
+          { sourceType: 'EA_ASSET', groundingType: 'REPOSITORY_FACT', sourceId: 'app-1', title: 'Job Matching Engine', excerpt: 'Repository application', assetType: 'Application', sourceAuthorityLevel: 'AUTHORITATIVE', retrievalReason: 'REPOSITORY_MATCH', score: 1, targetRef: { type: 'EA_ASSET', id: 'app-1' } },
+        ] },
+      ],
+    });
+    render(<CopilotPage />);
+    await waitFor(() => expect(screen.getAllByText('Chief Architect').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByText('🕐 History'));
+    fireEvent.click(await screen.findByText('Repository Chat'));
+    expect(await screen.findByText('🔍 1 source ▼')).toBeInTheDocument();
+  });
+
   it('starting a new conversation clears the message list and active conversation', async () => {
     mockFetch({
       '/copilot/architects': ARCHITECTS,
@@ -285,6 +303,26 @@ describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
 
     fireEvent.click(screen.getByText('View source →'));
     expect(openSpy).toHaveBeenCalledWith('/repository?assetId=asset-1', '_blank');
+  });
+
+  it('labels relationship and document evidence distinctly and does not create a fake document route', async () => {
+    const evidence = [
+      { sourceType: 'EA_RELATIONSHIP', groundingType: 'REPOSITORY_RELATIONSHIP', sourceId: 'rel-1', title: 'App supports Capability', excerpt: 'Stored relationship', sourceAuthorityLevel: 'AUTHORITATIVE', retrievalReason: 'CANONICAL', score: 1, targetRef: { type: 'EA_ASSET', id: 'cap-1' } },
+      { sourceType: 'DOCUMENT', groundingType: 'DOCUMENT_EVIDENCE', sourceId: 'doc-1:0', title: 'Architecture Standard', excerpt: 'Retrieved document context', sourceAuthorityLevel: 'UNVALIDATED', retrievalReason: 'TENANT_DOCUMENT_RAG', score: 0.9, targetRef: { type: 'DOCUMENT', id: 'doc-1' } },
+    ];
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [{ type: 'text', content: 'answer' }, { type: 'done', conversationId: 'conv-1', evidence }] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'What supports this?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.click(await screen.findByText('🔍 2 sources ▼'));
+    expect(screen.getByText('Repository relationship')).toBeInTheDocument();
+    expect(screen.getByText('Tenant document')).toBeInTheDocument();
+    expect(screen.getAllByText('View source →')).toHaveLength(1);
   });
 
   it('shows no sources toggle at all when the response has no evidence (most generic questions)', async () => {
