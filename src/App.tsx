@@ -28,15 +28,26 @@ import BillingPage from './pages/BillingPage'
 import DecisionEvaluationPage from './pages/DecisionEvaluationPage'
 import EaPlanningPage from './pages/EaPlanningPage'
 import GlossaryPage from './pages/GlossaryPage'
+import LandingPage from './pages/LandingPage'
 import './styles.css'
 
 function ProtectedRoute({ children, permission, superadminOnly }: { children: React.ReactNode; permission?: string; superadminOnly?: boolean }) {
   const { user, loading, hasPermission } = useAuth()
   if (loading) return <div className="loading-screen"><div className="spinner"/></div>
   if (!user) return <Navigate to="/login" replace />
-  if (superadminOnly && user.role !== 'SUPERADMIN') return <Navigate to="/" replace />
-  if (permission && !hasPermission(permission)) return <Navigate to="/" replace />
+  if (superadminOnly && user.role !== 'SUPERADMIN') return <Navigate to="/app" replace />
+  if (permission && !hasPermission(permission)) return <Navigate to="/app" replace />
   return <>{children}</>
+}
+
+const PUBLIC_LANDING_HOSTS = new Set(['archmindworks.com', 'www.archmindworks.com', 'localhost', '127.0.0.1'])
+
+export function isPublicLandingHost(hostname = window.location.hostname): boolean {
+  return PUBLIC_LANDING_HOSTS.has(hostname.toLowerCase())
+}
+
+function RootEntry() {
+  return isPublicLandingHost() ? <LandingPage /> : <Navigate to="/app" replace />
 }
 
 export default function App() {
@@ -46,12 +57,13 @@ export default function App() {
         <BrandingProvider>
         <BrowserRouter>
           <Routes>
+            <Route path="/" element={<RootEntry />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/invite/:token" element={<InviteAcceptPage />} />
             <Route path="/shared/:token" element={<SharedViewPage />} />
-            <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route index element={<DashboardPage />} />
+            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route path="/app" element={<DashboardPage />} />
               <Route path="adm" element={<ProtectedRoute permission="Repository.View"><AdmPage /></ProtectedRoute>} />
               <Route path="copilot" element={<ProtectedRoute permission="AIArchitect.Use"><CopilotPage /></ProtectedRoute>} />
               <Route path="repository" element={<ProtectedRoute permission="Repository.View"><RepositoryPage /></ProtectedRoute>} />

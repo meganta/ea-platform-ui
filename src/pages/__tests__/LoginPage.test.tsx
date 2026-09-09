@@ -69,6 +69,7 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('admin@test.com', 'Admin1234!', 'test-tenant');
     });
+    expect(mockNavigate).toHaveBeenCalledWith('/app');
   });
 
   it('displays the error message when login() rejects', async () => {
