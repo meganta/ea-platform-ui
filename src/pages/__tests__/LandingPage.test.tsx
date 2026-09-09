@@ -22,14 +22,14 @@ beforeEach(() => {
   document.documentElement.removeAttribute('lang')
 })
 
-describe('ArqOps landing page', () => {
+describe('ArchMind landing page', () => {
   it('renders the English customer proposition in LTR mode', () => {
     renderLanding('EN')
 
     expect(screen.getByRole('heading', { level: 1, name: 'Operate Enterprise Architecture with Clarity, Control, and Intelligence' })).toBeInTheDocument()
     expect(document.documentElement).toHaveAttribute('dir', 'ltr')
     expect(document.documentElement).toHaveAttribute('lang', 'en')
-    expect(document.title).toBe('ArqOps | Enterprise Architecture Operations Platform')
+    expect(document.title).toBe('ArchMind | Enterprise Architecture Operations Platform')
   })
 
   it('switches to Arabic, applies RTL, and persists the language preference', () => {

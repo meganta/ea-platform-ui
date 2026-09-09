@@ -65,9 +65,9 @@ const navItems = [
 
 const labels = {
   heroTitle: c('Operate Enterprise Architecture with Clarity, Control, and Intelligence', 'تشغيل البنية المؤسسية بوضوح وحوكمة وذكاء'),
-  heroBody: c('ArqOps brings enterprise architecture modeling, repository management, architecture views, governance, planning, assessments, and AI-assisted architecture into one integrated platform.', 'تجمع ArqOps نمذجة البنية المؤسسية، وإدارة مستودع الأصول المعمارية، والمشاهد المعمارية، والحوكمة، والتخطيط، والتقييمات، والمساعدة الذكية في منصة متكاملة واحدة.'),
+  heroBody: c('ArchMind brings enterprise architecture modeling, repository management, architecture views, governance, planning, assessments, and AI-assisted architecture into one integrated platform.', 'تجمع ArchMind نمذجة البنية المؤسسية، وإدارة مستودع الأصول المعمارية، والمشاهد المعمارية، والحوكمة، والتخطيط، والتقييمات، والمساعدة الذكية في منصة متكاملة واحدة.'),
   requestDemo: c('Request a Demo', 'اطلب عرضاً توضيحياً'),
-  explore: c('Explore ArqOps', 'استكشف ArqOps'),
+  explore: c('Explore ArchMind', 'استكشف ArchMind'),
   signIn: c('Sign In', 'تسجيل الدخول'),
 }
 
@@ -82,11 +82,11 @@ export default function LandingPage() {
   const [copied, setCopied] = useState(false)
 
   const seo = useMemo(() => locale === 'AR' ? {
-    title: 'ArqOps | منصة تشغيل البنية المؤسسية',
+    title: 'ArchMind | منصة تشغيل البنية المؤسسية',
     description: 'شغّل البنية المؤسسية من خلال نمذجة متكاملة، ومستودع معماري، ومشاهد، وحوكمة، وتخطيط، وتقييمات، ومساعدة ذكية.',
     ogLocale: 'ar_SA',
   } : {
-    title: 'ArqOps | Enterprise Architecture Operations Platform',
+    title: 'ArchMind | Enterprise Architecture Operations Platform',
     description: 'Operate enterprise architecture through integrated modeling, repository management, architecture views, governance, planning, assessments and AI-assisted architecture.',
     ogLocale: 'en_US',
   }, [locale])
@@ -115,7 +115,7 @@ export default function LandingPage() {
     setCopied(false)
     if (Object.keys(errors).length) return
     setRequestDraft([
-      'ArqOps demo request',
+      'ArchMind demo request',
       `Name: ${data.get('fullName')}`,
       `Organization: ${data.get('organization')}`,
       `Job title: ${data.get('jobTitle')}`,
@@ -137,7 +137,7 @@ export default function LandingPage() {
       <a className="arq-skip" href="#main">{L(c('Skip to content', 'انتقل إلى المحتوى'))}</a>
       <header className="arq-nav-wrap">
         <nav className="arq-nav" aria-label={L(c('Primary navigation', 'التنقل الرئيسي'))}>
-          <a className="arq-brand" href="#top" aria-label="ArqOps home"><span className="arq-mark">A</span><span>ArqOps</span></a>
+          <a className="arq-brand" href="#top" aria-label="ArchMind home"><span className="arq-mark">A</span><span>ArchMind</span></a>
           <button className="arq-menu-button" aria-label={L(c('Open navigation', 'فتح قائمة التنقل'))} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>☰</button>
           <div className={`arq-nav-panel${menuOpen ? ' open' : ''}`}>
             <div className="arq-nav-links">
@@ -171,7 +171,7 @@ export default function LandingPage() {
           <div className="arq-container">
             <SectionHeading eyebrow={c('THE OPERATING CHALLENGE', 'تحديات التشغيل')} title={c('Move beyond disconnected architecture work', 'تجاوز العمل المعماري المتفرق')} body={c('Enterprise architecture creates value when information, governance, and transformation planning operate as one system.', 'تتحقق قيمة البنية المؤسسية عندما تعمل المعلومات والحوكمة وتخطيط التحول ضمن منظومة واحدة.')} L={L} id="problems-title" />
             <div className="arq-problem-grid">{problems.map((item, index) => <article key={item.title.EN}><span>0{index + 1}</span><h3>{L(item.title)}</h3><p>{L(item.body)}</p></article>)}</div>
-            <div className="arq-answer"><strong>ArqOps</strong><span>{L(c('connects architecture definition, evidence, analysis, governance, and change in one operational environment.', 'تربط تعريف البنية المؤسسية وأدلتها وتحليلها وحوكمتها وتغييرها ضمن بيئة تشغيلية واحدة.'))}</span></div>
+            <div className="arq-answer"><strong>ArchMind</strong><span>{L(c('connects architecture definition, evidence, analysis, governance, and change in one operational environment.', 'تربط تعريف البنية المؤسسية وأدلتها وتحليلها وحوكمتها وتغييرها ضمن بيئة تشغيلية واحدة.'))}</span></div>
           </div>
         </section>
 
@@ -191,7 +191,7 @@ export default function LandingPage() {
 
         <section className="arq-section arq-ai-section" id="ai-architects" aria-labelledby="ai-title">
           <div className="arq-container arq-ai-grid">
-            <div><SectionHeading eyebrow={c('AI-ASSISTED ARCHITECTURE', 'البنية المؤسسية بمساعدة الذكاء الاصطناعي')} title={c('Architecture Expertise, Augmented by AI', 'خبرة معمارية معززة بالذكاء الاصطناعي')} body={c('ArqOps helps architects explore information, analyze relationships, review designs, evaluate alternatives, and accelerate architecture activities—grounded in organizational architecture context and under human direction.', 'تساعد ArqOps المعماريين على استكشاف المعلومات وتحليل العلاقات ومراجعة التصاميم وتقييم البدائل وتسريع الأنشطة المعمارية، استناداً إلى السياق المعماري للجهة وتحت إشراف بشري.')} L={L} id="ai-title" align="start" /></div>
+            <div><SectionHeading eyebrow={c('AI-ASSISTED ARCHITECTURE', 'البنية المؤسسية بمساعدة الذكاء الاصطناعي')} title={c('Architecture Expertise, Augmented by AI', 'خبرة معمارية معززة بالذكاء الاصطناعي')} body={c('ArchMind helps architects explore information, analyze relationships, review designs, evaluate alternatives, and accelerate architecture activities—grounded in organizational architecture context and under human direction.', 'تساعد ArchMind المعماريين على استكشاف المعلومات وتحليل العلاقات ومراجعة التصاميم وتقييم البدائل وتسريع الأنشطة المعمارية، استناداً إلى السياق المعماري للجهة وتحت إشراف بشري.')} L={L} id="ai-title" align="start" /></div>
             <div className="arq-architect-panel"><div className="arq-chief"><span>A</span><div><small>{L(c('COORDINATING ROLE', 'دور تنسيقي'))}</small><strong>{L(architectRoles[0])}</strong></div></div><div className="arq-role-grid">{architectRoles.slice(1).map((role) => <div key={role.EN}><i />{L(role)}</div>)}</div><p>{L(c('AI assistance supports professional judgment; architecture decisions remain with authorized people.', 'تدعم المساعدة الذكية الحكم المهني، بينما تبقى القرارات المعمارية بيد أصحاب الصلاحية.'))}</p></div>
           </div>
         </section>
@@ -213,7 +213,7 @@ export default function LandingPage() {
         </section>
 
         <section className="arq-section arq-framework-section" id="frameworks" aria-labelledby="framework-title">
-          <div className="arq-container arq-framework-grid"><div><SectionHeading eyebrow={c('FRAMEWORK-DRIVEN', 'منهجية قائمة على الأطر')} title={c('Designed for Framework-Driven Enterprise Architecture', 'مصممة لتطبيق أطر البنية المؤسسية عملياً')} body={c('ArqOps supports configurable enterprise architecture meta models and is being developed with NORA 2.0 as a primary framework for Saudi government architecture environments.', 'تدعم ArqOps نماذج وصفية قابلة للتخصيص، ويتم تطويرها مع اعتماد NORA 2.0 كأحد الأطر الرئيسية لبيئات البنية المؤسسية في الجهات الحكومية السعودية.')} L={L} id="framework-title" align="start" /><p className="arq-framework-note">{L(c('Framework configuration supports NORA 2.0, TOGAF-oriented, and custom meta-model structures. No certification claim is implied.', 'تدعم تهيئة الأطر هياكل NORA 2.0 والهياكل الموجهة بمنهجية TOGAF والنماذج الوصفية المخصصة، دون الإشارة إلى أي اعتماد رسمي.'))}</p></div><div className="arq-framework-visual"><span>NORA 2.0</span><span>TOGAF</span><span>{L(c('CUSTOM', 'مخصص'))}</span><div>{L(c('Configurable architecture language', 'لغة معمارية قابلة للتهيئة'))}</div></div></div>
+          <div className="arq-container arq-framework-grid"><div><SectionHeading eyebrow={c('FRAMEWORK-DRIVEN', 'منهجية قائمة على الأطر')} title={c('Designed for Framework-Driven Enterprise Architecture', 'مصممة لتطبيق أطر البنية المؤسسية عملياً')} body={c('ArchMind supports configurable enterprise architecture meta models and is being developed with NORA 2.0 as a primary framework for Saudi government architecture environments.', 'تدعم ArchMind نماذج وصفية قابلة للتخصيص، ويتم تطويرها مع اعتماد NORA 2.0 كأحد الأطر الرئيسية لبيئات البنية المؤسسية في الجهات الحكومية السعودية.')} L={L} id="framework-title" align="start" /><p className="arq-framework-note">{L(c('Framework configuration supports NORA 2.0, TOGAF-oriented, and custom meta-model structures. No certification claim is implied.', 'تدعم تهيئة الأطر هياكل NORA 2.0 والهياكل الموجهة بمنهجية TOGAF والنماذج الوصفية المخصصة، دون الإشارة إلى أي اعتماد رسمي.'))}</p></div><div className="arq-framework-visual"><span>NORA 2.0</span><span>TOGAF</span><span>{L(c('CUSTOM', 'مخصص'))}</span><div>{L(c('Configurable architecture language', 'لغة معمارية قابلة للتهيئة'))}</div></div></div>
         </section>
 
         <section className="arq-section arq-readiness" id="resources" aria-labelledby="readiness-title">
@@ -227,7 +227,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="arq-footer"><div className="arq-container arq-footer-grid"><div><a className="arq-brand footer" href="#top"><span className="arq-mark">A</span><span>ArqOps</span></a><p>{L(c('Enterprise architecture, operated with intent.', 'تشغيل البنية المؤسسية بوضوح وفاعلية.'))}</p></div><div className="arq-footer-links"><a href="#platform">{L(c('Platform', 'المنصة'))}</a><a href="#capabilities">{L(c('Capabilities', 'القدرات'))}</a><a href="#frameworks">{L(c('Frameworks', 'الأطر'))}</a><span title={L(c('Legal page not yet published', 'الصفحة القانونية غير منشورة بعد'))}>{L(c('Privacy · Coming soon', 'الخصوصية · قريباً'))}</span><span title={L(c('Legal page not yet published', 'الصفحة القانونية غير منشورة بعد'))}>{L(c('Terms · Coming soon', 'الشروط · قريباً'))}</span><a href="#demo">{L(c('Contact', 'تواصل معنا'))}</a><Link to="/login">{L(labels.signIn)}</Link></div><button className="arq-lang footer" onClick={() => setLocale(locale === 'EN' ? 'AR' : 'EN')}><span className={locale === 'EN' ? 'active' : ''}>EN</span><i /><span className={locale === 'AR' ? 'active' : ''}>العربية</span></button></div><div className="arq-container arq-copyright">© {new Date().getFullYear()} ArqOps</div></footer>
+      <footer className="arq-footer"><div className="arq-container arq-footer-grid"><div><a className="arq-brand footer" href="#top"><span className="arq-mark">A</span><span>ArchMind</span></a><p>{L(c('Enterprise architecture, operated with intent.', 'تشغيل البنية المؤسسية بوضوح وفاعلية.'))}</p></div><div className="arq-footer-links"><a href="#platform">{L(c('Platform', 'المنصة'))}</a><a href="#capabilities">{L(c('Capabilities', 'القدرات'))}</a><a href="#frameworks">{L(c('Frameworks', 'الأطر'))}</a><span title={L(c('Legal page not yet published', 'الصفحة القانونية غير منشورة بعد'))}>{L(c('Privacy · Coming soon', 'الخصوصية · قريباً'))}</span><span title={L(c('Legal page not yet published', 'الصفحة القانونية غير منشورة بعد'))}>{L(c('Terms · Coming soon', 'الشروط · قريباً'))}</span><a href="#demo">{L(c('Contact', 'تواصل معنا'))}</a><Link to="/login">{L(labels.signIn)}</Link></div><button className="arq-lang footer" onClick={() => setLocale(locale === 'EN' ? 'AR' : 'EN')}><span className={locale === 'EN' ? 'active' : ''}>EN</span><i /><span className={locale === 'AR' ? 'active' : ''}>العربية</span></button></div><div className="arq-container arq-copyright">© {new Date().getFullYear()} ArchMind</div></footer>
     </div>
   )
 }
@@ -238,7 +238,7 @@ function SectionHeading({ eyebrow, title, body, L, id, align = 'center' }: { eye
 
 function ProductComposition({ locale }: { locale: 'EN' | 'AR' }) {
   const L = (copy: Copy) => copy[locale]
-  return <div className="arq-product" aria-label={L(c('ArqOps platform interface composition', 'تصور لواجهة منصة ArqOps'))}><div className="arq-product-bar"><div className="arq-mini-mark">A</div><span>ArqOps</span><i /><i /><i /></div><div className="arq-product-body"><aside><b /><b /><b className="active" /><b /><b /></aside><div className="arq-product-canvas"><div className="arq-canvas-head"><div><small>{L(c('ARCHITECTURE OVERVIEW', 'نظرة عامة على البنية'))}</small><strong>{L(c('Operational architecture workspace', 'مساحة العمل المعمارية'))}</strong></div><span>{L(c('Current state', 'الحالة الحالية'))}</span></div><div className="arq-metric-row"><div><small>{L(c('Repository', 'المستودع'))}</small><strong>248</strong><em>+12</em></div><div><small>{L(c('Views', 'المشاهد'))}</small><strong>36</strong><em>Live</em></div><div><small>{L(c('Reviews', 'المراجعات'))}</small><strong>08</strong><em>Active</em></div></div><div className="arq-canvas-lower"><div className="arq-map-card"><div className="arq-card-label">{L(c('EA VIEW · DEPENDENCY MAP', 'مشهد الاعتماديات'))}</div><div className="arq-node n1">B</div><div className="arq-node n2">A</div><div className="arq-node n3">D</div><div className="arq-node n4">T</div><svg viewBox="0 0 300 150" aria-hidden="true"><path d="M52 38 C100 30 115 70 155 74 M155 74 C200 75 210 35 255 43 M155 74 C180 105 205 118 252 116" /></svg></div><div className="arq-ai-card"><div className="arq-ai-head"><span>AI</span><div><small>{L(c('CHIEF ARCHITECT', 'المعماري الرئيسي'))}</small><strong>{L(c('Architecture insight', 'رؤية معمارية'))}</strong></div></div><p>{L(c('Three applications support overlapping capabilities. Review consolidation options before the target-state transition.', 'تدعم ثلاثة تطبيقات قدرات متداخلة. راجع خيارات التوحيد قبل الانتقال إلى الحالة المستهدفة.'))}</p><div className="arq-ai-source">{L(c('Grounded in 14 architecture records', 'مستند إلى 14 سجلاً معمارياً'))}</div></div></div></div></div></div>
+  return <div className="arq-product" aria-label={L(c('ArchMind platform interface composition', 'تصور لواجهة منصة ArchMind'))}><div className="arq-product-bar"><div className="arq-mini-mark">A</div><span>ArchMind</span><i /><i /><i /></div><div className="arq-product-body"><aside><b /><b /><b className="active" /><b /><b /></aside><div className="arq-product-canvas"><div className="arq-canvas-head"><div><small>{L(c('ARCHITECTURE OVERVIEW', 'نظرة عامة على البنية'))}</small><strong>{L(c('Operational architecture workspace', 'مساحة العمل المعمارية'))}</strong></div><span>{L(c('Current state', 'الحالة الحالية'))}</span></div><div className="arq-metric-row"><div><small>{L(c('Repository', 'المستودع'))}</small><strong>248</strong><em>+12</em></div><div><small>{L(c('Views', 'المشاهد'))}</small><strong>36</strong><em>Live</em></div><div><small>{L(c('Reviews', 'المراجعات'))}</small><strong>08</strong><em>Active</em></div></div><div className="arq-canvas-lower"><div className="arq-map-card"><div className="arq-card-label">{L(c('EA VIEW · DEPENDENCY MAP', 'مشهد الاعتماديات'))}</div><div className="arq-node n1">B</div><div className="arq-node n2">A</div><div className="arq-node n3">D</div><div className="arq-node n4">T</div><svg viewBox="0 0 300 150" aria-hidden="true"><path d="M52 38 C100 30 115 70 155 74 M155 74 C200 75 210 35 255 43 M155 74 C180 105 205 118 252 116" /></svg></div><div className="arq-ai-card"><div className="arq-ai-head"><span>AI</span><div><small>{L(c('CHIEF ARCHITECT', 'المعماري الرئيسي'))}</small><strong>{L(c('Architecture insight', 'رؤية معمارية'))}</strong></div></div><p>{L(c('Three applications support overlapping capabilities. Review consolidation options before the target-state transition.', 'تدعم ثلاثة تطبيقات قدرات متداخلة. راجع خيارات التوحيد قبل الانتقال إلى الحالة المستهدفة.'))}</p><div className="arq-ai-source">{L(c('Grounded in 14 architecture records', 'مستند إلى 14 سجلاً معمارياً'))}</div></div></div></div></div></div>
 }
 
 function FlowCard({ index, title, body, L }: { index: string; title: Copy; body: Copy; L: (copy: Copy) => string }) { return <article><span>{index}</span><h3>{L(title)}</h3><p>{L(body)}</p></article> }
@@ -248,7 +248,7 @@ function ProcessRail({ items, L }: { items: Copy[]; L: (copy: Copy) => string })
 function DemoForm({ locale, errors, requestDraft, copied, onSubmit, onCopy }: { locale: 'EN' | 'AR'; errors: Record<string, string>; requestDraft: string; copied: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onCopy: () => void }) {
   const L = (copy: Copy) => copy[locale]
   const field = (name: string, label: Copy, type = 'text', optional = false) => <label><span>{L(label)}{optional && <small> {L(c('(optional)', '(اختياري)'))}</small>}</span><input name={name} type={type} aria-invalid={!!errors[name]} aria-describedby={errors[name] ? `${name}-error` : undefined} />{errors[name] && <em id={`${name}-error`}>{errors[name]}</em>}</label>
-  if (requestDraft) return <div className="arq-demo-form arq-demo-ready"><span className="arq-ready-mark">✓</span><h3>{L(c('Your request is ready', 'طلبك جاهز'))}</h3><p>{L(c('Online submission is not connected yet. Copy the prepared details and share them with your ArqOps representative.', 'الإرسال الإلكتروني غير متصل حالياً. انسخ تفاصيل الطلب وشاركها مع ممثل ArqOps.'))}</p><button className="arq-button" type="button" onClick={onCopy}>{copied ? L(c('Copied', 'تم النسخ')) : L(c('Copy request details', 'نسخ تفاصيل الطلب'))}</button></div>
+  if (requestDraft) return <div className="arq-demo-form arq-demo-ready"><span className="arq-ready-mark">✓</span><h3>{L(c('Your request is ready', 'طلبك جاهز'))}</h3><p>{L(c('Online submission is not connected yet. Copy the prepared details and share them with your ArchMind representative.', 'الإرسال الإلكتروني غير متصل حالياً. انسخ تفاصيل الطلب وشاركها مع ممثل ArchMind.'))}</p><button className="arq-button" type="button" onClick={onCopy}>{copied ? L(c('Copied', 'تم النسخ')) : L(c('Copy request details', 'نسخ تفاصيل الطلب'))}</button></div>
   return <form className="arq-demo-form" noValidate onSubmit={onSubmit}>
     <div className="arq-form-grid">{field('fullName', c('Full Name', 'الاسم الكامل'))}{field('organization', c('Organization', 'الجهة'))}{field('jobTitle', c('Job Title', 'المسمى الوظيفي'))}{field('email', c('Work Email', 'البريد الإلكتروني للعمل'), 'email')}{field('phone', c('Phone', 'رقم الهاتف'), 'tel', true)}<label><span>{L(c('Country', 'الدولة'))}</span><select name="country" defaultValue="Saudi Arabia" aria-invalid={!!errors.country}><option>Saudi Arabia</option><option>United Arab Emirates</option><option>Bahrain</option><option>Kuwait</option><option>Oman</option><option>Qatar</option><option>{L(c('Other', 'أخرى'))}</option></select>{errors.country && <em>{errors.country}</em>}</label></div>
     <label><span>{L(c('Message', 'الرسالة'))}</span><textarea name="message" rows={4} aria-invalid={!!errors.message} placeholder={L(c('Tell us about your architecture priorities…', 'حدثنا عن أولويات البنية المؤسسية لديكم…'))} />{errors.message && <em>{errors.message}</em>}</label>
