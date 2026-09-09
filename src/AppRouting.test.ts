@@ -4,7 +4,7 @@ import path from 'path'
 describe('public and authenticated route contract', () => {
   const appSource = fs.readFileSync(path.join(__dirname, 'App.tsx'), 'utf8')
 
-  it('maps the apex public root to the ArqOps landing page and tenant roots to /app', () => {
+  it('maps the apex public root to the ArchMind landing page and tenant roots to /app', () => {
     expect(appSource).toContain("'archmindworks.com', 'www.archmindworks.com'")
     expect(appSource).toContain('return isPublicLandingHost() ? <LandingPage /> : <Navigate to="/app" replace />')
     expect(appSource).toContain('<Route path="/" element={<RootEntry />} />')
