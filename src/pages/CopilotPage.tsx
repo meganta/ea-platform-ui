@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import ReactMarkdown from 'react-markdown'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -92,33 +93,83 @@ function escapeRegExp(s: string): string {
  * matched before shorter ones so a more specific title isn't shadowed by
  * a shorter one that happens to be a substring of it.
  */
+// Recursively walks React children, applying the citation-highlight
+// split (below) to any plain string node it finds, leaving every other
+// node type (nested <strong>, <code>, etc.) untouched. Needed because
+// ReactMarkdown's rendered children for a paragraph/list-item/etc. are
+// not always a single string - a sentence with bold text in the middle
+// arrives as an array of [string, <strong>, string]. Citations inside
+// the bold/nested portions simply aren't highlighted (graceful
+// degradation), rather than crashing or skipping the whole node.
+function highlightCitationsInNode(node: ReactNode, pattern: RegExp, candidates: EvidenceItem[]): ReactNode {
+  if (typeof node === 'string') {
+    const parts = node.split(pattern)
+    if (parts.length <= 1) return node
+    return parts.map((part, i) => {
+      const matched = candidates.find(e => e.title.toLowerCase() === part.toLowerCase())
+      if (!matched) return part
+      // Don't render a clickable citation link for an evidence type with
+      // no known deep-link target (e.g. a source type
+      // evidenceSourceUrl() doesn't yet have a real destination for) -
+      // matches openEvidenceSource()'s own check, so a link never
+      // silently opens nothing when clicked.
+      if (!evidenceSourceUrl(matched)) return part
+      return (
+        <span
+          key={i}
+          onClick={() => openEvidenceSource(matched)}
+          title={`Source: ${matched.title}`}
+          style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer', color: 'inherit', fontWeight: 500 }}
+        >
+          {part}
+        </span>
+      )
+    })
+  }
+  if (Array.isArray(node)) return node.map((child, i) => <span key={i}>{highlightCitationsInNode(child, pattern, candidates)}</span>)
+  return node
+}
+
+// Renders the AI's actual Markdown output (headings, bold, lists,
+// tables, etc.) instead of showing the raw '###'/'**bold**' syntax as
+// literal text, which is what plain string rendering was doing before -
+// the model has always produced well-formatted Markdown (confirmed
+// directly against the live streamed response), the frontend simply
+// never interpreted it. Citation highlighting (unchanged in behavior)
+// now applies per rendered text node rather than to the raw string,
+// via the component overrides below. Styling matches the ADM module's
+// existing ReactMarkdown usage (AdmPage.tsx) for visual consistency
+// across the app rather than inventing a second style.
 function renderContentWithCitations(content: string, evidence?: EvidenceItem[]): ReactNode {
-  if (!evidence || evidence.length === 0) return content
-  const candidates = [...evidence]
+  const candidates = (evidence || [])
     .filter(e => e.title && e.title.trim().length >= 3)
     .sort((a, b) => b.title.length - a.title.length)
-  if (candidates.length === 0) return content
+  const pattern = candidates.length > 0 ? new RegExp(`(${candidates.map(e => escapeRegExp(e.title)).join('|')})`, 'gi') : null
+  const withCitations = (children: ReactNode) => pattern ? highlightCitationsInNode(children, pattern, candidates) : children
 
-  const pattern = new RegExp(`(${candidates.map(e => escapeRegExp(e.title)).join('|')})`, 'gi')
-  const parts = content.split(pattern)
-  if (parts.length <= 1) return content // no match found at all
-
-  return parts.map((part, i) => {
-    const matched = candidates.find(e => e.title.toLowerCase() === part.toLowerCase())
-    if (!matched) return part
-    const sourceUrl = evidenceSourceUrl(matched)
-    if (!sourceUrl) return part
-    return (
-      <span
-        key={i}
-        onClick={() => openEvidenceSource(matched)}
-        title={`Source: ${matched.title}`}
-        style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer', color: 'inherit', fontWeight: 500 }}
-      >
-        {part}
-      </span>
-    )
-  })
+  return (
+    <ReactMarkdown components={{
+      h1: ({ children }) => <h1 style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent)', borderBottom: '1px solid var(--border)', paddingBottom: 4, marginBottom: 8, marginTop: 12 }}>{withCitations(children)}</h1>,
+      h2: ({ children }) => <h2 style={{ fontSize: 14, fontWeight: 700, color: 'var(--accent)', marginBottom: 6, marginTop: 10 }}>{withCitations(children)}</h2>,
+      h3: ({ children }) => <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--gold)', marginBottom: 4, marginTop: 8 }}>{withCitations(children)}</h3>,
+      p: ({ children }) => <p style={{ marginBottom: 8, lineHeight: 1.7 }}>{withCitations(children)}</p>,
+      strong: ({ children }) => <strong style={{ color: 'var(--text)', fontWeight: 700 }}>{withCitations(children)}</strong>,
+      em: ({ children }) => <em>{withCitations(children)}</em>,
+      ul: ({ children }) => <ul style={{ paddingLeft: 20, marginBottom: 8 }}>{children}</ul>,
+      ol: ({ children }) => <ol style={{ paddingLeft: 20, marginBottom: 8 }}>{children}</ol>,
+      li: ({ children }) => <li style={{ marginBottom: 3, lineHeight: 1.6 }}>{withCitations(children)}</li>,
+      table: ({ children }) => <div style={{ overflowX: 'auto', marginBottom: 12 }}><table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>{children}</table></div>,
+      thead: ({ children }) => <thead style={{ background: 'var(--navy-mid)' }}>{children}</thead>,
+      th: ({ children }) => <th style={{ padding: '6px 10px', textAlign: 'left', border: '1px solid var(--border)', color: 'var(--accent)', fontWeight: 600, fontSize: 11 }}>{children}</th>,
+      td: ({ children }) => <td style={{ padding: '5px 10px', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>{withCitations(children)}</td>,
+      hr: () => <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '12px 0' }} />,
+      code: ({ className, children }: any) => {
+        const lang = (className || '').replace('language-', '')
+        return <code style={{ background: 'rgba(3,105,161,0.1)', padding: '1px 5px', borderRadius: 3, fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--accent)' }} className={lang ? `language-${lang}` : undefined}>{children}</code>
+      },
+      blockquote: ({ children }) => <blockquote style={{ borderLeft: '3px solid var(--accent)', paddingLeft: 12, marginLeft: 0, color: 'var(--text-dim)', fontStyle: 'italic' }}>{children}</blockquote>,
+    }}>{content}</ReactMarkdown>
+  )
 }
 
 /** Expandable "N sources" panel shown under an architect message that has evidence — the Phase 1 evidence-grounded Copilot's one visible surface so far (inline citation markers in the response text itself are a further follow-up). */

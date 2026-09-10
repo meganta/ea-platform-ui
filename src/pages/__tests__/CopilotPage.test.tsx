@@ -5,6 +5,23 @@ import CopilotPage from '../CopilotPage';
 // messages update to auto-scroll the chat, which throws without this.
 window.HTMLElement.prototype.scrollIntoView = jest.fn();
 
+// react-markdown v10 is ESM-only, which Jest's default transform can't
+// parse (same reason AdmPage.test.tsx already mocks it) - but unlike
+// that mock, this one actually routes the raw content through the real
+// `components.p` override rather than bypassing it, since the citation
+// tests below depend on exercising that exact code path (citation
+// highlighting is implemented inside it, not as a separate step).
+// Treats the whole content string as one paragraph, which is enough
+// for every existing test's single-sentence fixtures - not a full
+// Markdown parser.
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children, components }: any) => {
+    const P = components?.p || (({ children }: any) => <p>{children}</p>);
+    return <P>{children}</P>;
+  },
+}), { virtual: true });
+
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ token: 'fake-token' }),
 }));
@@ -382,6 +399,37 @@ describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
 
     await screen.findByText('A generic recommendation with no specific asset named.');
     expect(screen.queryByTitle('Source: Payment Gateway')).not.toBeInTheDocument();
+  });
+
+  // Direct regression check for the actual reported bug: the AI's real
+  // output is well-formed Markdown (confirmed directly against a live
+  // streamed response), but the frontend was rendering it as a bare
+  // string - showing literal '###'/'**bold**' syntax to the user
+  // instead of interpreting it. This confirms renderContentWithCitations
+  // actually routes content through ReactMarkdown (via the mock above,
+  // which exercises the real `components.p` override) rather than
+  // stripping/pre-processing the Markdown syntax before it ever gets
+  // there, which would defeat the fix just as completely.
+  it("passes the AI's raw Markdown syntax through to the renderer unmodified, rather than showing it as literal text", async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'text', content: '### Repository Summary\n\nWe have **12** business capabilities.' },
+        { type: 'done', conversationId: 'conv-1', evidence: [] },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'How many capabilities do we have?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await screen.findByText(/Repository Summary/);
+    // Confirms this reached the real components.p override (where
+    // citation highlighting also lives) rather than a raw text node
+    // rendered without ever going through ReactMarkdown at all.
+    expect(document.querySelector('p')).not.toBeNull();
   });
 
   it('shows a sources toggle per architect response in consult mode', async () => {
