@@ -298,3 +298,65 @@ describe('ConnectorHubPage - sync interval display (HRDF demo: quarterly cadence
     expect(await screen.findByText('Disabled')).toBeInTheDocument();
   });
 });
+
+describe('ConnectorHubPage - Generic CSV connector detail', () => {
+  const CSV_CONNECTOR = {
+    id: 'csv-1', name: 'My CSV Import', connectorType: 'GENERIC_CSV', direction: 'IMPORT',
+    status: 'ACTIVE', _count: { syncJobs: 0 },
+  };
+  const OBJECT_TYPES = [{ code: 'Application', name: 'Application' }, { code: 'DataDomain', name: 'Data Domain' }];
+
+  it('shows an object-type picker and Import CSV button, disabled until a type is chosen', async () => {
+    mockFetch({ '/connectors/stats': {}, '/connectors': [CSV_CONNECTOR], '/meta-model/object-types': OBJECT_TYPES });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('My CSV Import'));
+
+    const importBtn = await screen.findByText('⬇ Import CSV');
+    expect(importBtn).toBeDisabled();
+
+    await waitFor(() => expect(screen.getByText('Data Domain')).toBeInTheDocument());
+    fireEvent.change(screen.getByDisplayValue('Object type...'), { target: { value: 'Application' } });
+    expect(importBtn).not.toBeDisabled();
+  });
+
+  it('does not show the ArchiMate XML import button for a CSV connector', async () => {
+    mockFetch({ '/connectors/stats': {}, '/connectors': [CSV_CONNECTOR], '/meta-model/object-types': OBJECT_TYPES });
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('My CSV Import'));
+    await screen.findByText('⬇ Import CSV');
+    expect(screen.queryByText('⬇ Import XML')).not.toBeInTheDocument();
+  });
+
+  it('uploads the selected CSV file to the real import/csv endpoint with the chosen object type, then switches to the Staging tab', async () => {
+    mockFetch({
+      '/connectors/stats': {}, '/connectors': [CSV_CONNECTOR], '/meta-model/object-types': OBJECT_TYPES,
+      '/import/csv': { jobId: 'job-1', headers: ['name', 'domain'], totalRows: 2, staged: 2, idColumn: 'name' },
+    });
+    window.alert = jest.fn();
+    render(<ConnectorHubPage />);
+    fireEvent.click(screen.getByText('🔌 Connectors'));
+    fireEvent.click(await screen.findByText('My CSV Import'));
+    await waitFor(() => expect(screen.getByText('Data Domain')).toBeInTheDocument());
+
+    fireEvent.change(screen.getByDisplayValue('Object type...'), { target: { value: 'Application' } });
+    const file = new File(['name,domain\nBilling API,APPLICATION\n'], 'apps.csv', { type: 'text/csv' });
+    const fileInput = document.querySelector('input[type="file"][accept=".csv"]') as HTMLInputElement;
+    fireEvent.change(fileInput, { target: { files: [file] } });
+
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => typeof c[0] === 'string' && c[0].includes('/import/csv'));
+      expect(call).toBeTruthy();
+      expect(call[1].method).toBe('POST');
+      expect(call[1].body).toBeInstanceOf(FormData);
+      expect((call[1].body as FormData).get('objectTypeCode')).toBe('Application');
+    });
+
+    // Lands on the Staging tab (the pre-existing, already-working part of
+    // this pipeline) rather than leaving the user on Overview with no next
+    // step — checked via content unique to that tab rather than a CSS
+    // custom-property style match (unreliable in jsdom).
+    expect(await screen.findByText('✅ Commit All Ready')).toBeInTheDocument();
+  });
+});

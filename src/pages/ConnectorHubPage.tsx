@@ -47,7 +47,11 @@ const CONNECTOR_TYPES = [
   { code: 'MANAGEENGINE_CMDB', name: 'ManageEngine OpManager', icon: '🖧', color: '#e8622c', desc: 'Server & infrastructure discovery via OpManager device inventory', fileOnly: false },
   { code: 'MEGA_HOPEX',      name: 'MEGA HOPEX',        icon: '⬡', color: '#e74c3c', desc: 'Export/import via MEGA API or file', fileOnly: false },
   { code: 'BIZZDESIGN',      name: 'Bizzdesign Horizzon', icon: '🔷', color: '#2ecc71', desc: 'Import/export via Bizzdesign API', fileOnly: false },
-  { code: 'GENERIC_CSV',     name: 'Generic CSV',       icon: '📊', color: '#7f8c8d', desc: 'Import any CSV file with column mapping', fileOnly: true },
+  { code: 'GENERIC_CSV',     name: 'Generic CSV',       icon: '📊', color: '#7f8c8d', desc: 'Import a CSV file of one object type at a time, then map columns and commit', fileOnly: true },
+  // NOTE: GENERIC_JSON is listed here (fileOnly: true) but, like
+  // GENERIC_CSV was until this fix, has no actual upload handler wired up
+  // in the action bar below — selecting it currently offers no working
+  // import path. Left as a known follow-up, out of scope for the CSV fix.
   { code: 'GENERIC_JSON',    name: 'Generic JSON',      icon: '📄', color: '#7f8c8d', desc: 'ArchMind canonical JSON format', fileOnly: true },
   { code: 'ENTRA_ID',        name: 'Microsoft Entra ID', icon: '🔑', color: '#0078d4', desc: 'Users, groups, and enterprise apps via Microsoft Graph', fileOnly: false },
   { code: 'GENERIC_CMDB',    name: 'Generic CMDB',      icon: '🗄', color: '#5d6d7e', desc: 'Any CMDB exposing a REST/OData API (requires endpoint configuration)', fileOnly: false },
@@ -252,6 +256,40 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
   const fileInputRef = useRef<HTMLInputElement>(null)
   const ct = CONNECTOR_TYPES.find(t => t.code === connector.connectorType)
 
+  // ── Generic CSV import (bulk repository content) ──────────────────────
+  // Loads a spreadsheet's columns and stages each row for the SAME field-
+  // mapping / matching / commit flow every other connector already uses
+  // (see the Mappings/Staging tabs below) — nothing new there, only the
+  // upload step was missing.
+  const csvFileInputRef = useRef<HTMLInputElement>(null)
+  const [csvObjectTypes, setCsvObjectTypes] = useState<{ code: string; name: string }[]>([])
+  const [csvObjectTypeCode, setCsvObjectTypeCode] = useState('')
+  const [csvIdColumn, setCsvIdColumn] = useState('')
+  const [csvUploading, setCsvUploading] = useState(false)
+  useEffect(() => {
+    if (ct?.code === 'GENERIC_CSV') {
+      api.get('/meta-model/object-types').then((d: any) => setCsvObjectTypes(Array.isArray(d) ? d : []))
+    }
+  }, [ct?.code]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const importCsv = async (file: File) => {
+    if (!csvObjectTypeCode) { alert('Choose which object type this CSV represents first.'); return }
+    setCsvUploading(true)
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('objectTypeCode', csvObjectTypeCode)
+    if (csvIdColumn) fd.append('idColumn', csvIdColumn)
+    const res = await fetch(`${API}/connectors/${connector.id}/import/csv`, {
+      method: 'POST', headers: { Authorization: `Bearer ${api.tok}` }, body: fd,
+    })
+    const data = await res.json()
+    setCsvUploading(false)
+    if (!res.ok) { alert(`CSV import failed: ${data.message || res.statusText}`); return }
+    loadJobs()
+    setTab('staging') // land on the existing staging/mapping UI to finish the import
+    alert(`Staged ${data.staged} of ${data.totalRows} row(s) from column "${data.idColumn}" as the unique id. Next: configure a field mapping (Mappings tab), then review and commit from the Staging tab.`)
+  }
+
   const loadJobs = () => api.get(`/connectors/${connector.id}/jobs`).then((d: any) => setJobs(Array.isArray(d) ? d : []))
   useEffect(() => { if (tab === 'jobs') loadJobs() }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -350,6 +388,17 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
               <input ref={fileInputRef} type="file" accept=".xml,.archimate" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) importArchiMate(e.target.files[0]) }} />
               <button style={S.btn()} onClick={() => fileInputRef.current?.click()} disabled={syncing}>{syncing ? '⏳ Importing...' : '⬇ Import XML'}</button>
               <button style={S.btn('primary')} onClick={exportArchiMate}>⬆ Export XML</button>
+            </>
+          )}
+          {ct?.code === 'GENERIC_CSV' && (
+            <>
+              <select style={{ ...S.input, width: 180 }} value={csvObjectTypeCode} onChange={e => setCsvObjectTypeCode(e.target.value)}>
+                <option value="">Object type...</option>
+                {csvObjectTypes.map(t => <option key={t.code} value={t.code}>{t.name}</option>)}
+              </select>
+              <input style={{ ...S.input, width: 140 }} placeholder="ID column (optional)" value={csvIdColumn} onChange={e => setCsvIdColumn(e.target.value)} />
+              <input ref={csvFileInputRef} type="file" accept=".csv" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) importCsv(e.target.files[0]) }} />
+              <button style={S.btn('primary')} onClick={() => csvFileInputRef.current?.click()} disabled={csvUploading || !csvObjectTypeCode}>{csvUploading ? '⏳ Uploading...' : '⬇ Import CSV'}</button>
             </>
           )}
         </div>
