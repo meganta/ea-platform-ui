@@ -3369,6 +3369,26 @@ export default function EaViewsPage() {
     if (state) { setInitialArchState(state); setTab('my-views') }
   }, [searchParams])
 
+  // ADM architecture integration returns this stable URL after creating,
+  // refreshing, or linking a TenantView. Resolve it through the existing
+  // tenant-scoped EA Views API and open the normal viewer; no ADM-specific
+  // renderer or copied dataset is introduced here.
+  useEffect(() => {
+    const viewId = searchParams.get('viewId')
+    if (!viewId) return
+    let cancelled = false
+    api.get(`/ea-views/${encodeURIComponent(viewId)}`).then((view: any) => {
+      if (!cancelled && view?.id && !view?.statusCode) {
+        setActiveView(view)
+        setTab('viewer')
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+    // useViewsApi returns lightweight request functions on each render; the
+    // query parameter is the navigation identity that should trigger reload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
   const loadStats = useCallback(() => { api.get('/ea-views/stats').then(setStats) }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { loadStats() }, [loadStats])
 
