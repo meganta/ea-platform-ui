@@ -48,9 +48,9 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
   });
 
-  it('defaults the organization field to "test-tenant" when no ?org= query param is present', () => {
+  it('defaults the organization field to "demo" when no ?org= query param is present', () => {
     renderLoginPage();
-    expect(screen.getByLabelText('Organization ID')).toHaveValue('test-tenant');
+    expect(screen.getByLabelText('Organization ID')).toHaveValue('demo');
   });
 
   it('pre-fills the organization field from a ?org= query param', () => {
@@ -67,7 +67,7 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('admin@test.com', 'Admin1234!', 'test-tenant');
+      expect(mockLogin).toHaveBeenCalledWith('admin@test.com', 'Admin1234!', 'demo');
     });
     expect(mockNavigate).toHaveBeenCalledWith('/app');
   });

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
+import { api } from '../lib/api'
 import './LandingPage.css'
 
 type Copy = { EN: string; AR: string }
@@ -80,6 +81,8 @@ export default function LandingPage() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [requestDraft, setRequestDraft] = useState('')
   const [copied, setCopied] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   const seo = useMemo(() => locale === 'AR' ? {
     title: 'ArchMind | منصة تشغيل البنية المؤسسية',
@@ -103,7 +106,7 @@ export default function LandingPage() {
     setMeta('meta[property="og:locale"]', 'content', seo.ogLocale)
   }, [seo])
 
-  const submitDemo = (event: FormEvent<HTMLFormElement>) => {
+  const submitDemo = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const data = new FormData(event.currentTarget)
     const required = ['fullName', 'organization', 'jobTitle', 'email', 'country', 'message', 'preferredLanguage']
@@ -114,17 +117,38 @@ export default function LandingPage() {
     setFormErrors(errors)
     setCopied(false)
     if (Object.keys(errors).length) return
-    setRequestDraft([
-      'ArchMind demo request',
-      `Name: ${data.get('fullName')}`,
-      `Organization: ${data.get('organization')}`,
-      `Job title: ${data.get('jobTitle')}`,
-      `Work email: ${data.get('email')}`,
-      `Phone: ${data.get('phone') || '—'}`,
-      `Country: ${data.get('country')}`,
-      `Preferred language: ${data.get('preferredLanguage')}`,
-      `Message: ${data.get('message')}`,
-    ].join('\n'))
+    const payload = {
+      fullName: String(data.get('fullName')),
+      organization: String(data.get('organization')),
+      jobTitle: String(data.get('jobTitle')),
+      email: String(data.get('email')),
+      phone: String(data.get('phone') || '') || undefined,
+      country: String(data.get('country')),
+      preferredLanguage: String(data.get('preferredLanguage')),
+      message: String(data.get('message')),
+    }
+    setSubmitting(true)
+    try {
+      await api.submitDemoRequest(payload)
+      setSubmitted(true)
+    } catch {
+      // Network/server issue - fall back to the local copy-to-clipboard
+      // flow so the visitor's filled-in details aren't lost even if
+      // submission itself failed.
+      setRequestDraft([
+        'ArchMind demo request',
+        `Name: ${payload.fullName}`,
+        `Organization: ${payload.organization}`,
+        `Job title: ${payload.jobTitle}`,
+        `Work email: ${payload.email}`,
+        `Phone: ${payload.phone || '—'}`,
+        `Country: ${payload.country}`,
+        `Preferred language: ${payload.preferredLanguage}`,
+        `Message: ${payload.message}`,
+      ].join('\n'))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const copyRequest = async () => {
@@ -223,7 +247,7 @@ export default function LandingPage() {
         </section>
 
         <section className="arq-demo" id="demo" aria-labelledby="demo-title">
-          <div className="arq-container arq-demo-grid"><div><div className="arq-kicker light"><span />{L(c('REQUEST A DEMONSTRATION', 'اطلب عرضاً توضيحياً'))}</div><h2 id="demo-title">{L(c('Ready to Operationalize Enterprise Architecture?', 'هل أنت مستعد لتفعيل البنية المؤسسية بشكل عملي؟'))}</h2><p>{L(c('Tell us about your architecture environment and the outcomes you want to enable.', 'عرّفنا ببيئة البنية المؤسسية لديكم والنتائج التي تسعون إلى تحقيقها.'))}</p><div className="arq-demo-assurance">{L(c('This MVP form prepares your request locally. It does not transmit or store your information.', 'يجهّز هذا النموذج الأولي طلبك محلياً، ولا يرسل معلوماتك أو يخزنها.'))}</div></div><DemoForm locale={locale} errors={formErrors} requestDraft={requestDraft} copied={copied} onSubmit={submitDemo} onCopy={copyRequest} /></div>
+          <div className="arq-container arq-demo-grid"><div><div className="arq-kicker light"><span />{L(c('REQUEST A DEMONSTRATION', 'اطلب عرضاً توضيحياً'))}</div><h2 id="demo-title">{L(c('Ready to Operationalize Enterprise Architecture?', 'هل أنت مستعد لتفعيل البنية المؤسسية بشكل عملي؟'))}</h2><p>{L(c('Tell us about your architecture environment and the outcomes you want to enable.', 'عرّفنا ببيئة البنية المؤسسية لديكم والنتائج التي تسعون إلى تحقيقها.'))}</p><div className="arq-demo-assurance">{L(c('Your details are sent directly to the ArchMind team - no account required.', 'تُرسل بياناتك مباشرة إلى فريق ArchMind، دون الحاجة إلى إنشاء حساب.'))}</div></div><DemoForm locale={locale} errors={formErrors} requestDraft={requestDraft} copied={copied} submitting={submitting} submitted={submitted} onSubmit={submitDemo} onCopy={copyRequest} /></div>
         </section>
       </main>
 
@@ -245,14 +269,15 @@ function FlowCard({ index, title, body, L }: { index: string; title: Copy; body:
 function State({ label, note, L }: { label: Copy; note: Copy; L: (copy: Copy) => string }) { return <div className="arq-state"><div><i /><i /><i /></div><strong>{L(label)}</strong><span>{L(note)}</span></div> }
 function ProcessRail({ items, L }: { items: Copy[]; L: (copy: Copy) => string }) { return <div className="arq-process-rail">{items.map((item, index) => <div key={item.EN}><span>{index + 1}</span><strong>{L(item)}</strong></div>)}</div> }
 
-function DemoForm({ locale, errors, requestDraft, copied, onSubmit, onCopy }: { locale: 'EN' | 'AR'; errors: Record<string, string>; requestDraft: string; copied: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onCopy: () => void }) {
+function DemoForm({ locale, errors, requestDraft, copied, submitting, submitted, onSubmit, onCopy }: { locale: 'EN' | 'AR'; errors: Record<string, string>; requestDraft: string; copied: boolean; submitting: boolean; submitted: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onCopy: () => void }) {
   const L = (copy: Copy) => copy[locale]
   const field = (name: string, label: Copy, type = 'text', optional = false) => <label><span>{L(label)}{optional && <small> {L(c('(optional)', '(اختياري)'))}</small>}</span><input name={name} type={type} aria-invalid={!!errors[name]} aria-describedby={errors[name] ? `${name}-error` : undefined} />{errors[name] && <em id={`${name}-error`}>{errors[name]}</em>}</label>
-  if (requestDraft) return <div className="arq-demo-form arq-demo-ready"><span className="arq-ready-mark">✓</span><h3>{L(c('Your request is ready', 'طلبك جاهز'))}</h3><p>{L(c('Online submission is not connected yet. Copy the prepared details and share them with your ArchMind representative.', 'الإرسال الإلكتروني غير متصل حالياً. انسخ تفاصيل الطلب وشاركها مع ممثل ArchMind.'))}</p><button className="arq-button" type="button" onClick={onCopy}>{copied ? L(c('Copied', 'تم النسخ')) : L(c('Copy request details', 'نسخ تفاصيل الطلب'))}</button></div>
+  if (submitted) return <div className="arq-demo-form arq-demo-ready"><span className="arq-ready-mark">✓</span><h3>{L(c('Thank you', 'شكراً لك'))}</h3><p>{L(c('Your request has been received. An ArchMind representative will be in touch shortly.', 'تم استلام طلبك. سيتواصل معك أحد ممثلي ArchMind قريباً.'))}</p></div>
+  if (requestDraft) return <div className="arq-demo-form arq-demo-ready"><span className="arq-ready-mark">✓</span><h3>{L(c('Your request is ready', 'طلبك جاهز'))}</h3><p>{L(c("We couldn't submit this automatically. Copy the prepared details and share them with your ArchMind representative.", 'تعذّر إرسال الطلب تلقائياً. انسخ تفاصيل الطلب وشاركها مع ممثل ArchMind.'))}</p><button className="arq-button" type="button" onClick={onCopy}>{copied ? L(c('Copied', 'تم النسخ')) : L(c('Copy request details', 'نسخ تفاصيل الطلب'))}</button></div>
   return <form className="arq-demo-form" noValidate onSubmit={onSubmit}>
     <div className="arq-form-grid">{field('fullName', c('Full Name', 'الاسم الكامل'))}{field('organization', c('Organization', 'الجهة'))}{field('jobTitle', c('Job Title', 'المسمى الوظيفي'))}{field('email', c('Work Email', 'البريد الإلكتروني للعمل'), 'email')}{field('phone', c('Phone', 'رقم الهاتف'), 'tel', true)}<label><span>{L(c('Country', 'الدولة'))}</span><select name="country" defaultValue="Saudi Arabia" aria-invalid={!!errors.country}><option>Saudi Arabia</option><option>United Arab Emirates</option><option>Bahrain</option><option>Kuwait</option><option>Oman</option><option>Qatar</option><option>{L(c('Other', 'أخرى'))}</option></select>{errors.country && <em>{errors.country}</em>}</label></div>
     <label><span>{L(c('Message', 'الرسالة'))}</span><textarea name="message" rows={4} aria-invalid={!!errors.message} placeholder={L(c('Tell us about your architecture priorities…', 'حدثنا عن أولويات البنية المؤسسية لديكم…'))} />{errors.message && <em>{errors.message}</em>}</label>
     <fieldset><legend>{L(c('Preferred Language', 'اللغة المفضلة'))}</legend><label className="arq-radio"><input type="radio" name="preferredLanguage" value="English" defaultChecked={locale === 'EN'} /> English</label><label className="arq-radio"><input type="radio" name="preferredLanguage" value="Arabic" defaultChecked={locale === 'AR'} /> العربية</label>{errors.preferredLanguage && <em>{errors.preferredLanguage}</em>}</fieldset>
-    <button className="arq-button form-submit" type="submit">{L(labels.requestDemo)} <Arrow /></button>
+    <button className="arq-button form-submit" type="submit" disabled={submitting}>{submitting ? L(c('Sending…', 'جارٍ الإرسال…')) : <>{L(labels.requestDemo)} <Arrow /></>}</button>
   </form>
 }

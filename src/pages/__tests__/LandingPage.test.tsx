@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { LangProvider } from '../../contexts/LangContext'
 import LandingPage from '../LandingPage'
 
@@ -79,7 +79,8 @@ describe('ArchMind landing page', () => {
     expect(global.fetch).not.toHaveBeenCalled()
   })
 
-  it('prepares a valid demo request locally and explains the submission limitation', () => {
+  it('submits a valid demo request to the backend and shows a thank-you state', async () => {
+    ;(global.fetch as jest.Mock).mockResolvedValue({ ok: true, status: 200, json: async () => ({ received: true }) })
     renderLanding()
 
     fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Aisha Al Saud' } })
@@ -90,8 +91,30 @@ describe('ArchMind landing page', () => {
     const submitButtons = screen.getAllByRole('button', { name: /Request a Demo/ })
     fireEvent.click(submitButtons[submitButtons.length - 1])
 
-    expect(screen.getByRole('heading', { name: 'Your request is ready' })).toBeInTheDocument()
-    expect(screen.getByText(/Online submission is not connected yet/)).toBeInTheDocument()
-    expect(global.fetch).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Thank you' })).toBeInTheDocument()
+    })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0]
+    expect(url).toContain('/public/demo-requests')
+    expect(JSON.parse(options.body)).toMatchObject({ fullName: 'Aisha Al Saud', organization: 'Example Authority', email: 'aisha@example.gov.sa' })
+  })
+
+  it('falls back to a local copy-to-clipboard state when submission fails', async () => {
+    ;(global.fetch as jest.Mock).mockRejectedValue(new Error('Network error'))
+    renderLanding()
+
+    fireEvent.change(screen.getByLabelText('Full Name'), { target: { value: 'Aisha Al Saud' } })
+    fireEvent.change(screen.getByLabelText('Organization'), { target: { value: 'Example Authority' } })
+    fireEvent.change(screen.getByLabelText('Job Title'), { target: { value: 'Enterprise Architect' } })
+    fireEvent.change(screen.getByLabelText('Work Email'), { target: { value: 'aisha@example.gov.sa' } })
+    fireEvent.change(screen.getByLabelText('Message'), { target: { value: 'We would like an architecture governance demonstration.' } })
+    const submitButtons = screen.getAllByRole('button', { name: /Request a Demo/ })
+    fireEvent.click(submitButtons[submitButtons.length - 1])
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Your request is ready' })).toBeInTheDocument()
+    })
+    expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 })

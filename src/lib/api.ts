@@ -15,6 +15,8 @@ async function req(method: string, path: string, body?: any) {
 
 export const api = {
   login: (email: string, password: string, tenantSlug: string) => req('POST', '/auth/login', { email, password, tenantSlug }),
+  submitDemoRequest: (data: { fullName: string; organization: string; jobTitle: string; email: string; phone?: string; country: string; preferredLanguage: string; message: string }) =>
+    req('POST', '/public/demo-requests', data),
   me: () => req('GET', '/auth/me'),
   getMe: () => req('GET', '/users/me'),
   updateMe: (data: any) => req('PUT', '/users/me', data),

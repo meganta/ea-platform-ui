@@ -23,7 +23,7 @@ export default function LoginPage() {
   const nav = useNavigate()
   const [searchParams] = useSearchParams()
   const boundTenant = HOSTNAME_TENANT_MAP[window.location.hostname]
-  const [form, setForm] = useState({ email:'', password:'', tenantSlug: boundTenant || searchParams.get('org') || 'test-tenant' })
+  const [form, setForm] = useState({ email:'', password:'', tenantSlug: boundTenant || searchParams.get('org') || 'demo' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [orgBranding, setOrgBranding] = useState<PublicBrandingSummary | null>(null)
