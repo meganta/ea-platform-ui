@@ -280,6 +280,19 @@ describe('EaViewsPage - MyViews', () => {
 });
 
 describe('EaViewsPage - Related Architecture Views entry point (ADM integration)', () => {
+  it('opens the exact tenant View returned by ADM architecture integration', async () => {
+    mockSearchParams = new URLSearchParams('viewId=view-adm-1');
+    mockFetch({
+      '/ea-views/view-adm-1': { id: 'view-adm-1', name: 'ADM Target Applications', visualization: 'TABLE', architectureState: 'TARGET', rootObjectTypes: ['GovApplication'] },
+      '/ea-views/stats': {},
+      '/ea-views/scenarios': [],
+      '/dataset': { dataset: { context: {}, objects: [], relationships: [], paths: [], hierarchies: [], metrics: [], warnings: [], provenance: {} }, eligibility: { eligible: ['TABLE'], defaultVisualization: 'TABLE', reasons: {} } },
+    });
+    render(<EaViewsPage />);
+    expect(await screen.findByText('ADM Target Applications')).toBeInTheDocument();
+    expect((global.fetch as jest.Mock).mock.calls.some(([url]) => url.includes('/ea-views/view-adm-1'))).toBe(true);
+  });
+
   it('reads the architectureState query param and lands directly on My Views, pre-filtered', async () => {
     mockSearchParams = new URLSearchParams('architectureState=TARGET');
     mockFetch({
