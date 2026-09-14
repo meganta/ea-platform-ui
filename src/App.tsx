@@ -29,6 +29,7 @@ import DecisionEvaluationPage from './pages/DecisionEvaluationPage'
 import EaPlanningPage from './pages/EaPlanningPage'
 import GlossaryPage from './pages/GlossaryPage'
 import LandingPage from './pages/LandingPage'
+import DemoRequestsPage from './pages/DemoRequestsPage'
 import './styles.css'
 
 function ProtectedRoute({ children, permission, superadminOnly }: { children: React.ReactNode; permission?: string; superadminOnly?: boolean }) {
@@ -85,6 +86,7 @@ export default function App() {
               <Route path="billing" element={<ProtectedRoute permission="Users.View" superadminOnly><BillingPage /></ProtectedRoute>} />
               <Route path="decision-evaluation" element={<ProtectedRoute permission="Reviews.View" superadminOnly><DecisionEvaluationPage /></ProtectedRoute>} />
               <Route path="ea-planning" element={<ProtectedRoute permission="Repository.View"><EaPlanningPage /></ProtectedRoute>} />
+              <Route path="demo-requests" element={<ProtectedRoute superadminOnly><DemoRequestsPage /></ProtectedRoute>} />
             </Route>
           </Routes>
         </BrowserRouter>
