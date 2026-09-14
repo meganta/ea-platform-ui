@@ -66,6 +66,7 @@ export default function Layout() {
     { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View', superadminOnly: true },
     { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Users.View', superadminOnly: true },
     { to: '/setup', label: '🏛 Setup Assistant', icon: '', permission: null, superadminOnly: true },
+    { to: '/demo-requests', label: '📨 Demo Requests', icon: '', permission: null, superadminOnly: true },
   ]
 
   const visibleNav = navItems.filter(item => {
@@ -74,9 +75,9 @@ export default function Layout() {
     return hasPermission(item.permission)
   })
 
-  const mainNav = visibleNav.filter(n => !['/repository', '/knowledge', '/glossary', '/users', '/access-governance', '/settings', '/setup'].includes(n.to))
+  const mainNav = visibleNav.filter(n => !['/repository', '/knowledge', '/glossary', '/users', '/access-governance', '/settings', '/setup', '/demo-requests'].includes(n.to))
   const repoNav = visibleNav.filter(n => ['/repository', '/knowledge', '/glossary'].includes(n.to))
-  const adminNav = visibleNav.filter(n => ['/users', '/access-governance', '/settings', '/setup'].includes(n.to))
+  const adminNav = visibleNav.filter(n => ['/users', '/access-governance', '/settings', '/setup', '/demo-requests'].includes(n.to))
 
   return (
     <div className="layout">
