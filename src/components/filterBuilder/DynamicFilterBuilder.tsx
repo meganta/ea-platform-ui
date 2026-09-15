@@ -31,7 +31,7 @@ type Condition = AttrCondition | RelCondition
 // type tag; this frontend type does the same via isGroup() below, so what
 // gets built here serializes directly as a valid backend ConditionGroup
 // with no translation step.
-type NestedGroup = { operator: 'AND' | 'OR'; conditions: Condition[] }
+type NestedGroup = { operator: 'AND' | 'OR'; conditions: AttrCondition[] }
 type Node = Condition | NestedGroup
 type Group = { operator: 'AND' | 'OR'; conditions: Node[] }
 export type ConditionGroup = Group
