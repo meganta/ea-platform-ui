@@ -664,7 +664,7 @@ export default function RepositoryPage() {
             Group by Cycle
           </label>
           {selectedAssetType !== 'ALL' && (
-            <button type="button" onClick={() => setShowFilterBuilder(s => !s)} className="arq-button" style={{ fontSize: 12, padding: '6px 12px', background: structuredQuery ? 'var(--accent)' : undefined, color: structuredQuery ? '#fff' : undefined }}>
+            <button type="button" onClick={() => setShowFilterBuilder(s => !s)} style={{ fontSize: 12, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: structuredQuery ? 'var(--accent)' : 'var(--navy-mid)', color: structuredQuery ? '#fff' : 'var(--text)' }}>
               ⚙ {showFilterBuilder ? 'Hide' : 'Advanced'} Filters{structuredQuery ? ` (${structuredQuery.conditions.length})` : ''}
             </button>
           )}
