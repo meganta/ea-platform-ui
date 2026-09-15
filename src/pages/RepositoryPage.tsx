@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
+import DynamicFilterBuilder, { ConditionGroup } from '../components/filterBuilder/DynamicFilterBuilder'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -446,6 +447,13 @@ export default function RepositoryPage() {
   const [page, setPage] = useState(1)
   const pageSize = 50
   const [total, setTotal] = useState(0)
+  // Meta Model-driven Dynamic Filter Builder (additive, see
+  // DynamicFilterBuilder) - null means "no structured filter active", in
+  // which case load() below uses the existing simple filters exactly as
+  // before (task section 11's "preserve existing simple filters" /
+  // section 25's compatibility requirement).
+  const [structuredQuery, setStructuredQuery] = useState<ConditionGroup | null>(null)
+  const [showFilterBuilder, setShowFilterBuilder] = useState(false)
 
   // Debounces the search box specifically - a keystroke updates `search`
   // (the input's own responsive value) immediately, but the actual API
@@ -463,6 +471,14 @@ export default function RepositoryPage() {
     ])
     setConfig(cfg)
     setSummary(sum)
+    if (structuredQuery && selectedAssetType !== 'ALL') {
+      // Meta Model-driven Dynamic Filter Builder active - server-side
+      // filtering/pagination via the shared Architecture Query Engine
+      // (task section 11's "expected Repository behavior" steps 4-6).
+      const result = await api.post('/ea-repository/assets/query', { query: { rootObjectType: selectedAssetType, conditionGroup: structuredQuery }, page, pageSize })
+      setAssets(result.items || []); setTotal(result.total || 0)
+      return
+    }
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
     if (selectedDomain !== 'ALL') params.set('domain', selectedDomain)
     if (selectedOperatingDomain !== 'ALL') params.set('operatingDomain', selectedOperatingDomain)
@@ -478,12 +494,25 @@ export default function RepositoryPage() {
     else { setAssets(result.items || []); setTotal(result.total || 0) }
   }
 
-  useEffect(() => { load() }, [page, selectedDomain, selectedOperatingDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [page, selectedDomain, selectedOperatingDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch, structuredQuery]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resets to page 1 whenever a filter actually changes - a filter
   // change while sitting on page 5 of the old result set should not
-  // silently show an empty/wrong page of the new, filtered set.
+  // silently show an empty/wrong page of the new, filtered set. Applies
+  // equally to the structured filter builder (task section 11, step 8).
   const changeFilter = (setter: (v: string) => void) => (value: string) => { setter(value); setPage(1) }
+  const applyStructuredQuery = () => setPage(1)
+  const clearStructuredQuery = () => { setStructuredQuery(null); setPage(1) }
+
+  // The filter builder's conditions are specific to the object type they
+  // were built for - changing the object type invalidates them, so this
+  // clears (rather than silently carrying over a now-meaningless
+  // structured query for the previous type).
+  const prevAssetType = useRef(selectedAssetType)
+  useEffect(() => {
+    if (prevAssetType.current !== selectedAssetType) { setStructuredQuery(null); setShowFilterBuilder(false) }
+    prevAssetType.current = selectedAssetType
+  }, [selectedAssetType])
 
   // Deep-link support (Copilot Phase 1's evidence drawer links here as
   // ?assetId=<id>) - fetches the asset directly by id rather than relying
@@ -634,10 +663,29 @@ export default function RepositoryPage() {
             <input type="checkbox" checked={groupByCycle} onChange={e => setGroupByCycle(e.target.checked)} />
             Group by Cycle
           </label>
+          {selectedAssetType !== 'ALL' && (
+            <button type="button" onClick={() => setShowFilterBuilder(s => !s)} className="arq-button" style={{ fontSize: 12, padding: '6px 12px', background: structuredQuery ? 'var(--accent)' : undefined, color: structuredQuery ? '#fff' : undefined }}>
+              ⚙ {showFilterBuilder ? 'Hide' : 'Advanced'} Filters{structuredQuery ? ` (${structuredQuery.conditions.length})` : ''}
+            </button>
+          )}
           <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
             {total > 0 ? `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}` : '0 of 0'}
           </div>
         </div>
+
+        {/* Meta Model-driven Dynamic Filter Builder (task section 11) -
+            gated on a specific object type being selected, since the
+            builder's discovery endpoint requires one. */}
+        {showFilterBuilder && selectedAssetType !== 'ALL' && (
+          <DynamicFilterBuilder
+            objectType={selectedAssetType}
+            api={api}
+            value={structuredQuery}
+            onChange={setStructuredQuery}
+            onApply={applyStructuredQuery}
+            onClear={clearStructuredQuery}
+          />
+        )}
 
         {/* Assets table */}
         {groupByCycle && Object.keys(groupedAssets).length > 0 ? (
