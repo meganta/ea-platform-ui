@@ -64,6 +64,13 @@ export default function DynamicFilterBuilder({ objectType, api, value, onChange,
     setError(null)
     try {
       const def = await api.get(`/architecture-query/filter-definition?objectType=${encodeURIComponent(objectType)}`)
+      // Defensive: treat a malformed/unexpected response shape (e.g. an
+      // API mock or gateway returning {} for an unrecognized path, a 404
+      // body, etc.) the same as a failed load, rather than crashing on
+      // `definition.identityFields` being undefined further down.
+      if (!def || !Array.isArray(def.identityFields) || !Array.isArray(def.attributes) || !Array.isArray(def.relationships)) {
+        throw new Error('malformed filter definition response')
+      }
       setDefinition(def)
     } catch (e: any) {
       // Task section 18: "Meta Model definition changed after builder

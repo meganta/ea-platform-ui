@@ -2091,3 +2091,44 @@ describe('EaViewsPage - ViewBuilder Path Builder wiring', () => {
     });
   });
 });
+
+describe('EaViewsPage - ViewBuilder Dynamic Filter Builder wiring', () => {
+  const FILTER_DEFINITION = {
+    objectType: 'CAPABILITY',
+    identityFields: [],
+    attributes: [{ code: 'capabilityLevel', name: 'Capability Level', dataType: 'INTEGER', supportedOperators: ['EQUALS', 'GT'] }],
+    relationships: [],
+  };
+
+  it('the filter builder only appears once exactly one root object type is selected', async () => {
+    mockFetch({ '/ea-views/stats': {}, '/architecture-query/filter-definition': FILTER_DEFINITION });
+    render(<EaViewsPage />);
+    fireEvent.click(screen.getByText('+ New View'));
+    await screen.findByText('New Custom View');
+    expect(screen.queryByText('Filters')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('CAPABILITY'));
+    expect(await screen.findByText('Filters')).toBeInTheDocument();
+  });
+
+  it('a condition built in the filter builder is persisted as filterConfig.structuredQuery in the create-view payload, not mixed into the top-level payload', async () => {
+    mockFetch({
+      '/ea-views/stats': {},
+      '/architecture-query/filter-definition': FILTER_DEFINITION,
+      '/ea-views': (opts: any) => { if (opts?.method === 'POST') return { id: 'new-view-1', name: JSON.parse(opts.body).name }; return []; },
+    });
+    render(<EaViewsPage />);
+    fireEvent.click(screen.getByText('+ New View'));
+    await screen.findByText('New Custom View');
+    fireEvent.click(screen.getByText('CAPABILITY'));
+    fireEvent.click(await screen.findByText('+ Add condition'));
+    fireEvent.change(screen.getByPlaceholderText(/Q4 2026 Application Portfolio/), { target: { value: 'My Filtered View' } });
+    fireEvent.click(screen.getByText(/Create View/));
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].endsWith('/ea-views') && c[1]?.method === 'POST');
+      expect(postCall).toBeDefined();
+      const body = JSON.parse(postCall[1].body);
+      expect(body.filterConfig.structuredQuery).toEqual({ operator: 'AND', conditions: [{ type: 'ATTRIBUTE', attributeCode: 'capabilityLevel', operator: 'EQUALS', value: '' }] });
+      expect(body.structuredQuery).toBeUndefined(); // never leaks as a top-level payload field
+    });
+  });
+});

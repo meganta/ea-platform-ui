@@ -6,6 +6,7 @@ import { RoadmapConfigPanel, RoadmapTimeline } from './eaviews/RoadmapView'
 import { DashboardBuilder, DashboardGrid, DashboardWidget } from './eaviews/DashboardBuilder'
 
 import { PathBuilder, RelationshipHop } from './eaviews/PathBuilder'
+import DynamicFilterBuilder from '../components/filterBuilder/DynamicFilterBuilder'
 import { useSearchParams } from 'react-router-dom'
 import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
@@ -2828,6 +2829,7 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
     domains: string[]
     viewpointId: string | undefined
     relationshipPath: RelationshipHop[]
+    structuredQuery: any
   }>({
     name: viewpoint?.name || '',
     description: viewpoint?.description || '',
@@ -2839,15 +2841,30 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
     domains: viewpoint?.requiredDomains || [],
     viewpointId: viewpoint?.id || undefined,
     relationshipPath: [],
+    structuredQuery: null,
   })
   const [saving, setSaving] = useState(false)
 
   const toggleArr = (arr: string[], val: string) => arr.includes(val) ? arr.filter(v=>v!==val) : [...arr, val]
 
+  // The filter builder's conditions are specific to the root object type
+  // they were built for - changing it (or picking multiple root types)
+  // invalidates a structured query built for a single one, so it's
+  // cleared rather than silently carried over (task section 4: "remove/
+  // reset incompatible structured conditions").
+  const setRootObjectTypes = (rootObjectTypes: string[]) => setForm(f => ({ ...f, rootObjectTypes, structuredQuery: null }))
+
   const save = async () => {
     if (!form.name) return
     setSaving(true)
-    const result = await api.post('/ea-views', form)
+    // structuredQuery persists inside filterConfig (task section 7 - no
+    // new field/model, reuses existing View persistence) - the backend's
+    // resolveExecutionContext extracts it back out into its own
+    // ViewQueryConfig.structuredQuery field at execution time (see
+    // tenant-view.service.ts).
+    const { structuredQuery, ...rest } = form
+    const payload = { ...rest, filterConfig: structuredQuery ? { structuredQuery } : {} }
+    const result = await api.post('/ea-views', payload)
     setSaving(false)
     if (result?.id) onCreated(result)
   }
@@ -2890,7 +2907,7 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
             <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Object Types</div>
             <div style={{ marginBottom:12 }}><label style={S.label}>Primary Object Types (root)</label>
               <div style={{ display:'flex', gap:6, flexWrap:'wrap' as const }}>
-                {ASSET_TYPES.map(t=><span key={t} onClick={()=>setForm(f=>({...f,rootObjectTypes:toggleArr(f.rootObjectTypes,t)}))} style={{ ...S.badge(form.rootObjectTypes.includes(t)?TYPE_COLOR[t]||'var(--accent)':'#7f8c8d'), cursor:'pointer', opacity:form.rootObjectTypes.includes(t)?1:0.5 }}>{t.replace(/_/g,' ')}</span>)}
+                {ASSET_TYPES.map(t=><span key={t} onClick={()=>setRootObjectTypes(toggleArr(form.rootObjectTypes,t))} style={{ ...S.badge(form.rootObjectTypes.includes(t)?TYPE_COLOR[t]||'var(--accent)':'#7f8c8d'), cursor:'pointer', opacity:form.rootObjectTypes.includes(t)?1:0.5 }}>{t.replace(/_/g,' ')}</span>)}
               </div>
             </div>
             {/* Progressive disclosure: hidden until at least one root type
@@ -2909,6 +2926,29 @@ function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpo
               </div>
             )}
           </div>
+
+          {/* Meta Model-driven Dynamic Filter Builder (task section 3/4) -
+              shown once exactly one root type is picked, since a
+              structured query targets a single root object type
+              (ArchitectureQuery.rootObjectType); with multiple root types
+              selected, which type's filters would apply is ambiguous, so
+              the builder stays hidden rather than guessing. Wired
+              directly into ViewQueryConfig.structuredQuery via the
+              existing backend contract - same shared component, same
+              structured-query shape as EA Repository, no fork. */}
+          {form.rootObjectTypes.length === 1 && (
+            <div style={S.card}>
+              <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Filters</div>
+              <DynamicFilterBuilder
+                objectType={form.rootObjectTypes[0]}
+                api={api}
+                value={form.structuredQuery}
+                onChange={structuredQuery => setForm(f => ({ ...f, structuredQuery }))}
+                onApply={() => {}}
+                onClear={() => setForm(f => ({ ...f, structuredQuery: null }))}
+              />
+            </div>
+          )}
 
           {/* Progressive disclosure: the Path Builder only appears once a
               root type is picked - a single-level view (the pre-existing,
