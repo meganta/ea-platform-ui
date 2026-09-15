@@ -15,6 +15,7 @@ interface PublicBrandingSummary {
 // no manual org entry needed.
 const HOSTNAME_TENANT_MAP: Record<string, string> = {
   'hrdf.archmindworks.com': 'test-tenant',
+  'monshaat.archmindworks.com': 'monshaat',
 }
 
 export default function LoginPage() {

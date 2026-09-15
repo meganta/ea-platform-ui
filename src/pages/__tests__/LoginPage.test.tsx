@@ -40,6 +40,10 @@ beforeEach(() => {
   global.fetch = jest.fn().mockResolvedValue({ ok: false }); // no branding by default
 });
 
+afterEach(() => {
+  jest.restoreAllMocks(); // undoes any jest.spyOn(window, 'location', 'get') so it doesn't leak into later tests
+});
+
 describe('LoginPage', () => {
   it('renders the sign-in form with organization, email, and password fields', () => {
     renderLoginPage();
@@ -57,6 +61,22 @@ describe('LoginPage', () => {
     mockSearchParams = new URLSearchParams('org=acme-corp');
     renderLoginPage();
     expect(screen.getByLabelText('Organization ID')).toHaveValue('acme-corp');
+  });
+
+  it('auto-selects the monshaat tenant and hides the organization field on monshaat.archmindworks.com', async () => {
+    jest.spyOn(window, 'location', 'get').mockReturnValue({ hostname: 'monshaat.archmindworks.com' } as any);
+    mockLogin.mockResolvedValue(undefined);
+    renderLoginPage();
+
+    expect(screen.queryByLabelText('Organization ID')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'admin@monshaat.reference.archmind.local' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'ArchMind-Ref-2026!' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith('admin@monshaat.reference.archmind.local', 'ArchMind-Ref-2026!', 'monshaat');
+    });
   });
 
   it('calls login() with the entered credentials on submit', async () => {
