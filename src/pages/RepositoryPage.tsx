@@ -6,29 +6,6 @@ import DynamicFilterBuilder, { ConditionGroup } from '../components/filterBuilde
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
-// EA Repository Production Readiness, item 3: ArchMind's six operating
-// domains - a fixed, cross-tenant platform constant (not tenant/
-// framework-varying data like assetType/domain, which correctly comes
-// from the Meta Model instead), mirroring the exact same codes already
-// defined server-side in libs/database/src/canonical-taxonomy.ts.
-const OPERATING_DOMAINS = [
-  { code: 'BUSINESS_ARCHITECTURE', name: 'Business Architecture' },
-  { code: 'BENEFICIARY_EXPERIENCE', name: 'Beneficiary Experience' },
-  { code: 'APPLICATION_INTEGRATION', name: 'Applications & Integration' },
-  { code: 'DATA_ARCHITECTURE', name: 'Data Architecture' },
-  { code: 'INFRASTRUCTURE', name: 'Infrastructure & Technology' },
-  { code: 'SECURITY_ARCHITECTURE', name: 'Security Architecture' },
-  // Not a 7th operating domain - a deliberately separate category.
-  // NORA 2.0's Strategy, Motivation, and Governance domains do not
-  // correspond to any real ArchMind operating domain; confirmed by
-  // explicit platform-owner correction that all three belong together
-  // under one unified Strategy Layer, not spread across three
-  // semantically-incorrect domain buckets. Mirrors the exact same code
-  // (STRATEGY_LAYER) already defined server-side in
-  // libs/database/src/canonical-taxonomy.ts.
-  { code: 'STRATEGY_LAYER', name: 'Strategy Layer' },
-]
-
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: 'badge-draft',
   UNDER_REVIEW: 'badge-review',
@@ -426,12 +403,6 @@ export default function RepositoryPage() {
   const [assets, setAssets] = useState<any[]>([])
   const [summary, setSummary] = useState<any>(null)
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL')
-  // EA Repository Production Readiness, item 3: the six ArchMind
-  // operating domains, for navigation - a separate axis from the
-  // NORA-native `domain` filter above, which stays as-is (framework-
-  // native domains like Strategy/Motivation/Governance are never
-  // deleted or hidden).
-  const [selectedOperatingDomain, setSelectedOperatingDomain] = useState<string>('ALL')
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL')
   const [selectedSource, setSelectedSource] = useState<string>('ALL')
   const [selectedAssetType, setSelectedAssetType] = useState<string>('ALL')
@@ -488,7 +459,6 @@ export default function RepositoryPage() {
     }
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) })
     if (selectedDomain !== 'ALL') params.set('domain', selectedDomain)
-    if (selectedOperatingDomain !== 'ALL') params.set('operatingDomain', selectedOperatingDomain)
     if (selectedStatus !== 'ALL') params.set('status', selectedStatus)
     if (selectedSource !== 'ALL') params.set('source', selectedSource)
     if (selectedAssetType !== 'ALL') params.set('assetType', selectedAssetType)
@@ -501,7 +471,7 @@ export default function RepositoryPage() {
     else { setAssets(result.items || []); setTotal(result.total || 0) }
   }
 
-  useEffect(() => { load() }, [page, selectedDomain, selectedOperatingDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch, structuredQuery]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [page, selectedDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch, structuredQuery]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resets to page 1 whenever a filter actually changes - a filter
   // change while sitting on page 5 of the old result set should not
@@ -610,74 +580,68 @@ export default function RepositoryPage() {
       </div>
 
       <div className="page-body">
-        {/* Summary cards - one per ArchMind operating domain (plus the
-            separate Strategy Layer category), driven entirely by
-            summary.byDomain (now resolved server-side via the Meta
-            Model, not the raw, inconsistent EaAsset.domain column -
-            fixed the exact reported bugs: duplicate APPLICATION/
-            APPLICATIONS cards, and GOVERNANCE/MOTIVATION shown as if
-            they were real operating domains). Clicking a card sets
-            selectedOperatingDomain (previously and incorrectly set
-            selectedDomain here, the wrong filter entirely). Replaces
-            the separate operating-domain pill row this same page used
-            to also have - consolidated into these cards instead of two
-            overlapping domain-filter UIs. */}
-        {summary && (
-          <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
-            <div
-              className="stat-card"
-              style={{ flex: 1, minWidth: 120, cursor: 'pointer', outline: selectedOperatingDomain === 'ALL' ? '2px solid var(--accent)' : undefined }}
-              onClick={() => changeFilter(setSelectedOperatingDomain)('ALL')}
-            >
-              <div className="stat-value">{summary.total}</div>
-              <div className="stat-label">Show All</div>
-            </div>
-            {OPERATING_DOMAINS.map(d => {
-              const match = summary.byDomain?.find((row: any) => row.domain === d.code)
-              return (
-                <div
-                  key={d.code}
-                  className="stat-card"
-                  style={{ flex: 1, minWidth: 120, cursor: 'pointer', outline: selectedOperatingDomain === d.code ? '2px solid var(--accent)' : undefined }}
-                  onClick={() => changeFilter(setSelectedOperatingDomain)(d.code)}
-                >
-                  <div className="stat-value" style={{ fontSize: 24 }}>{match?.count || 0}</div>
-                  <div className="stat-label">{d.name}</div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Filters - order per explicit request: Domain, then Object
-            Type, then Source, then Status (search stays first as the
-            free-text entry point, separate from the four dropdown
-            filters being ordered). */}
+        {/* Filters - reordered per explicit correction: Source is now the
+            first dropdown (right after search), since it determines
+            which other filters are even meaningful. ADM Output assets
+            don't fit the Domain/Object Type taxonomy the same way
+            Manual/Upload/Integration data does (see the taxonomy
+            investigation this session) - so selecting it swaps Domain/
+            Object Type out for Group by Cycle instead, rather than
+            showing dropdowns that would mostly return nothing useful.
+            Status stays visible for every source - confirmed via live
+            data that ADM Output assets use the exact same status enum
+            as everything else, no separate status list needed. */}
         <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
           <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
-          <select className="form-input" style={{ width: 140 }} value={selectedDomain} onChange={e => { changeFilter(setSelectedDomain)(e.target.value); setSelectedAssetType('ALL') }}>
-            <option value="ALL">All Domains</option>
-            {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
-          </select>
-          <select className="form-input" style={{ width: 140 }} value={selectedAssetType} onChange={e => changeFilter(setSelectedAssetType)(e.target.value)}>
-            <option value="ALL">All Types</option>
-            {repoAssetTypes.map((t:any) => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
-          </select>
-          <select className="form-input" style={{ width: 140 }} value={selectedSource} onChange={e => changeFilter(setSelectedSource)(e.target.value)}>
+          <select className="form-input" style={{ width: 150 }} value={selectedSource} onChange={e => {
+            const nextSource = e.target.value
+            changeFilter(setSelectedSource)(nextSource)
+            if (nextSource !== 'ADM_OUTPUT') {
+              // Group by Cycle only makes sense for ADM Output - reset it
+              // when switching away so it's never left silently checked
+              // behind a now-hidden control.
+              setGroupByCycle(false)
+            } else {
+              // Domain/Object Type don't apply to ADM Output and their
+              // controls are hidden while it's selected - reset them
+              // rather than leaving a filter silently active that the
+              // user can no longer see or change. Clearing
+              // selectedAssetType already triggers the existing
+              // prevAssetType effect below, which clears
+              // draftQuery/structuredQuery/showFilterBuilder for us.
+              setSelectedDomain('ALL')
+              setSelectedAssetType('ALL')
+            }
+          }}>
             <option value="ALL">All Sources</option>
             <option value="ADM_OUTPUT">ADM Output</option>
             <option value="MANUAL">Manual</option>
             <option value="UPLOAD">Upload</option>
+            <option value="INTEGRATION">Integration</option>
+            <option value="AI_GENERATED">AI Generated</option>
           </select>
+          {selectedSource === 'ADM_OUTPUT' ? (
+            <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={groupByCycle} onChange={e => setGroupByCycle(e.target.checked)} />
+              Group by Cycle
+            </label>
+          ) : (
+            <>
+              <select className="form-input" style={{ width: 140 }} value={selectedDomain} onChange={e => { changeFilter(setSelectedDomain)(e.target.value); setSelectedAssetType('ALL') }}>
+                <option value="ALL">All Domains</option>
+                {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
+              </select>
+              <select className="form-input" style={{ width: 140 }} value={selectedAssetType} onChange={e => changeFilter(setSelectedAssetType)(e.target.value)}>
+                <option value="ALL">All Types</option>
+                {repoAssetTypes.map((t:any) => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+              </select>
+            </>
+          )}
           <select className="form-input" style={{ width: 160 }} value={selectedStatus} onChange={e => changeFilter(setSelectedStatus)(e.target.value)}>
             <option value="ALL">All Statuses</option>
             {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
           </select>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-            <input type="checkbox" checked={groupByCycle} onChange={e => setGroupByCycle(e.target.checked)} />
-            Group by Cycle
-          </label>
-          {selectedAssetType !== 'ALL' && (
+          {selectedSource !== 'ADM_OUTPUT' && selectedAssetType !== 'ALL' && (
             <button type="button" onClick={toggleFilterBuilder} style={{ fontSize: 12, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: structuredQuery ? 'var(--accent)' : 'var(--navy-mid)', color: structuredQuery ? '#fff' : 'var(--text)' }}>
               ⚙ {showFilterBuilder ? 'Hide' : 'Advanced'} Filters{structuredQuery ? ` (${structuredQuery.conditions.length})` : ''}
             </button>
