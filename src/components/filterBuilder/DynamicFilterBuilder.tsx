@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { OPERATOR_LABELS, VALUELESS_OPERATORS, RANGE_OPERATORS, MULTI_VALUE_OPERATORS, inputTypeForDataType } from './filterBuilderHelpers'
 
 // ── Shared Meta Model-Driven Dynamic Filter Builder ─────────────────────────
@@ -58,12 +58,26 @@ export default function DynamicFilterBuilder({ objectType, api, value, onChange,
   const [error, setError] = useState<string | null>(null)
   const group = value ?? emptyGroup()
 
+  // Fix (live testing correction): the parent page's api object (from its
+  // own useApi() hook) is a new reference on every parent render, which
+  // includes every keystroke inside this builder (each onChange call
+  // updates the parent's draft state, re-rendering the parent and handing
+  // this component a brand-new api prop). Keeping api directly in
+  // loadDefinition's dependency array meant every keystroke re-triggered
+  // discovery, flashing the whole panel back to "Loading filters..." and
+  // visually wiping the in-progress edit. A ref sidesteps this: apiRef is
+  // updated on every render (no effect, no re-render caused), and
+  // loadDefinition reads api.current instead of closing over the prop
+  // directly - so only objectType/locale actually changing re-fetches.
+  const apiRef = useRef(api)
+  apiRef.current = api
+
   const loadDefinition = useCallback(async () => {
     if (!objectType) { setDefinition(null); return }
     setLoading(true)
     setError(null)
     try {
-      const def = await api.get(`/architecture-query/filter-definition?objectType=${encodeURIComponent(objectType)}`)
+      const def = await apiRef.current.get(`/architecture-query/filter-definition?objectType=${encodeURIComponent(objectType)}`)
       // Defensive: treat a malformed/unexpected response shape (e.g. an
       // API mock or gateway returning {} for an unrecognized path, a 404
       // body, etc.) the same as a failed load, rather than crashing on
@@ -81,7 +95,7 @@ export default function DynamicFilterBuilder({ objectType, api, value, onChange,
     } finally {
       setLoading(false)
     }
-  }, [objectType, api, locale])
+  }, [objectType, locale])
 
   useEffect(() => { loadDefinition() }, [loadDefinition])
 
@@ -274,9 +288,141 @@ function ValueInput({ field, operator, value, onChange }: { field: FilterAttribu
   return <input type={inputType} className="form-input" style={{ minWidth: 140 }} value={value ?? ''} onChange={e => onChange(inputType === 'number' ? Number(e.target.value) : e.target.value)} />
 }
 
-function AttributeConditionRow({ condition, fields, onChange, onRemove, locale }: { condition: AttrCondition; fields: FilterAttributeDef[]; onChange: (c: AttrCondition) => void; onRemove: () => void; locale: 'EN' | 'AR' }) {
+function AssetAutocompleteInput({ assetType, api, value, onChange, placeholder }: { assetType: string; api: { get: (path: string) => Promise<any> }; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const [query, setQuery] = useState(value || '')
+  const [options, setOptions] = useState<string[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  // Same unstable-api-reference fix as the main component's apiRef -
+  // keeps a re-render triggered elsewhere in the tree from re-running
+  // this search unnecessarily.
+  const apiRef = useRef(api)
+  apiRef.current = api
+
+  useEffect(() => setQuery(value || ''), [value])
+
+  useEffect(() => {
+    if (!open) return
+    const handle = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const result = await apiRef.current.get(`/ea-repository/assets?assetType=${encodeURIComponent(assetType)}&search=${encodeURIComponent(query)}&pageSize=8`)
+        const items = Array.isArray(result) ? result : (result?.items || [])
+        setOptions(items.map((a: any) => a.name).filter(Boolean))
+      } catch {
+        setOptions([])
+      } finally {
+        setLoading(false)
+      }
+    }, 250)
+    return () => clearTimeout(handle)
+  }, [query, assetType, open])
+
+  return (
+    <div style={{ position: 'relative', minWidth: 180 }}>
+      <input
+        className="form-input"
+        style={{ width: '100%' }}
+        value={query}
+        placeholder={placeholder}
+        onFocus={() => setOpen(true)}
+        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true) }}
+        onBlur={() => setTimeout(() => setOpen(false), 150)} // lets an option's onMouseDown fire before the dropdown closes
+      />
+      {open && (loading || options.length > 0) && (
+        <div style={{ position: 'absolute', zIndex: 20, top: '100%', insetInlineStart: 0, minWidth: 220, maxHeight: 220, overflowY: 'auto', background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', marginTop: 2 }}>
+          {loading && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>Searching…</div>}
+          {!loading && options.map(name => (
+            <div key={name} onMouseDown={() => { onChange(name); setQuery(name); setOpen(false) }} style={{ padding: '6px 10px', fontSize: 13, cursor: 'pointer' }}>{name}</div>
+          ))}
+          {!loading && options.length === 0 && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>No matches</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AssetMultiAutocompleteInput({ assetType, api, value, onChange, placeholder, locale }: { assetType: string; api: { get: (path: string) => Promise<any> }; value: string[]; onChange: (v: string[]) => void; placeholder?: string; locale: 'EN' | 'AR' }) {
+  const selected: string[] = Array.isArray(value) ? value : []
+  const [query, setQuery] = useState('')
+  const [options, setOptions] = useState<string[]>([])
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const apiRef = useRef(api)
+  apiRef.current = api
+
+  useEffect(() => {
+    if (!open) return
+    const handle = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const result = await apiRef.current.get(`/ea-repository/assets?assetType=${encodeURIComponent(assetType)}&search=${encodeURIComponent(query)}&pageSize=8`)
+        const items = Array.isArray(result) ? result : (result?.items || [])
+        setOptions(items.map((a: any) => a.name).filter((n: string) => n && !selected.includes(n)))
+      } catch {
+        setOptions([])
+      } finally {
+        setLoading(false)
+      }
+    }, 250)
+    return () => clearTimeout(handle)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, assetType, open, selected.length])
+
+  const addChip = (name: string) => { onChange([...selected, name]); setQuery(''); setOpen(false) }
+  const removeChip = (name: string) => onChange(selected.filter(n => n !== name))
+
+  return (
+    <div style={{ position: 'relative', minWidth: 220 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 6px', background: 'var(--navy-light)' }}>
+        {selected.map(name => (
+          <span key={name} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--navy-mid)', borderRadius: 4, padding: '2px 6px', fontSize: 12 }}>
+            {name}
+            <button type="button" onClick={() => removeChip(name)} aria-label={locale === 'AR' ? `إزالة ${name}` : `Remove ${name}`} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+          </span>
+        ))}
+        <input
+          aria-label={placeholder || (locale === 'AR' ? 'ابحث بالاسم' : 'Search by name')}
+          style={{ border: 'none', outline: 'none', flex: 1, minWidth: 100, fontSize: 13, background: 'transparent' }}
+          value={query}
+          placeholder={selected.length === 0 ? placeholder : ''}
+          onFocus={() => setOpen(true)}
+          onChange={e => { setQuery(e.target.value); setOpen(true) }}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+        />
+      </div>
+      {open && (loading || options.length > 0) && (
+        <div style={{ position: 'absolute', zIndex: 20, top: '100%', insetInlineStart: 0, minWidth: 220, maxHeight: 220, overflowY: 'auto', background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', marginTop: 2 }}>
+          {loading && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>Searching…</div>}
+          {!loading && options.map(name => (
+            <div key={name} onMouseDown={() => addChip(name)} style={{ padding: '6px 10px', fontSize: 13, cursor: 'pointer' }}>{name}</div>
+          ))}
+          {!loading && options.length === 0 && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>No matches</div>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AttributeConditionRow({ condition, fields, onChange, onRemove, locale, api, autocompleteAssetType }: { condition: AttrCondition; fields: FilterAttributeDef[]; onChange: (c: AttrCondition) => void; onRemove: () => void; locale: 'EN' | 'AR'; api?: { get: (path: string) => Promise<any> }; autocompleteAssetType?: string }) {
   const field = fields.find(f => f.code === condition.attributeCode) || fields[0]
   if (!field) return null
+  // Task correction (live testing): filtering by a related object's Name
+  // (the common "pick a specific related asset" case, e.g. "supported by
+  // Application = X") needs to let the user pick from real existing
+  // assets, not type a name from memory into a blind text box. Scoped to
+  // the identity __name field specifically, and only when this row is
+  // rendered inside a relationship's relatedConditions (autocompleteAssetType
+  // is only ever passed there - see RelationshipConditionRow below) - a
+  // top-level Name condition on the root type itself stays a plain text
+  // box, since CONTAINS/STARTS_WITH search there is already the intended
+  // free-text behavior.
+  // useAutocomplete: single-value autocomplete for EQUALS/CONTAINS/etc.
+  // useMultiAutocomplete: chip-based multi-select for IN/NOT_IN (task
+  // correction: a many-to-many/one-to-many relationship needs "is any of
+  // [A, B, C]", not just a single name).
+  const useAutocomplete = field.code === '__name' && !!api && !!autocompleteAssetType && !VALUELESS_OPERATORS.has(condition.operator) && !RANGE_OPERATORS.has(condition.operator) && !MULTI_VALUE_OPERATORS.has(condition.operator)
+  const useMultiAutocomplete = field.code === '__name' && !!api && !!autocompleteAssetType && MULTI_VALUE_OPERATORS.has(condition.operator)
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', padding: '8px 10px', background: 'var(--navy-mid)', borderRadius: 6, border: '1px solid var(--border)' }}>
       <select className="form-input" style={{ minWidth: 140 }} value={condition.attributeCode} onChange={e => {
@@ -285,10 +431,18 @@ function AttributeConditionRow({ condition, fields, onChange, onRemove, locale }
       }}>
         {fields.map(f => <option key={f.code} value={f.code}>{f.name}</option>)}
       </select>
-      <select className="form-input" style={{ minWidth: 120 }} value={condition.operator} onChange={e => onChange({ ...condition, operator: e.target.value, value: '' })}>
+      <select className="form-input" style={{ minWidth: 120 }} value={condition.operator} onChange={e => {
+        const nextOperator = e.target.value
+        // MULTI_VALUE_OPERATORS (IN/NOT_IN) need an array value, not ''.
+        onChange({ ...condition, operator: nextOperator, value: MULTI_VALUE_OPERATORS.has(nextOperator) ? [] : '' })
+      }}>
         {field.supportedOperators.map(op => <option key={op} value={op}>{OPERATOR_LABELS[op] || op}</option>)}
       </select>
-      <ValueInput field={field} operator={condition.operator} value={condition.value} onChange={v => onChange({ ...condition, value: v })} />
+      {useMultiAutocomplete
+        ? <AssetMultiAutocompleteInput assetType={autocompleteAssetType!} api={api!} value={condition.value} onChange={v => onChange({ ...condition, value: v })} placeholder={locale === 'AR' ? 'ابحث بالاسم...' : 'Search by name…'} locale={locale} />
+        : useAutocomplete
+          ? <AssetAutocompleteInput assetType={autocompleteAssetType!} api={api!} value={condition.value} onChange={v => onChange({ ...condition, value: v })} placeholder={locale === 'AR' ? 'ابحث بالاسم...' : 'Search by name…'} />
+          : <ValueInput field={field} operator={condition.operator} value={condition.value} onChange={v => onChange({ ...condition, value: v })} />}
       <button type="button" onClick={onRemove} aria-label={locale === 'AR' ? 'إزالة' : 'Remove'} style={{ marginInlineStart: 'auto', background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
     </div>
   )
@@ -297,11 +451,19 @@ function AttributeConditionRow({ condition, fields, onChange, onRemove, locale }
 function RelationshipConditionRow({ condition, relationships, api, onChange, onRemove, locale }: { condition: RelCondition; relationships: FilterRelationshipDef[]; api: { get: (path: string) => Promise<any> }; onChange: (c: RelCondition) => void; onRemove: () => void; locale: 'EN' | 'AR' }) {
   const relDef = relationships.find(r => r.relationshipDefId === condition.relationshipDefId) || relationships[0]
   const [relatedDefinition, setRelatedDefinition] = useState<FilterDefinition | null>(null)
+  const apiRef = useRef(api)
+  apiRef.current = api
 
   useEffect(() => {
     if (!condition.relatedConditions || !relDef) return
-    api.get(`/architecture-query/filter-definition?objectType=${encodeURIComponent(relDef.relatedObjectType)}`).then(setRelatedDefinition).catch(() => setRelatedDefinition(null))
-  }, [condition.relatedConditions, relDef, api])
+    apiRef.current.get(`/architecture-query/filter-definition?objectType=${encodeURIComponent(relDef.relatedObjectType)}`).then(setRelatedDefinition).catch(() => setRelatedDefinition(null))
+    // relDef.relatedObjectType (not the relDef object itself, and not
+    // api) is the real trigger here - the related type this needs
+    // definitions for. Using the object/api as dependencies would
+    // re-fetch on every keystroke inside an unrelated part of the tree
+    // that happens to recreate those references.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!condition.relatedConditions, relDef?.relatedObjectType])
 
   if (!relDef) return null
   const label = relDef.direction === 'OUTGOING' ? relDef.forwardLabel : (relDef.reverseLabel || relDef.forwardLabel)
@@ -345,6 +507,8 @@ function RelationshipConditionRow({ condition, relationships, api, onChange, onR
                     onChange({ ...condition, relatedConditions: conditions.length ? { ...condition.relatedConditions!, conditions } : undefined })
                   }}
                   locale={locale}
+                  api={api}
+                  autocompleteAssetType={relDef.relatedObjectType}
                 />
               ))}
               <button type="button" onClick={() => {

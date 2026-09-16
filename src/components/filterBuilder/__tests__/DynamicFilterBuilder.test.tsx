@@ -227,6 +227,57 @@ describe('DynamicFilterBuilder', () => {
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ conditions: [expect.objectContaining({ operator: 'NOT_EXISTS' })] }))
   })
 
+  // Requirement (explicit correction from live testing): a many-to-many/
+  // one-to-many relationship's related-object Name condition must allow
+  // picking several related assets ("is any of [A, B, C]"), not just one.
+  it('related-object Name field with IN operator renders a multi-select chip autocomplete, not a single text box', async () => {
+    const CAPABILITY_WITH_NAME = { ...CAPABILITY_DEFINITION, identityFields: [{ code: '__name', name: 'Name', dataType: 'TEXT', supportedOperators: ['EQUALS', 'CONTAINS', 'IN', 'NOT_IN'] }] }
+    const api = makeApi({ Application: APPLICATION_DEFINITION, GovCapability: CAPABILITY_WITH_NAME })
+    const onChange = jest.fn()
+    const value: ConditionGroup = {
+      operator: 'AND',
+      conditions: [{
+        type: 'RELATIONSHIP', relationshipDefId: 'rel-1', direction: 'OUTGOING', operator: 'EXISTS',
+        relatedConditions: { operator: 'AND', conditions: [{ type: 'ATTRIBUTE', attributeCode: '__name', operator: 'IN', value: ['Payments API'] }] },
+      }],
+    }
+    render(<DynamicFilterBuilder objectType="Application" api={api} value={value} onChange={onChange} onApply={jest.fn()} onClear={jest.fn()} />)
+    // The already-selected chip renders
+    await waitFor(() => expect(screen.getByText('Payments API')).toBeInTheDocument())
+    // A remove (×) control exists for the chip - proves this is the
+    // multi-select chip UI, not a plain text input showing the raw array
+    expect(screen.getByLabelText('Remove Payments API')).toBeInTheDocument()
+  })
+
+  it('selecting a search result while IN is active adds it as an additional chip, not replacing the existing selection', async () => {
+    const CAPABILITY_WITH_NAME = { ...CAPABILITY_DEFINITION, identityFields: [{ code: '__name', name: 'Name', dataType: 'TEXT', supportedOperators: ['EQUALS', 'CONTAINS', 'IN', 'NOT_IN'] }] }
+    const capabilitySearchApi = jest.fn().mockResolvedValue({ items: [{ name: 'Onboarding API' }] })
+    const api = { get: (path: string) => {
+      if (path.includes('/ea-repository/assets')) return capabilitySearchApi(path)
+      const match = path.match(/objectType=([^&]+)/)
+      const defs: Record<string, any> = { Application: APPLICATION_DEFINITION, GovCapability: CAPABILITY_WITH_NAME }
+      return Promise.resolve(defs[match ? decodeURIComponent(match[1]) : ''])
+    } }
+    const onChange = jest.fn()
+    const value: ConditionGroup = {
+      operator: 'AND',
+      conditions: [{
+        type: 'RELATIONSHIP', relationshipDefId: 'rel-1', direction: 'OUTGOING', operator: 'EXISTS',
+        relatedConditions: { operator: 'AND', conditions: [{ type: 'ATTRIBUTE', attributeCode: '__name', operator: 'IN', value: ['Payments API'] }] },
+      }],
+    }
+    render(<DynamicFilterBuilder objectType="Application" api={api} value={value} onChange={onChange} onApply={jest.fn()} onClear={jest.fn()} />)
+    await waitFor(() => expect(screen.getByText('Payments API')).toBeInTheDocument())
+    const searchInput = screen.getByLabelText('Search by name…')
+    fireEvent.focus(searchInput)
+    fireEvent.change(searchInput, { target: { value: 'Onboard' } })
+    const option = await screen.findByText('Onboarding API')
+    fireEvent.mouseDown(option)
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({
+      conditions: [expect.objectContaining({ relatedConditions: { operator: 'AND', conditions: [{ type: 'ATTRIBUTE', attributeCode: '__name', operator: 'IN', value: ['Payments API', 'Onboarding API'] }] } })],
+    }))
+  })
+
   it('forward relationship presentation: shows the forward label and related type name for an OUTGOING relationship', async () => {
     const api = makeApi({ Application: APPLICATION_DEFINITION })
     const value: ConditionGroup = { operator: 'AND', conditions: [{ type: 'RELATIONSHIP', relationshipDefId: 'rel-1', direction: 'OUTGOING', operator: 'EXISTS' }] }
