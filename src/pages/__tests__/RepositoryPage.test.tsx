@@ -458,3 +458,66 @@ describe('RepositoryPage - evidence-drawer deep link (Copilot Phase 1, ?assetId=
     expect(mockSetSearchParams).not.toHaveBeenCalled();
   });
 });
+
+describe('RepositoryPage - Advanced Filters apply-deferral (bug fix: query only re-runs on Apply, not every keystroke)', () => {
+  const FILTER_DEFINITION = {
+    objectType: 'APPLICATION',
+    identityFields: [],
+    attributes: [{ code: 'techStack', name: 'Tech Stack', dataType: 'TEXT', supportedOperators: ['CONTAINS'] }],
+    relationships: [],
+  };
+
+  it('editing a condition in the builder does NOT re-query - only clicking Apply filters does', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG,
+      '/ea-repository/assets/query': [asset()],
+      '/ea-repository/assets': [asset()],
+      '/ea-repository/summary': {},
+      '/architecture-query/filter-definition': FILTER_DEFINITION,
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.change(screen.getByDisplayValue('All Types'), { target: { value: 'APPLICATION' } });
+    fireEvent.click(screen.getByText(/Advanced Filters/));
+    fireEvent.click(await screen.findByText('+ Add condition'));
+    await screen.findByText('Tech Stack');
+
+    const queryCallsBeforeTyping = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/assets/query')).length;
+    const textInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+    fireEvent.change(textInput, { target: { value: 'Java' } });
+    fireEvent.change(textInput, { target: { value: 'JavaEE' } });
+    // Typing must not trigger the structured query endpoint at all
+    const queryCallsAfterTyping = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/assets/query')).length;
+    expect(queryCallsAfterTyping).toBe(queryCallsBeforeTyping);
+
+    fireEvent.click(screen.getByText('Apply filters'));
+    await waitFor(() => {
+      const queryCallsAfterApply = (global.fetch as jest.Mock).mock.calls.filter((c: any) => c[0].includes('/assets/query')).length;
+      expect(queryCallsAfterApply).toBeGreaterThan(queryCallsBeforeTyping);
+    });
+  });
+
+  it('re-opening the panel after Apply seeds the draft from the applied query, not a blank builder', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG,
+      '/ea-repository/assets/query': [asset()],
+      '/ea-repository/assets': [asset()],
+      '/ea-repository/summary': {},
+      '/architecture-query/filter-definition': FILTER_DEFINITION,
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.change(screen.getByDisplayValue('All Types'), { target: { value: 'APPLICATION' } });
+    fireEvent.click(screen.getByText(/Advanced Filters/));
+    fireEvent.click(await screen.findByText('+ Add condition'));
+    await screen.findByText('Tech Stack');
+    fireEvent.click(screen.getByText('Apply filters'));
+    await waitFor(() => expect(screen.getByText(/Hide Filters \(1\)/)).toBeInTheDocument());
+
+    // Close and re-open the panel
+    fireEvent.click(screen.getByText(/Hide Filters/));
+    fireEvent.click(screen.getByText(/Advanced Filters \(1\)/));
+    // The previously-applied condition is still shown, not a blank state
+    expect(await screen.findByText('Tech Stack')).toBeInTheDocument();
+  });
+});

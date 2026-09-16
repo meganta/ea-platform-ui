@@ -453,6 +453,13 @@ export default function RepositoryPage() {
   // before (task section 11's "preserve existing simple filters" /
   // section 25's compatibility requirement).
   const [structuredQuery, setStructuredQuery] = useState<ConditionGroup | null>(null)
+  // Separate draft state: DynamicFilterBuilder edits this freely (every
+  // keystroke) without triggering a query - only clicking "Apply filters"
+  // copies it into structuredQuery, which is the one actually in load()'s
+  // effect dependencies below. Without this split, every keystroke in a
+  // text condition's value box re-queried the server on every character,
+  // making "Apply" meaningless (explicit correction from live testing).
+  const [draftQuery, setDraftQuery] = useState<ConditionGroup | null>(null)
   const [showFilterBuilder, setShowFilterBuilder] = useState(false)
 
   // Debounces the search box specifically - a keystroke updates `search`
@@ -501,8 +508,15 @@ export default function RepositoryPage() {
   // silently show an empty/wrong page of the new, filtered set. Applies
   // equally to the structured filter builder (task section 11, step 8).
   const changeFilter = (setter: (v: string) => void) => (value: string) => { setter(value); setPage(1) }
-  const applyStructuredQuery = () => setPage(1)
-  const clearStructuredQuery = () => { setStructuredQuery(null); setPage(1) }
+  const applyStructuredQuery = () => { setStructuredQuery(draftQuery); setPage(1) }
+  const clearStructuredQuery = () => { setDraftQuery(null); setStructuredQuery(null); setPage(1) }
+  const toggleFilterBuilder = () => {
+    // Opening the panel seeds the draft from whatever is currently
+    // applied, so re-opening to tweak an already-applied filter shows
+    // the actual applied conditions rather than a blank builder.
+    if (!showFilterBuilder) setDraftQuery(structuredQuery)
+    setShowFilterBuilder(s => !s)
+  }
 
   // The filter builder's conditions are specific to the object type they
   // were built for - changing the object type invalidates them, so this
@@ -510,7 +524,7 @@ export default function RepositoryPage() {
   // structured query for the previous type).
   const prevAssetType = useRef(selectedAssetType)
   useEffect(() => {
-    if (prevAssetType.current !== selectedAssetType) { setStructuredQuery(null); setShowFilterBuilder(false) }
+    if (prevAssetType.current !== selectedAssetType) { setDraftQuery(null); setStructuredQuery(null); setShowFilterBuilder(false) }
     prevAssetType.current = selectedAssetType
   }, [selectedAssetType])
 
@@ -664,7 +678,7 @@ export default function RepositoryPage() {
             Group by Cycle
           </label>
           {selectedAssetType !== 'ALL' && (
-            <button type="button" onClick={() => setShowFilterBuilder(s => !s)} style={{ fontSize: 12, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: structuredQuery ? 'var(--accent)' : 'var(--navy-mid)', color: structuredQuery ? '#fff' : 'var(--text)' }}>
+            <button type="button" onClick={toggleFilterBuilder} style={{ fontSize: 12, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: structuredQuery ? 'var(--accent)' : 'var(--navy-mid)', color: structuredQuery ? '#fff' : 'var(--text)' }}>
               ⚙ {showFilterBuilder ? 'Hide' : 'Advanced'} Filters{structuredQuery ? ` (${structuredQuery.conditions.length})` : ''}
             </button>
           )}
@@ -680,8 +694,8 @@ export default function RepositoryPage() {
           <DynamicFilterBuilder
             objectType={selectedAssetType}
             api={api}
-            value={structuredQuery}
-            onChange={setStructuredQuery}
+            value={draftQuery}
+            onChange={setDraftQuery}
             onApply={applyStructuredQuery}
             onClear={clearStructuredQuery}
           />
