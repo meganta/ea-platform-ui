@@ -102,6 +102,10 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'dash.mod_plans':       { EN: 'plans', AR: 'خطط' },
   'nav.setup':         { EN: 'Setup Assistant', AR: 'مساعد الإعداد' },
   'nav.admin':         { EN: 'Admin', AR: 'الإدارة' },
+  'nav.glossary':      { EN: 'Glossary', AR: 'مسرد المصطلحات' },
+  'nav.users':         { EN: 'Users', AR: 'المستخدمون' },
+  'nav.access_governance': { EN: 'Access Governance', AR: 'حوكمة الوصول' },
+  'nav.demo_requests': { EN: 'Demo Requests', AR: 'طلبات العرض التجريبي' },
   // Auth
   'auth.email':        { EN: 'Email', AR: 'البريد الإلكتروني' },
   'auth.password':     { EN: 'Password', AR: 'كلمة المرور' },
