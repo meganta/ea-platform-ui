@@ -184,14 +184,14 @@ export default function DynamicFilterBuilder({ objectType, api, value, onChange,
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button type="button" onClick={addAttributeCondition} className="arq-button" style={{ fontSize: 12, padding: '6px 12px' }}>+ {locale === 'AR' ? 'إضافة شرط' : 'Add condition'}</button>
+            <button type="button" onClick={addAttributeCondition} style={{ fontSize: 12, padding: '6px 12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ {locale === 'AR' ? 'إضافة شرط' : 'Add condition'}</button>
             {definition.relationships.length > 0 && (
-              <button type="button" onClick={addRelationshipCondition} className="arq-button" style={{ fontSize: 12, padding: '6px 12px' }}>+ {locale === 'AR' ? 'إضافة علاقة' : 'Add relationship'}</button>
+              <button type="button" onClick={addRelationshipCondition} style={{ fontSize: 12, padding: '6px 12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ {locale === 'AR' ? 'إضافة علاقة' : 'Add relationship'}</button>
             )}
-            <button type="button" onClick={addGroup} className="arq-button" style={{ fontSize: 12, padding: '6px 12px' }}>+ {locale === 'AR' ? 'إضافة مجموعة' : 'Add group'}</button>
+            <button type="button" onClick={addGroup} style={{ fontSize: 12, padding: '6px 12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>+ {locale === 'AR' ? 'إضافة مجموعة' : 'Add group'}</button>
             <div style={{ flex: 1 }} />
             <button type="button" onClick={() => { onClear(); }} style={{ fontSize: 12, padding: '6px 12px', background: 'transparent', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-dim)', cursor: 'pointer' }}>{locale === 'AR' ? 'مسح' : 'Clear'}</button>
-            <button type="button" onClick={onApply} disabled={group.conditions.length === 0} className="arq-button" style={{ fontSize: 12, padding: '6px 14px', fontWeight: 700, opacity: group.conditions.length === 0 ? 0.5 : 1 }}>{locale === 'AR' ? 'تطبيق' : 'Apply filters'}</button>
+            <button type="button" onClick={onApply} disabled={group.conditions.length === 0} style={{ fontSize: 12, padding: '6px 14px', fontWeight: 700, background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: group.conditions.length === 0 ? 'default' : 'pointer', opacity: group.conditions.length === 0 ? 0.5 : 1 }}>{locale === 'AR' ? 'تطبيق' : 'Apply filters'}</button>
           </div>
         </>
       )}
