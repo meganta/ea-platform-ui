@@ -255,7 +255,7 @@ export default function DashboardPage() {
             {/* Monthly trend */}
             {monthlyTrend.length > 0 && monthlyTrend.some((m: any) => m.count > 0) && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>Monthly Reviews & Avg Score</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('dashboard.monthly_reviews')}</div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 64 }}>
                   {monthlyTrend.map((m: any, i: number) => {
                     const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any)=>x.count), 1)) * 48))
