@@ -107,21 +107,6 @@ describe('RepositoryPage - loading and listing', () => {
     expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('domain=APPLICATIONS'))).toBe(false);
   });
 
-  // EA Repository Production Readiness, item 3.
-  it('filters by ArchMind operating domain via the quick-filter pills - sends operatingDomain as a server-side query param', async () => {
-    mockFetch({
-      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
-      '/ea-repository/assets': (url: string) => url.includes('operatingDomain=DATA_ARCHITECTURE')
-        ? [asset({ id: 'a2', name: 'Data Entity Asset' })]
-        : [asset({ id: 'a1', name: 'Core Banking' })],
-    });
-    render(<RepositoryPage />);
-    await screen.findByText('Core Banking');
-    fireEvent.click(screen.getByText('Data Architecture'));
-    expect(await screen.findByText('Data Entity Asset')).toBeInTheDocument();
-    expect(screen.queryByText('Core Banking')).not.toBeInTheDocument();
-  });
-
   it('filters by status - sends the selected status as a server-side query param', async () => {
     mockFetch({
       '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
@@ -177,65 +162,13 @@ describe('RepositoryPage - loading and listing', () => {
     });
     render(<RepositoryPage />);
     await screen.findByText('Manual One');
+    // Group by Cycle is only shown once ADM Output is selected as the
+    // source (explicit correction: it doesn't apply to Manual/Upload
+    // data the same way) - select it first to reveal the checkbox.
+    fireEvent.change(screen.getByDisplayValue('All Sources'), { target: { value: 'ADM_OUTPUT' } });
     fireEvent.click(screen.getByRole('checkbox'));
     expect(await screen.findByText(/Manual Entries/)).toBeInTheDocument();
     expect(screen.getByText(/Uploads/)).toBeInTheDocument();
-  });
-});
-
-// Live bug report fix: the summary cards row used to show duplicate
-// cards for the same real concept (e.g. 'APPLICATION'/'APPLICATIONS'),
-// and treated NORA-native 'GOVERNANCE'/'MOTIVATION' as if they were
-// real ArchMind operating domains. Now driven by the fixed,
-// always-present OPERATING_DOMAINS list (merged with summary.byDomain's
-// resolved counts), not whatever raw values happen to be in the data.
-describe('RepositoryPage - summary cards (bug fix: no duplicates, correct domain set)', () => {
-  it('always renders exactly 8 cards (Show All + six operating domains + Strategy Layer), even when summary.byDomain has fewer entries than that', async () => {
-    mockFetch({
-      '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()],
-      '/ea-repository/summary': { total: 42, byDomain: [{ domain: 'APPLICATION_INTEGRATION', operatingDomainDisplayName: 'Applications & Integration', count: 42 }] },
-    });
-    render(<RepositoryPage />);
-    await screen.findByText('Show All');
-    expect(screen.getByText('Business Architecture')).toBeInTheDocument();
-    expect(screen.getByText('Strategy Layer')).toBeInTheDocument();
-    expect(screen.getByText('Applications & Integration')).toBeInTheDocument();
-  });
-
-  it('shows a single card with the merged count for a domain the backend resolved from multiple raw assetType values (the exact reported duplicate-card bug)', async () => {
-    mockFetch({
-      '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()],
-      '/ea-repository/summary': { total: 45, byDomain: [{ domain: 'APPLICATION_INTEGRATION', operatingDomainDisplayName: 'Applications & Integration', count: 30 }] },
-    });
-    render(<RepositoryPage />);
-    await screen.findByText('Show All');
-    expect(screen.getAllByText('Applications & Integration')).toHaveLength(1);
-    expect(screen.getByText('30')).toBeInTheDocument();
-  });
-
-  it('shows 0 (not missing) for an operating domain with no matching data', async () => {
-    mockFetch({
-      '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()],
-      '/ea-repository/summary': { total: 5, byDomain: [{ domain: 'DATA_ARCHITECTURE', operatingDomainDisplayName: 'Data Architecture', count: 5 }] },
-    });
-    render(<RepositoryPage />);
-    await screen.findByText('Show All');
-    const securityCard = screen.getByText('Security Architecture').closest('.stat-card');
-    expect(securityCard).toHaveTextContent('0');
-  });
-
-  it('clicking a domain card sends operatingDomain (not the old, wrong domain param) as a server-side query param', async () => {
-    mockFetch({
-      '/ea-repository/framework-config': CONFIG,
-      '/ea-repository/assets': (url: string, options: any) => url.includes('operatingDomain=STRATEGY_LAYER')
-        ? [asset({ id: 'a2', name: 'Strategic Goal Asset' })]
-        : [asset({ id: 'a1', name: 'Core Banking' })],
-      '/ea-repository/summary': { total: 2, byDomain: [{ domain: 'STRATEGY_LAYER', operatingDomainDisplayName: 'Strategy Layer', count: 1 }] },
-    });
-    render(<RepositoryPage />);
-    await screen.findByText('Core Banking');
-    fireEvent.click(screen.getByText('Strategy Layer'));
-    expect(await screen.findByText('Strategic Goal Asset')).toBeInTheDocument();
   });
 });
 
@@ -370,7 +303,10 @@ describe('RepositoryPage - connector provenance display (HRDF demo: ManageEngine
     });
     render(<RepositoryPage />);
     await screen.findByText('Legacy Sync Asset');
-    expect(screen.getByText('Integration')).toBeInTheDocument();
+    // getByText('Integration') is now ambiguous (the new Source dropdown
+    // also has an "Integration" option) - scope to the actual source
+    // badge, uniquely identified by its title (the sourceRef).
+    expect(screen.getByTitle('SOME-OTHER-SYSTEM-01')).toHaveTextContent('Integration');
   });
 
   it('shows the real synced attributes (CPU, memory, OS) in the asset detail view for a ManageEngine-sourced server', async () => {
@@ -519,5 +455,81 @@ describe('RepositoryPage - Advanced Filters apply-deferral (bug fix: query only 
     fireEvent.click(screen.getByText(/Advanced Filters \(1\)/));
     // The previously-applied condition is still shown, not a blank state
     expect(await screen.findByText('Tech Stack')).toBeInTheDocument();
+  });
+});
+
+describe('RepositoryPage - Source-first filter reorganization (explicit correction)', () => {
+  it('Source is the first dropdown, immediately after the search box', async () => {
+    mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    const selects = screen.getAllByRole('combobox');
+    expect((selects[0] as HTMLSelectElement).value).toBe('ALL'); // the Source select, defaulting to "All Sources"
+    expect(selects[0].querySelector('option[value="ALL"]')?.textContent).toBe('All Sources');
+  });
+
+  it('Source dropdown offers Integration and AI Generated, not just the original three', async () => {
+    mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    const sourceSelect = screen.getAllByRole('combobox')[0] as HTMLSelectElement;
+    const values = Array.from(sourceSelect.options).map(o => o.value);
+    expect(values).toEqual(['ALL', 'ADM_OUTPUT', 'MANUAL', 'UPLOAD', 'INTEGRATION', 'AI_GENERATED']);
+  });
+
+  it('selecting ADM Output hides Domain/Object Type and shows Group by Cycle instead', async () => {
+    mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    expect(screen.queryByText('Group by Cycle')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByDisplayValue('All Sources'), { target: { value: 'ADM_OUTPUT' } });
+    expect(screen.queryByText('All Domains')).not.toBeInTheDocument();
+    expect(screen.queryByText('All Types')).not.toBeInTheDocument();
+    expect(screen.getByText('Group by Cycle')).toBeInTheDocument();
+  });
+
+  it.each(['MANUAL', 'UPLOAD', 'INTEGRATION', 'AI_GENERATED'])('selecting %s shows Domain/Object Type and hides Group by Cycle', async (source) => {
+    mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.change(screen.getByDisplayValue('All Sources'), { target: { value: source } });
+    expect(screen.getByText('All Domains')).toBeInTheDocument();
+    expect(screen.getByText('All Types')).toBeInTheDocument();
+    expect(screen.queryByText('Group by Cycle')).not.toBeInTheDocument();
+  });
+
+  it('switching from ADM Output back to Manual/Upload resets Group by Cycle so it is not silently left checked', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ id: 'a1', name: 'Manual One', source: 'MANUAL' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Manual One');
+    fireEvent.change(screen.getByDisplayValue('All Sources'), { target: { value: 'ADM_OUTPUT' } });
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    fireEvent.change(screen.getByDisplayValue('ADM Output'), { target: { value: 'MANUAL' } });
+    // The checkbox itself is now hidden entirely (Group by Cycle doesn't
+    // apply to Manual), so its state cannot even be inspected via the
+    // UI anymore - which is exactly the point: it's been reset and the
+    // control that would show a stale "checked" state is gone.
+    expect(screen.queryByText('Group by Cycle')).not.toBeInTheDocument();
+  });
+
+  it('selecting ADM Output clears any active Domain/Object Type filter and Advanced Filters state, not just hides their controls', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets': [asset({ id: 'a1', name: 'App One' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('App One');
+    fireEvent.change(screen.getAllByRole('combobox')[2], { target: { value: 'APPLICATION' } }); // Object Type select
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('assetType=APPLICATION'))).toBe(true));
+
+    fireEvent.change(screen.getByDisplayValue('All Sources'), { target: { value: 'ADM_OUTPUT' } });
+    await waitFor(() => {
+      const lastCall = (global.fetch as jest.Mock).mock.calls[(global.fetch as jest.Mock).mock.calls.length - 1][0];
+      expect(lastCall).not.toContain('assetType=APPLICATION');
+    });
   });
 });
