@@ -66,8 +66,34 @@ function normalizeRepositoryDomain(domain: string): string {
   return domain === 'APPLICATIONS' ? 'APPLICATION' : domain
 }
 
+// Bug fix + refinement (live testing correction, then explicit follow-up
+// direction to keep the tenant-scoping feature working correctly rather
+// than dropping it): getRepositoryDomains previously either always read
+// the stale config.enabledDomains, or (a first-pass fix) ignored it
+// entirely once metaModelDriven was true. Neither is right:
+// enabledDomains IS a real, user-configurable setting (set via the Setup
+// Assistant's "domains in scope" step, PUT /config/framework) - a
+// tenant's deliberate choice to scope down which domains they focus on,
+// which deserves to be respected, not silently ignored.
+// The actual bug was that enabledDomains can contain domain codes that
+// no longer match the tenant's current, published Meta Model at all
+// (confirmed live: "BENEFICIARY_EXPERIENCE" in enabledDomains vs the
+// real Meta Model code "BENEFICIARY" - matching zero real assets).
+// Fix: intersect enabledDomains with the live Meta Model's own domain
+// codes (config.allDomains' keys) whenever a Meta Model exists - a
+// tenant's scoping choice is honored only for domains that still
+// genuinely exist. If the intersection is empty (every stored
+// enabledDomains entry is stale/unmatched), that scoping choice is
+// itself meaningless against the current Meta Model - falls back to
+// showing every current Meta Model domain rather than an empty dropdown.
 function getRepositoryDomains(config: any): string[] {
-  return Array.from(new Set((config?.enabledDomains || []).map(normalizeRepositoryDomain)))
+  if (!config?.metaModelDriven) {
+    return Array.from(new Set((config?.enabledDomains || []).map(normalizeRepositoryDomain)))
+  }
+  const liveMetaModelDomains = Object.keys(config?.allDomains || {})
+  const enabledNormalized = new Set((config?.enabledDomains || []).map(normalizeRepositoryDomain))
+  const scoped = liveMetaModelDomains.filter(d => enabledNormalized.has(normalizeRepositoryDomain(d)))
+  return Array.from(new Set((scoped.length > 0 ? scoped : liveMetaModelDomains).map(normalizeRepositoryDomain)))
 }
 
 function getRepositoryAssetTypes(config: any, domain: string): string[] {
@@ -405,6 +431,12 @@ export default function RepositoryPage() {
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL')
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL')
   const [selectedSource, setSelectedSource] = useState<string>('ALL')
+  // Data-taxonomy investigation, this session: assets whose domain/
+  // assetType no longer resolve against the tenant's current Meta Model
+  // (e.g. created before the tenant's first Meta Model publish) are kept
+  // out of the default list, but discoverably so via this explicit
+  // toggle - never silently hidden forever.
+  const [showNeedsReclassification, setShowNeedsReclassification] = useState(false)
   const [selectedAssetType, setSelectedAssetType] = useState<string>('ALL')
   const [groupByCycle, setGroupByCycle] = useState<boolean>(false)
   const [showAdd, setShowAdd] = useState(false)
@@ -463,6 +495,7 @@ export default function RepositoryPage() {
     if (selectedSource !== 'ALL') params.set('source', selectedSource)
     if (selectedAssetType !== 'ALL') params.set('assetType', selectedAssetType)
     if (debouncedSearch) params.set('search', debouncedSearch)
+    if (showNeedsReclassification) params.set('needsReclassification', 'true')
     const result = await api.get(`/ea-repository/assets?${params.toString()}`)
     // Backward-compatible with the pre-pagination shape (a plain array) in
     // case of a stale cached response during a rolling deploy - treats it
@@ -471,7 +504,7 @@ export default function RepositoryPage() {
     else { setAssets(result.items || []); setTotal(result.total || 0) }
   }
 
-  useEffect(() => { load() }, [page, selectedDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch, structuredQuery]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [page, selectedDomain, selectedStatus, selectedSource, selectedAssetType, debouncedSearch, structuredQuery, showNeedsReclassification]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Resets to page 1 whenever a filter actually changes - a filter
   // change while sitting on page 5 of the old result set should not
@@ -577,6 +610,14 @@ export default function RepositoryPage() {
           </div>
           <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ New Asset</button>
         </div>
+        {!!summary?.needsReclassificationCount && (
+          <div style={{ marginTop: 10, padding: '8px 14px', background: 'rgba(180,83,9,0.1)', border: '1px solid rgba(180,83,9,0.3)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span>⚠ {summary.needsReclassificationCount} asset{summary.needsReclassificationCount === 1 ? '' : 's'} could not be automatically matched to the current Meta Model and need manual reclassification.</span>
+            <button type="button" onClick={() => setShowNeedsReclassification(s => !s)} style={{ marginInlineStart: 'auto', fontSize: 12, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: showNeedsReclassification ? 'var(--accent)' : 'transparent', color: showNeedsReclassification ? '#fff' : 'var(--text)' }}>
+              {showNeedsReclassification ? 'Show Normal List' : 'Review These Assets'}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="page-body">

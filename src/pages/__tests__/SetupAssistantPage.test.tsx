@@ -27,26 +27,26 @@ describe('SetupAssistantPage - step navigation', () => {
     mockFetch({ '/setup/profile': {}, '/config': {} });
     render(<SetupAssistantPage />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
-    expect(screen.getByText('Step 1 of 5')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
   });
 
   it('resumes at the saved setupStep from the profile, not always step 1', async () => {
     mockFetch({ '/setup/profile': { setupStep: 3, setupCompleted: false }, '/config': {} });
     render(<SetupAssistantPage />);
-    expect(await screen.findByText('Step 3 of 5')).toBeInTheDocument();
+    expect(await screen.findByText('Step 2 of 4')).toBeInTheDocument();
   });
 
   it('caps the resumed step at the total number of steps, even if the server returns something higher', async () => {
     mockFetch({ '/setup/profile': { setupStep: 99, setupCompleted: false }, '/config': {} });
     render(<SetupAssistantPage />);
-    expect(await screen.findByText('Step 5 of 5')).toBeInTheDocument();
+    expect(await screen.findByText('Step 4 of 4')).toBeInTheDocument();
   });
 
   it('does not auto-resume mid-flow when the profile is already marked complete - stays on step 1 and shows the complete badge', async () => {
     mockFetch({ '/setup/profile': { setupStep: 4, setupCompleted: true }, '/config': {} });
     render(<SetupAssistantPage />);
     expect(await screen.findByText('✓ Setup Complete')).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 5')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 4')).toBeInTheDocument();
   });
 
   it('navigates directly to a step when its indicator is clicked', async () => {
@@ -54,11 +54,11 @@ describe('SetupAssistantPage - step navigation', () => {
     render(<SetupAssistantPage />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     fireEvent.click(screen.getByText('Readiness Score'));
-    expect(await screen.findByText('Step 4 of 5')).toBeInTheDocument();
+    expect(await screen.findByText('Step 3 of 4')).toBeInTheDocument();
   });
 });
 
-describe('SetupAssistantPage - Step4Readiness', () => {
+describe('SetupAssistantPage - Step3Readiness', () => {
   it('displays the overall readiness score', async () => {
     mockFetch({
       '/setup/profile': {}, '/config': {},
@@ -79,18 +79,18 @@ describe('SetupAssistantPage - Step4Readiness', () => {
     await waitFor(() => expect(screen.getAllByText('0%').length).toBeGreaterThan(0));
   });
 
-  it('advances to step 5 when the next-steps button is clicked', async () => {
+  it('advances to step 4 when the next-steps button is clicked', async () => {
     mockFetch({ '/setup/profile': {}, '/config': {}, '/setup/readiness': { overall: 50 }, '/setup/actions': { actions: [] } });
     render(<SetupAssistantPage />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     fireEvent.click(screen.getByText('Readiness Score'));
     await waitFor(() => expect(screen.getAllByText('50%').length).toBeGreaterThan(0));
     fireEvent.click(screen.getByText(/الخطوات التالية/));
-    expect(await screen.findByText('Step 5 of 5')).toBeInTheDocument();
+    expect(await screen.findByText('Step 4 of 4')).toBeInTheDocument();
   });
 });
 
-describe('SetupAssistantPage - Step5Actions', () => {
+describe('SetupAssistantPage - Step4Actions', () => {
   it('lists suggested next actions with a navigation button for each', async () => {
     mockFetch({
       '/setup/profile': {}, '/config': {},
