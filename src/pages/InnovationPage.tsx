@@ -722,6 +722,9 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh }: any) {
   const [isWatching, setIsWatching] = useState(!!item.tenantInterest?.isWatching)
   const [notes, setNotes] = useState(item.tenantInterest?.notes || '')
   const [saving, setSaving] = useState(false)
+  const [history, setHistory] = useState<any[] | null>(null)
+
+  useEffect(() => { api.get(`/innovation/radar/${item.id}/status-history`).then((d: any) => setHistory(Array.isArray(d) ? d : [])) }, [api, item])
 
   const saveStatus = async () => {
     setSaving(true)
@@ -806,6 +809,38 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh }: any) {
             <div style={S.label}>{t('innov.notes')}</div>
             <input style={S.input} value={notes} onChange={e => setNotes(e.target.value)} />
             <button style={S.btn('primary')} onClick={saveStatus} disabled={saving}>{saving ? t('innov.saving') : t('innov.save_status')}</button>
+          </div>
+
+          <div style={{ ...S.card, marginTop: 16 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+              🕘 {isAR ? 'سجل القرارات' : 'Decision History'}
+              <HelpTip text={isAR
+                ? 'سجل غير قابل للتعديل بكل مرة تغيّرت فيها حالة مؤسستك تجاه هذا العنصر.'
+                : 'An immutable record of every time your organization\u2019s status on this item changed.'} />
+            </div>
+            {history === null ? (
+              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
+            ) : history.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>
+                {isAR ? 'لا توجد تغييرات مسجلة بعد لحالة مؤسستك تجاه هذا العنصر.' : 'No status changes recorded yet for your organization on this item.'}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {history.map((h: any) => {
+                  const from = h.previousState?.tenantStatus
+                  const to = h.newState?.tenantStatus
+                  return (
+                    <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, flexWrap: 'wrap' as const }}>
+                      <span style={{ color: 'var(--text-dim)', minWidth: 110 }}>{new Date(h.createdAt).toLocaleString(isAR ? 'ar' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      {from ? <span style={S.badge(TENANT_STATUS_COLOR[from] || '#7f8c8d')}>{isAR ? TENANT_STATUS_LABEL[from]?.ar : TENANT_STATUS_LABEL[from]?.en}</span> : <span style={{ color: 'var(--text-dim)' }}>{isAR ? '(بلا حالة)' : '(none)'}</span>}
+                      <span>→</span>
+                      <span style={S.badge(TENANT_STATUS_COLOR[to] || '#7f8c8d')}>{isAR ? TENANT_STATUS_LABEL[to]?.ar : TENANT_STATUS_LABEL[to]?.en}</span>
+                      {h.newState?.notes && <span style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>— {h.newState.notes}</span>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
         </>
       )}

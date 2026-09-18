@@ -407,6 +407,37 @@ describe('InnovationPage - Radar detail and my-status', () => {
   });
 });
 
+describe('InnovationPage - Radar item Decision History', () => {
+  const HISTORY = [
+    { id: 'log-2', createdAt: '2026-09-10T12:00:00.000Z', previousState: { tenantStatus: 'EXPLORE' }, newState: { tenantStatus: 'PILOT', notes: 'Kicking off a pilot' } },
+    { id: 'log-1', createdAt: '2026-08-01T09:00:00.000Z', previousState: { tenantStatus: null }, newState: { tenantStatus: 'EXPLORE', notes: null } },
+  ];
+
+  it('fetches and renders the status-history timeline for the open item', async () => {
+    mockFetch({ '/innovation/radar/tech-1/status-history': HISTORY, '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText(/Decision History/);
+    expect(await screen.findByText(/Kicking off a pilot/)).toBeInTheDocument();
+    const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/status-history'));
+    expect(call).toBeDefined();
+  });
+
+  it('renders the first-ever transition (from null) as "(none)"', async () => {
+    mockFetch({ '/innovation/radar/tech-1/status-history': HISTORY, '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText('(none)')).toBeInTheDocument();
+  });
+
+  it('shows an empty-history message when no status changes have been recorded yet', async () => {
+    mockFetch({ '/innovation/radar/tech-1/status-history': [], '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/No status changes recorded yet/)).toBeInTheDocument();
+  });
+});
+
 describe('InnovationPage - Add Technology form', () => {
   it('creates a technology with the entered fields', async () => {
     mockFetch({ '/innovation/radar': [] });
