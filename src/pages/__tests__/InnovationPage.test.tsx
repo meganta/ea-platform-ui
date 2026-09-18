@@ -191,7 +191,7 @@ describe('InnovationPage - Radar portfolio dashboard', () => {
     await screen.findByText('AutoArchitect Agents');
     fireEvent.click(screen.getByText('📊 Portfolio'));
     expect(await screen.findByText('Total items across all radars')).toBeInTheDocument();
-    expect(screen.getByText('3')).toBeInTheDocument(); // total
+    expect(screen.getByText('Total items across all radars').parentElement).toHaveTextContent('3'); // total
   });
 
   it('counts items with no tenantInterest as not yet assessed, and items with an interest but no owner separately', async () => {
@@ -228,6 +228,90 @@ describe('InnovationPage - Radar portfolio dashboard', () => {
     await waitFor(() => {
       const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('radarDomain=DIGITAL_QUALITY'));
       expect(call).toBeDefined();
+    });
+  });
+
+  it('selecting a single domain\'s pill switches to a domain-scoped Management View with domain-specific stat cards, hiding the cross-domain breakdown', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B, ITEM_C] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('📊 Portfolio'));
+    await screen.findByText('Total items across all radars');
+    fireEvent.click(screen.getByTestId('portfolio-view-domain-DIGITAL_QUALITY'));
+    expect(await screen.findByText(/Digital Quality Management View/)).toBeInTheDocument();
+    expect(screen.getByText('Total practices in this radar').parentElement).toHaveTextContent('1'); // only ITEM_C is DIGITAL_QUALITY
+    expect(screen.getByText('Being assessed').parentElement).toHaveTextContent('1'); // ITEM_C is tenantStatus ASSESS
+    expect(screen.queryByText('Portfolio by Radar Domain')).not.toBeInTheDocument();
+  });
+
+  it('the Radar \u2192 Value Funnel counts studies genuinely linked to a scoped radar item via originRadarItemId', async () => {
+    const STUDY_FROM_RADAR = { id: 'study-1', originType: 'RADAR_ITEM', originRadarItemId: 'tech-1' };
+    const UNRELATED_STUDY = { id: 'study-2', originType: 'MANUAL', originRadarItemId: null };
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B], '/innovation/studies': [STUDY_FROM_RADAR, UNRELATED_STUDY] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('📊 Portfolio'));
+    expect(await screen.findByText(/Radar . Value Funnel/)).toBeInTheDocument();
+    expect(screen.getByText('Studies Generated')).toBeInTheDocument();
+    // Only tech-1 (RADAR_ITEM's real id) has a linked study; tech-2 and the MANUAL study don't count
+    const stageValue = screen.getByText('Studies Generated').previousElementSibling;
+    expect(stageValue).toHaveTextContent('1');
+  });
+});
+
+describe('InnovationPage - Related Radar Items', () => {
+  const RELATED_ITEM = { id: 'tech-2', code: 'ZERO_TRUST', name: 'Zero Trust Architecture', category: 'CYBERSECURITY', radarDomain: 'TECHNOLOGY' };
+  const ITEM_WITH_RELATIONS = { ...RADAR_ITEM, relatedTechnologyIds: ['tech-2'] };
+
+  it('renders a Related Radar Items card resolving each id to the real item\'s name', async () => {
+    mockFetch({ '/innovation/radar/tech-1': ITEM_WITH_RELATIONS, '/innovation/radar': [ITEM_WITH_RELATIONS, RELATED_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/Related Radar Items/)).toBeInTheDocument();
+    expect(await screen.findByText(/Zero Trust Architecture/)).toBeInTheDocument();
+  });
+
+  it('does not render the Related Radar Items card when there are none', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText(/autonomously plan and execute/);
+    expect(screen.queryByText(/Related Radar Items/)).not.toBeInTheDocument();
+  });
+
+  it('clicking a related-item chip navigates to that item\'s own detail view', async () => {
+    mockFetch({
+      '/innovation/radar/tech-1': ITEM_WITH_RELATIONS,
+      '/innovation/radar/tech-2': RELATED_ITEM,
+      '/innovation/radar': [ITEM_WITH_RELATIONS, RELATED_ITEM],
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    fireEvent.click(await screen.findByText(/Zero Trust Architecture/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/tech-2'));
+      expect(call).toBeDefined();
+    });
+  });
+
+  it('the Edit form lets an admin search for and add a related item, then saves relatedTechnologyIds', async () => {
+    mockFetch({
+      '/innovation/radar/tech-1': RADAR_ITEM,
+      '/innovation/radar': [RADAR_ITEM, RELATED_ITEM],
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText(/autonomously plan and execute/);
+    fireEvent.click(screen.getByText('innov.edit'));
+    const searchInput = await screen.findByPlaceholderText(/Search to add a related item/);
+    fireEvent.change(searchInput, { target: { value: 'Zero Trust' } });
+    fireEvent.click(await screen.findByText(/Zero Trust Architecture/));
+    fireEvent.click(screen.getByText('innov.save'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/innovation/radar/tech-1') && !c[0].includes('my-status'));
+      expect(call).toBeDefined();
+      const body = JSON.parse(call[1].body);
+      expect(body.relatedTechnologyIds).toEqual(['tech-2']);
     });
   });
 });
