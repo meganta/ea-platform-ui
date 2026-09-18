@@ -154,6 +154,23 @@ const allCategoryLabel = (code: string, isAR: boolean) => { const c = ALL_CATEGO
 const allCategoryIcon = (code: string) => ALL_CATEGORIES[code]?.icon || '🔷'
 const domainLabel = (code: string, isAR: boolean) => { const d = DOMAIN_INFO[code]; return d ? (isAR ? d.ar : d.en) : code }
 
+// ── Radar (blip) visualization — spec section 18 ───────────────────────────
+// Rings ordered center → edge (innermost = most committed/mature). Market
+// rings use the existing marketPosition field; Organization rings use the
+// tenant's own tenantInterest.tenantStatus. Items with no ring match for the
+// active basis (e.g. never-assessed items in Organization view) are simply
+// excluded from the chart rather than plotted at a fabricated position.
+const MARKET_RINGS = ['ADOPT', 'TRIAL', 'ASSESS', 'EXPLORE', 'HOLD']
+const ORG_RINGS = ['SCALE', 'ADOPT', 'PILOT', 'ASSESS', 'EXPLORE', 'WATCH', 'HOLD', 'RETIRE']
+const ringLabel = (basis: 'market' | 'org', code: string, isAR: boolean) => {
+  const src = basis === 'market' ? MARKET_POSITION_LABEL : TENANT_STATUS_LABEL
+  const l = src[code]
+  return l ? (isAR ? l.ar : l.en) : code
+}
+// Deterministic hash → stable jitter, so a chart doesn't re-shuffle blip
+// positions on every re-render/re-fetch of the same data.
+const hashStr = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0 } return Math.abs(h) }
+
 export default function InnovationPage() {
   const api = useApi()
   const { t, isAR } = useLang()
@@ -203,6 +220,8 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
   const [marketPosition, setMarketPosition] = useState('')
   const [creating, setCreating] = useState(false)
   const [seeding, setSeeding] = useState(false)
+  const [viewMode, setViewMode] = useState<'card' | 'radar'>('card')
+  const [ringBasis, setRingBasis] = useState<'market' | 'org'>('market')
 
   useEffect(() => { api.get('/innovation/radar/domains').then((d: any) => setDomains(Array.isArray(d) ? d : [])) }, [api])
 
@@ -269,9 +288,20 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
           {Object.keys(MARKET_POSITION_LABEL).map(p => <option key={p} value={p}>{isAR ? MARKET_POSITION_LABEL[p].ar : MARKET_POSITION_LABEL[p].en}</option>)}
         </select>
         <div style={{ flex: 1 }} />
+        <div style={{ display: 'flex', gap: 2, background: 'var(--navy-mid)', borderRadius: 8, padding: 2 }}>
+          <button onClick={() => setViewMode('card')} style={{ ...S.btn(viewMode === 'card' ? 'primary' : 'secondary'), padding: '6px 12px' }}>▦ {isAR ? 'بطاقات' : 'Cards'}</button>
+          <button onClick={() => setViewMode('radar')} style={{ ...S.btn(viewMode === 'radar' ? 'primary' : 'secondary'), padding: '6px 12px' }}>🎯 {isAR ? 'رادار' : 'Radar'}</button>
+        </div>
         {isAdmin && <button style={S.btn()} onClick={seed} disabled={seeding}>{seeding ? t('innov.seeding') : t('innov.seed')}</button>}
         {isAdmin && <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('innov.add_tech')}</button>}
       </div>
+
+      {viewMode === 'radar' && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          <button onClick={() => setRingBasis('market')} style={S.btn(ringBasis === 'market' ? 'primary' : 'secondary')}>{isAR ? 'موضع السوق' : 'Market Position'}</button>
+          <button onClick={() => setRingBasis('org')} style={S.btn(ringBasis === 'org' ? 'primary' : 'secondary')}>{isAR ? 'موقف مؤسستنا' : 'Our Organization\u2019s Status'}</button>
+        </div>
+      )}
 
       {creating && <RadarCreateForm api={api} isAR={isAR} t={t} defaultDomain={domain === 'ALL' ? 'TECHNOLOGY' : domain} onDone={() => { setCreating(false); load() }} onCancel={() => setCreating(false)} />}
 
@@ -281,11 +311,120 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
         <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>
           {category || marketPosition ? t('innov.no_items') : t('innov.no_radar')}
         </div>
+      ) : viewMode === 'radar' ? (
+        <RadarChart items={items} isAR={isAR} t={t} ringBasis={ringBasis} onSelect={openItem} />
       ) : (
         <div className="stat-grid-3" style={{ alignItems: 'start' }}>
           {items.map((item: any) => <RadarCard key={item.id} item={item} isAR={isAR} t={t} showDomain={domain === 'ALL'} onClick={() => openItem(item.id)} />)}
         </div>
       )}
+    </div>
+  )
+}
+
+function RadarChart({ items, isAR, t, ringBasis, onSelect }: any) {
+  const [hovered, setHovered] = useState<any>(null)
+  const rings: string[] = ringBasis === 'market' ? MARKET_RINGS : ORG_RINGS
+  const size = 640
+  const center = size / 2
+  const maxRadius = center - 60
+  const ringWidth = maxRadius / rings.length
+
+  // Position each item: ring = its market/org standing; angle = grouped by
+  // category (same-category items cluster into contiguous arcs, sorted so
+  // the clustering is stable render-to-render) with deterministic jitter
+  // inside its ring band so blips of the same category+ring don't stack
+  // exactly on top of each other.
+  const plotted = useMemo(() => {
+    const getRing = (item: any): string | null => {
+      if (ringBasis === 'market') return rings.includes(item.marketPosition) ? item.marketPosition : null
+      const status = item.tenantInterest?.tenantStatus
+      return status && rings.includes(status) ? status : null
+    }
+    const withRing = items.map((item: any) => ({ item, ring: getRing(item) })).filter((x: any) => x.ring)
+    const sorted = [...withRing].sort((a, b) => (a.item.category || '').localeCompare(b.item.category || '') || a.item.code.localeCompare(b.item.code))
+    const total = sorted.length || 1
+    return sorted.map((x: any, i: number) => {
+      const ringIndex = rings.indexOf(x.ring)
+      const angle = (i / total) * 2 * Math.PI - Math.PI / 2
+      const h = hashStr(x.item.code)
+      const jitter = ((h % 100) / 100 - 0.5) * ringWidth * 0.7
+      const r = ringIndex * ringWidth + ringWidth * 0.5 + jitter
+      return { ...x, x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) }
+    })
+  }, [items, ringBasis, rings, ringWidth, center])
+
+  const excluded = items.length - plotted.length
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' as const }}>
+        <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', maxWidth: 640, flex: '1 1 480px', background: 'var(--navy-light)', borderRadius: 12, border: '1px solid var(--border)' }}>
+          {rings.map((ringCode, i) => {
+            const rOuter = (rings.length - i) * ringWidth
+            return (
+              <circle key={ringCode} cx={center} cy={center} r={rOuter}
+                fill={i % 2 === 0 ? 'var(--navy)' : 'transparent'} fillOpacity={0.35}
+                stroke="var(--border)" strokeWidth={1} />
+            )
+          })}
+          {/* Ring labels, innermost ring's label nearest the center, along the top (12 o'clock) axis */}
+          {rings.map((ringCode, i) => {
+            const rMid = (rings.length - i - 0.5) * ringWidth
+            return (
+              <text key={ringCode} x={center} y={center - rMid} textAnchor="middle" dy={-4}
+                fontSize={11} fontWeight={700} fill="var(--text-dim)">
+                {ringLabel(ringBasis, ringCode, isAR)}
+              </text>
+            )
+          })}
+          {plotted.map(({ item, x, y }: any) => (
+            <circle key={item.id} className="radar-blip" cx={x} cy={y} r={hovered?.item?.id === item.id ? 9 : 6.5}
+              fill={MATURITY_COLOR[item.maturity] || '#7f8c8d'}
+              stroke={item.tenantInterest?.isFavorite ? '#f1c40f' : 'var(--navy)'}
+              strokeWidth={item.tenantInterest?.isFavorite ? 2.5 : 1.5}
+              opacity={0.92} style={{ cursor: 'pointer' }}
+              onMouseEnter={() => setHovered({ item, x, y })}
+              onMouseLeave={() => setHovered((h: any) => (h?.item?.id === item.id ? null : h))}
+              onClick={() => onSelect(item.id)} />
+          ))}
+          {hovered && (
+            <g style={{ pointerEvents: 'none' }}>
+              <rect x={Math.min(Math.max(hovered.x - 90, 4), size - 184)} y={hovered.y > center ? hovered.y - 58 : hovered.y + 14}
+                width={180} height={44} rx={8} fill="var(--navy)" stroke="var(--accent)" strokeWidth={1} />
+              <text x={Math.min(Math.max(hovered.x - 90, 4), size - 184) + 10} y={(hovered.y > center ? hovered.y - 58 : hovered.y + 14) + 18}
+                fontSize={12} fontWeight={700} fill="var(--text)">
+                {(isAR && hovered.item.nameAr ? hovered.item.nameAr : hovered.item.name).slice(0, 26)}
+              </text>
+              <text x={Math.min(Math.max(hovered.x - 90, 4), size - 184) + 10} y={(hovered.y > center ? hovered.y - 58 : hovered.y + 14) + 34}
+                fontSize={11} fill="var(--text-dim)">
+                {allCategoryLabel(hovered.item.category, isAR)}
+              </text>
+            </g>
+          )}
+        </svg>
+        <div style={{ minWidth: 180 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: 'var(--text-dim)' }}>{isAR ? 'لون النقطة = النضج' : 'Blip color = maturity'}</div>
+          {Object.keys(MATURITY_LABEL).map(m => (
+            <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: MATURITY_COLOR[m], display: 'inline-block' }} />
+              <span style={{ fontSize: 12 }}>{isAR ? MATURITY_LABEL[m].ar : MATURITY_LABEL[m].en}</span>
+            </div>
+          ))}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10 }}>
+            <span style={{ width: 10, height: 10, borderRadius: '50%', border: '2px solid #f1c40f', display: 'inline-block' }} />
+            <span style={{ fontSize: 12 }}>{t('innov.favorite')}</span>
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 14, lineHeight: 1.5 }}>
+            {isAR
+              ? `الحلقات من المركز للخارج = درجة الالتزام. ${plotted.length} عنصر معروض على الرادار.`
+              : `Rings run center-to-edge by commitment level. ${plotted.length} item(s) plotted.`}
+            {excluded > 0 && (ringBasis === 'org'
+              ? (isAR ? ` ${excluded} عنصر لم يُقيَّم بعد أو غير ذي صلة (غير معروض).` : ` ${excluded} item(s) not yet assessed or marked not relevant (not shown).`)
+              : (isAR ? ` ${excluded} عنصر بلا موضع سوق معروف.` : ` ${excluded} item(s) have no recognized market position.`))}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
