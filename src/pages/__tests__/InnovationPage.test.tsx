@@ -139,6 +139,46 @@ describe('InnovationPage - Radar tab', () => {
     expect(await screen.findByText('AI-Augmented Testing')).toBeInTheDocument();
     expect(screen.getAllByText(/Digital Quality/).length).toBeGreaterThanOrEqual(2); // domain switcher button + card badge
   });
+
+  it('defaults to Card view and switches to Radar view on toggle, rendering an svg chart', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    expect(document.querySelector('svg')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('🎯 Radar'));
+    expect(document.querySelector('svg')).toBeInTheDocument();
+    // Card content is gone once the chart is showing
+    expect(screen.queryByText('AutoArchitect Agents')).not.toBeInTheDocument();
+  });
+
+  it('clicking a blip in Radar view opens the item detail, fetching the full record', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('🎯 Radar'));
+    const blip = document.querySelector('svg circle.radar-blip');
+    expect(blip).toBeTruthy();
+    fireEvent.click(blip as Element);
+    expect(await screen.findByText('innov.back')).toBeInTheDocument();
+  });
+
+  it('Radar view offers a Market Position / Our Organization\u2019s Status ring-basis toggle', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('🎯 Radar'));
+    expect(screen.getByText('Market Position')).toBeInTheDocument();
+    expect(screen.getByText('Our Organization\u2019s Status')).toBeInTheDocument();
+  });
+
+  it('an item with no market position is excluded from the Market Position radar and counted as excluded', async () => {
+    const noPosition = { ...RADAR_ITEM, id: 'tech-2', name: 'No Position Item', marketPosition: 'SOMETHING_UNRECOGNIZED' };
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, noPosition] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('🎯 Radar'));
+    expect(await screen.findByText(/1 item\(s\) have no recognized market position/)).toBeInTheDocument();
+  });
 });
 
 describe('InnovationPage - Radar detail and my-status', () => {
