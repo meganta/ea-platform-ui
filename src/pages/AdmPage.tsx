@@ -46,6 +46,67 @@ const OUTPUT_STATUS_COLOR: Record<string, string> = {
   REJECTED: '#e74c3c',
 }
 
+function RepositoryEvidenceSummary({ evidence }: { evidence: any }) {
+  if (!evidence) return null
+  const coverageColor = evidence.coverage === 'SATISFIED' ? '#2ecc71' : evidence.coverage === 'PARTIAL' ? '#f39c12' : '#e74c3c'
+  return (
+    <div style={{ marginTop: 8, padding: '9px 10px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.25)', borderRadius: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center', marginBottom: 5 }}>
+        <strong style={{ fontSize: 10, color: '#2ecc71' }}>🗄 Repository Evidence — Automatically Sourced</strong>
+        <span style={{ fontSize: 9, color: coverageColor, border: `1px solid ${coverageColor}55`, borderRadius: 3, padding: '1px 5px' }}>{evidence.coverage}</span>
+      </div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.55 }}>
+        {evidence.assets?.length || 0} assets · {evidence.relationships?.length || 0} relationships/dependencies · {evidence.relevantObjectTypes?.length || 0} Meta Model types
+      </div>
+      {evidence.relevantObjectTypes?.length > 0 && (
+        <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>
+          Types: {evidence.relevantObjectTypes.slice(0, 6).map((type: any) => type.name).join(', ')}{evidence.relevantObjectTypes.length > 6 ? ` +${evidence.relevantObjectTypes.length - 6}` : ''}
+        </div>
+      )}
+      {evidence.missing?.length > 0 && (
+        <div style={{ marginTop: 5, fontSize: 10, color: '#f39c12' }}>
+          <strong>Missing / Additional Evidence Required:</strong> {evidence.missing.join(' ')}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ArchitectureImpact({ outputId }: { outputId: string }) {
+  const navigate = useNavigate()
+  const [activities, setActivities] = useState<any[]>([])
+
+  useEffect(() => {
+    fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/architecture-integration`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` },
+    })
+      .then(async response => response.ok ? response.json() : null)
+      .then(data => setActivities(Array.isArray(data?.activities) ? data.activities : []))
+      .catch(() => setActivities([]))
+  }, [outputId])
+
+  if (activities.length === 0) return null
+  return (
+    <div style={{ marginTop: 8, padding: '10px 12px', background: 'rgba(3,105,161,0.07)', border: '1px solid rgba(3,105,161,0.3)', borderRadius: 4 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 7 }}>✓ Architecture Impact</div>
+      {activities.map(activity => (
+        <div key={activity.id} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 0', fontSize: 10, borderTop: '1px solid rgba(148,163,184,0.12)' }}>
+          <span style={{ color: '#2ecc71' }}>✓</span>
+          <strong>{String(activity.targetModule || '').replace(/_/g, ' ')}</strong>
+          <span style={{ color: 'var(--text-dim)' }}>— {String(activity.action || '').replace(/_/g, ' ')}</span>
+          {activity.route ? (
+            <button onClick={() => navigate(activity.route)} style={{ border: 0, background: 'none', padding: 0, color: 'var(--accent)', cursor: 'pointer', fontSize: 10, textDecoration: 'underline' }}>
+              {activity.targetLabel}
+            </button>
+          ) : <span>{activity.targetLabel}</span>}
+          {activity.architectureState && <span style={{ marginLeft: 'auto', color: 'var(--text-dim)', fontSize: 9 }}>{activity.architectureState}</span>}
+          {activity.timestamp && <span title={new Date(activity.timestamp).toLocaleString()} style={{ color: 'var(--text-dim)', fontSize: 9 }}>• {new Date(activity.timestamp).toLocaleDateString()}</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Create Cycle Modal ────────────────────────────────────
 function CreateModal({ onClose, onCreate, t }: any) {
   const [form, setForm] = useState({ name: '', description: '', frameworkType: 'NORA' })
@@ -880,6 +941,7 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
   const [evidence, setEvidence] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [repositoryEvidence, setRepositoryEvidence] = useState<any>(null)
   const token = () => localStorage.getItem('ea_token')
 
   useEffect(() => {
@@ -887,7 +949,7 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
       headers: { Authorization: `Bearer ${token()}` }
     })
       .then(r => r.json())
-      .then(data => { setFields(data.fields || []); setEvidence(data.evidence || {}); setLoaded(true) })
+      .then(data => { setFields(data.fields || []); setEvidence(data.evidence || {}); setRepositoryEvidence(data.repositoryEvidence || null); setLoaded(true) })
       .catch(() => setLoaded(true))
   }, [out.id])
 
@@ -911,8 +973,9 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
 
   return (
     <div style={{ marginTop: 8 }}>
+      <RepositoryEvidenceSummary evidence={repositoryEvidence} />
       <div style={{ fontSize: 11, fontWeight: 600, color: '#f39c12', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span>🔍 Architecture Evidence Collection</span>
+        <span>🔍 ADM / Uploaded Evidence</span>
         <span style={{ fontSize: 10, color: 'var(--text-dim)', fontWeight: 400 }}>{filledCount}/{fields.length} fields provided</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -936,6 +999,9 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
             {filledCount}/{fields.length} fields filled — click &quot;{t('adm.analyze')}&quot; to process
           </span>
         )}
+      </div>
+      <div style={{ marginTop: 8, padding: '7px 9px', border: '1px solid var(--border)', borderRadius: 4, fontSize: 10, color: 'var(--text-dim)' }}>
+        📚 <strong>Knowledge Base Evidence</strong> — retrieved during generation when tenant RAG is enabled. Manual and uploaded evidence remains supplementary and is never overwritten by Repository evidence.
       </div>
     </div>
   )
@@ -1174,6 +1240,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                         ) : (
                           <div>
                             {inp.content && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6, maxHeight: 50, overflow: 'hidden', lineHeight: 1.5 }}>{inp.content.slice(0, 120)}{inp.content.length > 120 ? '...' : ''}</div>}
+                            <RepositoryEvidenceSummary evidence={inp.repositoryEvidence} />
                             <InputSourcePanel inp={inp} cycleId={cycle.id} onUpdated={(updated: any) => setPhaseInputs(prev => prev.map(i => i.id === updated.id ? updated : i))} onEdit={() => { setEditingInput(inp.id); setInputContent(inp.content || '') }} />
                           </div>
                         )}
@@ -1311,6 +1378,11 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                         {def?.behaviorType !== 'DISCOVERY' && (
                           <OutputSourcePanel out={out} onUpdated={(updated: any) => setPhaseOutputs(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))} />
                         )}
+
+                        {/* Persisted ADM architecture bindings, reloaded from
+                            the backend so integration activity survives page
+                            refresh and is not reduced to a transient toast. */}
+                        <ArchitectureImpact outputId={out.id} />
 
                         {(out.status === 'AI_DRAFT' || out.status === 'APPROVED') && out.content && out.content.length > 100 && <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />}
                         {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
