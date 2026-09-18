@@ -78,7 +78,81 @@ const TENANT_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
   ADOPT: { en: 'Adopt', ar: 'تبنّي' }, SCALE: { en: 'Scale', ar: 'توسّع' }, HOLD: { en: 'Hold', ar: 'إيقاف' }, RETIRE: { en: 'Retire', ar: 'إيقاف نهائي' },
 }
 const categoryLabel = (code: string, isAR: boolean) => { const c = CATEGORIES[code]; return c ? (isAR ? c.ar : c.en) : code }
-const categoryIcon = (code: string) => CATEGORIES[code]?.icon || '🔷'
+
+// ── Radar domains (Innovation & Transformation Radar) ──────────────────────
+// Mirrors apps/api/src/innovation/technology-radar.service.ts's RadarDomain
+// list + VALID_CATEGORIES_BY_DOMAIN — keep in sync if either grows. The
+// Technology Radar is now one of five domains rather than the whole module.
+const DOMAINS = ['TECHNOLOGY', 'DIGITAL_QUALITY', 'OPERATING_MODEL', 'AGILITY_DELIVERY', 'ARCHITECTURE_ENGINEERING']
+const DOMAIN_INFO: Record<string, { icon: string; en: string; ar: string }> = {
+  TECHNOLOGY:               { icon: '🔭', en: 'Technology', ar: 'التقنية' },
+  DIGITAL_QUALITY:          { icon: '✅', en: 'Digital Quality', ar: 'الجودة الرقمية' },
+  OPERATING_MODEL:          { icon: '🏛', en: 'Operating Model', ar: 'نموذج التشغيل' },
+  AGILITY_DELIVERY:         { icon: '🏃', en: 'Agility & Delivery', ar: 'المرونة والتسليم' },
+  ARCHITECTURE_ENGINEERING: { icon: '📐', en: 'Architecture & Engineering', ar: 'الهندسة المعمارية' },
+}
+const DIGITAL_QUALITY_CATEGORIES: Record<string, { icon: string; en: string; ar: string }> = {
+  QUALITY_ENGINEERING:  { icon: '🛠', en: 'Quality Engineering', ar: 'هندسة الجودة' },
+  TEST_AUTOMATION:      { icon: '🤖', en: 'Test Automation', ar: 'أتمتة الاختبار' },
+  AI_ENABLED_QUALITY:   { icon: '✨', en: 'AI-Enabled Quality', ar: 'الجودة المعتمدة على الذكاء الاصطناعي' },
+  NON_FUNCTIONAL_QUALITY: { icon: '📏', en: 'Non-Functional Quality', ar: 'الجودة غير الوظيفية' },
+  CONTINUOUS_QUALITY:   { icon: '🔁', en: 'Continuous Quality', ar: 'الجودة المستمرة' },
+  QUALITY_GOVERNANCE:   { icon: '📋', en: 'Quality Governance', ar: 'حوكمة الجودة' },
+  OBSERVABILITY:        { icon: '👁', en: 'Observability', ar: 'قابلية الملاحظة' },
+  RELIABILITY_ENGINEERING: { icon: '🧯', en: 'Reliability Engineering', ar: 'هندسة الموثوقية' },
+  ACCESSIBILITY:        { icon: '♿', en: 'Accessibility', ar: 'إمكانية الوصول' },
+  QUALITY_INTELLIGENCE: { icon: '📈', en: 'Quality Intelligence', ar: 'ذكاء الجودة' },
+  VENDOR_QUALITY:       { icon: '🤝', en: 'Vendor Quality', ar: 'جودة الموردين' },
+  DEVSECOPS_QUALITY:    { icon: '🔒', en: 'DevSecOps Quality', ar: 'جودة DevSecOps' },
+}
+const OPERATING_MODEL_CATEGORIES: Record<string, { icon: string; en: string; ar: string }> = {
+  PRODUCT_OPERATING_MODEL:  { icon: '📦', en: 'Product Operating Model', ar: 'نموذج تشغيل المنتج' },
+  PLATFORM_OPERATING_MODEL: { icon: '🧱', en: 'Platform Operating Model', ar: 'نموذج تشغيل المنصة' },
+  DIGITAL_OPERATING_MODEL:  { icon: '💾', en: 'Digital Operating Model', ar: 'نموذج التشغيل الرقمي' },
+  IT_OPERATING_MODEL:       { icon: '🖥', en: 'IT Operating Model', ar: 'نموذج تشغيل تقنية المعلومات' },
+  DATA_OPERATING_MODEL:     { icon: '🗄', en: 'Data Operating Model', ar: 'نموذج تشغيل البيانات' },
+  AI_OPERATING_MODEL:       { icon: '🤖', en: 'AI Operating Model', ar: 'نموذج تشغيل الذكاء الاصطناعي' },
+  CLOUD_OPERATING_MODEL:    { icon: '☁️', en: 'Cloud Operating Model', ar: 'نموذج التشغيل السحابي' },
+  SECURITY_OPERATING_MODEL: { icon: '🛡', en: 'Security Operating Model', ar: 'نموذج التشغيل الأمني' },
+  GOVERNANCE_MODEL:         { icon: '⚖️', en: 'Governance Model', ar: 'نموذج الحوكمة' },
+  SOURCING_MODEL:           { icon: '🔀', en: 'Sourcing Model', ar: 'نموذج الاستعانة بمصادر خارجية' },
+  SERVICE_MANAGEMENT_MODEL: { icon: '🧭', en: 'Service Management Model', ar: 'نموذج إدارة الخدمة' },
+}
+const AGILITY_DELIVERY_CATEGORIES: Record<string, { icon: string; en: string; ar: string }> = {
+  ENTERPRISE_AGILITY:        { icon: '🏃', en: 'Enterprise Agility', ar: 'المرونة المؤسسية' },
+  PRODUCT_DELIVERY:          { icon: '🚚', en: 'Product Delivery', ar: 'تسليم المنتج' },
+  LEAN:                      { icon: '📉', en: 'Lean', ar: 'المرن (Lean)' },
+  DEVOPS:                    { icon: '🔁', en: 'DevOps', ar: 'DevOps' },
+  TEAM_DESIGN:               { icon: '👥', en: 'Team Design', ar: 'تصميم الفرق' },
+  PORTFOLIO_AGILITY:         { icon: '💼', en: 'Portfolio Agility', ar: 'مرونة المحفظة' },
+  FLOW_MANAGEMENT:           { icon: '🌊', en: 'Flow Management', ar: 'إدارة التدفق' },
+  CONTINUOUS_IMPROVEMENT:    { icon: '📶', en: 'Continuous Improvement', ar: 'التحسين المستمر' },
+  ENGINEERING_PRODUCTIVITY:  { icon: '⚡', en: 'Engineering Productivity', ar: 'إنتاجية الهندسة' },
+}
+const ARCHITECTURE_ENGINEERING_CATEGORIES: Record<string, { icon: string; en: string; ar: string }> = {
+  CONTINUOUS_ARCHITECTURE:  { icon: '🔄', en: 'Continuous Architecture', ar: 'الهندسة المعمارية المستمرة' },
+  DOMAIN_DRIVEN_DESIGN:     { icon: '🧩', en: 'Domain-Driven Design', ar: 'التصميم الموجه بالمجال' },
+  API_ARCHITECTURE:         { icon: '🔌', en: 'API Architecture', ar: 'هندسة واجهات برمجة التطبيقات' },
+  EVENT_DRIVEN_ARCHITECTURE:{ icon: '📡', en: 'Event-Driven Architecture', ar: 'الهندسة المعمارية الموجهة بالأحداث' },
+  CLOUD_NATIVE_ARCHITECTURE:{ icon: '☁️', en: 'Cloud-Native Architecture', ar: 'الهندسة السحابية الأصلية' },
+  SECURITY_ARCHITECTURE:    { icon: '🛡', en: 'Security Architecture', ar: 'الهندسة الأمنية' },
+  PLATFORM_ARCHITECTURE:    { icon: '🧱', en: 'Platform Architecture', ar: 'هندسة المنصة' },
+  AI_ASSISTED_ARCHITECTURE: { icon: '✨', en: 'AI-Assisted Architecture', ar: 'الهندسة المعمارية بمساعدة الذكاء الاصطناعي' },
+  VALUE_STREAM_ARCHITECTURE:{ icon: '🌊', en: 'Value Stream Architecture', ar: 'هندسة تدفق القيمة' },
+}
+const CATEGORIES_BY_DOMAIN: Record<string, Record<string, { icon: string; en: string; ar: string }>> = {
+  TECHNOLOGY: CATEGORIES,
+  DIGITAL_QUALITY: DIGITAL_QUALITY_CATEGORIES,
+  OPERATING_MODEL: OPERATING_MODEL_CATEGORIES,
+  AGILITY_DELIVERY: AGILITY_DELIVERY_CATEGORIES,
+  ARCHITECTURE_ENGINEERING: ARCHITECTURE_ENGINEERING_CATEGORIES,
+}
+// Flat lookup across every domain's categories, so a card/detail view can
+// resolve a category's icon/label without first knowing which domain it's in.
+const ALL_CATEGORIES: Record<string, { icon: string; en: string; ar: string }> = Object.assign({}, ...Object.values(CATEGORIES_BY_DOMAIN))
+const allCategoryLabel = (code: string, isAR: boolean) => { const c = ALL_CATEGORIES[code]; return c ? (isAR ? c.ar : c.en) : code }
+const allCategoryIcon = (code: string) => ALL_CATEGORIES[code]?.icon || '🔷'
+const domainLabel = (code: string, isAR: boolean) => { const d = DOMAIN_INFO[code]; return d ? (isAR ? d.ar : d.en) : code }
 
 export default function InnovationPage() {
   const api = useApi()
@@ -122,35 +196,73 @@ export default function InnovationPage() {
 // ── Radar Tab ────────────────────────────────────────────────────────────────
 function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
   const [items, setItems] = useState<any[]>([])
+  const [domains, setDomains] = useState<any[]>([])
+  const [domain, setDomain] = useState('TECHNOLOGY')
   const [loading, setLoading] = useState(true)
   const [category, setCategory] = useState('')
   const [marketPosition, setMarketPosition] = useState('')
   const [creating, setCreating] = useState(false)
   const [seeding, setSeeding] = useState(false)
 
+  useEffect(() => { api.get('/innovation/radar/domains').then((d: any) => setDomains(Array.isArray(d) ? d : [])) }, [api])
+
   const load = useCallback(() => {
     setLoading(true)
     const params = new URLSearchParams()
+    if (domain !== 'ALL') params.set('radarDomain', domain)
     if (category) params.set('category', category)
     if (marketPosition) params.set('marketPosition', marketPosition)
     const qs = params.toString()
     api.get(`/innovation/radar${qs ? `?${qs}` : ''}`).then((d: any) => setItems(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
-  }, [api, category, marketPosition])
+  }, [api, domain, category, marketPosition])
   useEffect(() => { load() }, [load])
 
   const openItem = async (id: string) => { const full = await api.get(`/innovation/radar/${id}`); setSelected(full) }
   const refreshSelected = async () => { if (selected) await openItem(selected.id) }
 
-  const seed = async () => { setSeeding(true); try { await api.post('/innovation/radar/seed'); await load() } finally { setSeeding(false) } }
+  const seed = async () => { setSeeding(true); try { await api.post('/innovation/radar/seed'); await load(); const d = await api.get('/innovation/radar/domains'); setDomains(Array.isArray(d) ? d : []) } finally { setSeeding(false) } }
 
   if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} />
 
+  const domainCategories = domain === 'ALL' ? ALL_CATEGORIES : (CATEGORIES_BY_DOMAIN[domain] || {})
+
   return (
     <div>
+      {/* Innovation & Transformation Radar domain switcher - spec section 2/18 */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' as const }}>
+        {DOMAINS.map(d => {
+          const info = domains.find((x: any) => x.domain === d)
+          const active = domain === d
+          return (
+            <button key={d}
+              onClick={() => { setDomain(d); setCategory('') }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+                border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                background: active ? 'var(--accent)22' : 'var(--navy-light)',
+                color: active ? 'var(--accent)' : 'var(--text)', fontSize: 13, fontWeight: active ? 700 : 500, cursor: 'pointer',
+              }}>
+              <span>{DOMAIN_INFO[d].icon}</span>
+              <span>{domainLabel(d, isAR)}</span>
+              {info && <span style={{ fontSize: 11, opacity: 0.7 }}>({info.itemCount})</span>}
+            </button>
+          )
+        })}
+        <button onClick={() => { setDomain('ALL'); setCategory('') }}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10,
+            border: domain === 'ALL' ? '1px solid var(--accent)' : '1px solid var(--border)',
+            background: domain === 'ALL' ? 'var(--accent)22' : 'var(--navy-light)',
+            color: domain === 'ALL' ? 'var(--accent)' : 'var(--text)', fontSize: 13, fontWeight: domain === 'ALL' ? 700 : 500, cursor: 'pointer',
+          }}>
+          <span>🌐</span><span>{isAR ? 'كل الرادارات' : 'All Radars'}</span>
+        </button>
+      </div>
+
       <div style={{ ...S.row, marginBottom: 16, flexWrap: 'wrap' as const }}>
-        <select style={{ ...S.input, marginBottom: 0, width: 220 }} value={category} onChange={e => setCategory(e.target.value)}>
+        <select style={{ ...S.input, marginBottom: 0, width: 240 }} value={category} onChange={e => setCategory(e.target.value)}>
           <option value="">{t('innov.all_categories')}</option>
-          {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{categoryIcon(c)} {categoryLabel(c, isAR)}</option>)}
+          {Object.keys(domainCategories).map(c => <option key={c} value={c}>{domainCategories[c].icon} {isAR ? domainCategories[c].ar : domainCategories[c].en}</option>)}
         </select>
         <select style={{ ...S.input, marginBottom: 0, width: 180 }} value={marketPosition} onChange={e => setMarketPosition(e.target.value)}>
           <option value="">{t('innov.all_positions')}</option>
@@ -161,7 +273,7 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
         {isAdmin && <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('innov.add_tech')}</button>}
       </div>
 
-      {creating && <RadarCreateForm api={api} isAR={isAR} t={t} onDone={() => { setCreating(false); load() }} onCancel={() => setCreating(false)} />}
+      {creating && <RadarCreateForm api={api} isAR={isAR} t={t} defaultDomain={domain === 'ALL' ? 'TECHNOLOGY' : domain} onDone={() => { setCreating(false); load() }} onCancel={() => setCreating(false)} />}
 
       {loading ? (
         <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
@@ -171,30 +283,31 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
         </div>
       ) : (
         <div className="stat-grid-3" style={{ alignItems: 'start' }}>
-          {items.map((item: any) => <RadarCard key={item.id} item={item} isAR={isAR} t={t} onClick={() => openItem(item.id)} />)}
+          {items.map((item: any) => <RadarCard key={item.id} item={item} isAR={isAR} t={t} showDomain={domain === 'ALL'} onClick={() => openItem(item.id)} />)}
         </div>
       )}
     </div>
   )
 }
 
-function RadarCard({ item, isAR, t, onClick }: any) {
+function RadarCard({ item, isAR, t, showDomain, onClick }: any) {
   const interest = item.tenantInterest
   return (
     <div style={{ ...S.card, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8 }} onClick={onClick}
       onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
       onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <div style={{ fontSize: 22 }}>{categoryIcon(item.category)}</div>
+        <div style={{ fontSize: 22 }}>{allCategoryIcon(item.category)}</div>
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
             {isAR && item.nameAr ? item.nameAr : item.name}
             {interest?.isFavorite && <span title={t('innov.favorite')}>⭐</span>}
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{categoryLabel(item.category, isAR)}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{allCategoryLabel(item.category, isAR)}</div>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+        {showDomain && item.radarDomain && <span style={S.badge('#8e44ad')}>{DOMAIN_INFO[item.radarDomain]?.icon} {domainLabel(item.radarDomain, isAR)}</span>}
         <span style={S.badge(MATURITY_COLOR[item.maturity] || '#7f8c8d')}>{isAR ? MATURITY_LABEL[item.maturity]?.ar : MATURITY_LABEL[item.maturity]?.en}</span>
         <span style={S.badge(MARKET_POSITION_COLOR[item.marketPosition] || '#7f8c8d')}>{isAR ? MARKET_POSITION_LABEL[item.marketPosition]?.ar : MARKET_POSITION_LABEL[item.marketPosition]?.en}</span>
         {interest?.tenantStatus && interest.tenantStatus !== 'NOT_RELEVANT' && (
@@ -205,8 +318,9 @@ function RadarCard({ item, isAR, t, onClick }: any) {
   )
 }
 
-function RadarCreateForm({ api, isAR, t, onDone, onCancel }: any) {
-  const [form, setForm] = useState({ code: '', name: '', nameAr: '', description: '', category: 'AI', maturity: 'EMERGING' })
+function RadarCreateForm({ api, isAR, t, defaultDomain, onDone, onCancel }: any) {
+  const initialDomain = defaultDomain || 'TECHNOLOGY'
+  const [form, setForm] = useState({ code: '', name: '', nameAr: '', description: '', radarDomain: initialDomain, category: Object.keys(CATEGORIES_BY_DOMAIN[initialDomain])[0], maturity: 'EMERGING' })
   const [saving, setSaving] = useState(false)
 
   const create = async () => {
@@ -215,14 +329,22 @@ function RadarCreateForm({ api, isAR, t, onDone, onCancel }: any) {
     try { await api.post('/innovation/radar', form); onDone() } catch (e: any) { alert(e.message) } finally { setSaving(false) }
   }
 
+  const domainCategories = CATEGORIES_BY_DOMAIN[form.radarDomain] || {}
+
   return (
     <div style={{ ...S.card, marginBottom: 16 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <div><div style={S.label}>{t('innov.code')} *</div><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g, '_') }))} /></div>
         <div>
+          <div style={S.label}>{isAR ? 'رادار' : 'Radar'} *</div>
+          <select style={S.input} value={form.radarDomain} onChange={e => { const nextDomain = e.target.value; const firstCat = Object.keys(CATEGORIES_BY_DOMAIN[nextDomain])[0]; setForm(f => ({ ...f, radarDomain: nextDomain, category: firstCat })) }}>
+            {DOMAINS.map(d => <option key={d} value={d}>{DOMAIN_INFO[d].icon} {domainLabel(d, isAR)}</option>)}
+          </select>
+        </div>
+        <div>
           <div style={S.label}>{t('innov.filter_category')} *</div>
           <select style={S.input} value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))}>
-            {Object.keys(CATEGORIES).map(c => <option key={c} value={c}>{categoryLabel(c, isAR)}</option>)}
+            {Object.keys(domainCategories).map(c => <option key={c} value={c}>{domainCategories[c].icon} {isAR ? domainCategories[c].ar : domainCategories[c].en}</option>)}
           </select>
         </div>
         <div><div style={S.label}>{t('innov.name_en')} *</div><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} /></div>
@@ -268,7 +390,7 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh }: any) {
     <div>
       <div style={{ ...S.row, marginBottom: 16 }}>
         <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{t('innov.back')}</button>
-        <div style={{ flex: 1, fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>{categoryIcon(item.category)} {name}</div>
+        <div style={{ flex: 1, fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>{allCategoryIcon(item.category)} {name}</div>
         {isAdmin && (
           <>
             <button style={S.btn()} onClick={() => setEditing(e => !e)}>{t('innov.edit')}</button>
@@ -282,9 +404,10 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh }: any) {
       ) : (
         <>
           <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' as const }}>
+            {item.radarDomain && <span style={S.badge('#8e44ad')}>{DOMAIN_INFO[item.radarDomain]?.icon} {domainLabel(item.radarDomain, isAR)}</span>}
             <span style={S.badge(MATURITY_COLOR[item.maturity])}>{isAR ? MATURITY_LABEL[item.maturity]?.ar : MATURITY_LABEL[item.maturity]?.en}</span>
             <span style={S.badge(MARKET_POSITION_COLOR[item.marketPosition])}>{isAR ? MARKET_POSITION_LABEL[item.marketPosition]?.ar : MARKET_POSITION_LABEL[item.marketPosition]?.en}</span>
-            <span style={S.badge('#7f8c8d')}>{categoryLabel(item.category, isAR)}</span>
+            <span style={S.badge('#7f8c8d')}>{allCategoryLabel(item.category, isAR)}</span>
           </div>
 
           <div style={{ ...S.card, marginBottom: 16 }}>

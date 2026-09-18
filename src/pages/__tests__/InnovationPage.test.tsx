@@ -86,6 +86,59 @@ describe('InnovationPage - Radar tab', () => {
       expect(call).toBeDefined();
     });
   });
+
+  it('defaults to the Technology domain and includes radarDomain=TECHNOLOGY on the initial load', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar?') && c[0].includes('radarDomain=TECHNOLOGY'));
+    expect(call).toBeDefined();
+  });
+
+  it('shows all five radar domain buttons plus an All Radars option', async () => {
+    mockFetch({ '/innovation/radar': [] });
+    render(<InnovationPage />);
+    await screen.findByText('innov.no_radar');
+    expect(screen.getByText('Digital Quality')).toBeInTheDocument();
+    expect(screen.getByText('Operating Model')).toBeInTheDocument();
+    expect(screen.getByText('Agility & Delivery')).toBeInTheDocument();
+    expect(screen.getByText('Architecture & Engineering')).toBeInTheDocument();
+    expect(screen.getByText('All Radars')).toBeInTheDocument();
+  });
+
+  it('switching to a different domain re-fetches with that radarDomain and resets the category filter', async () => {
+    mockFetch({ '/innovation/radar': [] });
+    render(<InnovationPage />);
+    await screen.findByText('innov.no_radar');
+    fireEvent.click(screen.getByText('Digital Quality'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('radarDomain=DIGITAL_QUALITY'));
+      expect(call).toBeDefined();
+    });
+  });
+
+  it('switching to All Radars drops the radarDomain filter entirely', async () => {
+    mockFetch({ '/innovation/radar': [] });
+    render(<InnovationPage />);
+    await screen.findByText('innov.no_radar');
+    (global.fetch as jest.Mock).mockClear();
+    fireEvent.click(screen.getByText('All Radars'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar?') || c[0].endsWith('/innovation/radar'));
+      expect(call).toBeDefined();
+      expect(call[0].includes('radarDomain')).toBe(false);
+    });
+  });
+
+  it('shows a domain badge on each card once All Radars is selected', async () => {
+    const qualityItem = { ...RADAR_ITEM, id: 'dq-1', name: 'AI-Augmented Testing', category: 'AI_ENABLED_QUALITY', radarDomain: 'DIGITAL_QUALITY' };
+    mockFetch({ '/innovation/radar': [qualityItem] });
+    render(<InnovationPage />);
+    await screen.findByText('innov.no_radar').catch(() => {});
+    fireEvent.click(screen.getByText('All Radars'));
+    expect(await screen.findByText('AI-Augmented Testing')).toBeInTheDocument();
+    expect(screen.getAllByText(/Digital Quality/).length).toBeGreaterThanOrEqual(2); // domain switcher button + card badge
+  });
 });
 
 describe('InnovationPage - Radar detail and my-status', () => {
