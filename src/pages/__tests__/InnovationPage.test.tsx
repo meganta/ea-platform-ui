@@ -7,7 +7,7 @@ jest.mock('../../contexts/LangContext', () => ({
 
 let mockRole = 'TENANT_ADMIN';
 jest.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { role: mockRole } }),
+  useAuth: () => ({ user: { role: mockRole, userId: 'user-1' } }),
 }));
 
 beforeEach(() => {
@@ -229,6 +229,55 @@ describe('InnovationPage - Radar portfolio dashboard', () => {
       const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('radarDomain=DIGITAL_QUALITY'));
       expect(call).toBeDefined();
     });
+  });
+});
+
+describe('InnovationPage - Watchlist tab', () => {
+  const WATCHED_ITEM = {
+    id: 'tech-9', code: 'DATA_MESH', name: 'Data Mesh', nameAr: 'شبكة البيانات', category: 'DATA_ANALYTICS', radarDomain: 'TECHNOLOGY',
+    maturity: 'GROWING', marketPosition: 'ASSESS', description: 'x',
+    tenantInterest: { tenantStatus: 'ASSESS', isWatching: true, isFavorite: false, ownerUserId: 'user-1', updatedAt: '2026-09-01T00:00:00.000Z' },
+  };
+
+  it('navigating to the Watchlist tab fetches /innovation/radar/watchlist and lists the item', async () => {
+    mockFetch({ '/innovation/radar/watchlist': [WATCHED_ITEM], '/innovation/radar': [] });
+    render(<InnovationPage />);
+    fireEvent.click(screen.getByText(/Watchlist/));
+    expect(await screen.findByText(/Data Mesh/)).toBeInTheDocument();
+    const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/watchlist'));
+    expect(call).toBeDefined();
+  });
+
+  it('shows the empty state when nothing is being watched', async () => {
+    mockFetch({ '/innovation/radar/watchlist': [], '/innovation/radar': [] });
+    render(<InnovationPage />);
+    fireEvent.click(screen.getByText(/Watchlist/));
+    expect(await screen.findByText(/Nothing on your watchlist yet/)).toBeInTheDocument();
+  });
+
+  it('resolves the current user as the owner label "You"', async () => {
+    mockFetch({ '/innovation/radar/watchlist': [WATCHED_ITEM], '/innovation/radar': [] });
+    render(<InnovationPage />);
+    fireEvent.click(screen.getByText(/Watchlist/));
+    await screen.findByText(/Data Mesh/);
+    expect(screen.getByText('You')).toBeInTheDocument();
+  });
+
+  it('a watchlist item with no owner shows Unassigned', async () => {
+    const noOwner = { ...WATCHED_ITEM, id: 'tech-10', name: 'Unowned Item', tenantInterest: { ...WATCHED_ITEM.tenantInterest, ownerUserId: null } };
+    mockFetch({ '/innovation/radar/watchlist': [noOwner], '/innovation/radar': [] });
+    render(<InnovationPage />);
+    fireEvent.click(screen.getByText(/Watchlist/));
+    await screen.findByText(/Unowned Item/);
+    expect(screen.getByText('Unassigned')).toBeInTheDocument();
+  });
+
+  it('clicking a watchlist row opens the item detail view', async () => {
+    mockFetch({ '/innovation/radar/watchlist': [WATCHED_ITEM], '/innovation/radar/tech-9': WATCHED_ITEM, '/innovation/radar': [] });
+    render(<InnovationPage />);
+    fireEvent.click(screen.getByText(/Watchlist/));
+    fireEvent.click(await screen.findByText(/Data Mesh/));
+    expect(await screen.findByText('innov.back')).toBeInTheDocument();
   });
 });
 
