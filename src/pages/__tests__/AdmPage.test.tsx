@@ -140,6 +140,75 @@ describe('AdmPage - Related Architecture Views (EA Views integration)', () => {
   });
 });
 
+describe('AdmPage - Repository-first evidence and persisted Architecture Impact', () => {
+  const phaseDef = {
+    phase: '1', name: 'Scope Definition', description: 'Scope',
+    steps: [{
+      key: '1.3', title: 'Identify Stakeholders and Approve Charter', titleAr: '',
+      inputs: [{ key: 'org_structure', title: 'Organizational Structure', source: 'EXTERNAL', required: true, domains: [] }],
+      outputs: [{ key: 'ea_cycle_charter', title: 'EA Cycle Charter', behaviorType: 'GOVERNANCE', domains: [] }],
+    }],
+  };
+
+  function phaseRoutes(activities: any[] = []) {
+    return {
+      '/adm/cycles': [SAMPLE_CYCLE],
+      '/phases/1/inputs': {
+        phaseDef,
+        inputs: [{
+          id: 'input-org', inputKey: 'org_structure', title: 'Organizational Structure',
+          source: 'SYSTEM', providedBy: 'AUTO_REPO:asset-1', content: 'Repository evidence',
+          repositoryEvidence: {
+            coverage: 'PARTIAL',
+            assets: [{ id: 'asset-1', name: 'HRDF Organization Unit' }],
+            relationships: [],
+            relevantObjectTypes: [{ id: 'ot-1', name: 'Department' }],
+            missing: ['Reporting relationships require supplementary evidence.'],
+          },
+        }],
+      },
+      '/phases/1/outputs': {
+        phaseDef,
+        outputs: [{
+          id: 'output-charter', outputKey: 'ea_cycle_charter', title: 'EA Cycle Charter',
+          description: 'Charter', status: 'APPROVED', content: 'Approved charter',
+        }],
+      },
+      '/outputs/output-charter/architecture-integration': { activities },
+    };
+  }
+
+  async function openPhaseOne() {
+    render(<AdmPage />);
+    await waitFor(() => expect(screen.getAllByText('Q1 2026 ADM Cycle').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole('button', { name: /1 phase\.nora\.1/i }));
+    await screen.findByText('Organizational Structure');
+  }
+
+  it('shows automatically sourced Organization Unit evidence and a clear supplementary gap', async () => {
+    mockFetch(phaseRoutes());
+    await openPhaseOne();
+    expect(screen.getByText(/Repository Evidence — Automatically Sourced/)).toBeInTheDocument();
+    expect(screen.getByText(/1 assets · 0 relationships\/dependencies · 1 Meta Model types/)).toBeInTheDocument();
+    expect(screen.getByText(/Reporting relationships require supplementary evidence/)).toBeInTheDocument();
+  });
+
+  it('reloads persisted integration history and navigates with labels rather than exposing UUIDs', async () => {
+    mockFetch(phaseRoutes([{
+      id: 'binding-1', action: 'UPDATE', targetModule: 'REPOSITORY',
+      targetLabel: '1HRDF', route: '/repository?assetId=asset-1', architectureState: 'CURRENT',
+      timestamp: '2026-09-18T12:00:00.000Z', status: 'COMPLETED',
+    }]));
+    await openPhaseOne();
+    fireEvent.click(screen.getByText('EA Cycle Charter'));
+    expect(await screen.findByText('✓ Architecture Impact')).toBeInTheDocument();
+    expect(screen.getByText('1HRDF')).toBeInTheDocument();
+    expect(screen.queryByText('asset-1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('1HRDF'));
+    expect(mockNavigate).toHaveBeenCalledWith('/repository?assetId=asset-1');
+  });
+});
+
 describe('AdmPage - CreateModal', () => {
   it('opens the create modal when the New button is clicked', async () => {
     mockFetch({ '/adm/cycles': [] });
