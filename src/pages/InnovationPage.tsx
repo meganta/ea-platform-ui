@@ -178,7 +178,6 @@ export default function InnovationPage() {
   const isAdmin = user?.role === 'TENANT_ADMIN'
   const [tab, setTab] = useState<'radar' | 'favorites' | 'ideas' | 'studies' | 'profile'>('radar')
   const [selected, setSelected] = useState<any>(null)
-
   return (
     <div style={S.page} dir={isAR ? 'rtl' : 'ltr'}>
       <div style={S.header}>
@@ -200,7 +199,7 @@ export default function InnovationPage() {
         <button style={S.tab(tab === 'profile')} onClick={() => { setTab('profile'); setSelected(null) }}>{t('innov.tab_profile')}</button>
       </div>
       <div style={S.content}>
-        {tab === 'radar' && <RadarTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} />}
+        {tab === 'radar' && <RadarTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} onSwitchToStudies={() => setTab('studies')} />}
         {tab === 'favorites' && <FavoritesTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} />}
         {tab === 'ideas' && <IdeasTab api={api} isAR={isAR} t={t} userRole={user?.role} />}
         {tab === 'studies' && <StudiesTab api={api} isAR={isAR} t={t} />}
@@ -211,7 +210,7 @@ export default function InnovationPage() {
 }
 
 // ── Radar Tab ────────────────────────────────────────────────────────────────
-function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
+function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStudies }: any) {
   const [items, setItems] = useState<any[]>([])
   const [domains, setDomains] = useState<any[]>([])
   const [domain, setDomain] = useState('TECHNOLOGY')
@@ -222,6 +221,10 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
   const [seeding, setSeeding] = useState(false)
   const [viewMode, setViewMode] = useState<'card' | 'radar'>('card')
   const [ringBasis, setRingBasis] = useState<'market' | 'org'>('market')
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareIds, setCompareIds] = useState<string[]>([])
+  const [comparing, setComparing] = useState(false)
+  const MAX_COMPARE = 5
 
   useEffect(() => { api.get('/innovation/radar/domains').then((d: any) => setDomains(Array.isArray(d) ? d : [])) }, [api])
 
@@ -241,7 +244,19 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
 
   const seed = async () => { setSeeding(true); try { await api.post('/innovation/radar/seed'); await load(); const d = await api.get('/innovation/radar/domains'); setDomains(Array.isArray(d) ? d : []) } finally { setSeeding(false) } }
 
+  const toggleCompare = (id: string) => {
+    setCompareIds(ids => {
+      if (ids.includes(id)) return ids.filter(x => x !== id)
+      if (ids.length >= MAX_COMPARE) return ids
+      return [...ids, id]
+    })
+  }
+
   if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} />
+  if (comparing) return <ComparisonView api={api} items={items.filter((i: any) => compareIds.includes(i.id))} isAR={isAR} t={t}
+    onBack={() => setComparing(false)}
+    onDone={() => { setComparing(false); setCompareMode(false); setCompareIds([]) }}
+    onSwitchToStudies={onSwitchToStudies} />
 
   const domainCategories = domain === 'ALL' ? ALL_CATEGORIES : (CATEGORIES_BY_DOMAIN[domain] || {})
 
@@ -292,9 +307,26 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
           <button onClick={() => setViewMode('card')} style={{ ...S.btn(viewMode === 'card' ? 'primary' : 'secondary'), padding: '6px 12px' }}>▦ {isAR ? 'بطاقات' : 'Cards'}</button>
           <button onClick={() => setViewMode('radar')} style={{ ...S.btn(viewMode === 'radar' ? 'primary' : 'secondary'), padding: '6px 12px' }}>🎯 {isAR ? 'رادار' : 'Radar'}</button>
         </div>
+        {viewMode === 'card' && (
+          <button style={S.btn(compareMode ? 'primary' : 'secondary')} onClick={() => { setCompareMode(m => !m); setCompareIds([]) }}>
+            ⚖️ {isAR ? (compareMode ? 'إلغاء المقارنة' : 'قارن') : (compareMode ? 'Cancel Compare' : 'Compare')}
+          </button>
+        )}
         {isAdmin && <button style={S.btn()} onClick={seed} disabled={seeding}>{seeding ? t('innov.seeding') : t('innov.seed')}</button>}
         {isAdmin && <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('innov.add_tech')}</button>}
       </div>
+
+      {compareMode && (
+        <div style={{ ...S.card, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, background: 'var(--accent)11', borderColor: 'var(--accent)' }}>
+          <span style={{ fontSize: 13 }}>
+            {isAR ? `تم تحديد ${compareIds.length} من أصل ${MAX_COMPARE} — اختر عنصرين على الأقل للمقارنة` : `${compareIds.length} of ${MAX_COMPARE} selected — pick at least 2 to compare`}
+          </span>
+          <div style={{ flex: 1 }} />
+          <button style={S.btn('primary')} disabled={compareIds.length < 2} onClick={() => setComparing(true)}>
+            {isAR ? `قارن (${compareIds.length})` : `Compare (${compareIds.length})`}
+          </button>
+        </div>
+      )}
 
       {viewMode === 'radar' && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
@@ -315,7 +347,9 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
         <RadarChart items={items} isAR={isAR} t={t} ringBasis={ringBasis} onSelect={openItem} />
       ) : (
         <div className="stat-grid-3" style={{ alignItems: 'start' }}>
-          {items.map((item: any) => <RadarCard key={item.id} item={item} isAR={isAR} t={t} showDomain={domain === 'ALL'} onClick={() => openItem(item.id)} />)}
+          {items.map((item: any) => <RadarCard key={item.id} item={item} isAR={isAR} t={t} showDomain={domain === 'ALL'}
+            compareMode={compareMode} checked={compareIds.includes(item.id)} onToggleCompare={() => toggleCompare(item.id)}
+            onClick={() => (compareMode ? toggleCompare(item.id) : openItem(item.id))} />)}
         </div>
       )}
     </div>
@@ -429,12 +463,16 @@ function RadarChart({ items, isAR, t, ringBasis, onSelect }: any) {
   )
 }
 
-function RadarCard({ item, isAR, t, showDomain, onClick }: any) {
+function RadarCard({ item, isAR, t, showDomain, compareMode, checked, onToggleCompare, onClick }: any) {
   const interest = item.tenantInterest
   return (
-    <div style={{ ...S.card, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8 }} onClick={onClick}
+    <div style={{ ...S.card, cursor: 'pointer', display: 'flex', flexDirection: 'column', gap: 8, position: 'relative', borderColor: checked ? 'var(--accent)' : undefined }} onClick={onClick}
       onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
-      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}>
+      onMouseLeave={e => (e.currentTarget.style.borderColor = checked ? 'var(--accent)' : 'var(--border)')}>
+      {compareMode && (
+        <input type="checkbox" checked={checked} onChange={() => onToggleCompare()} onClick={e => e.stopPropagation()}
+          style={{ position: 'absolute', top: 12, [isAR ? 'left' : 'right']: 12, width: 16, height: 16, cursor: 'pointer' }} />
+      )}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
         <div style={{ fontSize: 22 }}>{allCategoryIcon(item.category)}</div>
         <div style={{ flex: 1 }}>
@@ -453,6 +491,89 @@ function RadarCard({ item, isAR, t, showDomain, onClick }: any) {
           <span style={S.badge(TENANT_STATUS_COLOR[interest.tenantStatus])}>{isAR ? TENANT_STATUS_LABEL[interest.tenantStatus]?.ar : TENANT_STATUS_LABEL[interest.tenantStatus]?.en}</span>
         )}
       </div>
+    </div>
+  )
+}
+
+function ComparisonView({ api, items, isAR, t, onBack, onDone, onSwitchToStudies }: any) {
+  const [creating, setCreating] = useState(false)
+  const [created, setCreated] = useState<any>(null)
+
+  const rows: { label: string; render: (item: any) => any }[] = [
+    { label: isAR ? 'الرادار' : 'Radar', render: (i: any) => `${DOMAIN_INFO[i.radarDomain]?.icon || ''} ${domainLabel(i.radarDomain, isAR)}` },
+    { label: isAR ? 'الفئة' : 'Category', render: (i: any) => `${allCategoryIcon(i.category)} ${allCategoryLabel(i.category, isAR)}` },
+    { label: t('innov.maturity'), render: (i: any) => isAR ? MATURITY_LABEL[i.maturity]?.ar : MATURITY_LABEL[i.maturity]?.en },
+    { label: isAR ? 'موضع السوق' : 'Market Position', render: (i: any) => isAR ? MARKET_POSITION_LABEL[i.marketPosition]?.ar : MARKET_POSITION_LABEL[i.marketPosition]?.en },
+    { label: isAR ? 'موقفنا' : 'Our Status', render: (i: any) => i.tenantInterest?.tenantStatus ? (isAR ? TENANT_STATUS_LABEL[i.tenantInterest.tenantStatus]?.ar : TENANT_STATUS_LABEL[i.tenantInterest.tenantStatus]?.en) : (isAR ? 'لم يُقيَّم' : 'Not yet assessed') },
+    { label: t('innov.description'), render: (i: any) => isAR && i.descriptionAr ? i.descriptionAr : i.description },
+    { label: t('innov.use_cases'), render: (i: any) => (i.typicalUseCases || []).join(' · ') || '—' },
+    { label: t('innov.benefits'), render: (i: any) => (i.benefits || []).join(' · ') || '—' },
+    { label: t('innov.risks'), render: (i: any) => (i.keyRisks || []).join(' · ') || '—' },
+    { label: isAR ? 'القدرات المطلوبة' : 'Required Capabilities', render: (i: any) => (i.requiredCapabilities || []).join(' · ') || '—' },
+  ]
+
+  const createStudy = async () => {
+    setCreating(true)
+    try {
+      const names = items.map((i: any) => isAR && i.nameAr ? i.nameAr : i.name)
+      const title = (isAR ? 'مقارنة: ' : 'Comparison: ') + names.join(isAR ? ' مقابل ' : ' vs ')
+      const objective = isAR
+        ? `تقييم مقارن للخيارات التالية لدعم قرار مبني على الأدلة: ${names.join('، ')}.`
+        : `A comparative assessment of the following options to support an evidence-based decision: ${names.join(', ')}.`
+      const originDescription = items.map((i: any) => `${isAR && i.nameAr ? i.nameAr : i.name} (${allCategoryLabel(i.category, isAR)}, ${isAR ? MATURITY_LABEL[i.maturity]?.ar : MATURITY_LABEL[i.maturity]?.en})`).join('\n')
+      const study = await api.post('/innovation/studies', { title, objective, originType: 'MANUAL', originDescription })
+      setCreated(study)
+    } catch (e: any) { alert(e.message) } finally { setCreating(false) }
+  }
+
+  return (
+    <div>
+      <div style={{ ...S.row, marginBottom: 16 }}>
+        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{t('innov.back')}</button>
+        <div style={{ flex: 1, fontSize: 18, fontWeight: 700 }}>⚖️ {isAR ? `مقارنة ${items.length} عناصر` : `Comparing ${items.length} items`}</div>
+      </div>
+
+      {created ? (
+        <div style={{ ...S.card, textAlign: 'center', padding: 24 }}>
+          <div style={{ fontSize: 14, marginBottom: 12 }}>
+            {isAR ? 'تم إنشاء دراسة استشارية من هذه المقارنة.' : 'A consultation study was created from this comparison.'}
+          </div>
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={() => { onSwitchToStudies?.(); onDone() }}>{isAR ? 'فتح تبويب الدراسات' : 'Open Studies tab'}</button>
+            <button style={S.btn()} onClick={onDone}>{t('innov.back')}</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: isAR ? 'right' : 'left', padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', width: 160 }} />
+                  {items.map((i: any) => (
+                    <th key={i.id} style={{ textAlign: isAR ? 'right' : 'left', padding: '10px 12px', borderBottom: '1px solid var(--border)', minWidth: 220 }}>
+                      {isAR && i.nameAr ? i.nameAr : i.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(row => (
+                  <tr key={row.label}>
+                    <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', fontWeight: 600, verticalAlign: 'top' }}>{row.label}</td>
+                    {items.map((i: any) => (
+                      <td key={i.id} style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', verticalAlign: 'top', lineHeight: 1.5 }}>{row.render(i)}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <button style={S.btn('primary')} onClick={createStudy} disabled={creating}>
+            {creating ? t('innov.saving') : (isAR ? '📄 أنشئ دراسة استشارية من هذه المقارنة' : '📄 Create Consultation Study from Comparison')}
+          </button>
+        </>
+      )}
     </div>
   )
 }
