@@ -99,26 +99,44 @@ describe('RepositoryPage - loading and listing', () => {
   // existing. Once metaModelDriven is true, the domain list must come
   // from config.allDomains' own keys (already correctly built
   // server-side from the live Meta Model), never enabledDomains.
-  it('when metaModelDriven is true, the Domain dropdown uses allDomains\' real Meta Model keys, not the stale enabledDomains field', async () => {
+  it('when metaModelDriven is true and enabledDomains has zero overlap with the live Meta Model (all stale), falls back to showing every current Meta Model domain', async () => {
     const staleConfig = {
       metaModelDriven: true,
-      enabledDomains: ['BUSINESS', 'APPLICATIONS', 'DATA', 'TECHNOLOGY', 'SECURITY', 'BENEFICIARY_EXPERIENCE'], // the real, stale, live value
-      allDomains: { BUSINESS: ['CAPABILITY'], BENEFICIARY: ['Touchpoint'], MOTIVATION: ['StrategicGoal'], GOVERNANCE: ['GovEntity'] },
+      enabledDomains: ['BUSINESS', 'APPLICATIONS', 'BENEFICIARY_EXPERIENCE'], // none of these match the real codes below - entirely stale
+      allDomains: { BENEFICIARY: ['Touchpoint'], MOTIVATION: ['StrategicGoal'], GOVERNANCE: ['GovEntity'] },
     };
     mockFetch({ '/ea-repository/framework-config': staleConfig, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
     render(<RepositoryPage />);
     await screen.findByText('Core Banking');
     const selects = screen.getAllByRole('combobox');
-    const domainSelect = selects.find(s => (s as HTMLSelectElement).options.length > 1 && Array.from((s as HTMLSelectElement).options).some(o => o.value === 'BENEFICIARY' || o.value === 'BENEFICIARY_EXPERIENCE'))!;
+    const domainSelect = selects.find(s => (s as HTMLSelectElement).options.length > 1 && Array.from((s as HTMLSelectElement).options).some(o => o.value === 'BENEFICIARY'))!;
     const optionValues = Array.from((domainSelect as HTMLSelectElement).options).map(o => o.value);
-    // The real Meta Model code, from allDomains
-    expect(optionValues).toContain('BENEFICIARY');
-    // Not the stale enabledDomains code, which matches zero real assets
-    expect(optionValues).not.toContain('BENEFICIARY_EXPERIENCE');
-    // Domains enabledDomains omitted entirely (MOTIVATION, GOVERNANCE)
-    // are now correctly offered too, since they come from allDomains
-    expect(optionValues).toContain('MOTIVATION');
-    expect(optionValues).toContain('GOVERNANCE');
+    // Zero overlap - every stored enabledDomains entry is meaningless
+    // against the current Meta Model, so every current domain is shown
+    // rather than an empty (or worse, silently wrong) dropdown.
+    expect(optionValues).toEqual(expect.arrayContaining(['BENEFICIARY', 'MOTIVATION', 'GOVERNANCE']));
+  });
+
+  it('when metaModelDriven is true and enabledDomains partially overlaps the live Meta Model, only the genuinely-scoped domains are shown - respects the tenant\'s deliberate choice rather than showing everything', async () => {
+    const partialConfig = {
+      metaModelDriven: true,
+      enabledDomains: ['BUSINESS', 'BENEFICIARY_EXPERIENCE'], // BUSINESS is a real, current match; BENEFICIARY_EXPERIENCE is the stale code
+      allDomains: { BUSINESS: ['CAPABILITY'], BENEFICIARY: ['Touchpoint'], MOTIVATION: ['StrategicGoal'], GOVERNANCE: ['GovEntity'] },
+    };
+    mockFetch({ '/ea-repository/framework-config': partialConfig, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    const selects = screen.getAllByRole('combobox');
+    const domainSelect = selects.find(s => (s as HTMLSelectElement).options.length > 1 && Array.from((s as HTMLSelectElement).options).some(o => o.value === 'BUSINESS'))!;
+    const optionValues = Array.from((domainSelect as HTMLSelectElement).options).map(o => o.value);
+    // The one genuine overlap is respected...
+    expect(optionValues).toContain('BUSINESS');
+    // ...but MOTIVATION/GOVERNANCE, which the tenant never scoped in at
+    // all (and BENEFICIARY, whose stored code was stale), stay excluded -
+    // this is the tenant's real, current scoping choice, not a bug.
+    expect(optionValues).not.toContain('MOTIVATION');
+    expect(optionValues).not.toContain('GOVERNANCE');
+    expect(optionValues).not.toContain('BENEFICIARY');
   });
 
   it('shows canonical APPLICATION in the domain filter when framework config still returns legacy APPLICATIONS', async () => {

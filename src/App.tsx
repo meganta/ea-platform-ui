@@ -11,7 +11,13 @@ import AdmPage from './pages/AdmPage'
 import CopilotPage from './pages/CopilotPage'
 import RepositoryPage from './pages/RepositoryPage'
 import KnowledgePage from './pages/KnowledgePage'
-import SettingsPage from './pages/SettingsPage'
+import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage'
+import AiSettingsPage from './pages/settings/AiSettingsPage'
+import KnowledgeBaseSettingsPage from './pages/settings/KnowledgeBaseSettingsPage'
+import GovernanceSettingsPage from './pages/settings/GovernanceSettingsPage'
+import OutputSettingsPage from './pages/settings/OutputSettingsPage'
+import NotificationsSettingsPage from './pages/settings/NotificationsSettingsPage'
+import ApiBillingSettingsPage from './pages/settings/ApiBillingSettingsPage'
 import GovernancePage from './pages/GovernancePage'
 import MetaModelPage from './pages/MetaModelPage'
 import EaViewsPage from './pages/EaViewsPage'
@@ -70,7 +76,15 @@ export default function App() {
               <Route path="repository" element={<ProtectedRoute permission="Repository.View"><RepositoryPage /></ProtectedRoute>} />
               <Route path="knowledge" element={<ProtectedRoute permission="Repository.View"><KnowledgePage /></ProtectedRoute>} />
               <Route path="glossary" element={<ProtectedRoute permission="Repository.View" superadminOnly><GlossaryPage /></ProtectedRoute>} />
-              <Route path="settings" element={<ProtectedRoute permission="Users.View" superadminOnly><SettingsPage /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute permission="Users.View" superadminOnly><Navigate to="/settings/organization" replace /></ProtectedRoute>} />
+              <Route path="settings/organization" element={<ProtectedRoute permission="Users.View" superadminOnly><OrganizationSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/ai" element={<ProtectedRoute permission="Users.View" superadminOnly><AiSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/knowledge-base" element={<ProtectedRoute permission="Users.View" superadminOnly><KnowledgeBaseSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/governance" element={<ProtectedRoute permission="Users.View" superadminOnly><GovernanceSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/output" element={<ProtectedRoute permission="Users.View" superadminOnly><OutputSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/notifications" element={<ProtectedRoute permission="Users.View" superadminOnly><NotificationsSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/users" element={<ProtectedRoute permission="Users.View" superadminOnly><UsersPage /></ProtectedRoute>} />
+              <Route path="settings/api-billing" element={<ProtectedRoute permission="Users.View" superadminOnly><ApiBillingSettingsPage /></ProtectedRoute>} />
               <Route path="governance" element={<ProtectedRoute permission="Reviews.View"><GovernancePage /></ProtectedRoute>} />
               <Route path="meta-model" element={<ProtectedRoute permission="MetaModel.View"><MetaModelPage /></ProtectedRoute>} />
               <Route path="ea-views" element={<ProtectedRoute permission="Views.View"><EaViewsPage /></ProtectedRoute>} />
@@ -78,8 +92,7 @@ export default function App() {
               <Route path="reports" element={<ProtectedRoute permission="Repository.View"><ReportsPage /></ProtectedRoute>} />
               <Route path="access-governance" element={<ProtectedRoute permission="Roles.View" superadminOnly><AccessGovernancePage /></ProtectedRoute>} />
               <Route path="users" element={<ProtectedRoute permission="Users.View"><UsersPage /></ProtectedRoute>} />
-              <Route path="setup" element={<ProtectedRoute superadminOnly><SetupAssistantPage /></ProtectedRoute>} />
-              <Route path="setup-assistant" element={<SetupAssistantPage />} />
+              <Route path="getting-started" element={<ProtectedRoute superadminOnly><SetupAssistantPage /></ProtectedRoute>} />
               <Route path="strategy" element={<ProtectedRoute permission="Repository.View" superadminOnly><StrategyPage /></ProtectedRoute>} />
               <Route path="innovation" element={<ProtectedRoute permission="Repository.View"><InnovationPage /></ProtectedRoute>} />
               <Route path="notifications" element={<NotificationsPage />} />

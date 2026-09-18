@@ -15,7 +15,19 @@ interface NavItem {
   permission: string | null
   adminOnly?: boolean
   superadminOnly?: boolean
+  children?: NavItem[]
 }
+
+const SETTINGS_CHILDREN: NavItem[] = [
+  { to: '/settings/organization', label: 'Organization', icon: '🏢', permission: null },
+  { to: '/settings/ai', label: 'AI & Copilot', icon: '🤖', permission: null },
+  { to: '/settings/knowledge-base', label: 'Knowledge Base', icon: '📚', permission: null },
+  { to: '/settings/governance', label: 'Governance', icon: '🏛', permission: null },
+  { to: '/settings/output', label: 'Output Preferences', icon: '🖼', permission: null },
+  { to: '/settings/notifications', label: 'Notifications', icon: '🔔', permission: null },
+  { to: '/settings/users', label: 'Users & Access', icon: '👥', permission: null },
+  { to: '/settings/api-billing', label: 'API & Billing', icon: '🔑', permission: null },
+]
 
 export default function Layout() {
   const { user, logout, hasPermission } = useAuth()
@@ -25,14 +37,20 @@ export default function Layout() {
   const [showSetupModal, setShowSetupModal] = useState(false)
   const [setupChecked, setSetupChecked] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // Auto-expanded whenever the current route is under /settings, so
+  // landing directly on e.g. /settings/governance (a bookmark, a link
+  // from elsewhere) shows the submenu open rather than collapsed with
+  // no visible indication of where you are.
+  const [settingsExpanded, setSettingsExpanded] = useState(false)
   const nav = useNavigate()
   const location = useLocation()
   const orgName = locale === 'AR' ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
 
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
+  useEffect(() => { if (location.pathname.startsWith('/settings')) setSettingsExpanded(true) }, [location.pathname])
 
   useEffect(() => {
-    if (setupChecked || location.pathname === '/setup') return
+    if (setupChecked || location.pathname === '/getting-started') return
     const token = localStorage.getItem('ea_token')
     if (!token) return
     fetch(`${API_URL}/setup/profile`, { headers: { Authorization: `Bearer ${token}` } })
@@ -54,7 +72,6 @@ export default function Layout() {
     { to: '/ea-planning', label: '🗓 EA Planning', icon: '', permission: 'Repository.View' },
     { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Repository.View' },
     { to: '/notifications', label: '🔔 ' + t('nav.notifications'), icon: '', permission: null },
-    { to: '/billing', label: '💳 ' + t('nav.billing'), icon: '', permission: 'Users.View', superadminOnly: true },
     { to: '/meta-model', label: '🧩 Meta-Model', icon: '', permission: 'MetaModel.View' },
     { to: '/ea-views', label: '🗺 EA Views', icon: '', permission: 'Views.View' },
     { to: '/connector-hub', label: '🔌 Connectors', icon: '', permission: 'Repository.View', superadminOnly: true },
@@ -62,10 +79,16 @@ export default function Layout() {
     { to: '/repository', label: '🗄 ' + t('nav.repository'), icon: '', permission: 'Repository.View' },
     { to: '/knowledge', label: '📚 ' + t('nav.knowledge'), icon: '', permission: 'Repository.View' },
     { to: '/glossary', label: '📖 Glossary', icon: '', permission: 'Repository.View', superadminOnly: true },
-    { to: '/users', label: '👥 Users', icon: '', permission: 'Users.View' },
     { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View', superadminOnly: true },
-    { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Users.View', superadminOnly: true },
-    { to: '/setup', label: '🏛 Setup Assistant', icon: '', permission: null, superadminOnly: true },
+    // Settings category (restructured, explicit direction): a single
+    // expandable nav group replacing the old flat, crowded /settings
+    // (11 tabs in one page) and the Setup Assistant's Profile &
+    // Framework step (folded into Organization below, including the
+    // domains-in-scope setting). Users & Access and API & Billing reuse
+    // the existing, fuller standalone UsersPage/BillingPage content
+    // rather than duplicating it under a second, thinner implementation.
+    { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Users.View', superadminOnly: true, children: SETTINGS_CHILDREN },
+    { to: '/getting-started', label: '🏛 Getting Started', icon: '', permission: null, superadminOnly: true },
     { to: '/demo-requests', label: '📨 Demo Requests', icon: '', permission: null, superadminOnly: true },
   ]
 
@@ -75,9 +98,9 @@ export default function Layout() {
     return hasPermission(item.permission)
   })
 
-  const mainNav = visibleNav.filter(n => !['/repository', '/knowledge', '/glossary', '/users', '/access-governance', '/settings', '/setup', '/demo-requests'].includes(n.to))
+  const mainNav = visibleNav.filter(n => !['/repository', '/knowledge', '/glossary', '/access-governance', '/settings', '/getting-started', '/demo-requests'].includes(n.to))
   const repoNav = visibleNav.filter(n => ['/repository', '/knowledge', '/glossary'].includes(n.to))
-  const adminNav = visibleNav.filter(n => ['/users', '/access-governance', '/settings', '/setup', '/demo-requests'].includes(n.to))
+  const adminNav = visibleNav.filter(n => ['/access-governance', '/settings', '/getting-started', '/demo-requests'].includes(n.to))
 
   return (
     <div className="layout">
@@ -110,7 +133,29 @@ export default function Layout() {
           {adminNav.length > 0 && (
             <>
               <div className="nav-label" style={{marginTop:8}}>Admin</div>
-              {adminNav.map(item => (
+              {adminNav.map(item => item.children ? (
+                <div key={item.to}>
+                  <button
+                    type="button"
+                    className={`nav-item${location.pathname.startsWith(item.to) ? ' active' : ''}`}
+                    onClick={() => setSettingsExpanded(e => !e)}
+                    style={{ justifyContent: 'space-between' }}
+                    aria-expanded={settingsExpanded}
+                  >
+                    <span>{item.icon ? item.icon + ' ' : ''}{item.label}</span>
+                    <span style={{ fontSize: 10, transition: 'transform 0.15s', transform: settingsExpanded ? 'rotate(90deg)' : 'none' }}>▸</span>
+                  </button>
+                  {settingsExpanded && (
+                    <div style={{ paddingInlineStart: 14, borderInlineStart: '1px solid var(--border)', marginInlineStart: 14 }}>
+                      {item.children.map(child => (
+                        <NavLink key={child.to} to={child.to} className={({isActive})=>`nav-item${isActive?' active':''}`} style={{ fontSize: 12.5 }}>
+                          {child.icon ? child.icon + ' ' : ''}{child.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
                 <NavLink key={item.to} to={item.to} className={({isActive})=>`nav-item${isActive?' active':''}`}>
                   {item.icon ? item.icon + ' ' : ''}{item.label}
                 </NavLink>

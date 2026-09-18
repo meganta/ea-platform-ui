@@ -66,28 +66,34 @@ function normalizeRepositoryDomain(domain: string): string {
   return domain === 'APPLICATIONS' ? 'APPLICATION' : domain
 }
 
-// Bug fix (live testing correction): this previously read
-// config.enabledDomains - a separate field stored once on the
-// frameworkConfig row at creation time (from a hardcoded snapshot) and
-// never updated when the tenant's Meta Model is later published or
-// republished. Confirmed on live data: test-tenant's enabledDomains was
-// ["BUSINESS","APPLICATIONS","DATA","TECHNOLOGY","SECURITY","BENEFICIARY_EXPERIENCE"] -
-// stale and wrong on every count. "BENEFICIARY_EXPERIENCE" doesn't match
-// any real EaAsset.domain value at all (the actual Meta Model domain
-// code is "BENEFICIARY") - selecting it sent domain=BENEFICIARY_EXPERIENCE
-// to the backend, matching zero rows despite 344 real Beneficiary-domain
-// assets existing. It was also missing MOTIVATION, GOVERNANCE, and
-// STRATEGY outright - three of the tenant's nine real Meta Model
-// domains were never even offered as options.
-// config.allDomains, by contrast, IS already correctly built server-side
-// from the live metaModelDomain/metaModelObjectType tables whenever a
-// Meta Model is published (config.metaModelDriven === true) - its keys
-// are the real, current domain codes. Falls back to enabledDomains only
-// when there's no published Meta Model at all yet (metaModelDriven is
-// false), matching getFrameworkConfig's own pre-Meta-Model fallback.
+// Bug fix + refinement (live testing correction, then explicit follow-up
+// direction to keep the tenant-scoping feature working correctly rather
+// than dropping it): getRepositoryDomains previously either always read
+// the stale config.enabledDomains, or (a first-pass fix) ignored it
+// entirely once metaModelDriven was true. Neither is right:
+// enabledDomains IS a real, user-configurable setting (set via the Setup
+// Assistant's "domains in scope" step, PUT /config/framework) - a
+// tenant's deliberate choice to scope down which domains they focus on,
+// which deserves to be respected, not silently ignored.
+// The actual bug was that enabledDomains can contain domain codes that
+// no longer match the tenant's current, published Meta Model at all
+// (confirmed live: "BENEFICIARY_EXPERIENCE" in enabledDomains vs the
+// real Meta Model code "BENEFICIARY" - matching zero real assets).
+// Fix: intersect enabledDomains with the live Meta Model's own domain
+// codes (config.allDomains' keys) whenever a Meta Model exists - a
+// tenant's scoping choice is honored only for domains that still
+// genuinely exist. If the intersection is empty (every stored
+// enabledDomains entry is stale/unmatched), that scoping choice is
+// itself meaningless against the current Meta Model - falls back to
+// showing every current Meta Model domain rather than an empty dropdown.
 function getRepositoryDomains(config: any): string[] {
-  const source = config?.metaModelDriven ? Object.keys(config?.allDomains || {}) : (config?.enabledDomains || [])
-  return Array.from(new Set(source.map(normalizeRepositoryDomain)))
+  if (!config?.metaModelDriven) {
+    return Array.from(new Set((config?.enabledDomains || []).map(normalizeRepositoryDomain)))
+  }
+  const liveMetaModelDomains = Object.keys(config?.allDomains || {})
+  const enabledNormalized = new Set((config?.enabledDomains || []).map(normalizeRepositoryDomain))
+  const scoped = liveMetaModelDomains.filter(d => enabledNormalized.has(normalizeRepositoryDomain(d)))
+  return Array.from(new Set((scoped.length > 0 ? scoped : liveMetaModelDomains).map(normalizeRepositoryDomain)))
 }
 
 function getRepositoryAssetTypes(config: any, domain: string): string[] {
