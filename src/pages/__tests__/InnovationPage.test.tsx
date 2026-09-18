@@ -181,6 +181,74 @@ describe('InnovationPage - Radar tab', () => {
   });
 });
 
+describe('InnovationPage - Radar comparison', () => {
+  const ITEM_B = { ...RADAR_ITEM, id: 'tech-2', code: 'ZERO_TRUST', name: 'Zero Trust Architecture', category: 'CYBERSECURITY', maturity: 'MATURE', marketPosition: 'ADOPT' };
+
+  it('entering Compare mode shows a checkbox on each card and no compare bar until 2+ are selected', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    expect(screen.queryByText(/of 5 selected/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('⚖️ Compare'));
+    expect(await screen.findByText(/0 of 5 selected/)).toBeInTheDocument();
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes.length).toBe(2);
+    fireEvent.click(checkboxes[0]);
+    expect(await screen.findByText(/1 of 5 selected/)).toBeInTheDocument();
+    const compareBtn = screen.getByText('Compare (1)');
+    expect(compareBtn).toBeDisabled();
+  });
+
+  it('selecting 2 items enables Compare and opens a side-by-side table', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('⚖️ Compare'));
+    const checkboxes = await screen.findAllByRole('checkbox');
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[1]);
+    const compareBtn = screen.getByText('Compare (2)');
+    expect(compareBtn).not.toBeDisabled();
+    fireEvent.click(compareBtn);
+    expect(await screen.findByText(/Comparing 2 items/)).toBeInTheDocument();
+    // Both item names appear as column headers
+    expect(screen.getByText('Zero Trust Architecture')).toBeInTheDocument();
+    expect(document.querySelector('table')).toBeInTheDocument();
+  });
+
+  it('clicking a card checkbox does not open the item detail view (stopPropagation)', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('⚖️ Compare'));
+    const checkboxes = await screen.findAllByRole('checkbox');
+    fireEvent.click(checkboxes[0]);
+    expect(screen.queryByText('innov.back')).not.toBeInTheDocument();
+  });
+
+  it('Create Consultation Study from Comparison posts a MANUAL-origin study naming both items', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B], '/innovation/studies': { id: 'study-new' } });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('⚖️ Compare'));
+    const checkboxes = await screen.findAllByRole('checkbox');
+    fireEvent.click(checkboxes[0]);
+    fireEvent.click(checkboxes[1]);
+    fireEvent.click(screen.getByText('Compare (2)'));
+    await screen.findByText(/Comparing 2 items/);
+    fireEvent.click(screen.getByText(/Create Consultation Study from Comparison/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/studies') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+      const body = JSON.parse(call[1].body);
+      expect(body.originType).toBe('MANUAL');
+      expect(body.title).toContain('AutoArchitect Agents');
+      expect(body.title).toContain('Zero Trust Architecture');
+    });
+    expect(await screen.findByText(/consultation study was created/)).toBeInTheDocument();
+  });
+});
+
 describe('InnovationPage - Radar detail and my-status', () => {
   it('opens the detail view when a radar card is clicked, fetching the full record', async () => {
     mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM] });
