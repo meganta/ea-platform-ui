@@ -181,6 +181,57 @@ describe('InnovationPage - Radar tab', () => {
   });
 });
 
+describe('InnovationPage - Radar portfolio dashboard', () => {
+  const ITEM_B = { ...RADAR_ITEM, id: 'tech-2', code: 'ZERO_TRUST', name: 'Zero Trust Architecture', category: 'CYBERSECURITY', maturity: 'MATURE', marketPosition: 'ADOPT', radarDomain: 'TECHNOLOGY', tenantInterest: { tenantStatus: 'PILOT', isFavorite: true, isWatching: true, ownerUserId: 'user-1' } };
+  const ITEM_C = { ...RADAR_ITEM, id: 'tech-3', code: 'AI_TESTING', name: 'AI-Augmented Testing', category: 'AI_ENABLED_QUALITY', radarDomain: 'DIGITAL_QUALITY', maturity: 'GROWING', marketPosition: 'ASSESS', tenantInterest: { tenantStatus: 'ASSESS', isFavorite: false, isWatching: false, ownerUserId: null } };
+
+  it('switching to Portfolio view fetches the full unfiltered radar list and renders aggregate counts', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B, ITEM_C] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('📊 Portfolio'));
+    expect(await screen.findByText('Total items across all radars')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument(); // total
+  });
+
+  it('counts items with no tenantInterest as not yet assessed, and items with an interest but no owner separately', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B, ITEM_C] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('📊 Portfolio'));
+    await screen.findByText('Total items across all radars');
+    // RADAR_ITEM has tenantInterest: null -> not yet assessed
+    // ITEM_C has tenantInterest with ownerUserId: null -> without owner
+    const notAssessedCard = screen.getByText('Not yet assessed').parentElement;
+    expect(notAssessedCard).toHaveTextContent('1');
+    const noOwnerCard = screen.getByText(/Without an owner/).parentElement;
+    expect(noOwnerCard).toHaveTextContent('1');
+  });
+
+  it('shows favorited and watching counts from tenantInterest flags', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_B, ITEM_C] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('📊 Portfolio'));
+    expect(await screen.findByText(/⭐ 1/)).toBeInTheDocument();
+    expect(screen.getByText(/👁 1/)).toBeInTheDocument();
+  });
+
+  it('clicking a domain bar in Portfolio by Radar Domain switches back to Card view scoped to that domain', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM, ITEM_C] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('📊 Portfolio'));
+    await screen.findByText('Portfolio by Radar Domain');
+    (global.fetch as jest.Mock).mockClear();
+    fireEvent.click(screen.getByTestId('portfolio-domain-DIGITAL_QUALITY'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('radarDomain=DIGITAL_QUALITY'));
+      expect(call).toBeDefined();
+    });
+  });
+});
+
 describe('InnovationPage - Radar comparison', () => {
   const ITEM_B = { ...RADAR_ITEM, id: 'tech-2', code: 'ZERO_TRUST', name: 'Zero Trust Architecture', category: 'CYBERSECURITY', maturity: 'MATURE', marketPosition: 'ADOPT' };
 
