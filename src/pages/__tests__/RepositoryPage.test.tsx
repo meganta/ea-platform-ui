@@ -88,6 +88,39 @@ describe('RepositoryPage - loading and listing', () => {
     expect(screen.queryByText('Core Banking')).not.toBeInTheDocument();
   });
 
+  // Live bug report fix: getRepositoryDomains previously always read
+  // config.enabledDomains - a separate field stored once on the
+  // frameworkConfig row and never synced when the tenant's Meta Model is
+  // later published/republished. Confirmed on live data: a tenant's
+  // enabledDomains still had the stale code "BENEFICIARY_EXPERIENCE"
+  // while its actual, current Meta Model domain code is "BENEFICIARY" -
+  // selecting the dropdown option sent a domain value matching zero
+  // real assets, despite hundreds of real Beneficiary-domain assets
+  // existing. Once metaModelDriven is true, the domain list must come
+  // from config.allDomains' own keys (already correctly built
+  // server-side from the live Meta Model), never enabledDomains.
+  it('when metaModelDriven is true, the Domain dropdown uses allDomains\' real Meta Model keys, not the stale enabledDomains field', async () => {
+    const staleConfig = {
+      metaModelDriven: true,
+      enabledDomains: ['BUSINESS', 'APPLICATIONS', 'DATA', 'TECHNOLOGY', 'SECURITY', 'BENEFICIARY_EXPERIENCE'], // the real, stale, live value
+      allDomains: { BUSINESS: ['CAPABILITY'], BENEFICIARY: ['Touchpoint'], MOTIVATION: ['StrategicGoal'], GOVERNANCE: ['GovEntity'] },
+    };
+    mockFetch({ '/ea-repository/framework-config': staleConfig, '/ea-repository/assets': [asset()], '/ea-repository/summary': {} });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    const selects = screen.getAllByRole('combobox');
+    const domainSelect = selects.find(s => (s as HTMLSelectElement).options.length > 1 && Array.from((s as HTMLSelectElement).options).some(o => o.value === 'BENEFICIARY' || o.value === 'BENEFICIARY_EXPERIENCE'))!;
+    const optionValues = Array.from((domainSelect as HTMLSelectElement).options).map(o => o.value);
+    // The real Meta Model code, from allDomains
+    expect(optionValues).toContain('BENEFICIARY');
+    // Not the stale enabledDomains code, which matches zero real assets
+    expect(optionValues).not.toContain('BENEFICIARY_EXPERIENCE');
+    // Domains enabledDomains omitted entirely (MOTIVATION, GOVERNANCE)
+    // are now correctly offered too, since they come from allDomains
+    expect(optionValues).toContain('MOTIVATION');
+    expect(optionValues).toContain('GOVERNANCE');
+  });
+
   it('shows canonical APPLICATION in the domain filter when framework config still returns legacy APPLICATIONS', async () => {
     mockFetch({
       '/ea-repository/framework-config': LEGACY_APPLICATIONS_CONFIG, '/ea-repository/summary': {},
@@ -531,5 +564,50 @@ describe('RepositoryPage - Source-first filter reorganization (explicit correcti
       const lastCall = (global.fetch as jest.Mock).mock.calls[(global.fetch as jest.Mock).mock.calls.length - 1][0];
       expect(lastCall).not.toContain('assetType=APPLICATION');
     });
+  });
+});
+
+describe('RepositoryPage - Needs Reclassification banner (data reconciliation)', () => {
+  it('does not show the banner when needsReclassificationCount is 0 or absent', async () => {
+    mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': { total: 5, needsReclassificationCount: 0 } });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    expect(screen.queryByText(/need manual reclassification/)).not.toBeInTheDocument();
+  });
+
+  it('shows the banner with the real count when needsReclassificationCount is nonzero', async () => {
+    mockFetch({ '/ea-repository/framework-config': CONFIG, '/ea-repository/assets': [asset()], '/ea-repository/summary': { total: 5612, needsReclassificationCount: 16 } });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    expect(screen.getByText(/16 assets could not be automatically matched/)).toBeInTheDocument();
+  });
+
+  it('clicking "Review These Assets" sends needsReclassification=true as a server-side query param', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': { total: 5612, needsReclassificationCount: 16 },
+      '/ea-repository/assets': (url: string) => url.includes('needsReclassification=true')
+        ? [asset({ id: 'a2', name: 'Orphaned Standard Asset' })]
+        : [asset({ id: 'a1', name: 'Core Banking' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('Review These Assets'));
+    expect(await screen.findByText('Orphaned Standard Asset')).toBeInTheDocument();
+    expect(screen.queryByText('Core Banking')).not.toBeInTheDocument();
+  });
+
+  it('toggles back to the normal list via "Show Normal List"', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': { total: 5612, needsReclassificationCount: 16 },
+      '/ea-repository/assets': (url: string) => url.includes('needsReclassification=true')
+        ? [asset({ id: 'a2', name: 'Orphaned Standard Asset' })]
+        : [asset({ id: 'a1', name: 'Core Banking' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('Review These Assets'));
+    await screen.findByText('Orphaned Standard Asset');
+    fireEvent.click(screen.getByText('Show Normal List'));
+    expect(await screen.findByText('Core Banking')).toBeInTheDocument();
   });
 });
