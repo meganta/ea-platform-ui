@@ -176,7 +176,7 @@ export default function InnovationPage() {
   const { t, isAR } = useLang()
   const { user } = useAuth() as any
   const isAdmin = user?.role === 'TENANT_ADMIN'
-  const [tab, setTab] = useState<'radar' | 'favorites' | 'ideas' | 'studies' | 'profile'>('radar')
+  const [tab, setTab] = useState<'radar' | 'favorites' | 'watchlist' | 'ideas' | 'studies' | 'profile'>('radar')
   const [selected, setSelected] = useState<any>(null)
   return (
     <div style={S.page} dir={isAR ? 'rtl' : 'ltr'}>
@@ -194,6 +194,7 @@ export default function InnovationPage() {
       <div style={S.tabs}>
         <button style={S.tab(tab === 'radar')} onClick={() => { setTab('radar'); setSelected(null) }}>{t('innov.tab_radar')}</button>
         <button style={S.tab(tab === 'favorites')} onClick={() => { setTab('favorites'); setSelected(null) }}>{t('innov.tab_favorites')}</button>
+        <button style={S.tab(tab === 'watchlist')} onClick={() => { setTab('watchlist'); setSelected(null) }}>👁 {isAR ? 'قائمة المتابعة' : 'Watchlist'}</button>
         <button style={S.tab(tab === 'ideas')} onClick={() => { setTab('ideas'); setSelected(null) }}>{t('innov.tab_ideas')}</button>
         <button style={S.tab(tab === 'studies')} onClick={() => { setTab('studies'); setSelected(null) }}>{t('innov.tab_studies')}</button>
         <button style={S.tab(tab === 'profile')} onClick={() => { setTab('profile'); setSelected(null) }}>{t('innov.tab_profile')}</button>
@@ -201,6 +202,7 @@ export default function InnovationPage() {
       <div style={S.content}>
         {tab === 'radar' && <RadarTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} onSwitchToStudies={() => setTab('studies')} />}
         {tab === 'favorites' && <FavoritesTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} />}
+        {tab === 'watchlist' && <WatchlistTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} userId={user?.userId} selected={selected} setSelected={setSelected} />}
         {tab === 'ideas' && <IdeasTab api={api} isAR={isAR} t={t} userRole={user?.role} />}
         {tab === 'studies' && <StudiesTab api={api} isAR={isAR} t={t} />}
         {tab === 'profile' && <ProfileTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} />}
@@ -903,6 +905,75 @@ function FavoritesTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
   return (
     <div className="stat-grid-3" style={{ alignItems: 'start' }}>
       {items.map((item: any) => <RadarCard key={item.id} item={item} isAR={isAR} t={t} onClick={() => openItem(item.id)} />)}
+    </div>
+  )
+}
+
+// ── Watchlist Tab (spec section 20: "make watching operationally useful") ──
+function WatchlistTab({ api, isAdmin, isAR, t, userId, selected, setSelected }: any) {
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    api.get('/innovation/radar/watchlist').then((d: any) => setItems(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+  }, [api])
+  useEffect(() => { load() }, [load])
+
+  const openItem = async (id: string) => { const full = await api.get(`/innovation/radar/${id}`); setSelected(full) }
+  const refreshSelected = async () => { if (selected) await openItem(selected.id) }
+
+  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} />
+
+  if (loading) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
+  if (items.length === 0) return (
+    <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>
+      {isAR ? 'لا توجد عناصر قيد المتابعة. من تفاصيل أي عنصر، فعّل "قيد المتابعة" لإضافته هنا.' : 'Nothing on your watchlist yet. From any item\u2019s detail view, check \u201cWatching\u201d to add it here.'}
+    </div>
+  )
+
+  const ownerLabel = (ownerUserId: string | null) => {
+    if (!ownerUserId) return isAR ? 'بلا مالك' : 'Unassigned'
+    if (ownerUserId === userId) return isAR ? 'أنت' : 'You'
+    return ownerUserId.slice(0, 8)
+  }
+  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString(isAR ? 'ar' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr>
+            {[isAR ? 'العنصر' : 'Item', isAR ? 'الرادار' : 'Radar', isAR ? 'الفئة' : 'Category', isAR ? 'موقفنا الحالي' : 'Current Position', t('innov.maturity'), isAR ? 'آخر تحديث لموقفنا' : 'Our Last Update', isAR ? 'المالك' : 'Owner'].map(h => (
+              <th key={h} style={{ textAlign: isAR ? 'right' : 'left', padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)', fontWeight: 600, fontSize: 11 }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item: any) => (
+            <tr key={item.id} style={{ cursor: 'pointer' }} onClick={() => openItem(item.id)}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-light)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', fontWeight: 600 }}>
+                {allCategoryIcon(item.category)} {isAR && item.nameAr ? item.nameAr : item.name}
+                {item.tenantInterest?.isFavorite && <span style={{ marginLeft: 6 }} title={t('innov.favorite')}>⭐</span>}
+              </td>
+              <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>{DOMAIN_INFO[item.radarDomain]?.icon} {domainLabel(item.radarDomain, isAR)}</td>
+              <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>{allCategoryLabel(item.category, isAR)}</td>
+              <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                <span style={S.badge(TENANT_STATUS_COLOR[item.tenantInterest?.tenantStatus] || '#7f8c8d')}>
+                  {item.tenantInterest?.tenantStatus ? (isAR ? TENANT_STATUS_LABEL[item.tenantInterest.tenantStatus]?.ar : TENANT_STATUS_LABEL[item.tenantInterest.tenantStatus]?.en) : (isAR ? 'غير محدد' : 'Unset')}
+                </span>
+              </td>
+              <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+                <span style={S.badge(MATURITY_COLOR[item.maturity] || '#7f8c8d')}>{isAR ? MATURITY_LABEL[item.maturity]?.ar : MATURITY_LABEL[item.maturity]?.en}</span>
+              </td>
+              <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)' }}>{fmtDate(item.tenantInterest?.updatedAt)}</td>
+              <td style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)' }}>{ownerLabel(item.tenantInterest?.ownerUserId)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
