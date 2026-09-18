@@ -219,7 +219,7 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
   const [marketPosition, setMarketPosition] = useState('')
   const [creating, setCreating] = useState(false)
   const [seeding, setSeeding] = useState(false)
-  const [viewMode, setViewMode] = useState<'card' | 'radar'>('card')
+  const [viewMode, setViewMode] = useState<'card' | 'radar' | 'portfolio'>('card')
   const [ringBasis, setRingBasis] = useState<'market' | 'org'>('market')
   const [compareMode, setCompareMode] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>([])
@@ -306,6 +306,7 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
         <div style={{ display: 'flex', gap: 2, background: 'var(--navy-mid)', borderRadius: 8, padding: 2 }}>
           <button onClick={() => setViewMode('card')} style={{ ...S.btn(viewMode === 'card' ? 'primary' : 'secondary'), padding: '6px 12px' }}>▦ {isAR ? 'بطاقات' : 'Cards'}</button>
           <button onClick={() => setViewMode('radar')} style={{ ...S.btn(viewMode === 'radar' ? 'primary' : 'secondary'), padding: '6px 12px' }}>🎯 {isAR ? 'رادار' : 'Radar'}</button>
+          <button onClick={() => setViewMode('portfolio')} style={{ ...S.btn(viewMode === 'portfolio' ? 'primary' : 'secondary'), padding: '6px 12px' }}>📊 {isAR ? 'المحفظة' : 'Portfolio'}</button>
         </div>
         {viewMode === 'card' && (
           <button style={S.btn(compareMode ? 'primary' : 'secondary')} onClick={() => { setCompareMode(m => !m); setCompareIds([]) }}>
@@ -337,7 +338,9 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
 
       {creating && <RadarCreateForm api={api} isAR={isAR} t={t} defaultDomain={domain === 'ALL' ? 'TECHNOLOGY' : domain} onDone={() => { setCreating(false); load() }} onCancel={() => setCreating(false)} />}
 
-      {loading ? (
+      {viewMode === 'portfolio' ? (
+        <RadarPortfolioDashboard api={api} isAR={isAR} t={t} onGoToDomain={(d: string) => { setDomain(d); setViewMode('card'); setCategory('') }} />
+      ) : loading ? (
         <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
       ) : items.length === 0 ? (
         <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>
@@ -352,6 +355,89 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
             onClick={() => (compareMode ? toggleCompare(item.id) : openItem(item.id))} />)}
         </div>
       )}
+    </div>
+  )
+}
+
+function RadarPortfolioDashboard({ api, isAR, t, onGoToDomain }: any) {
+  const [items, setItems] = useState<any[] | null>(null)
+
+  useEffect(() => { api.get('/innovation/radar').then((d: any) => setItems(Array.isArray(d) ? d : [])) }, [api])
+
+  const stats = useMemo(() => {
+    if (!items) return null
+    const byDomain: Record<string, number> = {}
+    DOMAINS.forEach(d => { byDomain[d] = 0 })
+    const byMaturity: Record<string, number> = {}
+    Object.keys(MATURITY_LABEL).forEach(m => { byMaturity[m] = 0 })
+    const byMarketPosition: Record<string, number> = {}
+    Object.keys(MARKET_POSITION_LABEL).forEach(p => { byMarketPosition[p] = 0 })
+    const byTenantStatus: Record<string, number> = {}
+    let notYetAssessed = 0, noOwner = 0, favorited = 0, watching = 0
+    for (const item of items) {
+      if (byDomain[item.radarDomain] !== undefined) byDomain[item.radarDomain]++
+      if (byMaturity[item.maturity] !== undefined) byMaturity[item.maturity]++
+      if (byMarketPosition[item.marketPosition] !== undefined) byMarketPosition[item.marketPosition]++
+      const interest = item.tenantInterest
+      if (!interest || interest.tenantStatus === 'NOT_RELEVANT') { notYetAssessed++; continue }
+      byTenantStatus[interest.tenantStatus] = (byTenantStatus[interest.tenantStatus] || 0) + 1
+      if (!interest.ownerUserId) noOwner++
+      if (interest.isFavorite) favorited++
+      if (interest.isWatching) watching++
+    }
+    return { total: items.length, byDomain, byMaturity, byMarketPosition, byTenantStatus, notYetAssessed, noOwner, favorited, watching }
+  }, [items])
+
+  if (!stats) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
+
+  const Bar = ({ label, count, max, color, onClick, testId }: any) => (
+    <div data-testid={testId} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, cursor: onClick ? 'pointer' : 'default' }} onClick={onClick}>
+      <div style={{ width: 170, fontSize: 12, textAlign: isAR ? 'left' : 'right', color: 'var(--text-dim)', flexShrink: 0 }}>{label}</div>
+      <div style={{ flex: 1, background: 'var(--navy-mid)', borderRadius: 6, height: 18, position: 'relative', overflow: 'hidden' }}>
+        <div style={{ width: `${max > 0 ? (count / max) * 100 : 0}%`, background: color, height: '100%', borderRadius: 6, transition: 'width 0.3s' }} />
+      </div>
+      <div style={{ width: 32, fontSize: 12, fontWeight: 700 }}>{count}</div>
+    </div>
+  )
+
+  const maxDomain = Math.max(1, ...Object.values(stats.byDomain))
+  const maxMaturity = Math.max(1, ...Object.values(stats.byMaturity))
+  const maxMarket = Math.max(1, ...Object.values(stats.byMarketPosition))
+  const maxTenant = Math.max(1, ...Object.values(stats.byTenantStatus))
+
+  return (
+    <div>
+      <div className="stat-grid-3" style={{ marginBottom: 20 }}>
+        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'إجمالي العناصر عبر كل الرادارات' : 'Total items across all radars'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.total}</div></div>
+        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'لم تُقيَّم بعد' : 'Not yet assessed'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.notYetAssessed}</div></div>
+        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'بلا مالك (من بين ما تم تقييمه)' : 'Without an owner (of assessed)'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.noOwner}</div></div>
+        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'مفضّلة' : 'Favorited'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>⭐ {stats.favorited}</div></div>
+        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'قيد المتابعة' : 'Watching'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>👁 {stats.watching}</div></div>
+        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'الرادارات المغطاة' : 'Radars covered'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{Object.values(stats.byDomain).filter((c: any) => c > 0).length} / {DOMAINS.length}</div></div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={S.card}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isAR ? 'المحفظة حسب الرادار' : 'Portfolio by Radar Domain'}</div>
+          {DOMAINS.map(d => <Bar key={d} testId={`portfolio-domain-${d}`} label={`${DOMAIN_INFO[d].icon} ${domainLabel(d, isAR)}`} count={stats.byDomain[d]} max={maxDomain} color="#8e44ad" onClick={() => onGoToDomain(d)} />)}
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{isAR ? 'انقر لعرض عناصر ذلك الرادار' : 'Click a bar to view that domain\u2019s items'}</div>
+        </div>
+        <div style={S.card}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isAR ? 'المحفظة حسب النضج' : 'Portfolio by Maturity'}</div>
+          {Object.keys(MATURITY_LABEL).map(m => <Bar key={m} label={isAR ? MATURITY_LABEL[m].ar : MATURITY_LABEL[m].en} count={stats.byMaturity[m]} max={maxMaturity} color={MATURITY_COLOR[m]} />)}
+        </div>
+        <div style={S.card}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isAR ? 'المحفظة حسب موضع السوق' : 'Portfolio by Market Position'}</div>
+          {Object.keys(MARKET_POSITION_LABEL).map(p => <Bar key={p} label={isAR ? MARKET_POSITION_LABEL[p].ar : MARKET_POSITION_LABEL[p].en} count={stats.byMarketPosition[p]} max={maxMarket} color={MARKET_POSITION_COLOR[p]} />)}
+        </div>
+        <div style={S.card}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isAR ? 'قمع تبنّي مؤسستنا' : 'Our Organization\u2019s Adoption Funnel'}</div>
+          {ORG_RINGS.map(s => <Bar key={s} label={isAR ? TENANT_STATUS_LABEL[s]?.ar : TENANT_STATUS_LABEL[s]?.en} count={stats.byTenantStatus[s] || 0} max={maxTenant} color={TENANT_STATUS_COLOR[s]} />)}
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>
+            {isAR ? `بالإضافة إلى ${stats.notYetAssessed} عنصر لم يُقيَّم بعد أو غير ذي صلة` : `Plus ${stats.notYetAssessed} item(s) not yet assessed or marked not relevant`}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
