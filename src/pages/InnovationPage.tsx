@@ -254,7 +254,7 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
     })
   }
 
-  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} />
+  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} />
   if (comparing) return <ComparisonView api={api} items={items.filter((i: any) => compareIds.includes(i.id))} isAR={isAR} t={t}
     onBack={() => setComparing(false)}
     onDone={() => { setComparing(false); setCompareMode(false); setCompareIds([]) }}
@@ -363,8 +363,13 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
 
 function RadarPortfolioDashboard({ api, isAR, t, onGoToDomain }: any) {
   const [items, setItems] = useState<any[] | null>(null)
+  const [studies, setStudies] = useState<any[] | null>(null)
+  const [viewDomain, setViewDomain] = useState('ALL')
 
   useEffect(() => { api.get('/innovation/radar').then((d: any) => setItems(Array.isArray(d) ? d : [])) }, [api])
+  useEffect(() => { api.get('/innovation/studies').then((d: any) => setStudies(Array.isArray(d) ? d : [])) }, [api])
+
+  const scopedItems = useMemo(() => (items || []).filter((i: any) => viewDomain === 'ALL' || i.radarDomain === viewDomain), [items, viewDomain])
 
   const stats = useMemo(() => {
     if (!items) return null
@@ -375,9 +380,9 @@ function RadarPortfolioDashboard({ api, isAR, t, onGoToDomain }: any) {
     const byMarketPosition: Record<string, number> = {}
     Object.keys(MARKET_POSITION_LABEL).forEach(p => { byMarketPosition[p] = 0 })
     const byTenantStatus: Record<string, number> = {}
-    let notYetAssessed = 0, noOwner = 0, favorited = 0, watching = 0
-    for (const item of items) {
-      if (byDomain[item.radarDomain] !== undefined) byDomain[item.radarDomain]++
+    let notYetAssessed = 0, noOwner = 0, favorited = 0, watching = 0, beingAssessed = 0, beingPiloted = 0, adoptedOrScaled = 0
+    for (const item of items) { if (byDomain[item.radarDomain] !== undefined) byDomain[item.radarDomain]++ }
+    for (const item of scopedItems) {
       if (byMaturity[item.maturity] !== undefined) byMaturity[item.maturity]++
       if (byMarketPosition[item.marketPosition] !== undefined) byMarketPosition[item.marketPosition]++
       const interest = item.tenantInterest
@@ -386,9 +391,22 @@ function RadarPortfolioDashboard({ api, isAR, t, onGoToDomain }: any) {
       if (!interest.ownerUserId) noOwner++
       if (interest.isFavorite) favorited++
       if (interest.isWatching) watching++
+      if (interest.tenantStatus === 'ASSESS') beingAssessed++
+      if (interest.tenantStatus === 'PILOT') beingPiloted++
+      if (interest.tenantStatus === 'ADOPT' || interest.tenantStatus === 'SCALE') adoptedOrScaled++
     }
-    return { total: items.length, byDomain, byMaturity, byMarketPosition, byTenantStatus, notYetAssessed, noOwner, favorited, watching }
-  }, [items])
+    return { total: items.length, byDomain, byMaturity, byMarketPosition, byTenantStatus, notYetAssessed, noOwner, favorited, watching, beingAssessed, beingPiloted, adoptedOrScaled }
+  }, [items, scopedItems])
+
+  const funnel = useMemo(() => {
+    if (!studies) return null
+    const scopedIds = new Set(scopedItems.map((i: any) => i.id))
+    const signalsOnRadar = scopedItems.length
+    const beingTracked = scopedItems.filter((i: any) => i.tenantInterest && i.tenantInterest.tenantStatus !== 'NOT_RELEVANT').length
+    const studiesGenerated = new Set(studies.filter((s: any) => s.originType === 'RADAR_ITEM' && s.originRadarItemId && scopedIds.has(s.originRadarItemId)).map((s: any) => s.originRadarItemId)).size
+    const adoptedOrScaled = scopedItems.filter((i: any) => i.tenantInterest && ['ADOPT', 'SCALE'].includes(i.tenantInterest.tenantStatus)).length
+    return { signalsOnRadar, beingTracked, studiesGenerated, adoptedOrScaled }
+  }, [studies, scopedItems])
 
   if (!stats) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
 
@@ -402,28 +420,91 @@ function RadarPortfolioDashboard({ api, isAR, t, onGoToDomain }: any) {
     </div>
   )
 
+  const FunnelStage = ({ label, count, max, color }: any) => (
+    <div style={{ textAlign: 'center', flex: 1 }}>
+      <div style={{ height: 60, display: 'flex', alignItems: 'flex-end', justifyContent: 'center', marginBottom: 8 }}>
+        <div style={{ width: '70%', height: `${max > 0 ? Math.max((count / max) * 100, 6) : 6}%`, background: color, borderRadius: '6px 6px 0 0' }} />
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 700 }}>{count}</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{label}</div>
+    </div>
+  )
+
   const maxDomain = Math.max(1, ...Object.values(stats.byDomain))
   const maxMaturity = Math.max(1, ...Object.values(stats.byMaturity))
   const maxMarket = Math.max(1, ...Object.values(stats.byMarketPosition))
   const maxTenant = Math.max(1, ...Object.values(stats.byTenantStatus))
+  const isSingleDomain = viewDomain !== 'ALL'
 
   return (
     <div>
-      <div className="stat-grid-3" style={{ marginBottom: 20 }}>
-        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'إجمالي العناصر عبر كل الرادارات' : 'Total items across all radars'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.total}</div></div>
-        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'لم تُقيَّم بعد' : 'Not yet assessed'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.notYetAssessed}</div></div>
-        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'بلا مالك (من بين ما تم تقييمه)' : 'Without an owner (of assessed)'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.noOwner}</div></div>
-        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'مفضّلة' : 'Favorited'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>⭐ {stats.favorited}</div></div>
-        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'قيد المتابعة' : 'Watching'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>👁 {stats.watching}</div></div>
-        <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'الرادارات المغطاة' : 'Radars covered'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{Object.values(stats.byDomain).filter((c: any) => c > 0).length} / {DOMAINS.length}</div></div>
+      {/* Domain-specific management views - spec sections 29-31: selecting one domain reframes this from a
+          generic cross-domain portfolio into that domain's own management view (real data only, same
+          underlying fields - no fabricated per-domain scores). */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' as const }}>
+        <button onClick={() => setViewDomain('ALL')}
+          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: viewDomain === 'ALL' ? '1px solid var(--accent)' : '1px solid var(--border)', background: viewDomain === 'ALL' ? 'var(--accent)22' : 'var(--navy-light)', color: viewDomain === 'ALL' ? 'var(--accent)' : 'var(--text)', fontSize: 13, fontWeight: viewDomain === 'ALL' ? 700 : 500, cursor: 'pointer' }}>
+          🌐 {isAR ? 'كل الرادارات' : 'All Radars'}
+        </button>
+        {DOMAINS.map(d => (
+          <button key={d} data-testid={`portfolio-view-domain-${d}`} onClick={() => setViewDomain(d)}
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', borderRadius: 10, border: viewDomain === d ? '1px solid var(--accent)' : '1px solid var(--border)', background: viewDomain === d ? 'var(--accent)22' : 'var(--navy-light)', color: viewDomain === d ? 'var(--accent)' : 'var(--text)', fontSize: 13, fontWeight: viewDomain === d ? 700 : 500, cursor: 'pointer' }}>
+            {DOMAIN_INFO[d].icon} {domainLabel(d, isAR)}
+          </button>
+        ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-        <div style={S.card}>
-          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isAR ? 'المحفظة حسب الرادار' : 'Portfolio by Radar Domain'}</div>
-          {DOMAINS.map(d => <Bar key={d} testId={`portfolio-domain-${d}`} label={`${DOMAIN_INFO[d].icon} ${domainLabel(d, isAR)}`} count={stats.byDomain[d]} max={maxDomain} color="#8e44ad" onClick={() => onGoToDomain(d)} />)}
-          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{isAR ? 'انقر لعرض عناصر ذلك الرادار' : 'Click a bar to view that domain\u2019s items'}</div>
+      {isSingleDomain && (
+        <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+          {DOMAIN_INFO[viewDomain].icon} {domainLabel(viewDomain, isAR)} {isAR ? 'عرض الإدارة' : 'Management View'}
         </div>
+      )}
+
+      <div className="stat-grid-3" style={{ marginBottom: 20 }}>
+        {isSingleDomain ? (
+          <>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'إجمالي الممارسات' : 'Total practices in this radar'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{scopedItems.length}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'قيد التقييم' : 'Being assessed'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.beingAssessed}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'قيد التجريب' : 'Being piloted'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.beingPiloted}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'مُتبنّاة أو مُوسّعة' : 'Adopted or scaled'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.adoptedOrScaled}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'لم تُقيَّم بعد' : 'Not yet assessed'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.notYetAssessed}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'قيد المتابعة' : 'Watching'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>👁 {stats.watching}</div></div>
+          </>
+        ) : (
+          <>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'إجمالي العناصر عبر كل الرادارات' : 'Total items across all radars'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.total}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'لم تُقيَّم بعد' : 'Not yet assessed'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.notYetAssessed}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'بلا مالك (من بين ما تم تقييمه)' : 'Without an owner (of assessed)'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{stats.noOwner}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'مفضّلة' : 'Favorited'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>⭐ {stats.favorited}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'قيد المتابعة' : 'Watching'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>👁 {stats.watching}</div></div>
+            <div style={S.card}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'الرادارات المغطاة' : 'Radars covered'}</div><div style={{ fontSize: 26, fontWeight: 700 }}>{Object.values(stats.byDomain).filter((c: any) => c > 0).length} / {DOMAINS.length}</div></div>
+          </>
+        )}
+      </div>
+
+      {funnel && (
+        <div style={{ ...S.card, marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 4 }}>{isAR ? 'قمع الرادار إلى القيمة' : 'Radar \u2192 Value Funnel'}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 12 }}>
+            {isAR ? 'مبني من بيانات حقيقية فقط: حالتنا الخاصة والدراسات الاستشارية المرتبطة فعليًا بعنصر رادار.' : 'Built only from real data: our own tenant status and studies genuinely linked to a radar item.'}
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <FunnelStage label={isAR ? 'إشارات على الرادار' : 'Signals on Radar'} count={funnel.signalsOnRadar} max={funnel.signalsOnRadar} color="#7f8c8d" />
+            <FunnelStage label={isAR ? 'نتابعها فعليًا' : 'Being Tracked'} count={funnel.beingTracked} max={funnel.signalsOnRadar} color="#3498db" />
+            <FunnelStage label={isAR ? 'ولّدت دراسة استشارية' : 'Studies Generated'} count={funnel.studiesGenerated} max={funnel.signalsOnRadar} color="#e67e22" />
+            <FunnelStage label={isAR ? 'مُتبنّاة أو مُوسّعة' : 'Adopted or Scaled'} count={funnel.adoptedOrScaled} max={funnel.signalsOnRadar} color="#2ecc71" />
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        {!isSingleDomain && (
+          <div style={S.card}>
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isAR ? 'المحفظة حسب الرادار' : 'Portfolio by Radar Domain'}</div>
+            {DOMAINS.map(d => <Bar key={d} testId={`portfolio-domain-${d}`} label={`${DOMAIN_INFO[d].icon} ${domainLabel(d, isAR)}`} count={stats.byDomain[d]} max={maxDomain} color="#8e44ad" onClick={() => onGoToDomain(d)} />)}
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{isAR ? 'انقر لعرض عناصر ذلك الرادار' : 'Click a bar to view that domain\u2019s items'}</div>
+          </div>
+        )}
         <div style={S.card}>
           <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isAR ? 'المحفظة حسب النضج' : 'Portfolio by Maturity'}</div>
           {Object.keys(MATURITY_LABEL).map(m => <Bar key={m} label={isAR ? MATURITY_LABEL[m].ar : MATURITY_LABEL[m].en} count={stats.byMaturity[m]} max={maxMaturity} color={MATURITY_COLOR[m]} />)}
@@ -715,7 +796,7 @@ function RadarCreateForm({ api, isAR, t, defaultDomain, onDone, onCancel }: any)
 }
 
 // ── Radar Detail ─────────────────────────────────────────────────────────────
-function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh }: any) {
+function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh, onOpenItem }: any) {
   const [editing, setEditing] = useState(false)
   const [status, setStatus] = useState(item.tenantInterest?.tenantStatus || 'NOT_RELEVANT')
   const [isFavorite, setIsFavorite] = useState(!!item.tenantInterest?.isFavorite)
@@ -723,8 +804,10 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh }: any) {
   const [notes, setNotes] = useState(item.tenantInterest?.notes || '')
   const [saving, setSaving] = useState(false)
   const [history, setHistory] = useState<any[] | null>(null)
+  const [allItems, setAllItems] = useState<any[]>([])
 
   useEffect(() => { api.get(`/innovation/radar/${item.id}/status-history`).then((d: any) => setHistory(Array.isArray(d) ? d : [])) }, [api, item])
+  useEffect(() => { api.get('/innovation/radar').then((d: any) => setAllItems(Array.isArray(d) ? d : [])) }, [api])
 
   const saveStatus = async () => {
     setSaving(true)
@@ -751,7 +834,7 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh }: any) {
       </div>
 
       {editing ? (
-        <RadarEditForm api={api} item={item} isAR={isAR} t={t} onDone={() => { setEditing(false); onRefresh() }} onCancel={() => setEditing(false)} />
+        <RadarEditForm api={api} item={item} isAR={isAR} t={t} allItems={allItems} onDone={() => { setEditing(false); onRefresh() }} onCancel={() => setEditing(false)} />
       ) : (
         <>
           <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' as const }}>
@@ -842,6 +925,32 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh }: any) {
               </div>
             )}
           </div>
+
+          {item.relatedTechnologyIds?.length > 0 && (
+            <div style={{ ...S.card, marginTop: 16 }}>
+              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+                🔗 {isAR ? 'عناصر رادار ذات صلة' : 'Related Radar Items'}
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
+                {item.relatedTechnologyIds.map((relId: string) => {
+                  const rel = allItems.find((x: any) => x.id === relId)
+                  if (!rel) return null
+                  return (
+                    <button key={relId} onClick={() => onOpenItem(relId)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20,
+                        border: '1px solid var(--border)', background: 'var(--navy-mid)', color: 'var(--text)',
+                        fontSize: 12, cursor: 'pointer',
+                      }}>
+                      <span>{allCategoryIcon(rel.category)}</span>
+                      <span>{isAR && rel.nameAr ? rel.nameAr : rel.name}</span>
+                      {rel.radarDomain && rel.radarDomain !== item.radarDomain && <span style={{ opacity: 0.6 }}>({DOMAIN_INFO[rel.radarDomain]?.icon})</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -863,13 +972,21 @@ function InfoList({ title, items }: { title: string; items?: string[] }) {
   )
 }
 
-function RadarEditForm({ api, item, isAR, t, onDone, onCancel }: any) {
+function RadarEditForm({ api, item, isAR, t, allItems, onDone, onCancel }: any) {
   const [form, setForm] = useState({
     name: item.name || '', nameAr: item.nameAr || '', description: item.description || '', descriptionAr: item.descriptionAr || '',
     category: item.category, maturity: item.maturity, marketPosition: item.marketPosition,
     typicalUseCases: (item.typicalUseCases || []).join(', '), benefits: (item.benefits || []).join(', '), keyRisks: (item.keyRisks || []).join(', '),
+    relatedTechnologyIds: item.relatedTechnologyIds || [],
   })
+  const [relatedSearch, setRelatedSearch] = useState('')
   const [saving, setSaving] = useState(false)
+
+  const toggleRelated = (id: string) => {
+    setForm(f => ({ ...f, relatedTechnologyIds: f.relatedTechnologyIds.includes(id) ? f.relatedTechnologyIds.filter((x: string) => x !== id) : [...f.relatedTechnologyIds, id] }))
+  }
+
+  const candidates = (allItems || []).filter((x: any) => x.id !== item.id && (isAR && x.nameAr ? x.nameAr : x.name).toLowerCase().includes(relatedSearch.toLowerCase()))
 
   const save = async () => {
     setSaving(true)
@@ -910,6 +1027,36 @@ function RadarEditForm({ api, item, isAR, t, onDone, onCancel }: any) {
       <input style={S.input} value={form.benefits} onChange={e => setForm(f => ({ ...f, benefits: e.target.value }))} />
       <div style={S.label}>{t('innov.risks')}</div>
       <input style={S.input} value={form.keyRisks} onChange={e => setForm(f => ({ ...f, keyRisks: e.target.value }))} />
+
+      <div style={S.label}>{isAR ? 'عناصر رادار ذات صلة' : 'Related Radar Items'}</div>
+      {form.relatedTechnologyIds.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: 8 }}>
+          {form.relatedTechnologyIds.map((id: string) => {
+            const rel = (allItems || []).find((x: any) => x.id === id)
+            return (
+              <span key={id} style={{ ...S.badge('#8e44ad'), display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => toggleRelated(id)}>
+                {rel ? (isAR && rel.nameAr ? rel.nameAr : rel.name) : id} ✕
+              </span>
+            )
+          })}
+        </div>
+      )}
+      <input style={S.input} placeholder={isAR ? 'ابحث لإضافة عنصر ذي صلة…' : 'Search to add a related item…'} value={relatedSearch} onChange={e => setRelatedSearch(e.target.value)} />
+      {relatedSearch && (
+        <div style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 10 }}>
+          {candidates.slice(0, 20).map((c: any) => (
+            <div key={c.id} onClick={() => { toggleRelated(c.id); setRelatedSearch('') }}
+              style={{ padding: '8px 12px', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-mid)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+              {allCategoryIcon(c.category)} {isAR && c.nameAr ? c.nameAr : c.name}
+              {form.relatedTechnologyIds.includes(c.id) && <span style={{ marginLeft: 'auto', color: 'var(--accent)' }}>✓</span>}
+            </div>
+          ))}
+          {candidates.length === 0 && <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد نتائج' : 'No matches'}</div>}
+        </div>
+      )}
+
       <div style={S.row}>
         <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? t('innov.saving') : t('innov.save')}</button>
         <button style={S.btn()} onClick={onCancel}>{t('innov.cancel')}</button>
@@ -932,7 +1079,7 @@ function FavoritesTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
   const openItem = async (id: string) => { const full = await api.get(`/innovation/radar/${id}`); setSelected(full) }
   const refreshSelected = async () => { if (selected) await openItem(selected.id) }
 
-  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} />
+  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} />
 
   if (loading) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
   if (items.length === 0) return <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('innov.no_favorites')}</div>
@@ -958,7 +1105,7 @@ function WatchlistTab({ api, isAdmin, isAR, t, userId, selected, setSelected }: 
   const openItem = async (id: string) => { const full = await api.get(`/innovation/radar/${id}`); setSelected(full) }
   const refreshSelected = async () => { if (selected) await openItem(selected.id) }
 
-  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} />
+  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} />
 
   if (loading) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
   if (items.length === 0) return (
