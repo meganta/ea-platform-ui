@@ -1235,3 +1235,152 @@ describe('InnovationPage - Studies tab: study editor (Innovation-P4)', () => {
     });
   });
 });
+
+describe('InnovationPage - Tenant Assessment Engine', () => {
+  const TEMPLATE = [
+    { key: 'strategicAlignment', bucket: 'strategicFit', weight: 0.5, en: 'Strategic Alignment', ar: 'x' },
+    { key: 'businessValue', bucket: 'opportunity', weight: 1, en: 'Business Value', ar: 'x' },
+  ];
+  const ASSESSMENT = { id: 'assess-1', opportunityScore: 4, readinessScore: 3, riskScore: 2, strategicFitScore: 4.5, compositeScore: 3.1, criteria: TEMPLATE.map(c => ({ ...c, score: 4 })) };
+
+  it('shows a "Start Assessment" prompt when this tenant has no assessment yet', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/assessment': null, '/innovation/radar/assessment-criteria-template': TEMPLATE, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/Start Assessment/)).toBeInTheDocument();
+  });
+
+  it('displays the computed bucket scores and composite score when an assessment already exists', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/assessment': ASSESSMENT, '/innovation/radar/assessment-criteria-template': TEMPLATE, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText('3.10')).toBeInTheDocument();
+    expect(screen.getByText('Composite Priority Score')).toBeInTheDocument();
+  });
+
+  it('submitting the criteria sliders PUTs to the assessment endpoint with the criteria array', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/assessment': null, '/innovation/radar/assessment-criteria-template': TEMPLATE, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    fireEvent.click(await screen.findByText(/Start Assessment/));
+    fireEvent.click(screen.getByText('innov.save'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/assessment'));
+      expect(call).toBeDefined();
+      const body = JSON.parse(call[1].body);
+      expect(Array.isArray(body.criteria)).toBe(true);
+      expect(body.criteria.length).toBe(2);
+    });
+  });
+});
+
+describe('InnovationPage - Organizational Relevance Engine', () => {
+  const SUGGESTED_LINK = { id: 'link-1', status: 'AI_SUGGESTED', rationale: 'Directly automates this workflow', asset: { name: 'Case Management', assetType: 'CAPABILITY' } };
+  const CONFIRMED_LINK = { id: 'link-2', status: 'CONFIRMED', rationale: 'Already reviewed', asset: { name: 'Customer Portal', assetType: 'APPLICATION' } };
+
+  it('shows an empty state and an Analyze button when no relevance analysis has run', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relevance': [], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/No relevance analysis has been run yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Analyze Relevance/)).toBeInTheDocument();
+  });
+
+  it('clicking Analyze posts to analyze-relevance and reloads the links', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relevance': [], '/innovation/radar/tech-1/analyze-relevance': { suggestionsCreated: 1 }, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    fireEvent.click(await screen.findByText(/Analyze Relevance/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/analyze-relevance') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+    });
+  });
+
+  it('shows AI-suggested links separately from reviewed ones, with the real asset name and rationale', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relevance': [SUGGESTED_LINK, CONFIRMED_LINK], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText('Case Management')).toBeInTheDocument();
+    expect(screen.getByText(/Directly automates this workflow/)).toBeInTheDocument();
+    expect(screen.getByText('Customer Portal')).toBeInTheDocument();
+    expect(screen.getByText('AI Suggested - needs your review')).toBeInTheDocument();
+    expect(screen.getByText('Reviewed')).toBeInTheDocument();
+  });
+
+  it('confirming a suggestion PUTs a CONFIRMED decision to the right link', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relevance': [SUGGESTED_LINK], '/innovation/radar/relevance/link-1': {}, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('Case Management');
+    fireEvent.click(screen.getByText(/Confirm/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/relevance/link-1') && c[1]?.method === 'PUT');
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body).decision).toBe('CONFIRMED');
+    });
+  });
+
+  it('rejecting a suggestion PUTs a REJECTED decision', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relevance': [SUGGESTED_LINK], '/innovation/radar/relevance/link-1': {}, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('Case Management');
+    fireEvent.click(screen.getByText(/Reject/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/relevance/link-1') && c[1]?.method === 'PUT');
+      expect(JSON.parse(call[1].body).decision).toBe('REJECTED');
+    });
+  });
+
+  it('editing a suggestion requires entering text before it can be saved, then PUTs EDITED with that text', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relevance': [SUGGESTED_LINK], '/innovation/radar/relevance/link-1': {}, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('Case Management');
+    fireEvent.click(screen.getByText(/✎/));
+    const input = screen.getByPlaceholderText(/Write your edited rationale/);
+    fireEvent.change(input, { target: { value: 'A more precise rationale' } });
+    fireEvent.click(screen.getByText('innov.save'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/relevance/link-1') && c[1]?.method === 'PUT');
+      const body = JSON.parse(call[1].body);
+      expect(body.decision).toBe('EDITED');
+      expect(body.editedRationale).toBe('A more precise rationale');
+    });
+  });
+
+  it('shows a placeholder rather than a blank when the linked asset no longer exists', async () => {
+    const orphaned = { id: 'link-3', status: 'AI_SUGGESTED', rationale: 'x', asset: null };
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relevance': [orphaned], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/asset no longer exists/)).toBeInTheDocument();
+  });
+});
+
+describe('InnovationPage - Opportunity Discovery (Create Idea from a radar item)', () => {
+  it('clicking "Create Idea from This" on a radar item switches to the Ideas tab with the create form pre-filled', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM], '/innovation/ideas': [] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    fireEvent.click(await screen.findByText(/Create Idea from This/));
+    // Now on the Ideas tab, with the create form auto-opened and pre-filled
+    const titleInput = await screen.findByDisplayValue('AutoArchitect Agents');
+    expect(titleInput).toBeInTheDocument();
+  });
+
+  it('submitting the pre-filled idea posts relatedRadarItemId matching the originating radar item', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM], '/innovation/ideas': { id: 'idea-new' } });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    fireEvent.click(await screen.findByText(/Create Idea from This/));
+    await screen.findByDisplayValue('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('innov.submit'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/ideas') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body).relatedRadarItemId).toBe('tech-1');
+    });
+  });
+});
