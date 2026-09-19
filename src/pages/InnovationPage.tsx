@@ -1008,6 +1008,10 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh, onOpenIte
           </div>
 
           <RadarRelationshipGraphCard api={api} item={item} allItems={allItems} isAR={isAR} t={t} isAdmin={isAdmin} onOpenItem={onOpenItem} />
+          <RadarAnalystCard api={api} item={item} isAR={isAR} t={t} />
+          <RadarEvidenceCard api={api} item={item} isAR={isAR} t={t} isAdmin={isAdmin} />
+          <RadarPilotsCard api={api} item={item} isAR={isAR} t={t} isAdmin={isAdmin} />
+          <RadarValueRealizationCard api={api} item={item} isAR={isAR} t={t} isAdmin={isAdmin} />
         </>
       )}
     </div>
@@ -1339,6 +1343,288 @@ function RadarRelationshipGraphCard({ api, item, allItems, isAR, t, isAdmin, onO
             </div>
           )}
         </div>
+      )}
+    </div>
+  )
+}
+
+// ── AI Innovation Analyst (spec section 15) ─────────────────────────────────
+const IMPACT_FRAMING_LABEL: Record<string, { en: string; ar: string }> = {
+  'Architecture Impact': { en: 'Architecture Impact', ar: 'الأثر المعماري' },
+  'Operating Model Impact': { en: 'Operating Model Impact', ar: 'أثر نموذج التشغيل' },
+  'Quality Impact': { en: 'Quality Impact', ar: 'أثر الجودة' },
+  'Delivery Impact': { en: 'Delivery Impact', ar: 'أثر التسليم' },
+}
+
+function RadarAnalystCard({ api, item, isAR, t }: any) {
+  const [result, setResult] = useState<any>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+
+  const analyze = async () => {
+    setAnalyzing(true)
+    try { const r = await api.post(`/innovation/radar/${item.id}/analyze`, {}); setResult(r) }
+    catch (e: any) { alert(e.message) } finally { setAnalyzing(false) }
+  }
+
+  return (
+    <div style={{ ...S.card, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ fontWeight: 600, fontSize: 13, flex: 1, display: 'flex', alignItems: 'center' }}>
+          🤖 {isAR ? 'محلل الابتكار بالذكاء الاصطناعي' : 'AI Innovation Analyst'}
+          <HelpTip text={isAR ? 'تحليل مبني فقط على بيانات هذا العنصر الحقيقية وتقييم/صلة مؤسستك إن وُجدت.' : 'Analysis grounded only in this item\u2019s own real fields and your organization\u2019s real assessment/relevance data, if any.'} />
+        </div>
+        <button style={S.btn('primary')} onClick={analyze} disabled={analyzing}>{analyzing ? (isAR ? 'جارٍ التحليل…' : 'Analyzing…') : (isAR ? 'حلّل هذا العنصر' : 'Analyze This Item')}</button>
+      </div>
+      {result && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
+            {isAR
+              ? `مبني على: موقفنا${result.groundedIn.tenantStatus ? ` (${result.groundedIn.tenantStatus})` : ' (غير محدد)'}${result.groundedIn.hasAssessment ? `، تقييم بدرجة ${result.groundedIn.compositeScore.toFixed(2)}` : '، بلا تقييم بعد'}، ${result.groundedIn.confirmedRelevanceCount} روابط صلة مؤكَّدة.`
+              : `Grounded in: our status${result.groundedIn.tenantStatus ? ` (${result.groundedIn.tenantStatus})` : ' (unset)'}${result.groundedIn.hasAssessment ? `, an assessment scoring ${result.groundedIn.compositeScore.toFixed(2)}` : ', no assessment yet'}, ${result.groundedIn.confirmedRelevanceCount} confirmed relevance link(s).`}
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{isAR ? IMPACT_FRAMING_LABEL[result.impactFraming]?.ar : IMPACT_FRAMING_LABEL[result.impactFraming]?.en}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{result.analysis.impactSummary}</div>
+          </div>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{isAR ? 'اعتبارات رئيسية' : 'Key Considerations'}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{result.analysis.keyConsiderations}</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={S.badge(TENANT_STATUS_COLOR[result.analysis.recommendedNextStep] || '#3498db')}>{isAR ? 'الخطوة التالية الموصى بها:' : 'Recommended Next Step:'} {isAR ? TENANT_STATUS_LABEL[result.analysis.recommendedNextStep]?.ar : TENANT_STATUS_LABEL[result.analysis.recommendedNextStep]?.en}</span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>{result.analysis.recommendedNextStepRationale}</div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Evidence & Signal Model + Trend Intelligence (spec sections 10-11) ──────
+const SIGNAL_TYPES = ['RESEARCH', 'MARKET', 'ADOPTION', 'REGULATORY', 'STANDARD', 'VENDOR', 'ACADEMIC', 'GOVERNMENT', 'IMPLEMENTATION', 'INTERNAL']
+const TREND_COLOR: Record<string, string> = { TRENDING: '#e74c3c', RISING: '#2ecc71', STABLE: '#3498db', DECLINING: '#e67e22', INSUFFICIENT_EVIDENCE: '#7f8c8d' }
+const TREND_LABEL: Record<string, { en: string; ar: string }> = {
+  TRENDING: { en: 'Trending', ar: 'رائج' }, RISING: { en: 'Rising', ar: 'صاعد' }, STABLE: { en: 'Stable', ar: 'مستقر' },
+  DECLINING: { en: 'Declining', ar: 'متراجع' }, INSUFFICIENT_EVIDENCE: { en: 'Insufficient Evidence', ar: 'أدلة غير كافية' },
+}
+
+function RadarEvidenceCard({ api, item, isAR, t, isAdmin }: any) {
+  const [signals, setSignals] = useState<any[] | null>(null)
+  const [trend, setTrend] = useState<any>(null)
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({ signalType: 'RESEARCH', source: '', sourceUrl: '', publisher: '', summary: '', confidence: 'MEDIUM' })
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(() => {
+    api.get(`/innovation/radar/${item.id}/evidence`).then((d: any) => setSignals(Array.isArray(d) ? d : []))
+    api.get(`/innovation/radar/${item.id}/trend`).then((d: any) => setTrend(d && d.trendState ? d : null))
+  }, [api, item])
+  useEffect(() => { load() }, [load])
+
+  const addSignal = async () => {
+    if (!form.source || !form.summary) return alert(isAR ? 'المصدر والملخص مطلوبان' : 'Source and summary are required')
+    setSaving(true)
+    try { await api.post(`/innovation/radar/${item.id}/evidence`, form); setAdding(false); setForm({ signalType: 'RESEARCH', source: '', sourceUrl: '', publisher: '', summary: '', confidence: 'MEDIUM' }); load() }
+    catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+  const removeSignal = async (id: string) => { try { await api.post(`/innovation/radar/evidence/${id}/delete`, {}); load() } catch (e: any) { alert(e.message) } }
+
+  if (signals === null) return null
+
+  return (
+    <div style={{ ...S.card, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>📰 {isAR ? 'الأدلة والاتجاه' : 'Evidence & Trend'}</div>
+        {trend && (
+          <span style={{ ...S.badge(TREND_COLOR[trend.trendState]), marginRight: 8 }} title={trend.reason}>
+            {isAR ? TREND_LABEL[trend.trendState]?.ar : TREND_LABEL[trend.trendState]?.en}
+          </span>
+        )}
+        {isAdmin && <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => setAdding(a => !a)}>+ {isAR ? 'أضف دليلًا' : 'Add Evidence'}</button>}
+      </div>
+      {trend && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>{trend.reason}</div>}
+
+      {adding && (
+        <div style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <select style={S.input} value={form.signalType} onChange={e => setForm(f => ({ ...f, signalType: e.target.value }))}>
+              {SIGNAL_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+            <select style={S.input} value={form.confidence} onChange={e => setForm(f => ({ ...f, confidence: e.target.value }))}>
+              {['HIGH', 'MEDIUM', 'LOW'].map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <input style={S.input} placeholder={isAR ? 'المصدر (مثال: تقرير Gartner)' : 'Source (e.g. Gartner report)'} value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} />
+          <input style={S.input} placeholder={isAR ? 'رابط المصدر (اختياري)' : 'Source URL (optional)'} value={form.sourceUrl} onChange={e => setForm(f => ({ ...f, sourceUrl: e.target.value }))} />
+          <input style={S.input} placeholder={isAR ? 'الناشر (اختياري)' : 'Publisher (optional)'} value={form.publisher} onChange={e => setForm(f => ({ ...f, publisher: e.target.value }))} />
+          <textarea style={{ ...S.input, minHeight: 60, fontFamily: 'inherit' }} placeholder={isAR ? 'ملخص الدليل' : 'Evidence summary'} value={form.summary} onChange={e => setForm(f => ({ ...f, summary: e.target.value }))} />
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={addSignal} disabled={saving}>{saving ? t('innov.saving') : t('innov.save')}</button>
+            <button style={S.btn()} onClick={() => setAdding(false)}>{t('innov.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {signals.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد أدلة مسجَّلة بعد.' : 'No evidence recorded yet.'}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {signals.map((s: any) => (
+            <div key={s.id} style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={S.badge('#3498db')}>{s.signalType}</span>
+                <span style={{ fontWeight: 600 }}>{s.sourceUrl ? <a href={s.sourceUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>{s.source}</a> : s.source}</span>
+                {s.publisher && <span style={{ color: 'var(--text-dim)' }}>({s.publisher})</span>}
+                <span style={{ marginLeft: 'auto', color: 'var(--text-dim)' }}>{new Date(s.observedDate).toLocaleDateString()}</span>
+                {isAdmin && <button onClick={() => removeSignal(s.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕</button>}
+              </div>
+              <div>{s.summary}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Pilot / Experiment Management (spec section 22) ─────────────────────────
+const PILOT_OUTCOME_COLOR: Record<string, string> = { ADOPT: '#2ecc71', SCALE: '#27ae60', REASSESS: '#f1c40f', HOLD: '#e67e22', STOP: '#e74c3c' }
+
+function RadarPilotsCard({ api, item, isAR, t, isAdmin }: any) {
+  const [pilots, setPilots] = useState<any[] | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({ title: '', hypothesis: '', problemStatement: '', expectedBenefit: '' })
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(() => { api.get(`/innovation/radar/${item.id}/pilots`).then((d: any) => setPilots(Array.isArray(d) ? d : [])) }, [api, item])
+  useEffect(() => { load() }, [load])
+
+  const create = async () => {
+    if (!form.title || !form.hypothesis) return alert(isAR ? 'العنوان والفرضية مطلوبان' : 'Title and hypothesis are required')
+    setSaving(true)
+    try { await api.post(`/innovation/radar/${item.id}/pilots`, form); setAdding(false); setForm({ title: '', hypothesis: '', problemStatement: '', expectedBenefit: '' }); load() }
+    catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+  const setStatus = async (id: string, status: string) => { try { await api.put(`/innovation/radar/pilots/${id}`, { status }); load() } catch (e: any) { alert(e.message) } }
+  const setOutcome = async (id: string, outcome: string) => { try { await api.put(`/innovation/radar/pilots/${id}`, { status: 'COMPLETED', outcome }); load() } catch (e: any) { alert(e.message) } }
+
+  if (pilots === null) return null
+
+  return (
+    <div style={{ ...S.card, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>🧪 {isAR ? 'التجارب والمشاريع الاستطلاعية' : 'Pilots & Experiments'}</div>
+        {isAdmin && <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => setAdding(a => !a)}>+ {isAR ? 'ابدأ تجربة' : 'Start a Pilot'}</button>}
+      </div>
+
+      {adding && (
+        <div style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
+          <input style={S.input} placeholder={isAR ? 'العنوان' : 'Title'} value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+          <textarea style={{ ...S.input, minHeight: 50, fontFamily: 'inherit' }} placeholder={isAR ? 'الفرضية' : 'Hypothesis'} value={form.hypothesis} onChange={e => setForm(f => ({ ...f, hypothesis: e.target.value }))} />
+          <textarea style={{ ...S.input, minHeight: 50, fontFamily: 'inherit' }} placeholder={isAR ? 'بيان المشكلة (اختياري)' : 'Problem statement (optional)'} value={form.problemStatement} onChange={e => setForm(f => ({ ...f, problemStatement: e.target.value }))} />
+          <input style={S.input} placeholder={isAR ? 'الفائدة المتوقعة (اختياري)' : 'Expected benefit (optional)'} value={form.expectedBenefit} onChange={e => setForm(f => ({ ...f, expectedBenefit: e.target.value }))} />
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? t('innov.saving') : t('innov.save')}</button>
+            <button style={S.btn()} onClick={() => setAdding(false)}>{t('innov.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {pilots.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد تجارب مسجَّلة بعد.' : 'No pilots recorded yet.'}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {pilots.map((p: any) => (
+            <div key={p.id} style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{p.title}</span>
+                <span style={S.badge(p.status === 'COMPLETED' ? '#2ecc71' : p.status === 'IN_PROGRESS' ? '#3498db' : '#7f8c8d')}>{p.status}</span>
+                {p.outcome && <span style={S.badge(PILOT_OUTCOME_COLOR[p.outcome])}>{p.outcome}</span>}
+              </div>
+              <div style={{ color: 'var(--text-dim)', marginBottom: 6 }}>{p.hypothesis}</div>
+              {isAdmin && p.status !== 'COMPLETED' && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
+                  {p.status === 'PLANNED' && <button style={{ ...S.btn('primary'), padding: '3px 8px', fontSize: 11 }} onClick={() => setStatus(p.id, 'IN_PROGRESS')}>{isAR ? 'ابدأ' : 'Start'}</button>}
+                  {['ADOPT', 'SCALE', 'REASSESS', 'HOLD', 'STOP'].map(o => (
+                    <button key={o} style={{ ...S.btn(), padding: '3px 8px', fontSize: 11 }} onClick={() => setOutcome(p.id, o)}>{isAR ? 'أنهِ:' : 'Conclude:'} {o}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Value Realization (spec section 24) ─────────────────────────────────────
+function RadarValueRealizationCard({ api, item, isAR, t, isAdmin }: any) {
+  const [records, setRecords] = useState<any[] | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState({ kpiName: '', baseline: '', target: '', actual: '' })
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(() => { api.get(`/innovation/radar/${item.id}/value-realization`).then((d: any) => setRecords(Array.isArray(d) ? d : [])) }, [api, item])
+  useEffect(() => { load() }, [load])
+
+  const create = async () => {
+    if (!form.kpiName) return alert(isAR ? 'اسم المؤشر مطلوب' : 'KPI name is required')
+    setSaving(true)
+    try { await api.post(`/innovation/radar/${item.id}/value-realization`, form); setAdding(false); setForm({ kpiName: '', baseline: '', target: '', actual: '' }); load() }
+    catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+  const updateActual = async (id: string, actual: string) => { try { await api.put(`/innovation/radar/value-realization/${id}`, { actual }); load() } catch (e: any) { alert(e.message) } }
+
+  if (records === null) return null
+
+  return (
+    <div style={{ ...S.card, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>📈 {isAR ? 'تحقيق القيمة' : 'Value Realization'}</div>
+        {isAdmin && <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => setAdding(a => !a)}>+ {isAR ? 'تتبَّع مؤشرًا' : 'Track a KPI'}</button>}
+      </div>
+
+      {adding && (
+        <div style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
+          <input style={S.input} placeholder={isAR ? 'اسم المؤشر' : 'KPI name'} value={form.kpiName} onChange={e => setForm(f => ({ ...f, kpiName: e.target.value }))} />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <input style={S.input} placeholder={isAR ? 'خط الأساس' : 'Baseline'} value={form.baseline} onChange={e => setForm(f => ({ ...f, baseline: e.target.value }))} />
+            <input style={S.input} placeholder={isAR ? 'الهدف' : 'Target'} value={form.target} onChange={e => setForm(f => ({ ...f, target: e.target.value }))} />
+          </div>
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? t('innov.saving') : t('innov.save')}</button>
+            <button style={S.btn()} onClick={() => setAdding(false)}>{t('innov.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {records.length === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد مؤشرات مُتابَعة بعد.' : 'No KPIs being tracked yet.'}</div>
+      ) : (
+        <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              {[isAR ? 'المؤشر' : 'KPI', isAR ? 'خط الأساس' : 'Baseline', isAR ? 'الهدف' : 'Target', isAR ? 'الفعلي' : 'Actual'].map(h => (
+                <th key={h} style={{ textAlign: isAR ? 'right' : 'left', padding: '6px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((r: any) => (
+              <tr key={r.id}>
+                <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', fontWeight: 600 }}>{r.kpiName}</td>
+                <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>{r.baseline || '—'}</td>
+                <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>{r.target || '—'}</td>
+                <td style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)' }}>
+                  {isAdmin ? (
+                    <input style={{ ...S.input, marginBottom: 0, padding: '3px 6px', width: 100 }} placeholder={isAR ? 'أدخل القيمة الفعلية' : 'Enter actual'} defaultValue={r.actual || ''} onBlur={e => e.target.value !== (r.actual || '') && updateActual(r.id, e.target.value)} />
+                  ) : (r.actual || '—')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </div>
   )
