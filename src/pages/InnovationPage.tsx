@@ -178,6 +178,11 @@ export default function InnovationPage() {
   const isAdmin = user?.role === 'TENANT_ADMIN'
   const [tab, setTab] = useState<'radar' | 'favorites' | 'watchlist' | 'ideas' | 'studies' | 'profile'>('radar')
   const [selected, setSelected] = useState<any>(null)
+  const [ideaSeed, setIdeaSeed] = useState<any>(null)
+  const createIdeaFrom = (item: any) => {
+    setIdeaSeed({ title: isAR && item.nameAr ? item.nameAr : item.name, description: item.description, relatedRadarItemId: item.id })
+    setTab('ideas')
+  }
   return (
     <div style={S.page} dir={isAR ? 'rtl' : 'ltr'}>
       <div style={S.header}>
@@ -200,10 +205,10 @@ export default function InnovationPage() {
         <button style={S.tab(tab === 'profile')} onClick={() => { setTab('profile'); setSelected(null) }}>{t('innov.tab_profile')}</button>
       </div>
       <div style={S.content}>
-        {tab === 'radar' && <RadarTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} onSwitchToStudies={() => setTab('studies')} />}
-        {tab === 'favorites' && <FavoritesTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} />}
-        {tab === 'watchlist' && <WatchlistTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} userId={user?.userId} selected={selected} setSelected={setSelected} />}
-        {tab === 'ideas' && <IdeasTab api={api} isAR={isAR} t={t} userRole={user?.role} />}
+        {tab === 'radar' && <RadarTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} onSwitchToStudies={() => setTab('studies')} onCreateIdeaFrom={createIdeaFrom} />}
+        {tab === 'favorites' && <FavoritesTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} onCreateIdeaFrom={createIdeaFrom} />}
+        {tab === 'watchlist' && <WatchlistTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} userId={user?.userId} selected={selected} setSelected={setSelected} onCreateIdeaFrom={createIdeaFrom} />}
+        {tab === 'ideas' && <IdeasTab api={api} isAR={isAR} t={t} userRole={user?.role} seed={ideaSeed} onSeedConsumed={() => setIdeaSeed(null)} />}
         {tab === 'studies' && <StudiesTab api={api} isAR={isAR} t={t} />}
         {tab === 'profile' && <ProfileTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} />}
       </div>
@@ -212,7 +217,7 @@ export default function InnovationPage() {
 }
 
 // ── Radar Tab ────────────────────────────────────────────────────────────────
-function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStudies }: any) {
+function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStudies, onCreateIdeaFrom }: any) {
   const [items, setItems] = useState<any[]>([])
   const [domains, setDomains] = useState<any[]>([])
   const [domain, setDomain] = useState('TECHNOLOGY')
@@ -254,7 +259,7 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
     })
   }
 
-  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} />
+  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} onCreateIdeaFrom={onCreateIdeaFrom} />
   if (comparing) return <ComparisonView api={api} items={items.filter((i: any) => compareIds.includes(i.id))} isAR={isAR} t={t}
     onBack={() => setComparing(false)}
     onDone={() => { setComparing(false); setCompareMode(false); setCompareIds([]) }}
@@ -796,7 +801,7 @@ function RadarCreateForm({ api, isAR, t, defaultDomain, onDone, onCancel }: any)
 }
 
 // ── Radar Detail ─────────────────────────────────────────────────────────────
-function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh, onOpenItem }: any) {
+function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh, onOpenItem, onCreateIdeaFrom }: any) {
   const [editing, setEditing] = useState(false)
   const [status, setStatus] = useState(item.tenantInterest?.tenantStatus || 'NOT_RELEVANT')
   const [isFavorite, setIsFavorite] = useState(!!item.tenantInterest?.isFavorite)
@@ -825,6 +830,7 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh, onOpenIte
       <div style={{ ...S.row, marginBottom: 16 }}>
         <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{t('innov.back')}</button>
         <div style={{ flex: 1, fontSize: 18, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>{allCategoryIcon(item.category)} {name}</div>
+        <button style={S.btn()} onClick={() => onCreateIdeaFrom(item)}>💡 {isAR ? 'أنشئ فكرة من هذا' : 'Create Idea from This'}</button>
         {isAdmin && (
           <>
             <button style={S.btn()} onClick={() => setEditing(e => !e)}>{t('innov.edit')}</button>
@@ -893,6 +899,9 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh, onOpenIte
             <input style={S.input} value={notes} onChange={e => setNotes(e.target.value)} />
             <button style={S.btn('primary')} onClick={saveStatus} disabled={saving}>{saving ? t('innov.saving') : t('innov.save_status')}</button>
           </div>
+
+          <RadarAssessmentCard api={api} item={item} isAR={isAR} t={t} />
+          <RadarRelevanceCard api={api} item={item} isAR={isAR} t={t} />
 
           <div style={{ ...S.card, marginTop: 16 }}>
             <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center' }}>
@@ -967,6 +976,185 @@ function InfoList({ title, items }: { title: string; items?: string[] }) {
         <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 12, lineHeight: 1.7 }}>
           {items.map((i, idx) => <li key={idx}>{i}</li>)}
         </ul>
+      )}
+    </div>
+  )
+}
+
+// ── Tenant Assessment Engine (spec section 12) ──────────────────────────────
+const SCORE_COLOR = (score: number) => (score >= 4 ? '#2ecc71' : score >= 2.5 ? '#f1c40f' : '#e74c3c')
+const BUCKET_LABEL: Record<string, { en: string; ar: string }> = {
+  strategicFit: { en: 'Strategic Fit', ar: 'الملاءمة الاستراتيجية' },
+  opportunity: { en: 'Opportunity', ar: 'الفرصة' },
+  readiness: { en: 'Readiness', ar: 'الجاهزية' },
+  risk: { en: 'Risk', ar: 'المخاطر' },
+}
+
+function RadarAssessmentCard({ api, item, isAR, t }: any) {
+  const [assessment, setAssessment] = useState<any>(null)
+  const [template, setTemplate] = useState<any[] | null>(null)
+  const [criteria, setCriteria] = useState<any[] | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { api.get(`/innovation/radar/${item.id}/assessment`).then((d: any) => setAssessment(d && typeof d.compositeScore === 'number' ? d : null)) }, [api, item])
+  useEffect(() => { api.get('/innovation/radar/assessment-criteria-template').then((d: any) => setTemplate(Array.isArray(d) ? d : [])) }, [api])
+
+  const startEditing = () => {
+    const base = assessment?.criteria || template || []
+    setCriteria(base.map((c: any) => ({ key: c.key, bucket: c.bucket, weight: c.weight, invert: c.invert || false, label: c.label || (isAR ? c.ar : c.en) || c.key, score: c.score ?? 3 })))
+    setEditing(true)
+  }
+
+  const save = async () => {
+    if (!criteria) return
+    setSaving(true)
+    try {
+      const result = await api.put(`/innovation/radar/${item.id}/assessment`, { criteria: criteria.map(c => ({ key: c.key, bucket: c.bucket, weight: c.weight, invert: c.invert, score: c.score })) })
+      setAssessment(result)
+      setEditing(false)
+    } catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+
+  if (template === null) return null
+
+  return (
+    <div style={{ ...S.card, marginTop: 16 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center' }}>
+        📊 {isAR ? 'تقييم مؤسستنا' : 'Our Organization\u2019s Assessment'}
+        <HelpTip text={isAR
+          ? 'تقييم مرجّح بمعايير تُدخلها أنت. النتائج المحسوبة (الفرصة/الجاهزية/المخاطر/الملاءمة الاستراتيجية/الأولوية الإجمالية) مبنية على أرقامك فقط - وليست تقديرًا من الذكاء الاصطناعي.'
+          : 'A weighted assessment using criteria you enter. The computed scores (Opportunity/Readiness/Risk/Strategic Fit/Composite Priority) are derived only from your own numbers - not an AI guess.'} />
+      </div>
+
+      {!editing ? (
+        assessment ? (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 12 }}>
+              {(['strategicFit', 'opportunity', 'readiness', 'risk'] as const).map(b => (
+                <div key={b} style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: SCORE_COLOR(b === 'risk' ? 5 - assessment[`${b}Score`] : assessment[`${b}Score`]) }}>{assessment[`${b}Score`].toFixed(1)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isAR ? BUCKET_LABEL[b].ar : BUCKET_LABEL[b].en}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ textAlign: 'center', padding: '10px 0', borderTop: '1px solid var(--border)', marginBottom: 12 }}>
+              <div style={{ fontSize: 26, fontWeight: 700 }}>{assessment.compositeScore.toFixed(2)}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? 'درجة الأولوية الإجمالية' : 'Composite Priority Score'}</div>
+            </div>
+            <button style={S.btn()} onClick={startEditing}>{isAR ? 'تحديث التقييم' : 'Update Assessment'}</button>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>{isAR ? 'لم يُقيَّم هذا العنصر بعد من قِبل مؤسستنا.' : 'This item has not been assessed by our organization yet.'}</div>
+            <button style={S.btn('primary')} onClick={startEditing}>{isAR ? 'ابدأ التقييم' : 'Start Assessment'}</button>
+          </>
+        )
+      ) : (
+        <>
+          {criteria?.map((c, idx) => (
+            <div key={c.key} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                <span>{c.label} <span style={{ color: 'var(--text-dim)' }}>({isAR ? BUCKET_LABEL[c.bucket]?.ar : BUCKET_LABEL[c.bucket]?.en})</span></span>
+                <span style={{ fontWeight: 700 }}>{c.score}</span>
+              </div>
+              <input type="range" min={1} max={5} step={1} value={c.score}
+                onChange={e => setCriteria(cs => cs!.map((x, i) => i === idx ? { ...x, score: Number(e.target.value) } : x))}
+                style={{ width: '100%' }} />
+            </div>
+          ))}
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? t('innov.saving') : t('innov.save')}</button>
+            <button style={S.btn()} onClick={() => setEditing(false)}>{t('innov.cancel')}</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── Organizational Relevance Engine (spec section 13) ───────────────────────
+function RadarRelevanceCard({ api, item, isAR, t }: any) {
+  const [links, setLinks] = useState<any[] | null>(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+
+  const load = useCallback(() => { api.get(`/innovation/radar/${item.id}/relevance`).then((d: any) => setLinks(Array.isArray(d) ? d : [])) }, [api, item])
+  useEffect(() => { load() }, [load])
+
+  const analyze = async () => {
+    setAnalyzing(true)
+    try { await api.post(`/innovation/radar/${item.id}/analyze-relevance`); load() }
+    catch (e: any) { alert(e.message) } finally { setAnalyzing(false) }
+  }
+
+  const review = async (linkId: string, decision: string, editedRationale?: string) => {
+    try { await api.put(`/innovation/radar/relevance/${linkId}`, { decision, editedRationale }); setEditingId(null); load() }
+    catch (e: any) { alert(e.message) }
+  }
+
+  if (links === null) return null
+
+  const suggested = links.filter(l => l.status === 'AI_SUGGESTED')
+  const decided = links.filter(l => l.status !== 'AI_SUGGESTED')
+
+  return (
+    <div style={{ ...S.card, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, display: 'flex', alignItems: 'center', flex: 1 }}>
+          🎯 {isAR ? 'الصلة بمؤسستنا' : 'Relevance to Our Organization'}
+          <HelpTip text={isAR
+            ? 'يحلّل الذكاء الاصطناعي هذا العنصر مقابل القدرات والتطبيقات الحقيقية في مستودعك، ويقترح روابط تحتاج لمراجعتك (تأكيد/رفض/تعديل).'
+            : 'AI analyzes this item against the real capabilities and applications in your repository and suggests links for you to review (confirm/reject/edit).'} />
+        </div>
+        <button style={S.btn()} onClick={analyze} disabled={analyzing}>{analyzing ? (isAR ? 'جارٍ التحليل…' : 'Analyzing…') : (isAR ? '🔍 حلّل الصلة' : '🔍 Analyze Relevance')}</button>
+      </div>
+
+      {links.length === 0 && !analyzing && (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لم يُجرَ تحليل للصلة بعد.' : 'No relevance analysis has been run yet.'}</div>
+      )}
+
+      {suggested.length > 0 && (
+        <div style={{ marginBottom: decided.length > 0 ? 16 : 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? 'مقترح من الذكاء الاصطناعي - بحاجة لمراجعتك' : 'AI Suggested - needs your review'}</div>
+          {suggested.map((l: any) => (
+            <div key={l.id} style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={S.badge('#3498db')}>{l.asset ? l.asset.assetType : l.assetType}</span>
+                <span style={{ fontWeight: 600, fontSize: 13 }}>{l.asset ? (isAR && l.asset.nameAr ? l.asset.nameAr : l.asset.name) : (isAR ? '(الأصل محذوف)' : '(asset no longer exists)')}</span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR && l.rationaleAr ? l.rationaleAr : l.rationale}</div>
+              {editingId === l.id ? (
+                <div>
+                  <input style={S.input} value={editText} onChange={e => setEditText(e.target.value)} placeholder={isAR ? 'اكتب التبرير المعدَّل…' : 'Write your edited rationale…'} />
+                  <div style={S.row}>
+                    <button style={S.btn('primary')} onClick={() => review(l.id, 'EDITED', editText)} disabled={!editText.trim()}>{t('innov.save')}</button>
+                    <button style={S.btn()} onClick={() => setEditingId(null)}>{t('innov.cancel')}</button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button style={{ ...S.btn('primary'), padding: '4px 10px', fontSize: 12 }} onClick={() => review(l.id, 'CONFIRMED')}>✓ {isAR ? 'تأكيد' : 'Confirm'}</button>
+                  <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => { setEditingId(l.id); setEditText(l.rationale) }}>✎ {isAR ? 'تعديل' : 'Edit'}</button>
+                  <button style={{ ...S.btn('danger'), padding: '4px 10px', fontSize: 12 }} onClick={() => review(l.id, 'REJECTED')}>✕ {isAR ? 'رفض' : 'Reject'}</button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {decided.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? 'مُراجَع' : 'Reviewed'}</div>
+          {decided.map((l: any) => (
+            <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12 }}>
+              <span style={S.badge(l.status === 'CONFIRMED' ? '#2ecc71' : l.status === 'REJECTED' ? '#e74c3c' : '#f1c40f')}>{l.status}</span>
+              <span>{l.asset ? (isAR && l.asset.nameAr ? l.asset.nameAr : l.asset.name) : (isAR ? '(الأصل محذوف)' : '(asset no longer exists)')}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -1066,7 +1254,7 @@ function RadarEditForm({ api, item, isAR, t, allItems, onDone, onCancel }: any) 
 }
 
 // ── Favorites Tab ────────────────────────────────────────────────────────────
-function FavoritesTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
+function FavoritesTab({ api, isAdmin, isAR, t, selected, setSelected, onCreateIdeaFrom }: any) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -1079,7 +1267,7 @@ function FavoritesTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
   const openItem = async (id: string) => { const full = await api.get(`/innovation/radar/${id}`); setSelected(full) }
   const refreshSelected = async () => { if (selected) await openItem(selected.id) }
 
-  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} />
+  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} onCreateIdeaFrom={onCreateIdeaFrom} />
 
   if (loading) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
   if (items.length === 0) return <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('innov.no_favorites')}</div>
@@ -1092,7 +1280,7 @@ function FavoritesTab({ api, isAdmin, isAR, t, selected, setSelected }: any) {
 }
 
 // ── Watchlist Tab (spec section 20: "make watching operationally useful") ──
-function WatchlistTab({ api, isAdmin, isAR, t, userId, selected, setSelected }: any) {
+function WatchlistTab({ api, isAdmin, isAR, t, userId, selected, setSelected, onCreateIdeaFrom }: any) {
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -1105,7 +1293,7 @@ function WatchlistTab({ api, isAdmin, isAR, t, userId, selected, setSelected }: 
   const openItem = async (id: string) => { const full = await api.get(`/innovation/radar/${id}`); setSelected(full) }
   const refreshSelected = async () => { if (selected) await openItem(selected.id) }
 
-  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} />
+  if (selected) return <RadarDetail api={api} item={selected} isAdmin={isAdmin} isAR={isAR} t={t} onBack={() => { setSelected(null); load() }} onRefresh={refreshSelected} onOpenItem={openItem} onCreateIdeaFrom={onCreateIdeaFrom} />
 
   if (loading) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
   if (items.length === 0) return (
@@ -1296,7 +1484,7 @@ function ScoreRing({ score, label }: { score: number | null; label: string }) {
   )
 }
 
-function IdeasTab({ api, isAR, t, userRole }: any) {
+function IdeasTab({ api, isAR, t, userRole, seed, onSeedConsumed }: any) {
   const [ideas, setIdeas] = useState<any[]>([])
   const [radarItems, setRadarItems] = useState<any[]>([])
   const [statusFilter, setStatusFilter] = useState('')
@@ -1310,6 +1498,11 @@ function IdeasTab({ api, isAR, t, userRole }: any) {
   }, [api, statusFilter])
   useEffect(() => { load() }, [load])
   useEffect(() => { api.get('/innovation/radar').then((d: any) => setRadarItems(Array.isArray(d) ? d : [])) }, [api])
+  // Opportunity Discovery (spec section 16): "Create Idea from This" on a
+  // radar item's detail view lands here already carrying that context -
+  // auto-open the create form pre-filled rather than making the person
+  // re-navigate and re-select the radar item themselves.
+  useEffect(() => { if (seed) { setCreating(true) } }, [seed])
 
   const openIdea = async (id: string) => { const full = await api.get(`/innovation/ideas/${id}`); setSelected(full) }
   const refreshSelected = async () => { if (selected) await openIdea(selected.id) }
@@ -1327,7 +1520,7 @@ function IdeasTab({ api, isAR, t, userRole }: any) {
         <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('innov.submit_idea')}</button>
       </div>
 
-      {creating && <IdeaCreateForm api={api} isAR={isAR} t={t} radarItems={radarItems} onDone={() => { setCreating(false); load() }} onCancel={() => setCreating(false)} />}
+      {creating && <IdeaCreateForm api={api} isAR={isAR} t={t} radarItems={radarItems} initial={seed} onDone={() => { setCreating(false); load(); onSeedConsumed?.() }} onCancel={() => { setCreating(false); onSeedConsumed?.() }} />}
 
       {loading ? (
         <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
@@ -1351,8 +1544,11 @@ function IdeasTab({ api, isAR, t, userRole }: any) {
   )
 }
 
-function IdeaCreateForm({ api, isAR, t, radarItems, onDone, onCancel }: any) {
-  const [form, setForm] = useState({ title: '', titleAr: '', description: '', descriptionAr: '', category: '', tags: '', relatedRadarItemId: '' })
+function IdeaCreateForm({ api, isAR, t, radarItems, initial, onDone, onCancel }: any) {
+  const [form, setForm] = useState({
+    title: initial?.title || '', titleAr: '', description: initial?.description || '', descriptionAr: '',
+    category: '', tags: '', relatedRadarItemId: initial?.relatedRadarItemId || '',
+  })
   const [saving, setSaving] = useState(false)
 
   const create = async () => {
