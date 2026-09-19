@@ -242,7 +242,7 @@ function NewConnector({ api, onCreated, onCancel }: { api: any, onCreated: (c: a
 
 // ── Connector Detail ──────────────────────────────────────────────────────────
 function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, connector: any, onBack: () => void, onRefresh: () => void }) {
-  const [tab, setTab] = useState<'overview' | 'credentials' | 'mappings' | 'staging' | 'jobs'>('overview')
+  const [tab, setTab] = useState<'overview' | 'credentials' | 'import' | 'mappings' | 'staging' | 'jobs'>('overview')
   const [creds, setCreds] = useState<any>({})
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -327,6 +327,10 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
 
   const credFields = CRED_FIELDS[connector.connectorType] || []
   const isGenericRestType = ['GENERIC_CMDB', 'API_MANAGEMENT', 'DATA_CATALOG', 'PPM_TOOL'].includes(connector.connectorType)
+  // GENERIC_CSV covers both CSV and Excel uploads — the backend's
+  // /import/csv-excel endpoint detects the format from the file itself,
+  // so one connector type and one tab cover both.
+  const isCsvExcel = connector.connectorType === 'GENERIC_CSV'
 
   return (
     <div>
@@ -366,9 +370,9 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-        {(['overview', 'credentials', 'mappings', 'staging', 'jobs'] as const).map(t => (
+        {(['overview', 'credentials', ...(isCsvExcel ? ['import'] : []), 'mappings', 'staging', 'jobs'] as Array<'overview' | 'credentials' | 'import' | 'mappings' | 'staging' | 'jobs'>).map(t => (
           <button key={t} style={S.tab(tab === t)} onClick={() => setTab(t)}>
-            {t === 'overview' ? '📋 Overview' : t === 'credentials' ? '🔐 Credentials' : t === 'mappings' ? '🗺 Mappings' : t === 'staging' ? '📥 Staging' : `📊 Sync Jobs (${jobs.length})`}
+            {t === 'overview' ? '📋 Overview' : t === 'credentials' ? '🔐 Credentials' : t === 'import' ? '📤 Bulk Import' : t === 'mappings' ? '🗺 Mappings' : t === 'staging' ? '📥 Staging' : `📊 Sync Jobs (${jobs.length})`}
           </button>
         ))}
       </div>
@@ -459,6 +463,8 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
         </div>
       )}
 
+      {tab === 'import' && <CsvExcelImportTab api={api} connector={connector} onStaged={() => setTab('staging')} />}
+
       {tab === 'mappings' && <MappingsTab api={api} connectorId={connector.id} connectorTypeName={ct?.name} />}
 
       {tab === 'staging' && <StagingTab api={api} connectorId={connector.id} />}
@@ -484,6 +490,221 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── CSV/Excel Bulk Repository Import Tab ────────────────────────────────────
+// Feeds the EA Repository against an object type that ALREADY EXISTS in the
+// published meta-model — this never creates/edits meta-model schema (that's
+// the separate Meta-Model editor). Flow: browse file -> pick the existing
+// object type -> map each column to either one of its attributes or one of
+// its relationships -> stage -> jump to the Staging tab to match & commit.
+type ColumnMapping = {
+  kind: '' | 'ATTRIBUTE' | 'RELATIONSHIP'
+  targetField?: string
+  relationshipCode?: string
+  relationshipTargetType?: string
+  relationshipLookupField?: 'NAME' | 'SOURCE_REF'
+  relationshipDelimiter?: string
+  required?: boolean
+}
+
+function CsvExcelImportTab({ api, connector, onStaged }: { api: any, connector: any, onStaged: () => void }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [preview, setPreview] = useState<any>(null)
+  const [sheetName, setSheetName] = useState('')
+  const [previewing, setPreviewing] = useState(false)
+
+  const [objectTypes, setObjectTypes] = useState<any[]>([])
+  const [objectTypeCode, setObjectTypeCode] = useState('')
+  const [targets, setTargets] = useState<{ attributes: any[]; relationships: any[] } | null>(null)
+  const [loadingTargets, setLoadingTargets] = useState(false)
+
+  const [columnMap, setColumnMap] = useState<Record<string, ColumnMapping>>({})
+  const [idColumn, setIdColumn] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState<any>(null)
+
+  useEffect(() => { api.get('/meta-model/object-types').then((d: any) => setObjectTypes(Array.isArray(d) ? d : [])) }, [api])
+
+  const doPreview = async (f: File) => {
+    setFile(f); setPreviewing(true); setPreview(null); setResult(null)
+    const fd = new FormData(); fd.append('file', f)
+    const q = sheetName ? `?sheetName=${encodeURIComponent(sheetName)}` : ''
+    const res = await fetch(`${API}/connectors/${connector.id}/import/csv-excel/preview${q}`, {
+      method: 'POST', headers: { Authorization: `Bearer ${api.tok}` }, body: fd,
+    })
+    const data = await res.json()
+    setPreviewing(false)
+    if (!res.ok) { alert(data?.message || 'Could not read this file'); return }
+    setPreview(data)
+    setColumnMap({})
+    setIdColumn('')
+  }
+
+  const loadTargets = async (code: string) => {
+    setObjectTypeCode(code); setTargets(null); setColumnMap({})
+    if (!code) return
+    setLoadingTargets(true)
+    const data = await api.get(`/connectors/meta-model/${code}/mapping-targets`)
+    setLoadingTargets(false)
+    if (data?.attributes) setTargets({ attributes: data.attributes, relationships: data.relationships || [] })
+    else alert(data?.message || `Could not load mapping targets for '${code}' — is it in the PUBLISHED meta-model?`)
+  }
+
+  const setColumn = (col: string, patch: Partial<ColumnMapping>) =>
+    setColumnMap(m => ({ ...m, [col]: { ...(m[col] || { kind: '' }), ...patch } }))
+
+  const attrByCode = (code: string) => targets?.attributes.find(a => a.code === code)
+  const relByCode = (code: string) => targets?.relationships.find(r => r.relationshipCode === code)
+
+  const saveMappingUploadAndApply = async () => {
+    if (!file || !objectTypeCode) return alert('Choose a file and an object type first')
+    const fieldMaps = Object.entries(columnMap)
+      .filter(([, m]) => m.kind === 'ATTRIBUTE' || m.kind === 'RELATIONSHIP')
+      .map(([sourceField, m]) => m.kind === 'ATTRIBUTE'
+        ? { sourceField, targetField: m.targetField, required: !!attrByCode(m.targetField || '')?.required }
+        : { sourceField, relationshipCode: m.relationshipCode, relationshipTargetType: m.relationshipTargetType, relationshipLookupField: m.relationshipLookupField || 'NAME', relationshipDelimiter: m.relationshipDelimiter || ';' })
+    if (fieldMaps.length === 0) return alert('Map at least one column before uploading')
+
+    setBusy(true); setResult(null)
+    try {
+      // sourceType/targetType both set to the object type code itself —
+      // a CSV/Excel row already IS the target object type, there's no
+      // separate "external type name" the way a live connector has.
+      await api.post(`/connectors/${connector.id}/mappings`, {
+        mappings: [{ sourceType: objectTypeCode, targetType: objectTypeCode, direction: 'IMPORT', fieldMaps }],
+      })
+
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('objectTypeCode', objectTypeCode)
+      if (sheetName) fd.append('sheetName', sheetName)
+      if (idColumn) fd.append('idColumn', idColumn)
+      const stageRes = await fetch(`${API}/connectors/${connector.id}/import/csv-excel`, {
+        method: 'POST', headers: { Authorization: `Bearer ${api.tok}` }, body: fd,
+      })
+      const staged = await stageRes.json()
+      if (!stageRes.ok) { alert(staged?.message || 'Upload failed'); setBusy(false); return }
+
+      const mapped = await api.post(`/connectors/${connector.id}/mappings/${objectTypeCode}/apply`)
+      setResult({ staged: staged.staged, totalRows: staged.totalRows, mapped: mapped.mapped, failedValidation: mapped.failedValidation })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 4 }}>
+        <span>Bulk-upload rows into the EA Repository against an object type that already exists in your published meta-model — attributes AND relationships. This does not create or edit meta-model schema.</span>
+        <HelpTip text="Browse a CSV/Excel file, pick which existing object type its rows belong to, map each column to a field or a relationship, then upload. Rows land in Staging for you to review and commit — nothing touches the repository until then." />
+      </div>
+
+      {/* Step 1: file */}
+      <div style={{ ...S.card, marginBottom: 16 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>1. Browse file</div>
+        <div style={S.row}>
+          <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" style={{ display: 'none' }} onChange={e => { if (e.target.files?.[0]) doPreview(e.target.files[0]) }} />
+          <button style={S.btn()} onClick={() => fileRef.current?.click()} disabled={previewing}>{previewing ? '⏳ Reading…' : '📁 Choose File'}</button>
+          {file && <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{file.name}</span>}
+          {preview?.availableSheets?.length > 1 && (
+            <select style={{ ...S.input, width: 200 }} value={sheetName} onChange={e => { setSheetName(e.target.value); if (file) doPreview(file) }}>
+              {preview.availableSheets.map((s: string) => <option key={s} value={s}>{s}</option>)}
+            </select>
+          )}
+        </div>
+        {preview && (
+          <div style={{ marginTop: 12 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6 }}>{preview.totalRows} row(s) · {preview.headers.length} column(s): {preview.headers.join(', ')}</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: 11, width: '100%' }}>
+                <thead><tr>{preview.headers.map((h: string) => <th key={h} style={{ textAlign: 'left', padding: '4px 8px', borderBottom: '1px solid var(--border)', color: 'var(--text-dim)' }}>{h}</th>)}</tr></thead>
+                <tbody>{preview.sampleRows.slice(0, 5).map((r: any, i: number) => (
+                  <tr key={i}>{preview.headers.map((h: string) => <td key={h} style={{ padding: '4px 8px', borderBottom: '1px solid var(--border)' }}>{r[h]}</td>)}</tr>
+                ))}</tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Step 2: object type */}
+      {preview && (
+        <div style={{ ...S.card, marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 10 }}>2. Which existing object type do these rows belong to?</div>
+          <select style={{ ...S.input, maxWidth: 360 }} value={objectTypeCode} onChange={e => loadTargets(e.target.value)}>
+            <option value="">Select an object type…</option>
+            {objectTypes.map((ot: any) => <option key={ot.id} value={ot.code}>{ot.name} ({ot.code})</option>)}
+          </select>
+          {loadingTargets && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>Loading attributes & relationships…</div>}
+        </div>
+      )}
+
+      {/* Step 3: column mapping */}
+      {preview && targets && (
+        <div style={{ ...S.card, marginBottom: 16 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>3. Map each column</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+            {targets.attributes.length} attribute(s) · {targets.relationships.length} relationship(s) available on this object type
+          </div>
+          <div>
+            <label style={S.label}>Stable ID column (optional — re-uploading the same file updates rows instead of duplicating them)</label>
+            <select style={{ ...S.input, maxWidth: 300, marginBottom: 14 }} value={idColumn} onChange={e => setIdColumn(e.target.value)}>
+              <option value="">— none, detect duplicate rows automatically —</option>
+              {preview.headers.map((h: string) => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </div>
+          {preview.headers.map((col: string) => {
+            const cm = columnMap[col] || { kind: '' }
+            return (
+              <div key={col} style={{ display: 'grid', gridTemplateColumns: '160px 1fr auto', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{col}</div>
+                <select style={S.input} value={cm.kind === 'ATTRIBUTE' ? `A:${cm.targetField || ''}` : cm.kind === 'RELATIONSHIP' ? `R:${cm.relationshipCode || ''}` : ''}
+                  onChange={e => {
+                    const v = e.target.value
+                    if (!v) return setColumn(col, { kind: '' })
+                    if (v.startsWith('A:')) return setColumn(col, { kind: 'ATTRIBUTE', targetField: v.slice(2) })
+                    const code = v.slice(2)
+                    const rel = relByCode(code)
+                    return setColumn(col, { kind: 'RELATIONSHIP', relationshipCode: code, relationshipTargetType: rel?.relatedObjectType?.code, relationshipLookupField: 'NAME', relationshipDelimiter: ';' })
+                  }}>
+                  <option value="">— Skip this column —</option>
+                  <optgroup label="Attributes">
+                    {targets.attributes.map(a => <option key={a.code} value={`A:${a.code}`}>{a.name} ({a.code}){a.required ? ' *required' : ''}</option>)}
+                  </optgroup>
+                  <optgroup label="Relationships">
+                    {targets.relationships.map(r => <option key={r.relationshipCode} value={`R:${r.relationshipCode}`}>{r.label} → {r.relatedObjectType.name} ({r.direction === 'OUTGOING' ? 'this → other' : 'other → this'}, {r.cardinality})</option>)}
+                  </optgroup>
+                </select>
+                {cm.kind === 'RELATIONSHIP' ? (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <select style={{ ...S.input, width: 110 }} value={cm.relationshipLookupField || 'NAME'} onChange={e => setColumn(col, { relationshipLookupField: e.target.value as any })}>
+                      <option value="NAME">by name</option>
+                      <option value="SOURCE_REF">by source ref</option>
+                    </select>
+                    <input style={{ ...S.input, width: 60 }} value={cm.relationshipDelimiter ?? ';'} onChange={e => setColumn(col, { relationshipDelimiter: e.target.value })} title="Delimiter for multiple related asset names in one cell" />
+                  </div>
+                ) : <div />}
+              </div>
+            )
+          })}
+
+          <div style={{ marginTop: 16 }}>
+            <button style={S.btn('primary')} onClick={saveMappingUploadAndApply} disabled={busy}>{busy ? '⏳ Uploading…' : '💾 Save Mapping & Upload'}</button>
+          </div>
+
+          {result && (
+            <div style={{ ...S.card, marginTop: 14, borderColor: '#2ecc71' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#2ecc71' }}>✅ Staged {result.staged} of {result.totalRows} row(s) · Mapped {result.mapped}{result.failedValidation ? ` · ${result.failedValidation} failed required-field validation` : ''}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 6 }}>Nothing has been written to the repository yet — go to the Staging tab to run matching and review/commit these rows.</div>
+              <button style={{ ...S.btn('primary'), marginTop: 10 }} onClick={onStaged}>Go to Staging →</button>
             </div>
           )}
         </div>
