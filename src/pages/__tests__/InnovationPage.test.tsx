@@ -1496,3 +1496,188 @@ describe('InnovationPage - Executive Brief', () => {
     expect(screen.getByText(/Grounded in: 5 items/)).toBeInTheDocument();
   });
 });
+
+describe('InnovationPage - AI Innovation Analyst', () => {
+  const ANALYSIS_RESULT = {
+    analysis: { impactSummary: 'Solid architecture fit.', keyConsiderations: 'Watch integration cost.', recommendedNextStep: 'PILOT', recommendedNextStepRationale: 'Assessment score supports a pilot.' },
+    impactFraming: 'Architecture Impact',
+    groundedIn: { tenantStatus: 'ASSESS', hasAssessment: true, compositeScore: 3.4, confirmedRelevanceCount: 1 },
+  };
+
+  it('posts to the analyze endpoint and renders the domain-framed analysis', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/analyze': ANALYSIS_RESULT, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    fireEvent.click(await screen.findByText(/Analyze This Item/));
+    expect(await screen.findByText('Solid architecture fit.')).toBeInTheDocument();
+    expect(screen.getByText('Architecture Impact')).toBeInTheDocument();
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/tech-1/analyze') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+    });
+  });
+});
+
+describe('InnovationPage - Evidence & Trend', () => {
+  const SIGNAL = { id: 'sig-1', signalType: 'RESEARCH', source: 'Gartner', summary: 'Notable adoption growth', observedDate: '2026-09-01T00:00:00.000Z' };
+  const TREND = { trendState: 'RISING', reason: 'Signal frequency increased from 1 to 3.' };
+
+  it('shows the trend badge and existing evidence signals', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/evidence': [SIGNAL], '/innovation/radar/tech-1/trend': TREND, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText('Rising')).toBeInTheDocument();
+    expect(await screen.findByText('Gartner')).toBeInTheDocument();
+  });
+
+  it('shows an empty state when there is no evidence yet', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/evidence': [], '/innovation/radar/tech-1/trend': { trendState: 'INSUFFICIENT_EVIDENCE', reason: 'x' }, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/No evidence recorded yet/)).toBeInTheDocument();
+  });
+
+  it('an admin can add a new evidence signal, posting source and summary', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/evidence': [], '/innovation/radar/tech-1/trend': { trendState: 'INSUFFICIENT_EVIDENCE', reason: 'x' }, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText(/No evidence recorded yet/);
+    fireEvent.click(screen.getByText(/Add Evidence/));
+    fireEvent.change(screen.getByPlaceholderText(/Source \(e.g. Gartner report\)/), { target: { value: 'IDC Report' } });
+    fireEvent.change(screen.getByPlaceholderText('Evidence summary'), { target: { value: 'Growing enterprise interest' } });
+    fireEvent.click(screen.getByText('innov.save'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/tech-1/evidence') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+      const body = JSON.parse(call[1].body);
+      expect(body.source).toBe('IDC Report');
+      expect(body.summary).toBe('Growing enterprise interest');
+    });
+  });
+
+  it('an admin can remove an evidence signal', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/evidence': [SIGNAL], '/innovation/radar/tech-1/trend': TREND, '/innovation/radar/evidence/sig-1/delete': { deleted: true }, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('Gartner');
+    fireEvent.click(screen.getByText('✕'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/evidence/sig-1/delete'));
+      expect(call).toBeDefined();
+    });
+  });
+});
+
+describe('InnovationPage - Pilots & Experiments', () => {
+  const PILOT = { id: 'pilot-1', title: 'AI Case Handling Pilot', hypothesis: 'Will reduce handling time', status: 'PLANNED' };
+
+  it('shows an empty state when there are no pilots yet', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/pilots': [], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/No pilots recorded yet/)).toBeInTheDocument();
+  });
+
+  it('an admin can start a new pilot with title and hypothesis', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/pilots': [], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText(/No pilots recorded yet/);
+    fireEvent.click(screen.getByText(/Start a Pilot/));
+    fireEvent.change(screen.getByPlaceholderText('Title'), { target: { value: 'My Pilot' } });
+    fireEvent.change(screen.getByPlaceholderText('Hypothesis'), { target: { value: 'It will help' } });
+    fireEvent.click(screen.getByText('innov.save'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/tech-1/pilots') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+      const body = JSON.parse(call[1].body);
+      expect(body.title).toBe('My Pilot');
+      expect(body.hypothesis).toBe('It will help');
+    });
+  });
+
+  it('lists an existing pilot with its status', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/pilots': [PILOT], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText('AI Case Handling Pilot')).toBeInTheDocument();
+    expect(screen.getByText('PLANNED')).toBeInTheDocument();
+  });
+
+  it('an admin can move a PLANNED pilot to IN_PROGRESS', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/pilots': [PILOT], '/innovation/radar/pilots/pilot-1': {}, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('AI Case Handling Pilot');
+    fireEvent.click(screen.getByText('Start'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/pilots/pilot-1') && c[1]?.method === 'PUT');
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body).status).toBe('IN_PROGRESS');
+    });
+  });
+
+  it('an admin can conclude a pilot with a real outcome', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/pilots': [{ ...PILOT, status: 'IN_PROGRESS' }], '/innovation/radar/pilots/pilot-1': {}, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('AI Case Handling Pilot');
+    fireEvent.click(screen.getByText(/Conclude: ADOPT/));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/pilots/pilot-1') && c[1]?.method === 'PUT');
+      const body = JSON.parse(call[1].body);
+      expect(body.status).toBe('COMPLETED');
+      expect(body.outcome).toBe('ADOPT');
+    });
+  });
+});
+
+describe('InnovationPage - Value Realization', () => {
+  const KPI_RECORD = { id: 'vr-1', kpiName: 'Cost reduction', baseline: '100k', target: '70k', actual: null };
+
+  it('shows an empty state when no KPIs are being tracked', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/value-realization': [], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/No KPIs being tracked yet/)).toBeInTheDocument();
+  });
+
+  it('an admin can start tracking a new KPI', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/value-realization': [], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText(/No KPIs being tracked yet/);
+    fireEvent.click(screen.getByText(/Track a KPI/));
+    fireEvent.change(screen.getByPlaceholderText('KPI name'), { target: { value: 'Time saved' } });
+    fireEvent.click(screen.getByText('innov.save'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/tech-1/value-realization') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body).kpiName).toBe('Time saved');
+    });
+  });
+
+  it('lists an existing KPI with baseline and target', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/value-realization': [KPI_RECORD], '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText('Cost reduction')).toBeInTheDocument();
+    expect(screen.getByText('100k')).toBeInTheDocument();
+    expect(screen.getByText('70k')).toBeInTheDocument();
+  });
+
+  it('an admin can update the actual value once measured', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/value-realization': [KPI_RECORD], '/innovation/radar/value-realization/vr-1': {}, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('Cost reduction');
+    const actualInput = screen.getByPlaceholderText('Enter actual');
+    fireEvent.change(actualInput, { target: { value: '68k' } });
+    fireEvent.blur(actualInput);
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/value-realization/vr-1') && c[1]?.method === 'PUT');
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body).actual).toBe('68k');
+    });
+  });
+});
