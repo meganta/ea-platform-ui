@@ -162,8 +162,17 @@ const domainLabel = (code: string, isAR: boolean) => { const d = DOMAIN_INFO[cod
 // excluded from the chart rather than plotted at a fabricated position.
 const MARKET_RINGS = ['ADOPT', 'TRIAL', 'ASSESS', 'EXPLORE', 'HOLD']
 const ORG_RINGS = ['SCALE', 'ADOPT', 'PILOT', 'ASSESS', 'EXPLORE', 'WATCH', 'HOLD', 'RETIRE']
-const ringLabel = (basis: 'market' | 'org', code: string, isAR: boolean) => {
-  const src = basis === 'market' ? MARKET_POSITION_LABEL : TENANT_STATUS_LABEL
+const MATURITY_RINGS = ['MATURE', 'GROWING', 'EMERGING', 'DECLINING']
+const HORIZON_RINGS = ['NOW', 'NEXT', 'LATER', 'WATCH']
+const HORIZON_LABEL: Record<string, { en: string; ar: string }> = {
+  NOW: { en: 'Now', ar: 'الآن' },
+  NEXT: { en: 'Next', ar: 'قادم' },
+  LATER: { en: 'Later', ar: 'لاحقًا' },
+  WATCH: { en: 'Watch', ar: 'مراقبة' },
+}
+type RingBasis = 'market' | 'org' | 'maturity' | 'horizon'
+const ringLabel = (basis: RingBasis, code: string, isAR: boolean) => {
+  const src = basis === 'market' ? MARKET_POSITION_LABEL : basis === 'org' ? TENANT_STATUS_LABEL : basis === 'maturity' ? MATURITY_LABEL : HORIZON_LABEL
   const l = src[code]
   return l ? (isAR ? l.ar : l.en) : code
 }
@@ -227,7 +236,7 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
   const [creating, setCreating] = useState(false)
   const [seeding, setSeeding] = useState(false)
   const [viewMode, setViewMode] = useState<'card' | 'radar' | 'portfolio'>('card')
-  const [ringBasis, setRingBasis] = useState<'market' | 'org'>('market')
+  const [ringBasis, setRingBasis] = useState<RingBasis>('market')
   const [compareMode, setCompareMode] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>([])
   const [comparing, setComparing] = useState(false)
@@ -340,6 +349,8 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
           <button onClick={() => setRingBasis('market')} style={S.btn(ringBasis === 'market' ? 'primary' : 'secondary')}>{isAR ? 'موضع السوق' : 'Market Position'}</button>
           <button onClick={() => setRingBasis('org')} style={S.btn(ringBasis === 'org' ? 'primary' : 'secondary')}>{isAR ? 'موقف مؤسستنا' : 'Our Organization\u2019s Status'}</button>
+          <button onClick={() => setRingBasis('maturity')} style={S.btn(ringBasis === 'maturity' ? 'primary' : 'secondary')}>{isAR ? 'النضج' : 'Maturity'}</button>
+          <button onClick={() => setRingBasis('horizon')} style={S.btn(ringBasis === 'horizon' ? 'primary' : 'secondary')}>{isAR ? 'الأفق الزمني' : 'Horizon'}</button>
         </div>
       )}
 
@@ -360,6 +371,60 @@ function RadarTab({ api, isAdmin, isAR, t, selected, setSelected, onSwitchToStud
           {items.map((item: any) => <RadarCard key={item.id} item={item} isAR={isAR} t={t} showDomain={domain === 'ALL'}
             compareMode={compareMode} checked={compareIds.includes(item.id)} onToggleCompare={() => toggleCompare(item.id)}
             onClick={() => (compareMode ? toggleCompare(item.id) : openItem(item.id))} />)}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Executive Brief (spec section 26) ───────────────────────────────────────
+function RadarExecutiveBriefCard({ api, isAR, t }: any) {
+  const [result, setResult] = useState<any>(null)
+  const [generating, setGenerating] = useState(false)
+  const [expanded, setExpanded] = useState(false)
+
+  const generate = async () => {
+    setGenerating(true)
+    try { const r = await api.post('/innovation/radar/executive-brief', {}); setResult(r); setExpanded(true) }
+    catch (e: any) { alert(e.message) } finally { setGenerating(false) }
+  }
+
+  return (
+    <div style={{ ...S.card, marginBottom: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'center' }}>
+        <div style={{ fontWeight: 600, fontSize: 13, flex: 1, display: 'flex', alignItems: 'center' }}>
+          📄 {isAR ? 'الموجز التنفيذي' : 'Executive Brief'}
+          <HelpTip text={isAR
+            ? 'موجز يكتبه الذكاء الاصطناعي استنادًا فقط إلى بياناتك الحقيقية المخزَّنة بالفعل - لا يُخترع أي رقم أو قرار.'
+            : 'An AI-written summary grounded only in your real, already-stored data - no invented numbers or decisions.'} />
+        </div>
+        <button style={S.btn('primary')} onClick={generate} disabled={generating}>{generating ? (isAR ? 'جارٍ الإنشاء…' : 'Generating…') : (isAR ? 'أنشئ الموجز' : 'Generate Brief')}</button>
+      </div>
+
+      {result && expanded && (
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+            {isAR ? `مبني على: ${result.sourceStats.totalItems} عنصر، ${result.sourceStats.topAssessments.length} تقييمات، ${result.sourceStats.recentDecisions.length} قرارات حديثة، ${result.sourceStats.confirmedRelevanceCount} روابط صلة مؤكَّدة.`
+              : `Grounded in: ${result.sourceStats.totalItems} items, ${result.sourceStats.topAssessments.length} assessments, ${result.sourceStats.recentDecisions.length} recent decisions, ${result.sourceStats.confirmedRelevanceCount} confirmed relevance links.`}
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{isAR ? 'الملخص التنفيذي' : 'Executive Summary'}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{result.brief.executiveSummary}</div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{isAR ? 'حركة المحفظة' : 'Portfolio Movement'}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{result.brief.portfolioMovement}</div>
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{isAR ? 'الأولويات الأهم' : 'Top Priorities'}</div>
+            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{result.brief.topPriorities}</div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{isAR ? 'الإجراءات الموصى بها' : 'Recommended Next Actions'}</div>
+            <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 13, lineHeight: 1.7 }}>
+              {(result.brief.recommendedNextActions || []).map((a: string, i: number) => <li key={i}>{a}</li>)}
+            </ul>
+          </div>
         </div>
       )}
     </div>
@@ -443,6 +508,8 @@ function RadarPortfolioDashboard({ api, isAR, t, onGoToDomain }: any) {
 
   return (
     <div>
+      <RadarExecutiveBriefCard api={api} isAR={isAR} t={t} />
+
       {/* Domain-specific management views - spec sections 29-31: selecting one domain reframes this from a
           generic cross-domain portfolio into that domain's own management view (real data only, same
           underlying fields - no fabricated per-domain scores). */}
@@ -532,7 +599,7 @@ function RadarPortfolioDashboard({ api, isAR, t, onGoToDomain }: any) {
 
 function RadarChart({ items, isAR, t, ringBasis, onSelect }: any) {
   const [hovered, setHovered] = useState<any>(null)
-  const rings: string[] = ringBasis === 'market' ? MARKET_RINGS : ORG_RINGS
+  const rings: string[] = ringBasis === 'market' ? MARKET_RINGS : ringBasis === 'org' ? ORG_RINGS : ringBasis === 'maturity' ? MATURITY_RINGS : HORIZON_RINGS
   const size = 640
   const center = size / 2
   const maxRadius = center - 60
@@ -546,6 +613,8 @@ function RadarChart({ items, isAR, t, ringBasis, onSelect }: any) {
   const plotted = useMemo(() => {
     const getRing = (item: any): string | null => {
       if (ringBasis === 'market') return rings.includes(item.marketPosition) ? item.marketPosition : null
+      if (ringBasis === 'maturity') return rings.includes(item.maturity) ? item.maturity : null
+      if (ringBasis === 'horizon') return item.horizon && rings.includes(item.horizon) ? item.horizon : null
       const status = item.tenantInterest?.tenantStatus
       return status && rings.includes(status) ? status : null
     }
@@ -627,9 +696,11 @@ function RadarChart({ items, isAR, t, ringBasis, onSelect }: any) {
             {isAR
               ? `الحلقات من المركز للخارج = درجة الالتزام. ${plotted.length} عنصر معروض على الرادار.`
               : `Rings run center-to-edge by commitment level. ${plotted.length} item(s) plotted.`}
-            {excluded > 0 && (ringBasis === 'org'
-              ? (isAR ? ` ${excluded} عنصر لم يُقيَّم بعد أو غير ذي صلة (غير معروض).` : ` ${excluded} item(s) not yet assessed or marked not relevant (not shown).`)
-              : (isAR ? ` ${excluded} عنصر بلا موضع سوق معروف.` : ` ${excluded} item(s) have no recognized market position.`))}
+            {excluded > 0 && (
+              ringBasis === 'org' ? (isAR ? ` ${excluded} عنصر لم يُقيَّم بعد أو غير ذي صلة (غير معروض).` : ` ${excluded} item(s) not yet assessed or marked not relevant (not shown).`)
+              : ringBasis === 'horizon' ? (isAR ? ` ${excluded} عنصر لم يُصنَّف بعد ضمن أفق زمني (غير معروض).` : ` ${excluded} item(s) not yet classified with a horizon (not shown).`)
+              : (isAR ? ` ${excluded} عنصر بلا موضع سوق معروف.` : ` ${excluded} item(s) have no recognized market position.`)
+            )}
           </div>
         </div>
       </div>
@@ -847,6 +918,7 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh, onOpenIte
             {item.radarDomain && <span style={S.badge('#8e44ad')}>{DOMAIN_INFO[item.radarDomain]?.icon} {domainLabel(item.radarDomain, isAR)}</span>}
             <span style={S.badge(MATURITY_COLOR[item.maturity])}>{isAR ? MATURITY_LABEL[item.maturity]?.ar : MATURITY_LABEL[item.maturity]?.en}</span>
             <span style={S.badge(MARKET_POSITION_COLOR[item.marketPosition])}>{isAR ? MARKET_POSITION_LABEL[item.marketPosition]?.ar : MARKET_POSITION_LABEL[item.marketPosition]?.en}</span>
+            {item.horizon && <span style={S.badge('#16a085')}>{isAR ? 'الأفق:' : 'Horizon:'} {isAR ? HORIZON_LABEL[item.horizon]?.ar : HORIZON_LABEL[item.horizon]?.en}</span>}
             <span style={S.badge('#7f8c8d')}>{allCategoryLabel(item.category, isAR)}</span>
           </div>
 
@@ -935,31 +1007,7 @@ function RadarDetail({ api, item, isAdmin, isAR, t, onBack, onRefresh, onOpenIte
             )}
           </div>
 
-          {item.relatedTechnologyIds?.length > 0 && (
-            <div style={{ ...S.card, marginTop: 16 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 12, display: 'flex', alignItems: 'center' }}>
-                🔗 {isAR ? 'عناصر رادار ذات صلة' : 'Related Radar Items'}
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
-                {item.relatedTechnologyIds.map((relId: string) => {
-                  const rel = allItems.find((x: any) => x.id === relId)
-                  if (!rel) return null
-                  return (
-                    <button key={relId} onClick={() => onOpenItem(relId)}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 20,
-                        border: '1px solid var(--border)', background: 'var(--navy-mid)', color: 'var(--text)',
-                        fontSize: 12, cursor: 'pointer',
-                      }}>
-                      <span>{allCategoryIcon(rel.category)}</span>
-                      <span>{isAR && rel.nameAr ? rel.nameAr : rel.name}</span>
-                      {rel.radarDomain && rel.radarDomain !== item.radarDomain && <span style={{ opacity: 0.6 }}>({DOMAIN_INFO[rel.radarDomain]?.icon})</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          <RadarRelationshipGraphCard api={api} item={item} allItems={allItems} isAR={isAR} t={t} isAdmin={isAdmin} onOpenItem={onOpenItem} />
         </>
       )}
     </div>
@@ -1160,10 +1208,146 @@ function RadarRelevanceCard({ api, item, isAR, t }: any) {
   )
 }
 
+// ── Relationship Graph (spec section 25) ────────────────────────────────────
+const RELATIONSHIP_TYPE_COLOR: Record<string, string> = {
+  DEPENDS_ON: '#e74c3c', ENABLES: '#2ecc71', COMPLEMENTS: '#3498db', COMPETES_WITH: '#e67e22',
+  REPLACES: '#9b59b6', CONVERGES_WITH: '#1abc9c', SUPPORTS: '#f1c40f', REQUIRES: '#e74c3c', RELATED: '#7f8c8d',
+}
+const RELATIONSHIP_TYPE_LABEL: Record<string, { en: string; ar: string }> = {
+  DEPENDS_ON: { en: 'Depends On', ar: 'يعتمد على' },
+  ENABLES: { en: 'Enables', ar: 'يُمكّن' },
+  COMPLEMENTS: { en: 'Complements', ar: 'يُكمّل' },
+  COMPETES_WITH: { en: 'Competes With', ar: 'ينافس' },
+  REPLACES: { en: 'Replaces', ar: 'يحل محل' },
+  CONVERGES_WITH: { en: 'Converges With', ar: 'يتقارب مع' },
+  SUPPORTS: { en: 'Supports', ar: 'يدعم' },
+  REQUIRES: { en: 'Requires', ar: 'يتطلب' },
+  RELATED: { en: 'Related', ar: 'ذو صلة' },
+}
+
+function RadarRelationshipGraphCard({ api, item, allItems, isAR, t, isAdmin, onOpenItem }: any) {
+  const [data, setData] = useState<{ outgoing: any[]; incoming: any[] } | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [search, setSearch] = useState('')
+  const [targetId, setTargetId] = useState('')
+  const [relType, setRelType] = useState('ENABLES')
+  const [types, setTypes] = useState<string[]>(Object.keys(RELATIONSHIP_TYPE_LABEL).filter(t2 => t2 !== 'RELATED'))
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(() => { api.get(`/innovation/radar/${item.id}/relationships`).then((d: any) => setData(d && d.outgoing ? d : { outgoing: [], incoming: [] })) }, [api, item])
+  useEffect(() => { load() }, [load])
+  useEffect(() => { api.get('/innovation/radar/relationship-types').then((d: any) => { if (Array.isArray(d) && d.length > 0) setTypes(d) }) }, [api])
+
+  const addRel = async () => {
+    if (!targetId) return
+    setSaving(true)
+    try { await api.post(`/innovation/radar/${item.id}/relationships`, { toTechnologyId: targetId, relationshipType: relType }); setAdding(false); setSearch(''); setTargetId(''); load() }
+    catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+  const removeRel = async (relId: string) => {
+    try { await api.post(`/innovation/radar/relationships/${relId}/delete`, {}); load() } catch (e: any) { alert(e.message) }
+  }
+
+  if (!data) return null
+  const total = data.outgoing.length + data.incoming.length
+  const candidates = (allItems || []).filter((x: any) => x.id !== item.id && (isAR && x.nameAr ? x.nameAr : x.name).toLowerCase().includes(search.toLowerCase()))
+
+  // Simple radial ego-graph: this item at center, every related item placed
+  // evenly around a circle, outgoing edges pointing out and incoming edges
+  // pointing in - deliberately just the current item's own neighborhood
+  // (spec's own example is a walkable chain, one hop at a time), not an
+  // attempt at a whole-catalog force-directed graph.
+  const size = 460
+  const center = size / 2
+  const radius = 165
+  const nodes = [...data.outgoing.map((r: any) => ({ ...r, direction: 'out' as const })), ...data.incoming.map((r: any) => ({ ...r, direction: 'in' as const }))]
+  const positioned = nodes.map((n, i) => {
+    const angle = (i / Math.max(nodes.length, 1)) * 2 * Math.PI - Math.PI / 2
+    return { ...n, x: center + radius * Math.cos(angle), y: center + radius * Math.sin(angle) }
+  })
+
+  return (
+    <div style={{ ...S.card, marginTop: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>🕸️ {isAR ? 'رسم العلاقات' : 'Relationship Graph'}</div>
+        {isAdmin && <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => setAdding(a => !a)}>+ {isAR ? 'أضف علاقة' : 'Add Relationship'}</button>}
+      </div>
+
+      {adding && (
+        <div style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
+          <input style={S.input} placeholder={isAR ? 'ابحث عن عنصر…' : 'Search for an item…'} value={search} onChange={e => { setSearch(e.target.value); setTargetId('') }} />
+          {search && !targetId && (
+            <div style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, marginBottom: 8 }}>
+              {candidates.slice(0, 15).map((c: any) => (
+                <div key={c.id} onClick={() => { setTargetId(c.id); setSearch(isAR && c.nameAr ? c.nameAr : c.name) }}
+                  style={{ padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--navy-mid)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
+                  {allCategoryIcon(c.category)} {isAR && c.nameAr ? c.nameAr : c.name}
+                </div>
+              ))}
+              {candidates.length === 0 && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد نتائج' : 'No matches'}</div>}
+            </div>
+          )}
+          <select style={S.input} value={relType} onChange={e => setRelType(e.target.value)}>
+            {types.map(ty => <option key={ty} value={ty}>{isAR ? RELATIONSHIP_TYPE_LABEL[ty]?.ar || ty : RELATIONSHIP_TYPE_LABEL[ty]?.en || ty}</option>)}
+          </select>
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={addRel} disabled={!targetId || saving}>{saving ? t('innov.saving') : t('innov.save')}</button>
+            <button style={S.btn()} onClick={() => setAdding(false)}>{t('innov.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {total === 0 ? (
+        <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد علاقات مسجَّلة لهذا العنصر بعد.' : 'No relationships recorded for this item yet.'}</div>
+      ) : (
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' as const }}>
+          <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', maxWidth: 460, flex: '1 1 320px' }}>
+            {positioned.map((n: any) => (
+              <line key={`edge-${n.id}`}
+                x1={n.direction === 'out' ? center : n.x} y1={n.direction === 'out' ? center : n.y}
+                x2={n.direction === 'out' ? n.x : center} y2={n.direction === 'out' ? n.y : center}
+                stroke={RELATIONSHIP_TYPE_COLOR[n.relationshipType] || '#7f8c8d'} strokeWidth={2} markerEnd="url(#arrow)" />
+            ))}
+            <defs>
+              <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--text-dim)" /></marker>
+            </defs>
+            {positioned.map((n: any) => (
+              <text key={`label-${n.id}`} x={(center + n.x) / 2} y={(center + n.y) / 2 - 6} textAnchor="middle" fontSize={9} fill={RELATIONSHIP_TYPE_COLOR[n.relationshipType]}>
+                {isAR ? RELATIONSHIP_TYPE_LABEL[n.relationshipType]?.ar || n.relationshipType : RELATIONSHIP_TYPE_LABEL[n.relationshipType]?.en || n.relationshipType}
+              </text>
+            ))}
+            <circle cx={center} cy={center} r={26} fill="var(--accent)" opacity={0.25} stroke="var(--accent)" strokeWidth={2} />
+            <text x={center} y={center + 4} textAnchor="middle" fontSize={10} fontWeight={700} fill="var(--text)">{isAR ? 'هذا العنصر' : 'This item'}</text>
+            {positioned.map((n: any) => n.otherItem && (
+              <g key={`node-${n.id}`} style={{ cursor: 'pointer' }} onClick={() => onOpenItem(n.otherItem.id)}>
+                <circle cx={n.x} cy={n.y} r={20} fill="var(--navy-mid)" stroke={RELATIONSHIP_TYPE_COLOR[n.relationshipType]} strokeWidth={2} />
+                <text x={n.x} y={n.y + 32} textAnchor="middle" fontSize={10} fill="var(--text)">{(isAR && n.otherItem.nameAr ? n.otherItem.nameAr : n.otherItem.name).slice(0, 16)}</text>
+              </g>
+            ))}
+          </svg>
+          {isAdmin && (
+            <div style={{ minWidth: 180, fontSize: 11 }}>
+              <div style={{ color: 'var(--text-dim)', marginBottom: 6, fontWeight: 700 }}>{isAR ? 'إدارة العلاقات' : 'Manage'}</div>
+              {[...data.outgoing, ...data.incoming].map((r: any) => (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <span style={{ flex: 1 }}>{r.otherItem ? (isAR && r.otherItem.nameAr ? r.otherItem.nameAr : r.otherItem.name) : (isAR ? '(محذوف)' : '(deleted)')}</span>
+                  <button onClick={() => removeRel(r.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 12 }}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function RadarEditForm({ api, item, isAR, t, allItems, onDone, onCancel }: any) {
   const [form, setForm] = useState({
     name: item.name || '', nameAr: item.nameAr || '', description: item.description || '', descriptionAr: item.descriptionAr || '',
-    category: item.category, maturity: item.maturity, marketPosition: item.marketPosition,
+    category: item.category, maturity: item.maturity, marketPosition: item.marketPosition, horizon: item.horizon || '',
     typicalUseCases: (item.typicalUseCases || []).join(', '), benefits: (item.benefits || []).join(', '), keyRisks: (item.keyRisks || []).join(', '),
     relatedTechnologyIds: item.relatedTechnologyIds || [],
   })
@@ -1181,6 +1365,7 @@ function RadarEditForm({ api, item, isAR, t, allItems, onDone, onCancel }: any) 
     try {
       await api.put(`/innovation/radar/${item.id}`, {
         ...form,
+        horizon: form.horizon || null,
         typicalUseCases: form.typicalUseCases.split(',').map((s: string) => s.trim()).filter(Boolean),
         benefits: form.benefits.split(',').map((s: string) => s.trim()).filter(Boolean),
         keyRisks: form.keyRisks.split(',').map((s: string) => s.trim()).filter(Boolean),
@@ -1204,6 +1389,13 @@ function RadarEditForm({ api, item, isAR, t, allItems, onDone, onCancel }: any) 
           <div style={S.label}>{t('innov.market_position')}</div>
           <select style={S.input} value={form.marketPosition} onChange={e => setForm(f => ({ ...f, marketPosition: e.target.value }))}>
             {Object.keys(MARKET_POSITION_LABEL).map(p => <option key={p} value={p}>{isAR ? MARKET_POSITION_LABEL[p].ar : MARKET_POSITION_LABEL[p].en}</option>)}
+          </select>
+        </div>
+        <div>
+          <div style={S.label}>{isAR ? 'الأفق الزمني' : 'Horizon'}</div>
+          <select style={S.input} value={form.horizon} onChange={e => setForm(f => ({ ...f, horizon: e.target.value }))}>
+            <option value="">{isAR ? 'غير مصنَّف' : 'Not yet classified'}</option>
+            {HORIZON_RINGS.map(h => <option key={h} value={h}>{isAR ? HORIZON_LABEL[h].ar : HORIZON_LABEL[h].en}</option>)}
           </select>
         </div>
       </div>
