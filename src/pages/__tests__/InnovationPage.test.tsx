@@ -259,40 +259,8 @@ describe('InnovationPage - Radar portfolio dashboard', () => {
   });
 });
 
-describe('InnovationPage - Related Radar Items', () => {
+describe('InnovationPage - Related Radar Items (edit-form picker only; display moved to Relationship Graph)', () => {
   const RELATED_ITEM = { id: 'tech-2', code: 'ZERO_TRUST', name: 'Zero Trust Architecture', category: 'CYBERSECURITY', radarDomain: 'TECHNOLOGY' };
-  const ITEM_WITH_RELATIONS = { ...RADAR_ITEM, relatedTechnologyIds: ['tech-2'] };
-
-  it('renders a Related Radar Items card resolving each id to the real item\'s name', async () => {
-    mockFetch({ '/innovation/radar/tech-1': ITEM_WITH_RELATIONS, '/innovation/radar': [ITEM_WITH_RELATIONS, RELATED_ITEM] });
-    render(<InnovationPage />);
-    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
-    expect(await screen.findByText(/Related Radar Items/)).toBeInTheDocument();
-    expect(await screen.findByText(/Zero Trust Architecture/)).toBeInTheDocument();
-  });
-
-  it('does not render the Related Radar Items card when there are none', async () => {
-    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM] });
-    render(<InnovationPage />);
-    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
-    await screen.findByText(/autonomously plan and execute/);
-    expect(screen.queryByText(/Related Radar Items/)).not.toBeInTheDocument();
-  });
-
-  it('clicking a related-item chip navigates to that item\'s own detail view', async () => {
-    mockFetch({
-      '/innovation/radar/tech-1': ITEM_WITH_RELATIONS,
-      '/innovation/radar/tech-2': RELATED_ITEM,
-      '/innovation/radar': [ITEM_WITH_RELATIONS, RELATED_ITEM],
-    });
-    render(<InnovationPage />);
-    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
-    fireEvent.click(await screen.findByText(/Zero Trust Architecture/));
-    await waitFor(() => {
-      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/tech-2'));
-      expect(call).toBeDefined();
-    });
-  });
 
   it('the Edit form lets an admin search for and add a related item, then saves relatedTechnologyIds', async () => {
     mockFetch({
@@ -312,6 +280,65 @@ describe('InnovationPage - Related Radar Items', () => {
       expect(call).toBeDefined();
       const body = JSON.parse(call[1].body);
       expect(body.relatedTechnologyIds).toEqual(['tech-2']);
+    });
+  });
+});
+
+describe('InnovationPage - Relationship Graph', () => {
+  const RELATED_ITEM = { id: 'tech-2', name: 'Zero Trust Architecture', category: 'CYBERSECURITY' };
+  const RELATIONSHIPS = { outgoing: [{ id: 'rel-1', relationshipType: 'ENABLES', otherItem: RELATED_ITEM }], incoming: [] };
+
+  it('shows an empty state when there are no relationships yet', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relationships': { outgoing: [], incoming: [] }, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/No relationships recorded for this item yet/)).toBeInTheDocument();
+  });
+
+  it('renders an outgoing relationship with the real target item name and type', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/relationships': RELATIONSHIPS, '/innovation/radar': [RADAR_ITEM, RELATED_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/Relationship Graph/)).toBeInTheDocument();
+    expect(await screen.findByText(/Zero Trust Architecture/)).toBeInTheDocument();
+  });
+
+  it('an admin can add a new typed relationship, posting the target id and chosen type', async () => {
+    mockFetch({
+      '/innovation/radar/tech-1': RADAR_ITEM,
+      '/innovation/radar/tech-1/relationships': { outgoing: [], incoming: [] },
+      '/innovation/radar/relationship-types': ['DEPENDS_ON', 'ENABLES', 'REQUIRES'],
+      '/innovation/radar': [RADAR_ITEM, RELATED_ITEM],
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText(/No relationships recorded/);
+    fireEvent.click(screen.getByText(/Add Relationship/));
+    const searchInput = await screen.findByPlaceholderText(/Search for an item/);
+    fireEvent.change(searchInput, { target: { value: 'Zero Trust' } });
+    fireEvent.click(await screen.findByText(/Zero Trust Architecture/));
+    fireEvent.click(screen.getByText('innov.save'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/tech-1/relationships') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body).toTechnologyId).toBe('tech-2');
+    });
+  });
+
+  it('an admin can remove an existing relationship', async () => {
+    mockFetch({
+      '/innovation/radar/tech-1': RADAR_ITEM,
+      '/innovation/radar/tech-1/relationships': RELATIONSHIPS,
+      '/innovation/radar/relationships/rel-1/delete': { deleted: true },
+      '/innovation/radar': [RADAR_ITEM, RELATED_ITEM],
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('Manage');
+    fireEvent.click(screen.getByText('✕'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/relationships/rel-1/delete'));
+      expect(call).toBeDefined();
     });
   });
 });
@@ -1382,5 +1409,90 @@ describe('InnovationPage - Opportunity Discovery (Create Idea from a radar item)
       expect(call).toBeDefined();
       expect(JSON.parse(call[1].body).relatedRadarItemId).toBe('tech-1');
     });
+  });
+});
+
+describe('InnovationPage - Maturity and Horizon radar views', () => {
+  it('offers Maturity and Horizon as additional ring-basis options in Radar view', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('🎯 Radar'));
+    expect(screen.getByText('Maturity')).toBeInTheDocument();
+    expect(screen.getByText('Horizon')).toBeInTheDocument();
+  });
+
+  it('switching to Horizon excludes items with no horizon classification and states the count', async () => {
+    const noHorizon = { ...RADAR_ITEM };
+    mockFetch({ '/innovation/radar': [noHorizon] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('🎯 Radar'));
+    fireEvent.click(screen.getByText('Horizon'));
+    expect(await screen.findByText(/1 item\(s\) not yet classified with a horizon/)).toBeInTheDocument();
+  });
+
+  it('an item with a real horizon is plotted in Horizon view', async () => {
+    const withHorizon = { ...RADAR_ITEM, horizon: 'NOW' };
+    mockFetch({ '/innovation/radar': [withHorizon] });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('🎯 Radar'));
+    fireEvent.click(screen.getByText('Horizon'));
+    expect(await screen.findByText(/1 item\(s\) plotted/)).toBeInTheDocument();
+  });
+
+  it('the Edit form lets an admin set a horizon, sending null rather than an empty string when left unset', async () => {
+    mockFetch({ '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar': [RADAR_ITEM] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText(/autonomously plan and execute/);
+    fireEvent.click(screen.getByText('innov.edit'));
+    fireEvent.click(screen.getByText('innov.save'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/innovation/radar/tech-1') && !c[0].includes('my-status'));
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body).horizon).toBeNull();
+    });
+  });
+
+  it('shows a Horizon badge on the item detail header when one is set', async () => {
+    const withHorizon = { ...RADAR_ITEM, horizon: 'NEXT' };
+    mockFetch({ '/innovation/radar/tech-1': withHorizon, '/innovation/radar': [withHorizon] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    expect(await screen.findByText(/Next/)).toBeInTheDocument();
+  });
+});
+
+describe('InnovationPage - Executive Brief', () => {
+  const BRIEF_RESPONSE = {
+    brief: { executiveSummary: 'Overall healthy portfolio.', portfolioMovement: 'Two items moved to PILOT.', topPriorities: 'Agentic AI leads.', recommendedNextActions: ['Review pilots', 'Assess two new items'] },
+    sourceStats: { totalItems: 5, topAssessments: [{ item: 'Agentic AI', compositeScore: 3.5 }], recentDecisions: [{ item: 'X', from: 'EXPLORE', to: 'PILOT' }], confirmedRelevanceCount: 2 },
+    generatedAt: '2026-09-19T00:00:00.000Z',
+  };
+
+  it('shows a Generate Brief button in the Portfolio view and posts to the executive-brief endpoint', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM], '/innovation/radar/executive-brief': BRIEF_RESPONSE });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('📊 Portfolio'));
+    fireEvent.click(await screen.findByText('Generate Brief'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/executive-brief') && c[1]?.method === 'POST');
+      expect(call).toBeDefined();
+    });
+  });
+
+  it('renders the generated brief sections and the real source-stats summary line', async () => {
+    mockFetch({ '/innovation/radar': [RADAR_ITEM], '/innovation/radar/executive-brief': BRIEF_RESPONSE });
+    render(<InnovationPage />);
+    await screen.findByText('AutoArchitect Agents');
+    fireEvent.click(screen.getByText('📊 Portfolio'));
+    fireEvent.click(await screen.findByText('Generate Brief'));
+    expect(await screen.findByText('Overall healthy portfolio.')).toBeInTheDocument();
+    expect(screen.getByText('Two items moved to PILOT.')).toBeInTheDocument();
+    expect(screen.getByText('Review pilots')).toBeInTheDocument();
+    expect(screen.getByText(/Grounded in: 5 items/)).toBeInTheDocument();
   });
 });
