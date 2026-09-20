@@ -151,12 +151,17 @@ function SequentialExecutionPanel({ cycle }: { cycle: any }) {
     finally { setBusy(false) }
   }
   const total = (run?.completedOutputIds?.length || 0) + (run?.remainingOutputIds?.length || 0)
+  const statusLabel = run?.status === 'RUNNING' ? 'Running'
+    : run?.status === 'WAITING_INPUT' ? 'Waiting for Input'
+      : run?.status === 'WAITING_FOR_ARCHITECTURE_APPROVAL' ? 'Architecture Approval Required'
+        : run?.status === 'REVIEW_REQUIRED' ? 'Review Required'
+          : String(run?.status || 'UNKNOWN').replace(/_/g, ' ')
   return (
     <div className="card mb-4" style={{ padding: '12px 16px' }}>
       <div className="flex items-center justify-between" style={{ gap: 12 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 12 }}>ADM Execution</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 3 }}>Manual mode remains available. Sequential mode follows the frozen NORA order and pauses for inputs, approvals, scope review, or failures.</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 3 }}>Manual mode remains available. Sequential mode automatically advances generated outputs and pauses only for missing input, genuine review, architecture publishing, or failures.</div>
         </div>
         {!run || ['STOPPED', 'COMPLETED'].includes(run.status) ? <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('start')}>▶ Run Sequentially</button> : (
           <div className="flex gap-2">
@@ -167,7 +172,7 @@ function SequentialExecutionPanel({ cycle }: { cycle: any }) {
         )}
       </div>
       {run && <div style={{ marginTop: 10, padding: 9, background: 'rgba(3,105,161,.06)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 10 }}>
-        <strong>{String(run.status || 'UNKNOWN').replace(/_/g, ' ')}</strong> · Phase {run.currentPhase || '—'} · Step {run.currentStep || '—'} · {run.completedOutputIds?.length || 0}/{total} completed · {run.remainingOutputIds?.length || 0} remaining
+        <strong>{statusLabel}</strong> — Phase {run.currentPhase || '—'} · Step {run.currentStep || '—'} · {run.completedOutputIds?.length || 0}/{total} completed · {run.remainingOutputIds?.length || 0} remaining
         {run.waitingReason && <div style={{ color: '#f39c12', marginTop: 4 }}>{run.waitingReason}</div>}
         {run.lastError && <div style={{ color: '#e74c3c', marginTop: 4 }}>{run.lastError}</div>}
       </div>}
@@ -201,6 +206,7 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
           : 'Architecture integration requires review. Resolve the highlighted items before applying.'))
       } else {
         setEditing(null); setProposalData(null); await load()
+        window.dispatchEvent(new Event('adm-sequential-updated'))
       }
     } finally { setBusy(false) }
   }
@@ -209,6 +215,7 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
     if (!rationale?.trim()) return
     await authFetch(`/adm-intelligence/outputs/${outputId}/architecture-impact/skip`, { method: 'POST', body: JSON.stringify({ rationale }) })
     await load()
+    window.dispatchEvent(new Event('adm-sequential-updated'))
   }
   if (!review?.entries?.length) return null
   return <div className="card mb-4" style={{ padding: '12px 16px' }}>
