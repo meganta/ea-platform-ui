@@ -398,6 +398,66 @@ describe('RepositoryPage - connector provenance display (HRDF demo: ManageEngine
   });
 });
 
+describe('RepositoryPage - Governance Findings and Roadmap panels in asset detail (real join services, not fabricated)', () => {
+  it('shows governance findings that reference this asset, via GovernanceFindingsAssetLinkService', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets/a1': asset(),
+      '/ea-repository/assets': [asset()],
+      '/governance/findings/by-asset/a1': { assetId: 'a1', findings: [{ id: 'f1', title: 'Missing encryption at rest', severity: 'HIGH', status: 'OPEN' }] },
+      '/ea-planning/roadmap/by-asset/a1': { assetId: 'a1', items: [] },
+    });
+    render(<RepositoryPage />);
+    fireEvent.click(await screen.findByText('Core Banking'));
+    expect(await screen.findByText('Missing encryption at rest')).toBeInTheDocument();
+    expect(screen.getByText('HIGH')).toBeInTheDocument();
+  });
+
+  it('shows no findings section when the asset has none - not an error state, the normal case', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets/a1': asset(),
+      '/ea-repository/assets': [asset()],
+      '/governance/findings/by-asset/a1': { assetId: 'a1', findings: [] },
+      '/ea-planning/roadmap/by-asset/a1': { assetId: 'a1', items: [] },
+    });
+    render(<RepositoryPage />);
+    fireEvent.click(await screen.findByText('Core Banking'));
+    await waitFor(() => expect(screen.queryByText('repository.findings_loading')).not.toBeInTheDocument());
+    expect(screen.queryByText('repository.findings_title')).not.toBeInTheDocument();
+  });
+
+  it('shows roadmap items (activities/deliverables) linked to this asset, via EAPlanningService.getRoadmapForAsset', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets/a1': asset(),
+      '/ea-repository/assets': [asset()],
+      '/governance/findings/by-asset/a1': { assetId: 'a1', findings: [] },
+      '/ea-planning/roadmap/by-asset/a1': { assetId: 'a1', items: [{ itemType: 'activity', id: 'A1', name: 'Migrate to cloud', planName: 'Cloud Migration Plan', periodLabel: '2026' }] },
+    });
+    render(<RepositoryPage />);
+    fireEvent.click(await screen.findByText('Core Banking'));
+    expect(await screen.findByText('Migrate to cloud')).toBeInTheDocument();
+    expect(screen.getByText(/Cloud Migration Plan/)).toBeInTheDocument();
+  });
+
+  it('does not let a failed findings/roadmap lookup crash the rest of the asset detail panel', async () => {
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/governance/findings/by-asset/') || url.includes('/ea-planning/roadmap/by-asset/')) return Promise.reject(new Error('network error'));
+      if (url.includes('/ea-repository/assets/a1')) return Promise.resolve({ ok: true, json: () => Promise.resolve(asset()) });
+      if (url.includes('/ea-repository/assets')) return Promise.resolve({ ok: true, json: () => Promise.resolve([asset()]) });
+      if (url.includes('framework-config')) return Promise.resolve({ ok: true, json: () => Promise.resolve(CONFIG) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+    render(<RepositoryPage />);
+    fireEvent.click(await screen.findByText('Core Banking'));
+    // The core asset detail still renders even though both new lookups
+    // rejected - proven by a modal-only element (list row also exists
+    // in the background, so "APPLICATION" alone would be ambiguous).
+    expect(await screen.findByText('Explore Dependencies', { exact: false })).toBeInTheDocument();
+  });
+});
+
 describe('RepositoryPage - evidence-drawer deep link (Copilot Phase 1, ?assetId=<id>)', () => {
   it('opens the asset detail modal directly when ?assetId is present, fetching that asset by id', async () => {
     mockSearchParams = new URLSearchParams('assetId=a1');
