@@ -140,6 +140,34 @@ describe('AdmPage - Related Architecture Views (EA Views integration)', () => {
   });
 });
 
+describe('AdmPage - sequential execution and Architecture Impact Review', () => {
+  it('keeps Manual mode and exposes the additional persisted Sequential mode', async () => {
+    mockFetch({ '/adm/cycles': [SAMPLE_CYCLE], '/sequential': {} });
+    render(<AdmPage />);
+    expect(await screen.findByText('ADM Execution')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('▶ Run Sequentially'));
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some((call: any) => call[0].includes('/sequential/start') && call[1]?.method === 'POST')).toBe(true));
+    expect(screen.getByText(/Manual mode remains available/)).toBeInTheDocument();
+  });
+
+  it('warns about pending architecture impact and opens an explicit controlled proposal', async () => {
+    mockFetch({
+      '/adm/cycles': [SAMPLE_CYCLE],
+      '/architecture-impact-proposal': { proposal: { assets: [], relationships: [], view: { behavior: 'CREATE_OR_REFRESH' } } },
+      '/architecture-impact': {
+        pendingCount: 1, completion: { allowed: false, warning: '1 approved architecture-state output(s) still require Architecture Impact Review.' },
+        entries: [{ outputId: 'o1', title: 'Application Inventory', phase: '2', outputStatus: 'APPROVED', architectureState: 'CURRENT', impactStatus: 'PENDING', activities: [] }],
+      },
+    });
+    render(<AdmPage />);
+    expect(await screen.findByText('Architecture Impact Review')).toBeInTheDocument();
+    expect(screen.getByText(/still require Architecture Impact Review/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Review / Apply'));
+    expect(await screen.findByDisplayValue(/CREATE_OR_REFRESH/)).toBeInTheDocument();
+    expect(screen.getByText('Apply Architecture Changes')).toBeInTheDocument();
+  });
+});
+
 describe('AdmPage - Repository-first evidence and persisted Architecture Impact', () => {
   const phaseDef = {
     phase: '1', name: 'Scope Definition', description: 'Scope',
@@ -172,6 +200,7 @@ describe('AdmPage - Repository-first evidence and persisted Architecture Impact'
         outputs: [{
           id: 'output-charter', outputKey: 'ea_cycle_charter', title: 'EA Cycle Charter',
           description: 'Charter', status: 'APPROVED', content: 'Approved charter',
+          scopeAlignment: { status: 'REVIEW_REQUIRED', scopeDomains: ['BUSINESS'], warnings: ['Explicit constraint requires review.'] },
         }],
       },
       '/outputs/output-charter/architecture-integration': { activities },
@@ -206,6 +235,14 @@ describe('AdmPage - Repository-first evidence and persisted Architecture Impact'
     expect(screen.queryByText('asset-1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('1HRDF'));
     expect(mockNavigate).toHaveBeenCalledWith('/repository?assetId=asset-1');
+  });
+
+  it('shows deterministic scope review warnings on downstream outputs', async () => {
+    mockFetch(phaseRoutes());
+    await openPhaseOne();
+    fireEvent.click(screen.getByText('EA Cycle Charter'));
+    expect(await screen.findByText('Scope Alignment: Review Required')).toBeInTheDocument();
+    expect(screen.getByText(/Explicit constraint requires review/)).toBeInTheDocument();
   });
 });
 
