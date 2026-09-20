@@ -192,6 +192,37 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
     const data = await authFetch(`/adm-intelligence/outputs/${outputId}/architecture-impact-proposal`)
     setProposalData(data); setTechnicalPayload(JSON.stringify(data.proposal, null, 2)); setEditing(outputId)
   }
+  const reassess = async (proposal: any) => {
+    if (!editing) return
+    setBusy(true)
+    try {
+      const result = await authFetch(`/adm-intelligence/outputs/${editing}/architecture-impact/reassess`, { method: 'POST', body: JSON.stringify(proposal) })
+      setTechnicalPayload(JSON.stringify(proposal, null, 2))
+      setProposalData((current: any) => ({ ...current, ...result, proposal }))
+    } finally { setBusy(false) }
+  }
+  const resolveRelationship = async (key: string, resolution: any, applyToEquivalent = false) => {
+    let proposal: any
+    try { proposal = JSON.parse(technicalPayload) } catch (_) { window.alert('The technical proposal payload is invalid.'); return }
+    const reviewed = proposalData?.assessment?.relationships || []
+    const selected = reviewed.find((item: any) => item.key === key)
+    const keys = applyToEquivalent && selected?.resolutionGroupKey
+      ? new Set(reviewed.filter((item: any) => item.resolutionGroupKey === selected.resolutionGroupKey).map((item: any) => item.key))
+      : new Set([key])
+    proposal.relationships = (proposal.relationships || []).map((item: any) => {
+      if (!keys.has(item.key)) return item
+      if (['EXCLUDE', 'KEEP_EXISTING'].includes(resolution.kind)) return { ...item, action: 'NO_CHANGE' }
+      const corrected = {
+        ...item,
+        relationshipDefinitionId: resolution.relationshipDefinitionId,
+        relationshipType: resolution.relationshipType,
+      }
+      if (resolution.kind === 'CORRECT_SOURCE') corrected.sourceAssetId = resolution.candidate.id
+      if (resolution.kind === 'CORRECT_TARGET') corrected.targetAssetId = resolution.candidate.id
+      return corrected
+    })
+    await reassess(proposal)
+  }
   const apply = async () => {
     if (!editing) return
     let body: any
@@ -239,7 +270,13 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
           <span style={{ color: proposalData.lifecycleStatus === 'READY_TO_APPLY' ? '#2ecc71' : '#f39c12', fontWeight: 700 }}>{String(proposalData.lifecycleStatus || 'PENDING').replace(/_/g, ' ')}</span>
         </div>
         {proposalData.scenario?.name && <div style={{ color: 'var(--text-dim)', marginTop: 4 }}>Scenario: {proposalData.scenario.name}</div>}
-        <ImpactAssessmentGroups assessment={proposalData.assessment} />
+        {proposalData.reassessment?.status === 'SUPERSEDED_BY_REASSESSMENT' && <div style={{ color: '#2ecc71', marginTop: 6 }}>
+          Corrected proposal rebuilt from the same approved ADM output. The previous pending review remains visible in the audit context.
+        </div>}
+        {proposalData.evidenceContext && <div style={{ color: 'var(--text-dim)', marginTop: 6 }}>
+          Repository Evidence — Automatically Sourced: {proposalData.evidenceContext.assets} assets and {proposalData.evidenceContext.relationships} relationships used as context; not proposed as changes.
+        </div>}
+        <ImpactAssessmentGroups assessment={proposalData.assessment} busy={busy} onResolveRelationship={resolveRelationship} />
         {proposalData.warnings?.map((warning: string, index: number) => <div key={index} style={{ color: '#f39c12', marginTop: 6 }}>⚠ {warning}</div>)}
         <details style={{ marginTop: 10 }}>
           <summary style={{ cursor: 'pointer', color: 'var(--text-dim)' }}>Technical proposal details</summary>
@@ -251,7 +288,7 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
   </div>
 }
 
-function ImpactAssessmentGroups({ assessment }: { assessment: any }) {
+function ImpactAssessmentGroups({ assessment, busy = false, onResolveRelationship }: { assessment: any; busy?: boolean; onResolveRelationship?: (key: string, resolution: any, applyToEquivalent?: boolean) => void }) {
   if (!assessment) return null
   const assets = assessment.assets || []
   const groups = [
@@ -275,10 +312,41 @@ function ImpactAssessmentGroups({ assessment }: { assessment: any }) {
     </div>)}
     {relationships.length > 0 && <div style={{ marginTop: 7, padding: 8, background: 'rgba(3,105,161,.05)', borderRadius: 4 }}>
       <strong>Relationships</strong>
-      {relationships.map((item: any, index: number) => <div key={`${item.key}-${index}`} style={{ marginTop: 4, color: 'var(--text-dim)' }}>
-        {item.source || item.sourceKey || 'Source'} → {item.relationshipType || 'Relationship'} → {item.target || item.targetKey || 'Target'} · {String(item.status).replace(/_/g, ' ')}
-        {item.reason && <> — {item.reason}</>}
-      </div>)}
+      {relationships.map((item: any, index: number) => {
+        const equivalentCount = item.resolutionGroupKey
+          ? relationships.filter((candidate: any) => candidate.resolutionGroupKey === item.resolutionGroupKey).length
+          : 1
+        const isFirstEquivalent = !item.resolutionGroupKey
+          || relationships.findIndex((candidate: any) => candidate.resolutionGroupKey === item.resolutionGroupKey) === index
+        const resolutions = item.resolutions || []
+        const endpointResolutions = resolutions.filter((resolution: any) => ['CORRECT_SOURCE', 'CORRECT_TARGET'].includes(resolution.kind))
+        return <div key={`${item.key}-${index}`} style={{ marginTop: 7, paddingTop: 7, borderTop: index ? '1px solid var(--border)' : 'none', color: 'var(--text-dim)' }}>
+          <div>{item.source?.name || item.source || item.sourceKey || 'Source'} → {item.requestedRelationship || item.relationshipType || 'Relationship'} → {item.target?.name || item.target || item.targetKey || 'Target'} · {String(item.status).replace(/_/g, ' ')}</div>
+          {item.source?.objectType && <div style={{ marginTop: 2 }}>Source: {item.source.objectTypeLabel || item.source.objectType} ({item.source.semanticType || 'no semantic type'}) · Target: {item.target?.objectTypeLabel || item.target?.objectType} ({item.target?.semanticType || 'no semantic type'})</div>}
+          {item.reason && <div style={{ color: '#f39c12', marginTop: 2 }}>{item.reason}</div>}
+          {item.status === 'REQUIRES_REVIEW' && onResolveRelationship && <div className="flex gap-2" style={{ marginTop: 6, flexWrap: 'wrap' }}>
+            {item.automaticResolution && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => onResolveRelationship(item.key, item.automaticResolution)}>Resolve Automatically</button>}
+            {resolutions.filter((resolution: any) => ['USE_RELATIONSHIP', 'EXCLUDE', 'KEEP_EXISTING'].includes(resolution.kind)).map((resolution: any, resolutionIndex: number) => <button key={`${resolution.kind}-${resolutionIndex}`} className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onResolveRelationship(item.key, resolution)}>
+              {resolution.kind === 'USE_RELATIONSHIP' ? `Use ${resolution.definition?.forwardLabel || resolution.relationshipType}` : resolution.label}
+            </button>)}
+            {endpointResolutions.length > 0 && <select aria-label={`Correct endpoint for ${item.key}`} className="form-input" disabled={busy} defaultValue="" onChange={event => {
+              const resolution = endpointResolutions[Number(event.target.value)]
+              if (resolution) onResolveRelationship(item.key, resolution)
+            }} style={{ width: 'auto', minWidth: 240 }}>
+              <option value="" disabled>Correct Endpoint…</option>
+              {endpointResolutions.map((resolution: any, resolutionIndex: number) => <option key={resolutionIndex} value={resolutionIndex}>
+                {resolution.endpoint}: {resolution.candidate.name} ({resolution.candidate.assetType})
+              </option>)}
+            </select>}
+            {isFirstEquivalent && equivalentCount > 1 && item.automaticResolution && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onResolveRelationship(item.key, item.automaticResolution, true)}>
+              Apply this resolution to all {equivalentCount} equivalent items
+            </button>}
+            {isFirstEquivalent && equivalentCount > 1 && !item.automaticResolution && resolutions.some((resolution: any) => resolution.kind === 'EXCLUDE') && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => onResolveRelationship(item.key, resolutions.find((resolution: any) => resolution.kind === 'EXCLUDE'), true)}>
+              Exclude all {equivalentCount} equivalent proposals
+            </button>}
+          </div>}
+        </div>
+      })}
     </div>}
     {assessment.view && <div style={{ marginTop: 7, padding: 8, background: 'rgba(3,105,161,.05)', borderRadius: 4 }}>
       <strong>EA Views</strong>
