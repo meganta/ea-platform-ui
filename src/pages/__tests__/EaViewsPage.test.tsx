@@ -40,6 +40,12 @@ import * as exportUtils from '../eaviews/exportUtils';
 beforeEach(() => {
   jest.clearAllMocks();
   mockSearchParams = new URLSearchParams();
+  // ViewLibrary now guards its seed call with a sessionStorage flag (see
+  // EaViewsPage.tsx) so it only reseeds once per browser session -
+  // jsdom's sessionStorage persists across tests within this file unless
+  // explicitly cleared, so without this every test after the first
+  // "seeds on load" test would silently skip seeding.
+  sessionStorage.clear();
 });
 
 function mockFetch(routes: Record<string, any>) {
@@ -88,6 +94,52 @@ describe('EaViewsPage - ViewLibrary', () => {
       const seedCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/viewpoints/seed'));
       expect(seedCall).toBeDefined();
     });
+  });
+
+  // ── Real production bug fix: a slow/failing seed call must never hang
+  // the page on "Loading" forever - the list loads independently now.
+  it('still shows the list even when the seed call fails (was: hung on Loading forever, no .catch() at all)', async () => {
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/viewpoints': [SAMPLE_VIEWPOINT],
+      '/ea-views/viewpoints/seed': { __fail: true, status: 504 },
+    });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    expect(await screen.findByText('Application Landscape')).toBeInTheDocument();
+  });
+
+  it('does not call the seed endpoint again on a second mount within the same session (only re-loads the list)', async () => {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views/viewpoints': [SAMPLE_VIEWPOINT] });
+    const { unmount } = render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    await screen.findByText('Application Landscape');
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('/viewpoints/seed'))).toBe(true));
+    unmount();
+
+    jest.clearAllMocks();
+    mockFetch({ '/ea-views/stats': {}, '/ea-views/viewpoints': [SAMPLE_VIEWPOINT] });
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    await screen.findByText('Application Landscape');
+    expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('/viewpoints/seed'))).toBe(false);
+  });
+
+  it('shows a retry option instead of hanging silently when the list itself fails at the network level', async () => {
+    // get() in this codebase resolves with whatever JSON comes back even
+    // on an HTTP error status (see EaViewsPage's own get() - it never
+    // checks r.ok) - the failure mode this retry UI actually guards
+    // against is a genuine network-level rejection (timeout, connection
+    // reset), which is what actually caused the production incident.
+    global.fetch = jest.fn().mockImplementation((url: string) => {
+      if (url.includes('/ea-views/viewpoints/seed')) return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      if (url.includes('/ea-views/viewpoints')) return Promise.reject(new Error('network error'));
+      if (url.includes('/ea-views/stats')) return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+    render(<EaViewsPage />);
+    fireEvent.click(await screen.findByText('📚 View Library'));
+    expect(await screen.findByText(/Could not load the View Library/)).toBeInTheDocument();
   });
 
   it('filters viewpoints by category', async () => {

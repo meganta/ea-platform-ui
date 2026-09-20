@@ -124,18 +124,34 @@ function computeForceLayout(nodes: any[], edges: any[], existingPositions: Recor
 }
 
 // ── View Library (predefined viewpoints) ──────────────────────────────────────
+// Real bug fixed here (production, Sept 2026): this used to await
+// Promise.all([GET list, POST seed]) with no .catch() at all - once the
+// backend's seed endpoint got slow (library grew from 12 to 60
+// viewpoints; see the backend fix in the same incident), a timeout on
+// the POST rejected the whole Promise.all silently, and the page hung
+// on "Loading" forever with no error shown. Fixed two ways: (1) the
+// list load and the seed call are now independent - a failed/slow seed
+// never blocks the list from rendering, since GET already returns
+// whatever's been seeded from any PRIOR load; (2) seeding only runs
+// once per browser session (sessionStorage guard) rather than on every
+// single page visit, since it re-upserts the entire library every time
+// for no benefit once a session has already done it once.
+const VIEWPOINTS_SEEDED_KEY = 'ea_viewpoints_seeded_session'
+
 function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }) {
   const [viewpoints, setViewpoints] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [filterCat, setFilterCat] = useState('')
   const [filterStakeholder, setFilterStakeholder] = useState('')
   const [compatibility, setCompatibility] = useState<Record<string, any>>({})
 
-  useEffect(() => {
-    Promise.all([api.get('/ea-views/viewpoints'), api.post('/ea-views/viewpoints/seed')]).then(([vps]: any[]) => {
-      const list = Array.isArray(vps) ? vps : []
-      setViewpoints(list)
+  const loadList = useCallback(() => {
+    api.get('/ea-views/viewpoints').then((vps: any) => {
+      setViewpoints(Array.isArray(vps) ? vps : [])
       setLoading(false)
+      setLoadError(false)
+      const list: any[] = Array.isArray(vps) ? vps : []
       // Fired once per viewpoint after the list itself has loaded, not
       // blocking the initial render - compatibility badges fill in
       // progressively rather than delaying the whole library.
@@ -144,7 +160,26 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
           if (c) setCompatibility(prev => ({ ...prev, [vp.id]: c }))
         }).catch(() => {})
       })
-    })
+    }).catch(() => { setLoading(false); setLoadError(true) })
+  }, [api])
+
+  useEffect(() => {
+    if (sessionStorage.getItem(VIEWPOINTS_SEEDED_KEY)) {
+      // Already seeded once this session - just load the list, which
+      // already reflects everything a prior seed run inserted. Skips
+      // the ~60-entry upsert round trip entirely on every subsequent
+      // page visit within the session.
+      loadList()
+      return
+    }
+    api.post('/ea-views/viewpoints/seed')
+      .then(() => sessionStorage.setItem(VIEWPOINTS_SEEDED_KEY, '1'))
+      .catch(() => {})
+      // Load the list regardless of whether seeding itself succeeded -
+      // a slow/failed seed should never block showing whatever the
+      // library already has (which, for any tenant that's ever loaded
+      // this page before, is everything).
+      .finally(loadList)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -176,7 +211,11 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
         )}
       </div>
 
-      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
+      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : loadError ? (
+        <div style={{ textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>
+          Could not load the View Library. <button style={S.btn('primary')} onClick={() => { setLoading(true); loadList() }}>Retry</button>
+        </div>
+      ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
           {filtered.map(vp => {
             const compat = compatibility[vp.id]
