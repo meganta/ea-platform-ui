@@ -107,6 +107,122 @@ function ArchitectureImpact({ outputId }: { outputId: string }) {
   )
 }
 
+function ScopeAlignment({ alignment }: { alignment: any }) {
+  if (!alignment) return null
+  const review = alignment.status === 'REVIEW_REQUIRED'
+  return (
+    <div style={{ marginTop: 8, padding: '7px 9px', border: `1px solid ${review ? 'rgba(243,156,18,.45)' : 'rgba(46,204,113,.35)'}`, background: review ? 'rgba(243,156,18,.08)' : 'rgba(46,204,113,.06)', borderRadius: 4, fontSize: 10 }}>
+      <strong style={{ color: review ? '#f39c12' : '#2ecc71' }}>
+        {review ? 'Scope Alignment: Review Required' : 'Cycle Scope: In Scope'}
+      </strong>
+      {alignment.warnings?.map((warning: string, index: number) => <div key={index} style={{ marginTop: 4, color: 'var(--text-dim)' }}>• {warning}</div>)}
+      <div style={{ marginTop: 3, color: 'var(--text-dim)' }}>Scope provenance: Phase 1 · {alignment.scopeDomains?.join(', ') || 'All domains'}</div>
+    </div>
+  )
+}
+
+function SequentialExecutionPanel({ cycle }: { cycle: any }) {
+  const [run, setRun] = useState<any>(null)
+  const [busy, setBusy] = useState(false)
+  const load = async (advance = false) => {
+    try {
+      const path = advance ? `/adm-intelligence/cycles/${cycle.id}/sequential/advance` : `/adm-intelligence/cycles/${cycle.id}/sequential`
+      const next = advance ? await authFetch(path, { method: 'POST' }) : await authFetch(path)
+      setRun(next?.id ? next : null)
+    } catch (_) {}
+  }
+  useEffect(() => { load() }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (run?.status !== 'RUNNING') return
+    const timer = setInterval(() => load(true), 3000)
+    return () => clearInterval(timer)
+  }, [run?.status, run?.currentOutputId]) // eslint-disable-line react-hooks/exhaustive-deps
+  const action = async (name: string) => {
+    setBusy(true)
+    try {
+      const next = await authFetch(`/adm-intelligence/cycles/${cycle.id}/sequential/${name}`, { method: 'POST' })
+      setRun(next?.id ? next : null)
+    }
+    finally { setBusy(false) }
+  }
+  const total = (run?.completedOutputIds?.length || 0) + (run?.remainingOutputIds?.length || 0)
+  return (
+    <div className="card mb-4" style={{ padding: '12px 16px' }}>
+      <div className="flex items-center justify-between" style={{ gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 12 }}>ADM Execution</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 3 }}>Manual mode remains available. Sequential mode follows the frozen NORA order and pauses for inputs, approvals, scope review, or failures.</div>
+        </div>
+        {!run || ['STOPPED', 'COMPLETED'].includes(run.status) ? <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('start')}>▶ Run Sequentially</button> : (
+          <div className="flex gap-2">
+            {run.status === 'RUNNING' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => action('pause')}>Pause</button>}
+            {['PAUSED', 'WAITING_INPUT', 'REVIEW_REQUIRED', 'FAILED'].includes(run.status) && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('resume')}>Resume</button>}
+            <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => action('stop')}>Stop</button>
+          </div>
+        )}
+      </div>
+      {run && <div style={{ marginTop: 10, padding: 9, background: 'rgba(3,105,161,.06)', border: '1px solid var(--border)', borderRadius: 4, fontSize: 10 }}>
+        <strong>{String(run.status || 'UNKNOWN').replace(/_/g, ' ')}</strong> · Phase {run.currentPhase || '—'} · Step {run.currentStep || '—'} · {run.completedOutputIds?.length || 0}/{total} completed · {run.remainingOutputIds?.length || 0} remaining
+        {run.waitingReason && <div style={{ color: '#f39c12', marginTop: 4 }}>{run.waitingReason}</div>}
+        {run.lastError && <div style={{ color: '#e74c3c', marginTop: 4 }}>{run.lastError}</div>}
+      </div>}
+    </div>
+  )
+}
+
+function ArchitectureImpactReview({ cycle }: { cycle: any }) {
+  const [review, setReview] = useState<any>(null)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [proposal, setProposal] = useState('')
+  const [busy, setBusy] = useState(false)
+  const load = () => authFetch(`/adm-intelligence/cycles/${cycle.id}/architecture-impact`).then(setReview).catch(() => setReview(null))
+  useEffect(() => { load() }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const inspect = async (outputId: string) => {
+    const data = await authFetch(`/adm-intelligence/outputs/${outputId}/architecture-impact-proposal`)
+    setProposal(JSON.stringify(data.proposal, null, 2)); setEditing(outputId)
+  }
+  const apply = async () => {
+    if (!editing) return
+    let body: any
+    try { body = JSON.parse(proposal) } catch (_) { window.alert('The architecture proposal JSON is invalid.'); return }
+    setBusy(true)
+    try {
+      const result = await authFetch(`/adm-intelligence/outputs/${editing}/architecture-impact/apply`, { method: 'POST', body: JSON.stringify(body) })
+      if (result?.status === 'REQUIRES_REVIEW') window.alert(result.message || 'Architecture integration requires review.')
+      setEditing(null); await load()
+    } finally { setBusy(false) }
+  }
+  const skip = async (outputId: string) => {
+    const rationale = window.prompt('Why should this architecture impact be intentionally skipped?')
+    if (!rationale?.trim()) return
+    await authFetch(`/adm-intelligence/outputs/${outputId}/architecture-impact/skip`, { method: 'POST', body: JSON.stringify({ rationale }) })
+    await load()
+  }
+  if (!review?.entries?.length) return null
+  return <div className="card mb-4" style={{ padding: '12px 16px' }}>
+    <div style={{ fontWeight: 700, fontSize: 12 }}>Architecture Impact Review</div>
+    <div style={{ color: review.pendingCount ? '#f39c12' : '#2ecc71', fontSize: 10, marginTop: 3 }}>
+      {review.completion?.warning || 'All approved architecture impacts have been applied or intentionally skipped.'}
+    </div>
+    {review.entries.map((entry: any) => <div key={entry.outputId} style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 10 }}>
+      <div className="flex items-center justify-between" style={{ gap: 8 }}>
+        <div><strong>{entry.title}</strong> · {entry.architectureState} · <span style={{ color: entry.impactStatus === 'PENDING' ? '#f39c12' : '#2ecc71' }}>{entry.impactStatus}</span></div>
+        {entry.outputStatus === 'APPROVED' && entry.impactStatus === 'PENDING' && <div className="flex gap-2">
+          <button className="btn btn-primary btn-sm" onClick={() => inspect(entry.outputId)}>Review / Apply</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => skip(entry.outputId)}>Skip intentionally</button>
+        </div>}
+      </div>
+      {entry.rationale && <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>Decision rationale: {entry.rationale}</div>}
+      {entry.activities?.length > 0 && <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>{entry.activities.length} persisted Repository / Scenario / View activities</div>}
+      {editing === entry.outputId && <div style={{ marginTop: 8 }}>
+        <div style={{ color: 'var(--text-dim)', marginBottom: 5 }}>Review the explicit Current/Target asset, relationship and View actions. Target actions may be changed to INTRODUCE, UPDATE, REMOVE or RESTORE before publishing.</div>
+        <textarea className="form-input" rows={12} value={proposal} onChange={event => setProposal(event.target.value)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }} />
+        <div className="flex gap-2 mt-2"><button className="btn btn-primary btn-sm" disabled={busy} onClick={apply}>Apply Architecture Changes</button><button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}>Cancel</button></div>
+      </div>}
+    </div>)}
+  </div>
+}
+
 // ── Create Cycle Modal ────────────────────────────────────
 function CreateModal({ onClose, onCreate, t }: any) {
   const [form, setForm] = useState({ name: '', description: '', frameworkType: 'NORA' })
@@ -1097,6 +1213,9 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const approveOutput = async (outputId: string) => {
     const result = await api.put(`/adm-intelligence/outputs/${outputId}`, { status: 'APPROVED' })
     setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
+    // If this cycle is running sequentially, approval releases the persisted
+    // pause and advances to the next eligible frozen-NORA output.
+    api.post(`/adm-intelligence/cycles/${cycle.id}/sequential/advance`).catch(() => {})
     // Re-fetch inputs so next step gets auto-populated immediately
     setTimeout(async () => {
       try {
@@ -1383,6 +1502,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                             the backend so integration activity survives page
                             refresh and is not reduced to a transient toast. */}
                         <ArchitectureImpact outputId={out.id} />
+                        <ScopeAlignment alignment={out.scopeAlignment} />
 
                         {(out.status === 'AI_DRAFT' || out.status === 'APPROVED') && out.content && out.content.length > 100 && <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />}
                         {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
@@ -1816,6 +1936,8 @@ export default function AdmPage() {
                 {cycleView === 'repository' && <CycleRepositoryView cycle={selected} />}
                 {cycleView === 'phases' && (
                 <>
+                <SequentialExecutionPanel cycle={selected} />
+                <ArchitectureImpactReview cycle={selected} />
                 {/* Phase map */}
                 <div className="card mb-4">
                   <div className="flex items-center justify-between mb-4">
