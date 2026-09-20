@@ -88,7 +88,7 @@ function ArchitectureImpact({ outputId }: { outputId: string }) {
   if (activities.length === 0) return null
   return (
     <div style={{ marginTop: 8, padding: '10px 12px', background: 'rgba(3,105,161,0.07)', border: '1px solid rgba(3,105,161,0.3)', borderRadius: 4 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 7 }}>✓ Architecture Impact</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 7 }}>Architecture Impact Activity</div>
       {activities.map(activity => (
         <div key={activity.id} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '4px 0', fontSize: 10, borderTop: '1px solid rgba(148,163,184,0.12)' }}>
           <span style={{ color: '#2ecc71' }}>✓</span>
@@ -133,6 +133,11 @@ function SequentialExecutionPanel({ cycle }: { cycle: any }) {
   }
   useEffect(() => { load() }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
+    const refresh = () => load()
+    window.addEventListener('adm-sequential-updated', refresh)
+    return () => window.removeEventListener('adm-sequential-updated', refresh)
+  }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
     if (run?.status !== 'RUNNING') return
     const timer = setInterval(() => load(true), 3000)
     return () => clearInterval(timer)
@@ -173,23 +178,30 @@ function SequentialExecutionPanel({ cycle }: { cycle: any }) {
 function ArchitectureImpactReview({ cycle }: { cycle: any }) {
   const [review, setReview] = useState<any>(null)
   const [editing, setEditing] = useState<string | null>(null)
-  const [proposal, setProposal] = useState('')
+  const [proposalData, setProposalData] = useState<any>(null)
+  const [technicalPayload, setTechnicalPayload] = useState('')
   const [busy, setBusy] = useState(false)
   const load = () => authFetch(`/adm-intelligence/cycles/${cycle.id}/architecture-impact`).then(setReview).catch(() => setReview(null))
   useEffect(() => { load() }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const inspect = async (outputId: string) => {
     const data = await authFetch(`/adm-intelligence/outputs/${outputId}/architecture-impact-proposal`)
-    setProposal(JSON.stringify(data.proposal, null, 2)); setEditing(outputId)
+    setProposalData(data); setTechnicalPayload(JSON.stringify(data.proposal, null, 2)); setEditing(outputId)
   }
   const apply = async () => {
     if (!editing) return
     let body: any
-    try { body = JSON.parse(proposal) } catch (_) { window.alert('The architecture proposal JSON is invalid.'); return }
+    try { body = JSON.parse(technicalPayload) } catch (_) { window.alert('The technical proposal payload is invalid.'); return }
     setBusy(true)
     try {
       const result = await authFetch(`/adm-intelligence/outputs/${editing}/architecture-impact/apply`, { method: 'POST', body: JSON.stringify(body) })
-      if (result?.status === 'REQUIRES_REVIEW') window.alert(result.message || 'Architecture integration requires review.')
-      setEditing(null); await load()
+      if (['REQUIRES_REVIEW', 'REVIEW_REQUIRED', 'PARTIALLY_APPLIED', 'FAILED'].includes(result?.status)) {
+        setProposalData((current: any) => ({ ...current, lifecycleStatus: result.status === 'REQUIRES_REVIEW' ? 'REVIEW_REQUIRED' : result.status, assessment: result }))
+        window.alert(result.reason || (result.status === 'PARTIALLY_APPLIED'
+          ? 'Architecture changes were only partially applied. Review the recorded activity before retrying.'
+          : 'Architecture integration requires review. Resolve the highlighted items before applying.'))
+      } else {
+        setEditing(null); setProposalData(null); await load()
+      }
     } finally { setBusy(false) }
   }
   const skip = async (outputId: string) => {
@@ -206,20 +218,76 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
     </div>
     {review.entries.map((entry: any) => <div key={entry.outputId} style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 10 }}>
       <div className="flex items-center justify-between" style={{ gap: 8 }}>
-        <div><strong>{entry.title}</strong> · {entry.architectureState} · <span style={{ color: entry.impactStatus === 'PENDING' ? '#f39c12' : '#2ecc71' }}>{entry.impactStatus}</span></div>
-        {entry.outputStatus === 'APPROVED' && entry.impactStatus === 'PENDING' && <div className="flex gap-2">
+        <div><strong>{entry.title}</strong> · {entry.architectureState} · <span style={{ color: entry.impactStatus === 'APPLIED' ? '#2ecc71' : entry.impactStatus === 'SKIPPED' ? '#64748B' : '#f39c12' }}>{String(entry.impactStatus).replace(/_/g, ' ')}</span></div>
+        {entry.outputStatus === 'APPROVED' && !['APPLIED', 'SKIPPED', 'REJECTED'].includes(entry.impactStatus) && <div className="flex gap-2">
           <button className="btn btn-primary btn-sm" onClick={() => inspect(entry.outputId)}>Review / Apply</button>
           <button className="btn btn-secondary btn-sm" onClick={() => skip(entry.outputId)}>Skip intentionally</button>
         </div>}
       </div>
       {entry.rationale && <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>Decision rationale: {entry.rationale}</div>}
       {entry.activities?.length > 0 && <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>{entry.activities.length} persisted Repository / Scenario / View activities</div>}
-      {editing === entry.outputId && <div style={{ marginTop: 8 }}>
-        <div style={{ color: 'var(--text-dim)', marginBottom: 5 }}>Review the explicit Current/Target asset, relationship and View actions. Target actions may be changed to INTRODUCE, UPDATE, REMOVE or RESTORE before publishing.</div>
-        <textarea className="form-input" rows={12} value={proposal} onChange={event => setProposal(event.target.value)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10 }} />
+      {editing === entry.outputId && proposalData && <div style={{ marginTop: 8, padding: 10, border: '1px solid var(--border)', borderRadius: 5 }}>
+        <div className="flex items-center justify-between" style={{ gap: 8, flexWrap: 'wrap' }}>
+          <div><strong>{proposalData.outputName || entry.title}</strong> · {proposalData.architectureState} · {(proposalData.affectedDomains || []).join(', ') || 'Cross-domain'}</div>
+          <span style={{ color: proposalData.lifecycleStatus === 'READY_TO_APPLY' ? '#2ecc71' : '#f39c12', fontWeight: 700 }}>{String(proposalData.lifecycleStatus || 'PENDING').replace(/_/g, ' ')}</span>
+        </div>
+        {proposalData.scenario?.name && <div style={{ color: 'var(--text-dim)', marginTop: 4 }}>Scenario: {proposalData.scenario.name}</div>}
+        <ImpactAssessmentGroups assessment={proposalData.assessment} />
+        {proposalData.warnings?.map((warning: string, index: number) => <div key={index} style={{ color: '#f39c12', marginTop: 6 }}>⚠ {warning}</div>)}
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ cursor: 'pointer', color: 'var(--text-dim)' }}>Technical proposal details</summary>
+          <textarea aria-label="Technical proposal details" className="form-input" rows={12} value={technicalPayload} onChange={event => setTechnicalPayload(event.target.value)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, marginTop: 7 }} />
+        </details>
         <div className="flex gap-2 mt-2"><button className="btn btn-primary btn-sm" disabled={busy} onClick={apply}>Apply Architecture Changes</button><button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}>Cancel</button></div>
       </div>}
     </div>)}
+  </div>
+}
+
+function ImpactAssessmentGroups({ assessment }: { assessment: any }) {
+  if (!assessment) return null
+  const assets = assessment.assets || []
+  const groups = [
+    ['Matched Existing', assets.filter((item: any) => item.status === 'MATCH_EXISTING')],
+    ['New', assets.filter((item: any) => ['CREATE', 'INTRODUCE'].includes(item.status))],
+    ['Updated', assets.filter((item: any) => item.status === 'UPDATE')],
+    ['Removed', assets.filter((item: any) => item.status === 'REMOVE')],
+    ['Restored', assets.filter((item: any) => item.status === 'RESTORE')],
+    ['Conflicts / Review Required', assets.filter((item: any) => ['CONFLICT', 'REQUIRES_REVIEW'].includes(item.status))],
+  ] as Array<[string, any[]]>
+  const relationships = assessment.relationships || []
+  return <div style={{ marginTop: 9 }}>
+    {groups.filter(([, items]) => items.length).map(([label, items]) => <div key={label} style={{ marginTop: 7, padding: 8, background: 'rgba(3,105,161,.05)', borderRadius: 4 }}>
+      <strong>{label}</strong>
+      {items.map((item: any, index: number) => <div key={`${item.key}-${index}`} style={{ marginTop: 4, color: 'var(--text-dim)' }}>
+        {item.name || item.key} {(item.objectTypeLabel || item.objectType) ? `(${item.objectTypeLabel || item.objectType})` : ''}
+        {item.reason && <> — {item.reason}</>}
+        {item.conflicts?.length > 0 && <> — {item.conflicts.join('; ')}</>}
+        {item.status === 'UPDATE' && item.before && <ImpactChangeRows before={item.before} after={item.after} />}
+      </div>)}
+    </div>)}
+    {relationships.length > 0 && <div style={{ marginTop: 7, padding: 8, background: 'rgba(3,105,161,.05)', borderRadius: 4 }}>
+      <strong>Relationships</strong>
+      {relationships.map((item: any, index: number) => <div key={`${item.key}-${index}`} style={{ marginTop: 4, color: 'var(--text-dim)' }}>
+        {item.source || item.sourceKey || 'Source'} → {item.relationshipType || 'Relationship'} → {item.target || item.targetKey || 'Target'} · {String(item.status).replace(/_/g, ' ')}
+        {item.reason && <> — {item.reason}</>}
+      </div>)}
+    </div>}
+    {assessment.view && <div style={{ marginTop: 7, padding: 8, background: 'rgba(3,105,161,.05)', borderRadius: 4 }}>
+      <strong>EA Views</strong>
+      <div style={{ marginTop: 4, color: 'var(--text-dim)' }}>{assessment.view.name || assessment.view.viewpoint} · {assessment.view.architectureState || ''} · {String(assessment.view.status).replace(/_/g, ' ')}</div>
+    </div>}
+  </div>
+}
+
+function ImpactChangeRows({ before, after }: { before: any; after: any }) {
+  const beforeValues = { name: before?.name, description: before?.description, owner: before?.owner, ...(before?.attributes || {}) }
+  const afterValues = { name: after?.name, description: after?.description, owner: after?.owner, ...(after?.attributes || {}) }
+  const changed = [...new Set([...Object.keys(beforeValues), ...Object.keys(afterValues)])]
+    .filter(key => JSON.stringify(beforeValues[key]) !== JSON.stringify(afterValues[key]))
+  const display = (value: any) => value == null || value === '' ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)
+  return <div style={{ margin: '4px 0 0 10px' }}>
+    {changed.map(key => <div key={key}><strong>{key.replace(/_/g, ' ')}:</strong> {display(beforeValues[key])} → {display(afterValues[key])}</div>)}
   </div>
 }
 
@@ -1213,9 +1281,8 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
   const approveOutput = async (outputId: string) => {
     const result = await api.put(`/adm-intelligence/outputs/${outputId}`, { status: 'APPROVED' })
     setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
-    // If this cycle is running sequentially, approval releases the persisted
-    // pause and advances to the next eligible frozen-NORA output.
-    api.post(`/adm-intelligence/cycles/${cycle.id}/sequential/advance`).catch(() => {})
+    // The approval endpoint authoritatively advances an active sequential run.
+    window.dispatchEvent(new Event('adm-sequential-updated'))
     // Re-fetch inputs so next step gets auto-populated immediately
     setTimeout(async () => {
       try {

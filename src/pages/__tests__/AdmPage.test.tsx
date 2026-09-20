@@ -153,7 +153,23 @@ describe('AdmPage - sequential execution and Architecture Impact Review', () => 
   it('warns about pending architecture impact and opens an explicit controlled proposal', async () => {
     mockFetch({
       '/adm/cycles': [SAMPLE_CYCLE],
-      '/architecture-impact-proposal': { proposal: { assets: [], relationships: [], view: { behavior: 'CREATE_OR_REFRESH' } } },
+      '/architecture-impact-proposal': {
+        outputName: 'Application Inventory', architectureState: 'CURRENT', affectedDomains: ['APPLICATIONS'], lifecycleStatus: 'REVIEW_REQUIRED',
+        proposal: { assets: [{ key: '1HRDF', action: 'RECONCILE' }], relationships: [], view: { behavior: 'CREATE_OR_REFRESH' } },
+        assessment: {
+          status: 'REVIEW_REQUIRED',
+          assets: [
+            { key: '1HRDF', name: '1HRDF', objectType: 'Application', status: 'MATCH_EXISTING' },
+            { key: 'new-app', name: 'New App', objectType: 'Application', status: 'INTRODUCE' },
+            { key: 'changed-app', name: 'Changed App', objectType: 'Application', status: 'UPDATE', before: { owner: 'A' }, after: { owner: 'B' } },
+            { key: 'old-app', name: 'Old App', objectType: 'Application', status: 'REMOVE' },
+            { key: 'restored-app', name: 'Restored App', objectType: 'Application', status: 'RESTORE' },
+            { key: 'ambiguous-app', name: 'Ambiguous App', objectType: 'Application', status: 'CONFLICT', conflicts: ['Two matching Repository identities require a user decision.'] },
+          ],
+          relationships: [{ key: 'rel-1', source: '1HRDF', target: 'New App', relationshipType: 'supports', status: 'ADD' }],
+          view: { status: 'CREATE', name: 'Application Inventory', viewpoint: 'application_inventory', architectureState: 'CURRENT' },
+        },
+      },
       '/architecture-impact': {
         pendingCount: 1, completion: { allowed: false, warning: '1 approved architecture-state output(s) still require Architecture Impact Review.' },
         entries: [{ outputId: 'o1', title: 'Application Inventory', phase: '2', outputStatus: 'APPROVED', architectureState: 'CURRENT', impactStatus: 'PENDING', activities: [] }],
@@ -163,7 +179,18 @@ describe('AdmPage - sequential execution and Architecture Impact Review', () => 
     expect(await screen.findByText('Architecture Impact Review')).toBeInTheDocument();
     expect(screen.getByText(/still require Architecture Impact Review/)).toBeInTheDocument();
     fireEvent.click(screen.getByText('Review / Apply'));
-    expect(await screen.findByDisplayValue(/CREATE_OR_REFRESH/)).toBeInTheDocument();
+    expect(await screen.findByText('Matched Existing')).toBeInTheDocument();
+    expect(screen.getByText('New')).toBeInTheDocument();
+    expect(screen.getByText('Updated')).toBeInTheDocument();
+    expect(screen.getByText('Removed')).toBeInTheDocument();
+    expect(screen.getByText('Restored')).toBeInTheDocument();
+    expect(screen.getByText('Conflicts / Review Required')).toBeInTheDocument();
+    expect(screen.getByText('Relationships')).toBeInTheDocument();
+    expect(screen.getByText(/1HRDF → supports → New App · ADD/)).toBeInTheDocument();
+    expect(screen.getByText('EA Views')).toBeInTheDocument();
+    expect(screen.getByText('REVIEW REQUIRED')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Technical proposal details'));
+    expect((await screen.findByLabelText('Technical proposal details') as HTMLTextAreaElement).value).toContain('CREATE_OR_REFRESH');
     expect(screen.getByText('Apply Architecture Changes')).toBeInTheDocument();
   });
 });
@@ -230,7 +257,7 @@ describe('AdmPage - Repository-first evidence and persisted Architecture Impact'
     }]));
     await openPhaseOne();
     fireEvent.click(screen.getByText('EA Cycle Charter'));
-    expect(await screen.findByText('✓ Architecture Impact')).toBeInTheDocument();
+    expect(await screen.findByText('Architecture Impact Activity')).toBeInTheDocument();
     expect(screen.getByText('1HRDF')).toBeInTheDocument();
     expect(screen.queryByText('asset-1')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('1HRDF'));
