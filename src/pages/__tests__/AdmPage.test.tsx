@@ -148,6 +148,40 @@ describe('AdmPage - sequential execution and Architecture Impact Review', () => 
     fireEvent.click(screen.getByText('▶ Run Sequentially'));
     await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some((call: any) => call[0].includes('/sequential/start') && call[1]?.method === 'POST')).toBe(true));
     expect(screen.getByText(/Manual mode remains available/)).toBeInTheDocument();
+    expect(screen.getByText(/automatically advances generated outputs/)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['RUNNING', 'Running'],
+    ['WAITING_INPUT', 'Waiting for Input'],
+    ['REVIEW_REQUIRED', 'Review Required'],
+    ['WAITING_FOR_ARCHITECTURE_APPROVAL', 'Architecture Approval Required'],
+  ])('shows a human-readable %s pause/running reason', async (status, label) => {
+    mockFetch({
+      '/adm/cycles': [SAMPLE_CYCLE],
+      '/sequential': {
+        id: 'run-1', status, currentPhase: '2', currentStep: '2.3',
+        completedOutputIds: ['o1'], remainingOutputIds: ['o2'],
+        waitingReason: status === 'RUNNING' ? null : `${label} — Application Inventory`,
+      },
+    });
+    render(<AdmPage />);
+    expect(await screen.findByText(label)).toBeInTheDocument();
+    expect(screen.getByText(/Phase 2 · Step 2.3/)).toBeInTheDocument();
+  });
+
+  it('does not offer a generic Resume action at an architecture publication gate', async () => {
+    mockFetch({
+      '/adm/cycles': [SAMPLE_CYCLE],
+      '/sequential': {
+        id: 'run-1', status: 'WAITING_FOR_ARCHITECTURE_APPROVAL', currentPhase: '2', currentStep: '2.3',
+        completedOutputIds: [], remainingOutputIds: ['o1'], waitingReason: 'Architecture Approval Required — Current Repository impact.',
+      },
+    });
+    render(<AdmPage />);
+    expect(await screen.findByText('Architecture Approval Required')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument();
+    expect(screen.getByText(/Current Repository impact/)).toBeInTheDocument();
   });
 
   it('warns about pending architecture impact and opens an explicit controlled proposal', async () => {
@@ -192,6 +226,10 @@ describe('AdmPage - sequential execution and Architecture Impact Review', () => 
     fireEvent.click(screen.getByText('Technical proposal details'));
     expect((await screen.findByLabelText('Technical proposal details') as HTMLTextAreaElement).value).toContain('CREATE_OR_REFRESH');
     expect(screen.getByText('Apply Architecture Changes')).toBeInTheDocument();
+    const dispatchSpy = jest.spyOn(window, 'dispatchEvent');
+    fireEvent.click(screen.getByText('Apply Architecture Changes'));
+    await waitFor(() => expect(dispatchSpy.mock.calls.some(([event]) => event.type === 'adm-sequential-updated')).toBe(true));
+    dispatchSpy.mockRestore();
   });
 });
 
