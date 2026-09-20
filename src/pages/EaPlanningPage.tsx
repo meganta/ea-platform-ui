@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import HelpTip from '../components/HelpTip'
+import { useLang } from '../contexts/LangContext'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -40,7 +41,8 @@ const PRIORITY_COLOR: Record<string, string> = { HIGH: '#e74c3c', MEDIUM: '#f39c
 
 export default function EaPlanningPage() {
   const api = useApi()
-  const [tab, setTab] = useState<'dashboard'|'plans'>('dashboard')
+  const { t } = useLang()
+  const [tab, setTab] = useState<'dashboard'|'plans'|'roadmap'>('dashboard')
   const [dashboard, setDashboard] = useState<any>(null)
   const [planTypes, setPlanTypes] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
@@ -67,11 +69,91 @@ export default function EaPlanningPage() {
       <div style={S.tabs}>
         <button style={S.tab(tab === 'dashboard')} onClick={() => setTab('dashboard')}>📊 Dashboard</button>
         <button style={S.tab(tab === 'plans')} onClick={() => setTab('plans')}>📋 All Plans</button>
+        <button style={S.tab(tab === 'roadmap')} onClick={() => setTab('roadmap')}>{t('planning.tab_roadmap')}</button>
       </div>
       <div style={S.content}>
         {tab === 'dashboard' && <DashboardTab dashboard={dashboard} onOpenPlans={() => setTab('plans')} />}
         {tab === 'plans' && <PlansListTab api={api} onOpen={openPlan} />}
+        {tab === 'roadmap' && <RoadmapTab api={api} t={t} />}
       </div>
+    </div>
+  )
+}
+
+// ── Roadmap ──────────────────────────────────────────────────────────────────
+function RoadmapTab({ api, t }: { api: any, t: (k: string) => string }) {
+  const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [domain, setDomain] = useState('')
+
+  const load = useCallback(() => {
+    setLoading(true)
+    const q = domain ? `?domain=${encodeURIComponent(domain)}` : ''
+    api.get(`/ea-planning/roadmap${q}`).then((d: any) => setItems(Array.isArray(d?.items) ? d.items : [])).finally(() => setLoading(false))
+  }, [api, domain])
+  useEffect(() => { load() }, [load])
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>{t('planning.roadmap_filter_domain')}<HelpTip text={t('planning.roadmap_help')} /></div>
+        <select style={{ ...S.input, width: 200, marginBottom: 0 }} value={domain} onChange={e => setDomain(e.target.value)}>
+          <option value="">All</option>
+          {DOMAINS.map(d => <option key={d} value={d}>{d.replace('_', ' ')}</option>)}
+        </select>
+      </div>
+      {loading ? (
+        <div style={{ color: 'var(--text-dim)' }}>Loading…</div>
+      ) : items.length === 0 ? (
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('planning.roadmap_empty')}</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {items.map((item: any, i: number) => (
+            <div key={i} style={{ ...S.card, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={S.badge(item.itemType === 'activity' ? '#00b4d8' : '#9b59b6')}>{item.itemType === 'activity' ? t('repository.roadmap_activity') : t('repository.roadmap_deliverable')}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{item.name}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{item.assetName} ({item.assetType}) · {item.planName}</div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'right' as const }}>
+                {item.periodLabel || '—'}
+                {item.periodStart && <div>{new Date(item.periodStart).toLocaleDateString()} → {item.periodEnd ? new Date(item.periodEnd).toLocaleDateString() : '?'}</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Asset picker (used to link a plan activity/deliverable to a real EA asset)
+function AssetPicker({ api, t, onPick, onCancel }: { api: any, t: (k: string) => string, onPick: (asset: any) => void, onCancel: () => void }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<any[]>([])
+  useEffect(() => {
+    if (!query.trim()) { setResults([]); return }
+    const handle = setTimeout(() => {
+      api.get(`/ea-repository/assets?search=${encodeURIComponent(query)}`).then((r: any) => setResults(Array.isArray(r) ? r.slice(0, 8) : [])).catch(() => setResults([]))
+    }, 250)
+    return () => clearTimeout(handle)
+  }, [api, query])
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <input autoFocus style={{ ...S.input, marginBottom: 0, width: 240 }} placeholder={t('planning.search_asset')} value={query} onChange={e => setQuery(e.target.value)} onBlur={() => setTimeout(onCancel, 150)} />
+      {query.trim() && (
+        <div style={{ position: 'absolute', top: '100%', left: 0, zIndex: 10, width: 280, background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, marginTop: 4, maxHeight: 220, overflow: 'auto' }}>
+          {results.length === 0 ? (
+            <div style={{ padding: 10, fontSize: 12, color: 'var(--text-dim)' }}>{t('planning.no_asset_results')}</div>
+          ) : results.map(a => (
+            <div key={a.id} style={{ padding: '8px 10px', fontSize: 12, cursor: 'pointer', borderBottom: '1px solid var(--border)' }} onMouseDown={() => onPick(a)}>
+              <div style={{ fontWeight: 600 }}>{a.name}</div>
+              <div style={{ color: 'var(--text-dim)', fontSize: 10 }}>{a.canonicalDisplayLabel || a.assetType}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -249,11 +331,55 @@ function NewPlanWizard({ api, planTypes, onCreated, onCancel }: { api: any, plan
   )
 }
 
+// ── Asset link control (shown inline on an activity/deliverable row in
+// view mode - linking targets the persisted item by its stable id, so
+// this deliberately isn't shown on unsaved edit-mode drafts) ────────────
+function AssetLinkControl({ item, isPicking, onStartPick, onPick, onCancelPick, onUnlink, api, t }: {
+  item: any, field: string, isPicking: boolean,
+  onStartPick: () => void, onPick: (asset: any) => void, onCancelPick: () => void, onUnlink: () => void,
+  api: any, t: (k: string) => string,
+}) {
+  if (isPicking) return <AssetPicker api={api} t={t} onPick={onPick} onCancel={onCancelPick} />
+  if (item.assetId) {
+    return (
+      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10 }}>
+        <span style={{ padding: '1px 8px', borderRadius: 2, background: 'rgba(3,105,161,0.1)', color: 'var(--accent)' }} title={`${t('planning.linked_to')}: ${item.assetName}`}>🔗 {item.assetName}</span>
+        <button style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', fontSize: 10 }} onClick={onUnlink}>{t('planning.unlink')}</button>
+      </span>
+    )
+  }
+  return <button style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 10, whiteSpace: 'nowrap' as const }} onClick={onStartPick}>{t('planning.link_asset')}</button>
+}
+
 // ── Plan Detail ──────────────────────────────────────────────────────────────
 function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onBack: () => void, onRefresh: () => void }) {
+  const { t } = useLang()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<any>({ ...plan })
   const [saving, setSaving] = useState(false)
+  const [scenarios, setScenarios] = useState<any[]>([])
+  const [scenarioPick, setScenarioPick] = useState('')
+  const [pickingAssetFor, setPickingAssetFor] = useState<{ field: 'activities' | 'deliverables', itemId: string } | null>(null)
+
+  useEffect(() => { api.get('/ea-views/scenarios').then((s: any) => setScenarios(Array.isArray(s) ? s : [])).catch(() => setScenarios([])) }, [api])
+  const linkedScenario = scenarios.find(s => s.id === plan.scenarioId)
+
+  const linkScenario = async () => {
+    if (!scenarioPick) return
+    await api.patch(`/ea-planning/plans/${plan.id}/scenario`, { scenarioId: scenarioPick })
+    setScenarioPick(''); onRefresh()
+  }
+  const unlinkScenario = async () => { await api.del(`/ea-planning/plans/${plan.id}/scenario`); onRefresh() }
+
+  const linkItemAsset = async (field: 'activities' | 'deliverables', itemId: string, asset: any) => {
+    setPickingAssetFor(null)
+    await api.patch(`/ea-planning/plans/${plan.id}/${field}/${itemId}/asset`, { assetId: asset.id })
+    onRefresh()
+  }
+  const unlinkItemAsset = async (field: 'activities' | 'deliverables', itemId: string) => {
+    await api.del(`/ea-planning/plans/${plan.id}/${field}/${itemId}/asset`)
+    onRefresh()
+  }
 
   const save = async () => {
     setSaving(true)
@@ -281,7 +407,11 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
     setForm((f: any) => ({ ...f, [field]: (f[field] || []).map((item: any, i: number) => i === idx ? { ...item, ...patch } : item) }))
   }
   const addListItem = (field: 'activities'|'deliverables'|'kpis'|'risks', blank: any) => {
-    setForm((f: any) => ({ ...f, [field]: [...(f[field] || []), blank] }))
+    // Every activity/deliverable needs a stable id for asset linking
+    // (PATCH /ea-planning/plans/:id/activities/:itemId/asset) - AI-generated
+    // items already carry one (see the generation prompt), but a manually
+    // added item previously had none.
+    setForm((f: any) => ({ ...f, [field]: [...(f[field] || []), { id: `${field[0].toUpperCase()}${Date.now()}`, ...blank }] }))
   }
   const removeListItem = (field: 'activities'|'deliverables'|'kpis'|'risks', idx: number) => {
     setForm((f: any) => ({ ...f, [field]: (f[field] || []).filter((_: any, i: number) => i !== idx) }))
@@ -333,6 +463,25 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
         </div>
 
         <div style={S.card}>
+          <div style={{ ...S.label, display: 'flex', alignItems: 'center' }}>{t('planning.scenario_title')}<HelpTip text={t('planning.scenario_help')} /></div>
+          {linkedScenario ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13 }}>{linkedScenario.name}</span>
+              <button style={{ ...S.btn(), fontSize: 11 }} onClick={unlinkScenario}>{t('planning.scenario_unlink')}</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <select aria-label="scenario-select" style={{ ...S.input, marginBottom: 0, width: 260 }} value={scenarioPick} onChange={e => setScenarioPick(e.target.value)}>
+                <option value="">{t('planning.scenario_select')}</option>
+                {scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+              <button style={{ ...S.btn('primary'), fontSize: 11 }} onClick={linkScenario} disabled={!scenarioPick}>{t('planning.scenario_link')}</button>
+            </div>
+          )}
+          {scenarios.length === 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>{t('planning.scenario_none')}</div>}
+        </div>
+
+        <div style={S.card}>
           <div style={S.label}>Objectives</div>
           {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.objectives || ''} onChange={e => setForm((f: any) => ({ ...f, objectives: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.objectives || 'Not defined.'}</div>}
         </div>
@@ -353,6 +502,12 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
               </> : <>
                 <span style={S.badge(PRIORITY_COLOR[a.priority] || '#7f8c8d')}>{a.priority || 'MEDIUM'}</span>
                 <div style={{ flex: 1 }}>{a.name}{a.timeframe ? ` (${a.timeframe})` : ''}{a.description ? ` — ${a.description}` : ''}</div>
+                <AssetLinkControl item={a} field="activities" isPicking={pickingAssetFor?.field === 'activities' && pickingAssetFor?.itemId === a.id}
+                  onStartPick={() => setPickingAssetFor({ field: 'activities', itemId: a.id })}
+                  onPick={(asset) => linkItemAsset('activities', a.id, asset)}
+                  onCancelPick={() => setPickingAssetFor(null)}
+                  onUnlink={() => unlinkItemAsset('activities', a.id)}
+                  api={api} t={t} />
               </>}
             </div>
           ))}
@@ -368,7 +523,15 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
                 <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={d.name || ''} onChange={e => updateListItem('deliverables', i, { name: e.target.value })} placeholder="Deliverable name" />
                 <input style={{ ...S.input, marginBottom: 0, width: 120 }} value={d.dueTimeframe || ''} onChange={e => updateListItem('deliverables', i, { dueTimeframe: e.target.value })} placeholder="Due" />
                 <button style={{ ...S.btn('danger'), fontSize: 10, padding: '4px 8px' }} onClick={() => removeListItem('deliverables', i)}>✕</button>
-              </> : <div style={{ flex: 1 }}>{d.name} {d.type ? `— ${d.type}` : ''}{d.dueTimeframe ? `, due ${d.dueTimeframe}` : ''}</div>}
+              </> : <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ flex: 1 }}>{d.name} {d.type ? `— ${d.type}` : ''}{d.dueTimeframe ? `, due ${d.dueTimeframe}` : ''}</span>
+                <AssetLinkControl item={d} field="deliverables" isPicking={pickingAssetFor?.field === 'deliverables' && pickingAssetFor?.itemId === d.id}
+                  onStartPick={() => setPickingAssetFor({ field: 'deliverables', itemId: d.id })}
+                  onPick={(asset) => linkItemAsset('deliverables', d.id, asset)}
+                  onCancelPick={() => setPickingAssetFor(null)}
+                  onUnlink={() => unlinkItemAsset('deliverables', d.id)}
+                  api={api} t={t} />
+              </div>}
             </div>
           ))}
           {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('deliverables', { name: '' })}>+ Add Deliverable</button>}

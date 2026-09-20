@@ -20,6 +20,13 @@ const SOURCE_COLORS: Record<string, string> = {
   INTEGRATION: 'badge-ai-draft',
 }
 
+const FINDING_SEVERITY_COLORS: Record<string, string> = {
+  CRITICAL: '#dc2626',
+  HIGH: '#e74c3c',
+  MEDIUM: '#f39c12',
+  LOW: '#2ecc71',
+}
+
 // Demo/display heuristic, not a true foreign-key trace: EaAsset has no
 // direct connectorId field (only source/sourceRef - the real link to a
 // specific sync run lives in SyncStagingRecord.matchedAssetId, which
@@ -228,6 +235,15 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
   const navigate = useNavigate()
   const [asset, setAsset] = useState(initialAsset)
   const [attachments, setAttachments] = useState(initialAsset.attachments || [])
+  // Governance findings and roadmap items that reference this asset -
+  // both read via the real join services added on the backend
+  // (GovernanceFindingsAssetLinkService / EAPlanningService.getRoadmapForAsset),
+  // not fabricated here. Loaded alongside the asset refetch below so a
+  // slow/failed lookup never blocks the rest of the panel from rendering.
+  const [findings, setFindings] = useState<any[]>([])
+  const [findingsLoading, setFindingsLoading] = useState(true)
+  const [roadmapItems, setRoadmapItems] = useState<any[]>([])
+  const [roadmapLoading, setRoadmapLoading] = useState(true)
 
   // Fetch fresh data on mount to get latest attachments
   useEffect(() => {
@@ -235,6 +251,14 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
       setAsset(fresh)
       setAttachments(fresh.attachments || [])
     }).catch(() => {})
+    api.get(`/governance/findings/by-asset/${initialAsset.id}`)
+      .then((r: any) => setFindings(Array.isArray(r?.findings) ? r.findings : []))
+      .catch(() => setFindings([]))
+      .finally(() => setFindingsLoading(false))
+    api.get(`/ea-planning/roadmap/by-asset/${initialAsset.id}`)
+      .then((r: any) => setRoadmapItems(Array.isArray(r?.items) ? r.items : []))
+      .catch(() => setRoadmapItems([]))
+      .finally(() => setRoadmapLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAsset.id])
   const [uploading, setUploading] = useState(false)
@@ -327,6 +351,57 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
                 <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{rel.direction === 'OUTGOING' ? '→' : '←'}</span>
                 <span style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>{rel.displayLabel}</span>
                 <span>{rel.relatedAsset?.canonicalDisplayLabel ? `${rel.relatedAsset.name} (${rel.relatedAsset.canonicalDisplayLabel})` : rel.relatedAsset?.name}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Governance findings referencing this asset - via the real
+            ReviewFinding -> ReviewFindingEvidence -> ReviewEvidence
+            (TENANT_REPOSITORY) chain (GovernanceFindingsAssetLinkService).
+            Loading state shown briefly rather than nothing, and the
+            section stays hidden once loaded if there's genuinely
+            nothing to show - an asset with zero findings is the normal
+            case, not an error state worth a permanent empty-state box. */}
+        {findingsLoading ? (
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{t('repository.findings_loading')}</div>
+        ) : findings.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+              🏛 {t('repository.findings_title')} ({findings.length})
+              <HelpTip text={t('repository.findings_help')} />
+            </div>
+            {findings.map((f: any) => (
+              <div key={f.id} style={{ fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ padding: '1px 8px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', background: FINDING_SEVERITY_COLORS[f.severity] ? `${FINDING_SEVERITY_COLORS[f.severity]}22` : 'rgba(100,116,139,0.1)', color: FINDING_SEVERITY_COLORS[f.severity] || 'var(--text-dim)' }}>{f.severity || '—'}</span>
+                  <span style={{ flex: 1 }}>{f.title}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{f.status}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Roadmap items linked to this asset - via
+            EAPlanningService.getRoadmapForAsset(), the real assetId
+            link on plan activities/deliverables (never AI-guessed - see
+            that service's own doc comment). */}
+        {roadmapLoading ? (
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{t('repository.roadmap_loading')}</div>
+        ) : roadmapItems.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, display: 'flex', alignItems: 'center' }}>
+              🗓 {t('repository.roadmap_title')} ({roadmapItems.length})
+              <HelpTip text={t('repository.roadmap_help')} />
+            </div>
+            {roadmapItems.map((item: any, i: number) => (
+              <div key={i} style={{ fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ padding: '1px 8px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', background: 'rgba(3,105,161,0.1)', color: 'var(--accent)' }}>{item.itemType === 'activity' ? t('repository.roadmap_activity') : t('repository.roadmap_deliverable')}</span>
+                  <span style={{ flex: 1 }}>{item.name}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.planName}{item.periodLabel ? ` · ${item.periodLabel}` : ''}</span>
+                </div>
               </div>
             ))}
           </div>

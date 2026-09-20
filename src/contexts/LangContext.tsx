@@ -911,6 +911,33 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'users.confirm_deactivate': { EN: 'Deactivate this user?', AR: 'إلغاء تفعيل هذا المستخدم؟' },
   'users.confirm_cancel_invite': { EN: 'Cancel this invitation?', AR: 'إلغاء هذه الدعوة؟' },
   'users.help': { EN: 'Manage users in your tenant. Invite new users by email, or create them directly. Deactivate users who no longer need access.', AR: 'إدارة المستخدمين في المستأجر. قم بدعوة مستخدمين جدد عبر البريد الإلكتروني أو إنشاؤهم مباشرة. قم بإلغاء تفعيل المستخدمين الذين لم يعودوا بحاجة للوصول.' },
+
+  // Repository - asset detail: Governance Findings and Roadmap panels
+  'repository.findings_loading':    { EN: 'Checking governance findings…', AR: 'جارٍ التحقق من نتائج الحوكمة…' },
+  'repository.findings_title':      { EN: 'Governance Findings', AR: 'نتائج الحوكمة' },
+  'repository.findings_help':       { EN: 'Governance review findings that reference this asset as evidence.', AR: 'نتائج مراجعات الحوكمة التي تشير إلى هذا الأصل كدليل.' },
+  'repository.roadmap_loading':     { EN: 'Checking roadmap…', AR: 'جارٍ التحقق من خارطة الطريق…' },
+  'repository.roadmap_title':       { EN: 'Roadmap', AR: 'خارطة الطريق' },
+  'repository.roadmap_help':        { EN: 'EA Plan activities and deliverables linked to this asset.', AR: 'أنشطة ومخرجات خطط البنية المؤسسية المرتبطة بهذا الأصل.' },
+  'repository.roadmap_activity':    { EN: 'Activity', AR: 'نشاط' },
+  'repository.roadmap_deliverable': { EN: 'Deliverable', AR: 'مخرج' },
+
+  // EA Planning - Roadmap tab and asset/scenario linking
+  'planning.tab_roadmap':      { EN: '🗺 Roadmap', AR: '🗺 خارطة الطريق' },
+  'planning.roadmap_help':     { EN: 'Every plan activity or deliverable linked to a real EA asset, across all plans, in one timeline. Items not yet linked to an asset are not shown here - link them from a plan\'s detail view.', AR: 'كل نشاط أو مخرج من خطط البنية المؤسسية مرتبط بأصل حقيقي، عبر جميع الخطط، في جدول زمني واحد. العناصر غير المرتبطة بأصل بعد لا تظهر هنا - قم بربطها من صفحة تفاصيل الخطة.' },
+  'planning.roadmap_empty':    { EN: 'No roadmap items yet. Link an activity or deliverable to an EA asset from a plan\'s detail view to see it here.', AR: 'لا توجد عناصر في خارطة الطريق بعد. قم بربط نشاط أو مخرج بأصل من البنية المؤسسية من صفحة تفاصيل الخطة لرؤيته هنا.' },
+  'planning.roadmap_filter_domain': { EN: 'Filter by domain', AR: 'تصفية حسب المجال' },
+  'planning.link_asset':       { EN: '🔗 Link Asset', AR: '🔗 ربط أصل' },
+  'planning.linked_to':        { EN: 'Linked to', AR: 'مرتبط بـ' },
+  'planning.unlink':           { EN: 'Unlink', AR: 'إلغاء الربط' },
+  'planning.search_asset':     { EN: 'Search EA assets by name…', AR: 'ابحث عن أصول البنية المؤسسية بالاسم…' },
+  'planning.no_asset_results': { EN: 'No matching assets found.', AR: 'لم يتم العثور على أصول مطابقة.' },
+  'planning.scenario_title':   { EN: 'Target Architecture Scenario', AR: 'سيناريو البنية المستهدفة' },
+  'planning.scenario_help':    { EN: 'Link this plan to the Architecture Scenario representing the target state its activities work toward. Optional - a plan can exist without one.', AR: 'اربط هذه الخطة بسيناريو العمارة الذي يمثل الحالة المستهدفة التي تعمل أنشطتها على تحقيقها. اختياري - يمكن أن توجد الخطة بدونه.' },
+  'planning.scenario_none':    { EN: 'No scenario linked', AR: 'لا يوجد سيناريو مرتبط' },
+  'planning.scenario_select':  { EN: 'Select a scenario…', AR: 'اختر سيناريو…' },
+  'planning.scenario_link':    { EN: 'Link', AR: 'ربط' },
+  'planning.scenario_unlink':  { EN: 'Unlink Scenario', AR: 'إلغاء ربط السيناريو' },
 }
 
 // ── Missing key log (dev only) ───────────────────────────────────────────────
