@@ -231,6 +231,52 @@ describe('AdmPage - sequential execution and Architecture Impact Review', () => 
     await waitFor(() => expect(dispatchSpy.mock.calls.some(([event]) => event.type === 'adm-sequential-updated')).toBe(true));
     dispatchSpy.mockRestore();
   });
+
+  it('exposes actionable semantic relationship resolution, safe bulk exclusion, and read-only reassessment', async () => {
+    const blocker = (key: string, target: string) => ({
+      key, status: 'REQUIRES_REVIEW', requestedRelationship: 'Project involves Capability',
+      source: { id: 'project-1', name: 'Project A', objectType: 'TechProject', objectTypeLabel: 'Technology Project', semanticType: 'Project' },
+      target: { id: target, name: 'Capability A', objectType: 'GovCapability', objectTypeLabel: 'Government Capability', semanticType: 'BusinessCapability' },
+      reason: 'Relationship is invalid for these endpoint types or direction.',
+      resolutionGroupKey: 'project:capability:project-involves-capability',
+      resolutions: [{ kind: 'EXCLUDE', label: 'Exclude Proposed Relationship' }],
+    });
+    const proposal = { assets: [], relationships: [
+      { key: 'rel-1', sourceAssetId: 'project-1', targetAssetId: 'cap-1', relationshipType: 'Project involves Capability' },
+      { key: 'rel-2', sourceAssetId: 'project-1', targetAssetId: 'cap-2', relationshipType: 'Project involves Capability' },
+    ], view: { behavior: 'CREATE_OR_REFRESH' } };
+    mockFetch({
+      '/adm/cycles': [SAMPLE_CYCLE],
+      '/architecture-impact/reassess': (options: any) => ({
+        lifecycleStatus: 'READY_TO_APPLY', proposal: JSON.parse(options.body),
+        assessment: { status: 'READY_TO_APPLY', assets: [], relationships: JSON.parse(options.body).relationships.map((item: any) => ({ key: item.key, status: 'NO_CHANGE' })) },
+      }),
+      '/architecture-impact-proposal': {
+        outputName: 'Business Capability Map', architectureState: 'CURRENT', lifecycleStatus: 'REVIEW_REQUIRED',
+        evidenceContext: { assets: 40, relationships: 80, proposedAsChanges: false },
+        proposal,
+        assessment: { status: 'REVIEW_REQUIRED', assets: [], relationships: [blocker('rel-1', 'cap-1'), blocker('rel-2', 'cap-2')] },
+      },
+      '/architecture-impact': {
+        pendingCount: 1, completion: { allowed: false, warning: 'Review required.' },
+        entries: [{ outputId: 'o1', title: 'Business Capability Map', outputStatus: 'APPROVED', architectureState: 'CURRENT', impactStatus: 'REVIEW_REQUIRED', activities: [] }],
+      },
+    });
+    render(<AdmPage />);
+    fireEvent.click(await screen.findByText('Review / Apply'));
+    expect(await screen.findByText(/40 assets and 80 relationships used as context; not proposed as changes/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Technology Project \(Project\) · Target: Government Capability \(BusinessCapability\)/)).toHaveLength(2);
+    fireEvent.click(screen.getByText('Exclude all 2 equivalent proposals'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((entry: any) => entry[0].includes('/architecture-impact/reassess'));
+      expect(call).toBeDefined();
+      expect(JSON.parse(call[1].body).relationships).toEqual([
+        expect.objectContaining({ key: 'rel-1', action: 'NO_CHANGE' }),
+        expect.objectContaining({ key: 'rel-2', action: 'NO_CHANGE' }),
+      ]);
+    });
+    expect(await screen.findByText('READY TO APPLY')).toBeInTheDocument();
+  });
 });
 
 describe('AdmPage - Repository-first evidence and persisted Architecture Impact', () => {
