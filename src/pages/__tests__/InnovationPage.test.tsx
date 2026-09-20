@@ -5,6 +5,11 @@ jest.mock('../../contexts/LangContext', () => ({
   useLang: () => ({ t: (key: string) => key, isAR: false }),
 }));
 
+const mockNavigate = jest.fn();
+jest.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}), { virtual: true });
+
 let mockRole = 'TENANT_ADMIN';
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { role: mockRole, userId: 'user-1' } }),
@@ -604,43 +609,20 @@ describe('InnovationPage - Favorites tab', () => {
 });
 
 describe('InnovationPage - Organization Profile tab', () => {
-  it('loads and displays the existing profile fields', async () => {
+  it('loads and displays the existing profile fields read-only, with a link to Organization Settings', async () => {
     mockFetch({
       '/innovation/radar': [],
-      '/innovation/context-profile': { industry: 'Public Sector', organizationSize: 'ENTERPRISE', domainsInScope: ['Finance', 'HR'] },
+      '/innovation/context-profile': { industry: 'Public Sector', organizationSize: 'ENTERPRISE', primaryMandate: 'Deliver digital services', orgDescriptionShort: 'A government entity', constraints: { dataResidency: 'Must remain within KSA' } },
     });
     render(<InnovationPage />);
     fireEvent.click(await screen.findByText('innov.tab_profile'));
-    expect(await screen.findByDisplayValue('Public Sector')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('Finance, HR')).toBeInTheDocument();
-  });
-
-  it('saves the profile with parsed domains and constraints on submit, for a TENANT_ADMIN', async () => {
-    mockFetch({
-      '/innovation/radar': [],
-      '/innovation/context-profile': { industry: '', organizationSize: '', domainsInScope: [] },
-    });
-    render(<InnovationPage />);
-    fireEvent.click(await screen.findByText('innov.tab_profile'));
-    await screen.findByText('innov.profile_title');
-
-    const industryInput = screen.getAllByRole('textbox')[0];
-    fireEvent.change(industryInput, { target: { value: 'Healthcare' } });
-    fireEvent.click(screen.getByText('innov.save_profile'));
-
-    await waitFor(() => {
-      const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/innovation/context-profile'));
-      expect(putCall).toBeDefined();
-    });
-  });
-
-  it('shows a read-only notice and no save button for a non-admin', async () => {
-    mockRole = 'ARCHITECT';
-    mockFetch({ '/innovation/radar': [], '/innovation/context-profile': { industry: '', domainsInScope: [] } });
-    render(<InnovationPage />);
-    fireEvent.click(await screen.findByText('innov.tab_profile'));
-    expect(await screen.findByText('innov.readonly_notice')).toBeInTheDocument();
+    expect(await screen.findByText('Public Sector')).toBeInTheDocument();
+    expect(screen.getByText('ENTERPRISE')).toBeInTheDocument();
+    expect(screen.getByText('Deliver digital services')).toBeInTheDocument();
+    expect(screen.getByText('dataResidency: Must remain within KSA')).toBeInTheDocument();
+    // No editable inputs for this content anymore - editing moved to Organization Settings.
     expect(screen.queryByText('innov.save_profile')).not.toBeInTheDocument();
+    expect(screen.getByText('✎ Edit in Organization Settings')).toBeInTheDocument();
   });
 });
 

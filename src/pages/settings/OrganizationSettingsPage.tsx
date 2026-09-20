@@ -55,9 +55,16 @@ export default function OrganizationSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [form, setForm] = useState({
-    organizationName: '', organizationNameAr: '', sector: 'GOVERNMENT',
+    sector: 'GOVERNMENT',
     entityType: 'AUTHORITY', language: 'AR', eaMaturityLevel: 1,
     preferredFramework: 'NORA', domainsInScope: [] as string[],
+    // Organizational Context fields — consolidated in from the Innovation
+    // module's former "Organization Profile" tab (see InnovationPage.tsx),
+    // which edited this exact same tenant-level SetupProfile record through
+    // a second, disconnected UI. Centralized here since this page is the
+    // one place tenant/org-level attributes belong; Innovation now only
+    // displays this context read-only with a link back to this page.
+    industry: '', organizationSize: '', primaryMandate: '', orgDescriptionShort: '', constraints: '',
   })
 
   useEffect(() => {
@@ -67,14 +74,17 @@ export default function OrganizationSettingsPage() {
         const liveDomains = rc?.metaModelDriven ? Object.keys(rc?.allDomains || {}) : (FALLBACK_DOMAINS[p?.preferredFramework || 'NORA'] || FALLBACK_DOMAINS.NORA)
         setForm(f => ({
           ...f,
-          organizationName: p?.organizationName || '',
-          organizationNameAr: p?.organizationNameAr || '',
           sector: p?.sector || 'GOVERNMENT',
           entityType: p?.entityType || 'AUTHORITY',
           language: p?.language || 'AR',
           eaMaturityLevel: p?.eaMaturityLevel || 1,
           preferredFramework: p?.preferredFramework || 'NORA',
           domainsInScope: p?.domainsInScope?.length ? p.domainsInScope : liveDomains,
+          industry: p?.industry || '',
+          organizationSize: p?.organizationSize || '',
+          primaryMandate: p?.primaryMandate || '',
+          orgDescriptionShort: p?.orgDescriptionShort || '',
+          constraints: p?.constraints && typeof p.constraints === 'object' ? Object.entries(p.constraints).map(([k, v]) => `${k}: ${v}`).join('\n') : '',
         }))
       })
       .finally(() => setLoading(false))
@@ -88,7 +98,21 @@ export default function OrganizationSettingsPage() {
     setSaving(true)
     setMsg(null)
     try {
-      const r1 = await authFetch('/setup/profile', { method: 'PUT', body: JSON.stringify(form) })
+      const constraintsObj: Record<string, string> = {}
+      form.constraints.split('\n').forEach(line => {
+        const idx = line.indexOf(':')
+        if (idx > 0) constraintsObj[line.slice(0, idx).trim()] = line.slice(idx + 1).trim()
+      })
+      const r1 = await authFetch('/setup/profile', {
+        method: 'PUT',
+        body: JSON.stringify({
+          sector: form.sector, entityType: form.entityType, language: form.language, eaMaturityLevel: form.eaMaturityLevel,
+          preferredFramework: form.preferredFramework, domainsInScope: form.domainsInScope,
+          industry: form.industry || undefined, organizationSize: form.organizationSize || undefined,
+          primaryMandate: form.primaryMandate || undefined, orgDescriptionShort: form.orgDescriptionShort || undefined,
+          constraints: constraintsObj,
+        }),
+      })
       const r2 = await authFetch('/config/framework', { method: 'PUT', body: JSON.stringify({ frameworkType: form.preferredFramework, enabledDomains: form.domainsInScope }) })
       if ((r1.id || r1.tenantId) && r2) setMsg({ type: 'success', text: isAR ? '✓ تم الحفظ بنجاح' : '✓ Saved successfully' })
       else setMsg({ type: 'error', text: isAR ? 'حدث خطأ أثناء الحفظ' : 'Something went wrong while saving' })
@@ -131,15 +155,10 @@ export default function OrganizationSettingsPage() {
         {subTab === 'profile' && <>
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="section-title">{isAR ? 'ملف المنظمة' : 'Organization Profile'}</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 12 }}>
+            {isAR ? 'اسم المنظمة والشعار متاحان في تبويب "الهوية البصرية".' : 'Organization name and logo live under the "Branding" tab.'}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="form-group">
-              <label className="form-label">{isAR ? 'اسم المنظمة (عربي)' : 'Organization Name (Arabic)'}</label>
-              <input className="form-input" dir="rtl" value={form.organizationNameAr} onChange={e => setForm(f => ({ ...f, organizationNameAr: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">{isAR ? 'اسم المنظمة (إنجليزي)' : 'Organization Name (English)'}</label>
-              <input className="form-input" value={form.organizationName} onChange={e => setForm(f => ({ ...f, organizationName: e.target.value }))} />
-            </div>
             <div className="form-group">
               <label className="form-label">{isAR ? 'القطاع' : 'Sector'}</label>
               <select className="form-input" value={form.sector} onChange={e => setForm(f => ({ ...f, sector: e.target.value }))}>
@@ -166,6 +185,43 @@ export default function OrganizationSettingsPage() {
                 <span style={{ fontSize: 12, width: 70, color: 'var(--text-dim)', textAlign: 'end' }}>{(isAR ? MATURITY_LABELS_AR : MATURITY_LABELS_EN)[form.eaMaturityLevel]}</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="section-title" style={{ display: 'flex', alignItems: 'center' }}>
+            {isAR ? 'السياق التنظيمي' : 'Organizational Context'}
+            <HelpTip text={isAR
+              ? 'يُستخدم هذا السياق لتأسيس دراسات الاستشارة المُولّدة بالذكاء الاصطناعي (وحدة الابتكار) ووثائق البنية المؤسسية على واقع مؤسستك بدلاً من نصائح عامة. كان يُحرَّر سابقًا من داخل وحدة الابتكار بشكل منفصل - تم دمجه هنا مع بقية إعدادات المنظمة.'
+              : 'This context grounds AI-generated consultation studies (Innovation module) and EA documents in your organization\'s real situation instead of generic advice. Previously edited from a separate tab inside the Innovation module - now consolidated here with the rest of your organization settings.'} />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className="form-group">
+              <label className="form-label">{isAR ? 'الصناعة/القطاع (وصف حر)' : 'Industry'}</label>
+              <input className="form-input" value={form.industry} onChange={e => setForm(f => ({ ...f, industry: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">{isAR ? 'حجم المنظمة' : 'Organization Size'}</label>
+              <select className="form-input" value={form.organizationSize} onChange={e => setForm(f => ({ ...f, organizationSize: e.target.value }))}>
+                <option value="">—</option>
+                <option value="SMALL">{isAR ? 'صغيرة' : 'Small'}</option>
+                <option value="MEDIUM">{isAR ? 'متوسطة' : 'Medium'}</option>
+                <option value="LARGE">{isAR ? 'كبيرة' : 'Large'}</option>
+                <option value="ENTERPRISE">{isAR ? 'مؤسسية كبرى' : 'Enterprise'}</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">{isAR ? 'المهمة الرئيسية' : 'Primary Mandate'}</label>
+            <input className="form-input" value={form.primaryMandate} onChange={e => setForm(f => ({ ...f, primaryMandate: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">{isAR ? 'وصف مختصر' : 'Short Description'}</label>
+            <input className="form-input" value={form.orgDescriptionShort} onChange={e => setForm(f => ({ ...f, orgDescriptionShort: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center' }}>{isAR ? 'القيود' : 'Constraints'}<HelpTip text={isAR ? 'سطر واحد لكل قيد بصيغة "النوع: الوصف" - مثال: dataResidency: يجب أن تبقى البيانات داخل المملكة' : 'One constraint per line, as "type: description" - e.g. dataResidency: Must remain within KSA'} /></label>
+            <textarea className="form-input" style={{ minHeight: 80, resize: 'vertical', fontFamily: 'inherit' }} value={form.constraints} onChange={e => setForm(f => ({ ...f, constraints: e.target.value }))} />
           </div>
         </div>
 

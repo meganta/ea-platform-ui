@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
@@ -219,7 +220,7 @@ export default function InnovationPage() {
         {tab === 'watchlist' && <WatchlistTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} userId={user?.userId} selected={selected} setSelected={setSelected} onCreateIdeaFrom={createIdeaFrom} />}
         {tab === 'ideas' && <IdeasTab api={api} isAR={isAR} t={t} userRole={user?.role} seed={ideaSeed} onSeedConsumed={() => setIdeaSeed(null)} />}
         {tab === 'studies' && <StudiesTab api={api} isAR={isAR} t={t} />}
-        {tab === 'profile' && <ProfileTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} />}
+        {tab === 'profile' && <ProfileTab api={api} isAR={isAR} t={t} />}
       </div>
     </div>
   )
@@ -1827,44 +1828,27 @@ function WatchlistTab({ api, isAdmin, isAR, t, userId, selected, setSelected, on
 }
 
 // ── Organization Profile Tab ─────────────────────────────────────────────────
-function ProfileTab({ api, isAdmin, isAR, t }: any) {
+// Read-only display only, as of this consolidation. Editing moved to
+// Settings > Organization (OrganizationSettingsPage.tsx's "Organizational
+// Context" card) - this was a second, disconnected UI for the exact same
+// tenant-level SetupProfile record, which belongs in one place. It also
+// carried a real data-corruption risk: this tab's "Domains in Scope" was a
+// free-text comma list writing to the SAME `domainsInScope` column that
+// Settings > Organization's Framework card manages as validated domain
+// codes (used to scope Repository filters/Meta-Model) - saving here could
+// silently overwrite that structured value with arbitrary text. Dropped
+// entirely rather than ported; the Framework card is the one real editor.
+function ProfileTab({ api, isAR, t }: any) {
+  const navigate = useNavigate()
   const [profile, setProfile] = useState<any>(null)
-  const [form, setForm] = useState({ industry: '', organizationSize: '', primaryMandate: '', orgDescriptionShort: '', domainsInScope: '', constraints: '' })
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    api.get('/innovation/context-profile').then((p: any) => {
-      setProfile(p)
-      setForm({
-        industry: p?.industry || '', organizationSize: p?.organizationSize || '', primaryMandate: p?.primaryMandate || '',
-        orgDescriptionShort: p?.orgDescriptionShort || '', domainsInScope: (p?.domainsInScope || []).join(', '),
-        constraints: p?.constraints && typeof p.constraints === 'object' ? Object.entries(p.constraints).map(([k, v]) => `${k}: ${v}`).join('\n') : '',
-      })
-    })
+    api.get('/innovation/context-profile').then((p: any) => setProfile(p))
   }, [api])
 
-  const save = async () => {
-    setSaving(true); setSaved(false)
-    const constraintsObj: Record<string, string> = {}
-    form.constraints.split('\n').forEach(line => {
-      const idx = line.indexOf(':')
-      if (idx > 0) constraintsObj[line.slice(0, idx).trim()] = line.slice(idx + 1).trim()
-    })
-    try {
-      await api.put('/innovation/context-profile', {
-        industry: form.industry || undefined,
-        organizationSize: form.organizationSize || undefined,
-        primaryMandate: form.primaryMandate || undefined,
-        orgDescriptionShort: form.orgDescriptionShort || undefined,
-        domainsInScope: form.domainsInScope ? form.domainsInScope.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
-        constraints: constraintsObj,
-      })
-      setSaved(true)
-    } catch (e: any) { alert(e.message) } finally { setSaving(false) }
-  }
-
   if (!profile) return <div style={{ color: 'var(--text-dim)' }}>{isAR ? 'جارٍ التحميل…' : 'Loading…'}</div>
+
+  const constraintsList = profile.constraints && typeof profile.constraints === 'object' ? Object.entries(profile.constraints) : []
 
   return (
     <div style={{ maxWidth: 700 }}>
@@ -1873,36 +1857,22 @@ function ProfileTab({ api, isAdmin, isAR, t }: any) {
         <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6 }}>{t('innov.profile_desc')}</div>
       </div>
 
-      {!isAdmin && <div style={{ ...S.badge('#f39c12'), display: 'block', marginBottom: 16, padding: '8px 12px' }}>{t('innov.readonly_notice')}</div>}
-
       <div style={S.card}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <div><div style={S.label}>{t('innov.industry')}</div><input style={S.input} disabled={!isAdmin} value={form.industry} onChange={e => setForm(f => ({ ...f, industry: e.target.value }))} /></div>
-          <div>
-            <div style={S.label}>{t('innov.org_size')}</div>
-            <select style={S.input} disabled={!isAdmin} value={form.organizationSize} onChange={e => setForm(f => ({ ...f, organizationSize: e.target.value }))}>
-              <option value="">—</option>
-              <option value="SMALL">{isAR ? 'صغيرة' : 'Small'}</option>
-              <option value="MEDIUM">{isAR ? 'متوسطة' : 'Medium'}</option>
-              <option value="LARGE">{isAR ? 'كبيرة' : 'Large'}</option>
-              <option value="ENTERPRISE">{isAR ? 'مؤسسية كبرى' : 'Enterprise'}</option>
-            </select>
-          </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 12 }}>
+          <div><div style={S.label}>{t('innov.industry')}</div><div>{profile.industry || '—'}</div></div>
+          <div><div style={S.label}>{t('innov.org_size')}</div><div>{profile.organizationSize || '—'}</div></div>
         </div>
         <div style={S.label}>{t('innov.mandate')}</div>
-        <input style={S.input} disabled={!isAdmin} value={form.primaryMandate} onChange={e => setForm(f => ({ ...f, primaryMandate: e.target.value }))} />
+        <div style={{ marginBottom: 12 }}>{profile.primaryMandate || '—'}</div>
         <div style={S.label}>{t('innov.short_desc')}</div>
-        <input style={S.input} disabled={!isAdmin} value={form.orgDescriptionShort} onChange={e => setForm(f => ({ ...f, orgDescriptionShort: e.target.value }))} />
-        <div style={S.label}>{t('innov.domains')}</div>
-        <input style={S.input} disabled={!isAdmin} value={form.domainsInScope} onChange={e => setForm(f => ({ ...f, domainsInScope: e.target.value }))} />
+        <div style={{ marginBottom: 12 }}>{profile.orgDescriptionShort || '—'}</div>
         <div style={S.label}>{t('innov.constraints')}</div>
-        <textarea style={{ ...S.input, minHeight: 80, resize: 'vertical' as const, fontFamily: 'inherit' }} disabled={!isAdmin} value={form.constraints} onChange={e => setForm(f => ({ ...f, constraints: e.target.value }))} />
-        {isAdmin && (
-          <div style={S.row}>
-            <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? t('innov.saving') : t('innov.save_profile')}</button>
-            {saved && <span style={{ color: '#2ecc71', fontSize: 12 }}>✓ {t('innov.saved')}</span>}
-          </div>
-        )}
+        <div style={{ marginBottom: 16 }}>
+          {constraintsList.length ? constraintsList.map(([k, v]) => <div key={k}>{k}: {String(v)}</div>) : '—'}
+        </div>
+        <button style={S.btn('primary')} onClick={() => navigate('/settings/organization')}>
+          {isAR ? '✎ تعديل في إعدادات المنظمة' : '✎ Edit in Organization Settings'}
+        </button>
       </div>
     </div>
   )
