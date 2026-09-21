@@ -33,6 +33,7 @@ function plan(overrides: Partial<Record<string, any>> = {}) {
     activities: [{ id: 'A1', name: 'Migrate Payments App', priority: 'HIGH' }],
     deliverables: [{ id: 'D1', name: 'Migration Runbook', type: 'Document' }],
     kpis: [], risks: [], scenarioId: null,
+    objectives: [], initiatives: [],
     ...overrides,
   };
 }
@@ -148,6 +149,7 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
     await screen.findByText('45%');
     fireEvent.click(screen.getByText('📋 All Plans'));
     fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText('📋 Plan Content'));
     await screen.findByText('Migrate Payments App');
 
     fireEvent.click(screen.getAllByText('planning.link_asset')[0]);
@@ -169,6 +171,7 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
     await screen.findByText('45%');
     fireEvent.click(screen.getByText('📋 All Plans'));
     fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText('📋 Plan Content'));
     expect(await screen.findByTitle('planning.linked_to: Payments App')).toBeInTheDocument();
     expect(screen.getByText('planning.unlink')).toBeInTheDocument();
     expect(screen.queryByText('planning.link_asset')).not.toBeInTheDocument();
@@ -183,6 +186,7 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
     await screen.findByText('45%');
     fireEvent.click(screen.getByText('📋 All Plans'));
     fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText('📋 Plan Content'));
     fireEvent.click(await screen.findByText('planning.unlink'));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -201,6 +205,7 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
     await screen.findByText('45%');
     fireEvent.click(screen.getByText('📋 All Plans'));
     fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText('📋 Plan Content'));
     await screen.findByText(/Migration Runbook/);
 
     // Two "link_asset" buttons exist (activity + deliverable) - click the second (deliverable's).
@@ -213,5 +218,63 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
       expect.stringContaining('/ea-planning/plans/plan-1/deliverables/D1/asset'),
       expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ assetId: 'doc-1' }) }),
     ));
+  });
+});
+
+describe('EaPlanningPage - Objectives & Initiatives tabs', () => {
+  it('adds an objective and posts it to the plan', async () => {
+    mockFetch({ ...BASE_ROUTES, '/ea-planning/plans/plan-1': plan() });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('📋 All Plans'));
+    fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText(/🎯 Objectives/));
+    await screen.findByText(/No objectives defined yet/);
+
+    fireEvent.click(screen.getByText('+ Add Objective'));
+    fireEvent.change(screen.getByPlaceholderText('Objective title'), { target: { value: 'Improve maturity' } });
+    fireEvent.click(screen.getByText('Add Objective'));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans/plan-1/objectives'),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ title: 'Improve maturity' }) }),
+    ));
+  });
+
+  it('shows initiatives with health/status controls and flags one with no owner', async () => {
+    mockFetch({
+      ...BASE_ROUTES,
+      '/ea-planning/plans/plan-1': plan({
+        initiatives: [{ id: 'init-1', title: 'Stand up exception workflow', status: 'IN_PROGRESS', health: 'AT_RISK', objectiveId: null, ownerId: null }],
+      }),
+    });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('📋 All Plans'));
+    fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText(/🚀 Initiatives/));
+
+    expect(await screen.findByText('Stand up exception workflow')).toBeInTheDocument();
+    expect(screen.getByText('👤 No owner')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue('AT RISK'), { target: { value: 'BLOCKED' } });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans/plan-1/initiatives/init-1'),
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ health: 'BLOCKED' }) }),
+    ));
+  });
+
+  it('dashboard shows the needs-attention list and opens the initiatives tab of the right plan on click', async () => {
+    mockFetch({
+      ...BASE_ROUTES,
+      '/ea-planning/dashboard': { ...DASHBOARD, initiativesTotal: 1, initiativesByHealth: { ON_TRACK: 0, AT_RISK: 0, DELAYED: 0, BLOCKED: 1 },
+        needsAttention: [{ type: 'BLOCKED_INITIATIVE', initiativeId: 'init-1', planId: 'plan-1', planName: 'Cloud Migration Plan', title: 'Stand up exception workflow' }] },
+      '/ea-planning/plans/plan-1': plan({ initiatives: [{ id: 'init-1', title: 'Stand up exception workflow', status: 'IN_PROGRESS', health: 'BLOCKED', objectiveId: null, ownerId: 'user-1' }] }),
+    });
+    render(<EaPlanningPage />);
+    await screen.findByText('Stand up exception workflow');
+    fireEvent.click(screen.getByText('Stand up exception workflow'));
+    // Lands directly on the Initiatives tab rather than Overview.
+    expect(await screen.findByText('👤 user-1')).toBeInTheDocument();
   });
 });

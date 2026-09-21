@@ -38,6 +38,12 @@ const STATUS_COLOR: Record<string, string> = { DRAFT: '#7f8c8d', ACTIVE: '#2ecc7
 const FREQ_LABEL: Record<string, string> = { ANNUAL: 'Annual', SEMI_ANNUAL: 'Semi-Annual', QUARTERLY: 'Quarterly', ON_DEMAND: 'On-Demand' }
 const DOMAINS = ['BUSINESS', 'BENEFICIARY_EXPERIENCE', 'APPLICATIONS', 'DATA', 'TECHNOLOGY', 'SECURITY']
 const PRIORITY_COLOR: Record<string, string> = { HIGH: '#e74c3c', MEDIUM: '#f39c12', LOW: '#2ecc71' }
+const HEALTH_COLOR: Record<string, string> = { ON_TRACK: '#2ecc71', AT_RISK: '#f39c12', DELAYED: '#e67e22', BLOCKED: '#e74c3c' }
+const OBJ_STATUS_COLOR: Record<string, string> = { NOT_STARTED: '#7f8c8d', IN_PROGRESS: '#3498db', ACHIEVED: '#2ecc71', AT_RISK: '#e74c3c' }
+const INIT_STATUS_COLOR: Record<string, string> = { DRAFT: '#7f8c8d', APPROVED: '#3498db', IN_PROGRESS: '#9b59b6', COMPLETED: '#2ecc71', CANCELLED: '#e74c3c' }
+const NEEDS_ATTENTION_LABEL: Record<string, string> = {
+  BLOCKED_INITIATIVE: '🚫 Blocked', DELAYED_INITIATIVE: '⏱ Delayed', OVERDUE_INITIATIVE: '📅 Overdue', UNASSIGNED_OWNER: '👤 No owner assigned',
+}
 
 export default function EaPlanningPage() {
   const api = useApi()
@@ -46,15 +52,16 @@ export default function EaPlanningPage() {
   const [dashboard, setDashboard] = useState<any>(null)
   const [planTypes, setPlanTypes] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
+  const [selectedInitialTab, setSelectedInitialTab] = useState<string>('overview')
   const [creating, setCreating] = useState(false)
 
   const loadDashboard = useCallback(() => { api.get('/ea-planning/dashboard').then(setDashboard) }, [api])
   const loadPlanTypes = useCallback(() => { api.get('/ea-planning/plan-types').then((d: any) => setPlanTypes(Array.isArray(d) ? d : [])) }, [api])
   useEffect(() => { loadDashboard(); loadPlanTypes() }, [loadDashboard, loadPlanTypes])
 
-  const openPlan = async (id: string) => { const full = await api.get(`/ea-planning/plans/${id}`); setSelected(full) }
+  const openPlan = async (id: string, initialTab?: string) => { const full = await api.get(`/ea-planning/plans/${id}`); setSelected(full); setSelectedInitialTab(initialTab || 'overview') }
 
-  if (selected) return <PlanDetail api={api} plan={selected} onBack={() => { setSelected(null); loadDashboard() }} onRefresh={() => openPlan(selected.id)} />
+  if (selected) return <PlanDetail api={api} plan={selected} initialTab={selectedInitialTab} onBack={() => { setSelected(null); loadDashboard() }} onRefresh={() => openPlan(selected.id, undefined)} />
   if (creating) return <NewPlanWizard api={api} planTypes={planTypes} onCreated={(p: any) => { setCreating(false); loadDashboard(); openPlan(p.id) }} onCancel={() => setCreating(false)} />
 
   return (
@@ -72,7 +79,7 @@ export default function EaPlanningPage() {
         <button style={S.tab(tab === 'roadmap')} onClick={() => setTab('roadmap')}>{t('planning.tab_roadmap')}</button>
       </div>
       <div style={S.content}>
-        {tab === 'dashboard' && <DashboardTab dashboard={dashboard} onOpenPlans={() => setTab('plans')} />}
+        {tab === 'dashboard' && <DashboardTab dashboard={dashboard} onOpenPlans={() => setTab('plans')} onOpenInitiative={(planId: string) => openPlan(planId, 'initiatives')} />}
         {tab === 'plans' && <PlansListTab api={api} onOpen={openPlan} />}
         {tab === 'roadmap' && <RoadmapTab api={api} t={t} />}
       </div>
@@ -159,16 +166,53 @@ function AssetPicker({ api, t, onPick, onCancel }: { api: any, t: (k: string) =>
 }
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
-function DashboardTab({ dashboard, onOpenPlans }: { dashboard: any, onOpenPlans: () => void }) {
+function DashboardTab({ dashboard, onOpenPlans, onOpenInitiative }: { dashboard: any, onOpenPlans: () => void, onOpenInitiative: (planId: string) => void }) {
   if (!dashboard) return <div style={{ color: 'var(--text-dim)' }}>Loading…</div>
+  const needsAttention: any[] = dashboard.needsAttention || []
   return (
     <div>
       <div className="stat-grid-4">
         <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Total Plans</div><div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard.total}</div></div>
         <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Active</div><div style={{ fontSize: 28, fontWeight: 700, color: '#2ecc71' }}>{dashboard.active}</div></div>
         <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Avg Progress</div><div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard.avgProgress}%</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>High-Risk Plans</div><div style={{ fontSize: 28, fontWeight: 700, color: dashboard.highRisk > 0 ? '#e74c3c' : undefined }}>{dashboard.highRisk}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Needs Attention</div><div style={{ fontSize: 28, fontWeight: 700, color: needsAttention.length > 0 ? '#e74c3c' : undefined }}>{needsAttention.length}</div></div>
       </div>
+
+      {dashboard.initiativesTotal > 0 && (
+        <div style={{ ...S.card, marginTop: 16 }}>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>Initiative Health ({dashboard.initiativesTotal} initiatives across all plans)</div>
+          <div style={{ display: 'flex', gap: 8, height: 10, borderRadius: 5, overflow: 'hidden', marginBottom: 10 }}>
+            {Object.entries(dashboard.initiativesByHealth || {}).map(([h, c]: any) => c > 0 && (
+              <div key={h} title={`${h}: ${c}`} style={{ flex: c, background: HEALTH_COLOR[h] }} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            {Object.entries(dashboard.initiativesByHealth || {}).map(([h, c]: any) => (
+              <div key={h} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 4, background: HEALTH_COLOR[h] }} />{h.replace('_', ' ')}: <b>{c}</b>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ ...S.card, marginTop: 16 }}>
+        <div style={{ fontWeight: 600, marginBottom: 12 }}>⚠ Needs Attention</div>
+        {needsAttention.length === 0 ? (
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Nothing needs attention right now.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {needsAttention.slice(0, 12).map((n: any, i: number) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12, cursor: 'pointer' }} onClick={() => onOpenInitiative(n.planId)}>
+                <span style={S.badge(n.type === 'UNASSIGNED_OWNER' ? '#7f8c8d' : '#e74c3c')}>{NEEDS_ATTENTION_LABEL[n.type] || n.type}</span>
+                <div style={{ flex: 1 }}>{n.title}</div>
+                <div style={{ color: 'var(--text-dim)' }}>{n.planName}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div style={{ ...S.grid2, marginTop: 16 }}>
         <div style={S.card}>
           <div style={{ fontWeight: 600, marginBottom: 12 }}>By Status</div>
@@ -352,8 +396,9 @@ function AssetLinkControl({ item, isPicking, onStartPick, onPick, onCancelPick, 
 }
 
 // ── Plan Detail ──────────────────────────────────────────────────────────────
-function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onBack: () => void, onRefresh: () => void }) {
+function PlanDetail({ api, plan, initialTab, onBack, onRefresh }: { api: any, plan: any, initialTab?: string, onBack: () => void, onRefresh: () => void }) {
   const { t } = useLang()
+  const [detailTab, setDetailTab] = useState<'overview' | 'objectives' | 'initiatives' | 'content'>((initialTab as any) || 'overview')
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<any>({ ...plan })
   const [saving, setSaving] = useState(false)
@@ -444,6 +489,15 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
           )}
         </div>
       </div>
+      <div style={S.tabs}>
+        <button style={S.tab(detailTab === 'overview')} onClick={() => setDetailTab('overview')}>Overview</button>
+        <button style={S.tab(detailTab === 'objectives')} onClick={() => setDetailTab('objectives')}>🎯 Objectives ({plan.objectives?.length ?? 0})</button>
+        <button style={S.tab(detailTab === 'initiatives')} onClick={() => setDetailTab('initiatives')}>🚀 Initiatives ({plan.initiatives?.length ?? 0})</button>
+        <button style={S.tab(detailTab === 'content')} onClick={() => setDetailTab('content')}>📋 Plan Content</button>
+      </div>
+      {detailTab === 'objectives' && <div style={S.content}><ObjectivesTab api={api} plan={plan} onRefresh={onRefresh} /></div>}
+      {detailTab === 'initiatives' && <div style={S.content}><InitiativesTab api={api} plan={plan} onRefresh={onRefresh} /></div>}
+      {detailTab === 'overview' && (
       <div style={S.content}>
         <div style={S.grid3}>
           <div style={S.card}>
@@ -482,16 +536,19 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
         </div>
 
         <div style={S.card}>
-          <div style={S.label}>Objectives</div>
+          <div style={S.label}>Objectives Narrative <span style={{ fontWeight: 400, color: 'var(--text-dim)' }}>(free-form summary - see the Objectives tab for trackable objectives)</span></div>
           {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.objectives || ''} onChange={e => setForm((f: any) => ({ ...f, objectives: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.objectives || 'Not defined.'}</div>}
         </div>
         <div style={S.card}>
           <div style={S.label}>Scope</div>
           {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.scope || ''} onChange={e => setForm((f: any) => ({ ...f, scope: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.scope || 'Not defined.'}</div>}
         </div>
-
+      </div>
+      )}
+      {detailTab === 'content' && (
+      <div style={S.content}>
         {/* Activities */}
-        <div style={S.card}>
+        <div style={{ ...S.card, marginTop: 16 }}>
           <div style={{ fontWeight: 600, marginBottom: 10 }}>Key Activities ({activities.length})</div>
           {activities.map((a: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
@@ -575,6 +632,131 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
           {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.notes || ''} onChange={e => setForm((f: any) => ({ ...f, notes: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.notes || 'None.'}</div>}
         </div>
       </div>
+      )}
+    </div>
+  )
+}
+
+// ── Objectives Tab ───────────────────────────────────────────────────────────
+function ObjectivesTab({ api, plan, onRefresh }: { api: any, plan: any, onRefresh: () => void }) {
+  const objectives: any[] = plan.objectives || []
+  const [adding, setAdding] = useState(false)
+  const [title, setTitle] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const create = async () => {
+    if (!title.trim()) return
+    setSaving(true)
+    try { await api.post(`/ea-planning/plans/${plan.id}/objectives`, { title }); setTitle(''); setAdding(false); onRefresh() }
+    catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+  const setStatus = async (id: string, status: string) => { await api.patch(`/ea-planning/plans/${plan.id}/objectives/${id}`, { status }); onRefresh() }
+  const remove = async (id: string) => { if (!window.confirm('Delete this objective? Initiatives pursuing it will be unlinked, not deleted.')) return; await api.del(`/ea-planning/plans/${plan.id}/objectives/${id}`); onRefresh() }
+
+  return (
+    <div>
+      {objectives.length === 0 && !adding ? (
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>No objectives defined yet. Objectives are the "what are we trying to achieve" for this plan - initiatives then pursue them.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {objectives.map((o: any) => {
+            const initiativeCount = (plan.initiatives || []).filter((i: any) => i.objectiveId === o.id).length
+            return (
+              <div key={o.id} style={{ ...S.card, marginBottom: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>{o.title}</div>
+                    {o.description && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{o.description}</div>}
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{initiativeCount} initiative{initiativeCount === 1 ? '' : 's'}{o.ownerId ? ` · Owner: ${o.ownerId}` : ''}</div>
+                  </div>
+                  <select style={{ ...S.input, marginBottom: 0, width: 140 }} value={o.status} onChange={e => setStatus(o.id, e.target.value)}>
+                    {Object.keys(OBJ_STATUS_COLOR).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                  </select>
+                  <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => remove(o.id)}>Delete</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {adding ? (
+        <div style={S.card}>
+          <input style={S.input} autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Objective title" onKeyDown={e => e.key === 'Enter' && create()} />
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={create} disabled={saving || !title.trim()}>{saving ? 'Adding…' : 'Add Objective'}</button>
+            <button style={S.btn()} onClick={() => { setAdding(false); setTitle('') }}>Cancel</button>
+          </div>
+        </div>
+      ) : <button style={S.btn('primary')} onClick={() => setAdding(true)}>+ Add Objective</button>}
+    </div>
+  )
+}
+
+// ── Initiatives Tab ──────────────────────────────────────────────────────────
+function InitiativesTab({ api, plan, onRefresh }: { api: any, plan: any, onRefresh: () => void }) {
+  const initiatives: any[] = plan.initiatives || []
+  const objectives: any[] = plan.objectives || []
+  const [adding, setAdding] = useState(false)
+  const [title, setTitle] = useState('')
+  const [objectiveId, setObjectiveId] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const create = async () => {
+    if (!title.trim()) return
+    setSaving(true)
+    try { await api.post(`/ea-planning/plans/${plan.id}/initiatives`, { title, objectiveId: objectiveId || undefined }); setTitle(''); setObjectiveId(''); setAdding(false); onRefresh() }
+    catch (e: any) { alert(e.message) } finally { setSaving(false) }
+  }
+  const patch = async (id: string, data: any) => { await api.patch(`/ea-planning/plans/${plan.id}/initiatives/${id}`, data); onRefresh() }
+  const remove = async (id: string) => { if (!window.confirm('Delete this initiative?')) return; await api.del(`/ea-planning/plans/${plan.id}/initiatives/${id}`); onRefresh() }
+  const objectiveTitle = (id?: string) => objectives.find(o => o.id === id)?.title
+
+  return (
+    <div>
+      {initiatives.length === 0 && !adding ? (
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>No initiatives yet. Initiatives are the concrete work items pursuing this plan's objectives.</div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {initiatives.map((i: any) => (
+            <div key={i.id} style={{ ...S.card, marginBottom: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{i.title}</div>
+                  {i.description && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 2 }}>{i.description}</div>}
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4, display: 'flex', gap: 10 }}>
+                    {i.objectiveId && <span>🎯 {objectiveTitle(i.objectiveId) || 'Linked objective'}</span>}
+                    {i.ownerId ? <span>👤 {i.ownerId}</span> : <span style={{ color: '#e74c3c' }}>👤 No owner</span>}
+                    {i.endDate && <span>📅 Due {new Date(i.endDate).toLocaleDateString()}</span>}
+                  </div>
+                </div>
+                <span style={S.badge(HEALTH_COLOR[i.health] || '#7f8c8d')}>{i.health.replace('_', ' ')}</span>
+                <select style={{ ...S.input, marginBottom: 0, width: 130 }} value={i.status} onChange={e => patch(i.id, { status: e.target.value })}>
+                  {Object.keys(INIT_STATUS_COLOR).map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
+                </select>
+                <select style={{ ...S.input, marginBottom: 0, width: 110 }} value={i.health} onChange={e => patch(i.id, { health: e.target.value })}>
+                  {Object.keys(HEALTH_COLOR).map(h => <option key={h} value={h}>{h.replace('_', ' ')}</option>)}
+                </select>
+                <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => remove(i.id)}>Delete</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {adding ? (
+        <div style={S.card}>
+          <input style={S.input} autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="Initiative title" onKeyDown={e => e.key === 'Enter' && create()} />
+          {objectives.length > 0 && (
+            <select style={S.input} value={objectiveId} onChange={e => setObjectiveId(e.target.value)}>
+              <option value="">No linked objective</option>
+              {objectives.map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
+            </select>
+          )}
+          <div style={S.row}>
+            <button style={S.btn('primary')} onClick={create} disabled={saving || !title.trim()}>{saving ? 'Adding…' : 'Add Initiative'}</button>
+            <button style={S.btn()} onClick={() => { setAdding(false); setTitle(''); setObjectiveId('') }}>Cancel</button>
+          </div>
+        </div>
+      ) : <button style={S.btn('primary')} onClick={() => setAdding(true)}>+ Add Initiative</button>}
     </div>
   )
 }
