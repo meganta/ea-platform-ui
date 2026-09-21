@@ -1422,6 +1422,21 @@ describe('EaViewsPage - Comparison mode (Phase 5B)', () => {
     fireEvent.click(screen.getByText(/⇄ Compare/));
   }
 
+  it('opens the existing comparison engine directly from an ADM same-viewpoint comparison link', async () => {
+    mockSearchParams = new URLSearchParams('viewId=v1&compareLeft=current&compareRight=targetA');
+    mockFetch({
+      '/ea-views/stats': {},
+      '/ea-views/v1/dataset': baseDatasetResponse,
+      '/ea-views/v1/compare': comparisonResult('Target A', 2),
+      '/ea-views/scenarios': scenarioList,
+      '/ea-views/v1': { id: 'v1', name: 'Comparable View', visualization: 'TABLE', status: 'PUBLISHED', architectureState: 'TARGET', scenarioId: 'targetA' },
+    });
+    render(<EaViewsPage />);
+    expect(await screen.findByText(/\+2 Added/)).toBeInTheDocument();
+    const call = (global.fetch as jest.Mock).mock.calls.find((entry: any) => entry[0].includes('/ea-views/v1/compare'));
+    expect(JSON.parse(call[1].body)).toEqual({ leftScenarioId: 'current', rightScenarioId: 'targetA' });
+  });
+
   // ── Mandatory comparison race-condition test ────────────────────────
   it('fast Target A -> Target B comparison requests: Target B resolving first is never overwritten by a later-resolving, stale Target A response', async () => {
     let resolveA: (v: any) => void = () => {};

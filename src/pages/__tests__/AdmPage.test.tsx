@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AdmPage from '../AdmPage';
 
 jest.mock('../../contexts/LangContext', () => ({
-  useLang: () => ({ t: (key: string) => key, isAR: false }),
+  useLang: () => ({ t: (key: string) => key, isAR: false, resolveText: (value: string) => value }),
 }));
 
 jest.mock('react-markdown', () => ({ __esModule: true, default: ({ children }: any) => <div>{children}</div> }), { virtual: true });
@@ -184,11 +184,38 @@ describe('AdmPage - sequential execution and Architecture Impact Review', () => 
     expect(screen.getByText(/Current Repository impact/)).toBeInTheDocument();
   });
 
+  it('shows a direct Action Required CTA for the exact paused output', async () => {
+    mockFetch({
+      '/adm/cycles': [SAMPLE_CYCLE],
+      '/sequential': {
+        id: 'run-1', status: 'WAITING_FOR_ARCHITECTURE_APPROVAL', currentPhase: '2', currentStep: '2.3',
+        completedOutputIds: [], remainingOutputIds: ['o1'], waitingReason: 'Output review required',
+        actionRequired: { type: 'OUTPUT_REVIEW', phase: '2', step: '2.3', reason: 'Output review required', output: { id: 'o1', title: 'Application Inventory', status: 'AI_DRAFT' } },
+      },
+      '/phases/2/inputs': { inputs: [], phaseDef: { phase: '2', name: 'Current', steps: [{ key: '2.3', title: 'Applications', inputs: [], outputs: [{ key: 'application_inventory', title: 'Application Inventory' }] }] } },
+      '/phases/2/outputs': { outputs: [{ id: 'o1', outputKey: 'application_inventory', title: 'Application Inventory', status: 'AI_DRAFT', content: 'A'.repeat(120) }], phaseDef: { phase: '2', name: 'Current', steps: [{ key: '2.3', title: 'Applications', inputs: [], outputs: [{ key: 'application_inventory', title: 'Application Inventory' }] }] } },
+    });
+    render(<AdmPage />);
+    expect(await screen.findByText('Action Required')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Review Output' }));
+    expect(await screen.findByText('adm.phase 2 — Current')).toBeInTheDocument();
+    expect(screen.getAllByText('Application Inventory').length).toBeGreaterThan(0);
+  });
+
   it('warns about pending architecture impact and opens an explicit controlled proposal', async () => {
     mockFetch({
       '/adm/cycles': [SAMPLE_CYCLE],
       '/architecture-impact-proposal': {
         outputName: 'Application Inventory', architectureState: 'CURRENT', affectedDomains: ['APPLICATIONS'], lifecycleStatus: 'REVIEW_REQUIRED',
+        decisionContext: {
+          origin: { cycleName: 'Q1 2026 ADM Cycle', phase: '2', stepId: '2.3', outputName: 'Application Inventory', scopeDomains: ['APPLICATIONS'] },
+          rationale: 'Approved application inventory identifies the affected application estate.',
+          currentState: { assets: [{ key: '1HRDF', name: '1HRDF', type: 'Application' }], relationships: [] },
+          proposedState: { assets: [{ key: 'new-app', name: 'New App', type: 'Application', action: 'INTRODUCE' }], relationships: [] },
+          deltas: [{ kind: 'ASSET', name: 'New App', action: 'INTRODUCE' }],
+          consequences: { architectureState: 'CURRENT', affectedDomains: ['APPLICATIONS'], explicitMutationCount: 1, dependencyImpactCount: 1, applicationImpactCount: 1 },
+        },
+        impactPreview: { nodes: [{ id: 'app-1', name: '1HRDF', type: 'Application', change: 'UPDATE' }], edges: [] },
         proposal: { assets: [{ key: '1HRDF', action: 'RECONCILE' }], relationships: [], view: { behavior: 'CREATE_OR_REFRESH' } },
         assessment: {
           status: 'REVIEW_REQUIRED',
@@ -210,9 +237,13 @@ describe('AdmPage - sequential execution and Architecture Impact Review', () => 
       },
     });
     render(<AdmPage />);
-    expect(await screen.findByText('Architecture Impact Review')).toBeInTheDocument();
+    expect(await screen.findByText('Architecture Decision Workspace')).toBeInTheDocument();
     expect(screen.getByText(/still require Architecture Impact Review/)).toBeInTheDocument();
     fireEvent.click(screen.getByText('Review / Apply'));
+    expect(await screen.findByText('Why is this change proposed?')).toBeInTheDocument();
+    expect(screen.getByText('What exists now?')).toBeInTheDocument();
+    expect(screen.getByText('What is proposed?')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Architecture impact preview' })).toBeInTheDocument();
     expect(await screen.findByText('Matched Existing')).toBeInTheDocument();
     expect(screen.getByText('New')).toBeInTheDocument();
     expect(screen.getByText('Updated')).toBeInTheDocument();
