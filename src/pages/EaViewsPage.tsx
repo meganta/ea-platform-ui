@@ -461,6 +461,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // changed. The user can still check UNCHANGED explicitly.
   const [comparisonChangeFilter, setComparisonChangeFilter] = useState<Set<string>>(new Set(['ADDED', 'REMOVED', 'MODIFIED']))
   const comparisonRequestTokenRef = React.useRef(0)
+  const urlComparisonKeyRef = React.useRef<string | null>(null)
   const [comparisonGraphVisible, setComparisonGraphVisible] = useState<any>(null)
   const [comparisonGraphFocusId, setComparisonGraphFocusId] = useState<string | null>(null)
   const [comparisonHeatmapMetric, setComparisonHeatmapMetric] = useState<string>('')
@@ -787,6 +788,29 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       if (myToken === comparisonRequestTokenRef.current) setComparisonLoading(false)
     })
   }
+
+  // ADM decision links preselect a semantically compatible scenario pair
+  // for this exact View definition. The existing comparison endpoint remains
+  // authoritative; this only opens the established comparison mode directly.
+  useEffect(() => {
+    const leftId = searchParams.get('compareLeft')
+    const rightId = searchParams.get('compareRight')
+    if (!leftId || !rightId || scenarios.length === 0) return
+    const key = `${view.id}:${leftId}:${rightId}`
+    if (urlComparisonKeyRef.current === key) return
+    const eligible = scenarios.some(item => item.id === leftId) && scenarios.some(item => item.id === rightId)
+    if (!eligible) {
+      setComparisonMode(true)
+      setComparisonError('This comparison is unavailable because one of the linked scenarios is no longer eligible.')
+      urlComparisonKeyRef.current = key
+      return
+    }
+    urlComparisonKeyRef.current = key
+    setComparisonMode(true)
+    setAuthoringMode(false)
+    setAiAssistMode(false)
+    runComparison(leftId, rightId)
+  }, [scenarios, searchParams, view.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Authoring actions (Phase 5C) ─────────────────────────────────────
   //

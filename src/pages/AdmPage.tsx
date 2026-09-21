@@ -18,6 +18,10 @@ function DiagramBlock({ chart }: { chart: string }) {
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
   fetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
+const scrollToElement = (id: string, block: ScrollLogicalPosition = 'center') => {
+  const element = document.getElementById(id)
+  if (element && typeof element.scrollIntoView === 'function') element.scrollIntoView({ behavior: 'smooth', block })
+}
 
 function useApi() {
   const token = () => localStorage.getItem('ea_token')
@@ -121,7 +125,7 @@ function ScopeAlignment({ alignment }: { alignment: any }) {
   )
 }
 
-function SequentialExecutionPanel({ cycle }: { cycle: any }) {
+function SequentialExecutionPanel({ cycle, onReviewOutput, onReviewImpact }: { cycle: any; onReviewOutput: (action: any) => void; onReviewImpact: (outputId: string) => void }) {
   const [run, setRun] = useState<any>(null)
   const [busy, setBusy] = useState(false)
   const load = async (advance = false) => {
@@ -157,7 +161,7 @@ function SequentialExecutionPanel({ cycle }: { cycle: any }) {
         : run?.status === 'REVIEW_REQUIRED' ? 'Review Required'
           : String(run?.status || 'UNKNOWN').replace(/_/g, ' ')
   return (
-    <div className="card mb-4" style={{ padding: '12px 16px' }}>
+    <div id="adm-execution-panel" className="card mb-4" style={{ padding: '12px 16px', position: 'sticky', top: 8, zIndex: 12, boxShadow: '0 6px 20px rgba(0,0,0,.12)' }}>
       <div className="flex items-center justify-between" style={{ gap: 12 }}>
         <div>
           <div style={{ fontWeight: 700, fontSize: 12 }}>ADM Execution</div>
@@ -166,7 +170,8 @@ function SequentialExecutionPanel({ cycle }: { cycle: any }) {
         {!run || ['STOPPED', 'COMPLETED'].includes(run.status) ? <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('start')}>▶ Run Sequentially</button> : (
           <div className="flex gap-2">
             {run.status === 'RUNNING' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => action('pause')}>Pause</button>}
-            {['PAUSED', 'WAITING_INPUT', 'REVIEW_REQUIRED', 'FAILED'].includes(run.status) && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('resume')}>Resume</button>}
+            {['PAUSED', 'FAILED'].includes(run.status) && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('resume')}>Resume</button>}
+            {run.status === 'WAITING_INPUT' && !run.actionRequired?.output && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('resume')}>Resume</button>}
             <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => action('stop')}>Stop</button>
           </div>
         )}
@@ -176,11 +181,27 @@ function SequentialExecutionPanel({ cycle }: { cycle: any }) {
         {run.waitingReason && <div style={{ color: '#f39c12', marginTop: 4 }}>{run.waitingReason}</div>}
         {run.lastError && <div style={{ color: '#e74c3c', marginTop: 4 }}>{run.lastError}</div>}
       </div>}
+      {run?.actionRequired && <div data-testid="adm-action-required" style={{ marginTop: 10, padding: 12, background: 'rgba(243,156,18,.09)', border: '1px solid rgba(243,156,18,.45)', borderRadius: 5 }}>
+        <div style={{ fontWeight: 700, color: '#f39c12', fontSize: 12 }}>Action Required</div>
+        <div style={{ fontSize: 11, marginTop: 5 }}>
+          Phase {run.actionRequired.phase || '—'} · Step {run.actionRequired.step || '—'}
+          {run.actionRequired.output?.title && <> · <strong>{run.actionRequired.output.title}</strong></>}
+        </div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{run.actionRequired.reason}</div>
+        <div className="flex gap-2" style={{ marginTop: 9, flexWrap: 'wrap' }}>
+          {['OUTPUT_REVIEW', 'INPUT_REQUIRED'].includes(run.actionRequired.type) && run.actionRequired.output && <button className="btn btn-primary btn-sm" onClick={() => onReviewOutput(run.actionRequired)}>
+            {run.actionRequired.type === 'INPUT_REQUIRED' ? 'Provide Required Input' : 'Review Output'}
+          </button>}
+          {run.actionRequired.type === 'ARCHITECTURE_IMPACT' && run.actionRequired.output && <button className="btn btn-primary btn-sm" onClick={() => onReviewImpact(run.actionRequired.output.id)}>Review Architecture Impact</button>}
+          {run.status !== 'PAUSED' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => action('pause')}>Pause Execution</button>}
+        </div>
+      </div>}
     </div>
   )
 }
 
-function ArchitectureImpactReview({ cycle }: { cycle: any }) {
+function ArchitectureImpactReview({ cycle, focusOutputId, onDecisionComplete }: { cycle: any; focusOutputId?: string | null; onDecisionComplete: () => void }) {
+  const navigate = useNavigate()
   const [review, setReview] = useState<any>(null)
   const [editing, setEditing] = useState<string | null>(null)
   const [proposalData, setProposalData] = useState<any>(null)
@@ -188,10 +209,19 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
   const [busy, setBusy] = useState(false)
   const load = () => authFetch(`/adm-intelligence/cycles/${cycle.id}/architecture-impact`).then(setReview).catch(() => setReview(null))
   useEffect(() => { load() }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const refresh = () => load()
+    window.addEventListener('adm-sequential-updated', refresh)
+    return () => window.removeEventListener('adm-sequential-updated', refresh)
+  }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
   const inspect = async (outputId: string) => {
     const data = await authFetch(`/adm-intelligence/outputs/${outputId}/architecture-impact-proposal`)
     setProposalData(data); setTechnicalPayload(JSON.stringify(data.proposal, null, 2)); setEditing(outputId)
   }
+  useEffect(() => {
+    if (!focusOutputId || !review?.entries?.some((entry: any) => entry.outputId === focusOutputId)) return
+    inspect(focusOutputId).then(() => setTimeout(() => scrollToElement(`architecture-impact-${focusOutputId}`), 0))
+  }, [focusOutputId, review?.entries?.length]) // eslint-disable-line react-hooks/exhaustive-deps
   const reassess = async (proposal: any) => {
     if (!editing) return
     setBusy(true)
@@ -238,6 +268,7 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
       } else {
         setEditing(null); setProposalData(null); await load()
         window.dispatchEvent(new Event('adm-sequential-updated'))
+        onDecisionComplete()
       }
     } finally { setBusy(false) }
   }
@@ -247,14 +278,15 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
     await authFetch(`/adm-intelligence/outputs/${outputId}/architecture-impact/skip`, { method: 'POST', body: JSON.stringify({ rationale }) })
     await load()
     window.dispatchEvent(new Event('adm-sequential-updated'))
+    onDecisionComplete()
   }
   if (!review?.entries?.length) return null
-  return <div className="card mb-4" style={{ padding: '12px 16px' }}>
-    <div style={{ fontWeight: 700, fontSize: 12 }}>Architecture Impact Review</div>
+  return <div id="architecture-impact-review" className="card mb-4" style={{ padding: '12px 16px' }}>
+    <div style={{ fontWeight: 700, fontSize: 12 }}>Architecture Decision Workspace</div>
     <div style={{ color: review.pendingCount ? '#f39c12' : '#2ecc71', fontSize: 10, marginTop: 3 }}>
       {review.completion?.warning || 'All approved architecture impacts have been applied or intentionally skipped.'}
     </div>
-    {review.entries.map((entry: any) => <div key={entry.outputId} style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 10 }}>
+    {review.entries.map((entry: any) => <div id={`architecture-impact-${entry.outputId}`} key={entry.outputId} style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 10 }}>
       <div className="flex items-center justify-between" style={{ gap: 8 }}>
         <div><strong>{entry.title}</strong> · {entry.architectureState} · <span style={{ color: entry.impactStatus === 'APPLIED' ? '#2ecc71' : entry.impactStatus === 'SKIPPED' ? '#64748B' : '#f39c12' }}>{String(entry.impactStatus).replace(/_/g, ' ')}</span></div>
         {entry.outputStatus === 'APPROVED' && !['APPLIED', 'SKIPPED', 'REJECTED'].includes(entry.impactStatus) && <div className="flex gap-2">
@@ -276,16 +308,110 @@ function ArchitectureImpactReview({ cycle }: { cycle: any }) {
         {proposalData.evidenceContext && <div style={{ color: 'var(--text-dim)', marginTop: 6 }}>
           Repository Evidence — Automatically Sourced: {proposalData.evidenceContext.assets} assets and {proposalData.evidenceContext.relationships} relationships used as context; not proposed as changes.
         </div>}
+        <DecisionContext context={proposalData.decisionContext} />
+        <ImpactPreview preview={proposalData.impactPreview} />
         <ImpactAssessmentGroups assessment={proposalData.assessment} busy={busy} onResolveRelationship={resolveRelationship} />
         {proposalData.warnings?.map((warning: string, index: number) => <div key={index} style={{ color: '#f39c12', marginTop: 6 }}>⚠ {warning}</div>)}
         <details style={{ marginTop: 10 }}>
           <summary style={{ cursor: 'pointer', color: 'var(--text-dim)' }}>Technical proposal details</summary>
           <textarea aria-label="Technical proposal details" className="form-input" rows={12} value={technicalPayload} onChange={event => setTechnicalPayload(event.target.value)} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, marginTop: 7 }} />
         </details>
+        <div className="flex gap-2" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+          {proposalData.navigation?.fullViewRoute && <button className="btn btn-secondary btn-sm" onClick={() => navigate(proposalData.navigation.fullViewRoute)}>Open Full Architecture View</button>}
+          {proposalData.navigation?.compareWithCurrentRoute && <button className="btn btn-secondary btn-sm" onClick={() => navigate(proposalData.navigation.compareWithCurrentRoute)}>Compare with Current</button>}
+          {proposalData.navigation?.pendingView && <span style={{ color: 'var(--text-dim)', alignSelf: 'center' }}>The reusable full View will be available after Apply.</span>}
+        </div>
+        <TransitionDecision outputId={entry.outputId} value={proposalData.transitionDecision} onChanged={(value: any) => setProposalData((current: any) => ({ ...current, transitionDecision: value }))} />
         <div className="flex gap-2 mt-2"><button className="btn btn-primary btn-sm" disabled={busy} onClick={apply}>Apply Architecture Changes</button><button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}>Cancel</button></div>
       </div>}
     </div>)}
   </div>
+}
+
+function DecisionContext({ context }: { context: any }) {
+  if (!context) return null
+  const consequences = context.consequences || {}
+  return <div style={{ marginTop: 10, display: 'grid', gap: 8 }}>
+    <section style={{ padding: 10, background: 'rgba(3,105,161,.05)', border: '1px solid var(--border)', borderRadius: 5 }}>
+      <strong>Why is this change proposed?</strong>
+      <div style={{ marginTop: 4, color: 'var(--text-dim)' }}>{context.origin?.cycleName} · Phase {context.origin?.phase} · Step {context.origin?.stepId || '—'} · {context.origin?.outputName}</div>
+      {context.origin?.objective && <div style={{ marginTop: 4 }}><strong>Cycle objective:</strong> {context.origin.objective}</div>}
+      <div style={{ marginTop: 4 }}><strong>Scope:</strong> {context.origin?.scopeDomains?.join(', ') || 'Cross-domain'}</div>
+      <div style={{ marginTop: 6, lineHeight: 1.55 }}>{context.rationale || 'No concise narrative rationale is available; assess the approved output and explicit architecture facts below.'}</div>
+    </section>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 8 }}>
+      <section style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 5 }}>
+        <strong>What exists now?</strong>
+        {context.currentState?.assets?.length ? context.currentState.assets.map((asset: any) => <div key={asset.key} style={{ marginTop: 5 }}>{asset.name} <span style={{ color: 'var(--text-dim)' }}>({asset.type || 'Architecture Element'})</span></div>) : <div style={{ marginTop: 5, color: 'var(--text-dim)' }}>No explicit affected Current elements are declared.</div>}
+        {context.currentState?.relationships?.map((relationship: any) => <div key={relationship.key} style={{ marginTop: 4, color: 'var(--text-dim)' }}>{relationship.source} → {relationship.relationship} → {relationship.target}</div>)}
+      </section>
+      <section style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 5 }}>
+        <strong>What is proposed?</strong>
+        {context.proposedState?.assets?.length ? context.proposedState.assets.map((asset: any) => <div key={asset.key} style={{ marginTop: 5 }}><span style={{ color: changeColor(asset.action) }}>{asset.action}</span> · {asset.name} <span style={{ color: 'var(--text-dim)' }}>({asset.type || 'Architecture Element'})</span></div>) : <div style={{ marginTop: 5, color: 'var(--text-dim)' }}>No explicit asset mutation; refresh the architecture projection only.</div>}
+        {context.proposedState?.relationships?.map((relationship: any) => <div key={relationship.key} style={{ marginTop: 4 }}><span style={{ color: changeColor(relationship.action) }}>{relationship.action}</span> · {relationship.source} → {relationship.relationship} → {relationship.target}</div>)}
+      </section>
+    </div>
+    <section style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 5 }}>
+      <strong>Current → Proposed</strong>
+      {context.deltas?.length ? context.deltas.map((delta: any, index: number) => <div key={`${delta.kind}-${delta.name || delta.key}-${index}`} style={{ marginTop: 6 }}>
+        <span style={{ color: changeColor(delta.action), fontWeight: 700 }}>{delta.action}</span> · {delta.name || `${delta.source} → ${delta.relationship} → ${delta.target}`}
+        {delta.action === 'UPDATE' && delta.before && <ImpactChangeRows before={delta.before} after={delta.after} />}
+      </div>) : <div style={{ marginTop: 5, color: 'var(--text-dim)' }}>No explicit element delta. Applying refreshes/reuses the linked View without treating Repository evidence as a change command.</div>}
+    </section>
+    <section style={{ padding: 10, border: '1px solid var(--border)', borderRadius: 5 }}>
+      <strong>Why does it matter?</strong>
+      <div style={{ marginTop: 5, color: 'var(--text-dim)' }}>
+        {consequences.architectureState} architecture · {(consequences.affectedDomains || []).join(', ') || 'Cross-domain'} · {consequences.explicitMutationCount || 0} explicit mutations · {consequences.dependencyImpactCount || 0} dependency changes
+        {(consequences.capabilityImpactCount || 0) > 0 && <> · {consequences.capabilityImpactCount} capability elements</>}
+        {(consequences.applicationImpactCount || 0) > 0 && <> · {consequences.applicationImpactCount} application elements</>}
+      </div>
+    </section>
+  </div>
+}
+
+function changeColor(action: string) {
+  if (['CREATE', 'INTRODUCE', 'ADD'].includes(action)) return 'var(--success)'
+  if (['REMOVE', 'REJECTED'].includes(action)) return 'var(--danger)'
+  if (['UPDATE', 'RESTORE'].includes(action)) return 'var(--gold)'
+  return 'var(--text-dim)'
+}
+
+function ImpactPreview({ preview }: { preview: any }) {
+  if (!preview?.nodes?.length) return <div style={{ marginTop: 10, padding: 10, border: '1px dashed var(--border)', borderRadius: 5, color: 'var(--text-dim)' }}><strong>Impact Preview</strong><div style={{ marginTop: 4 }}>No explicit changed topology is declared. The decision refreshes the reusable architecture View only.</div></div>
+  const width = 720
+  const height = Math.max(160, Math.ceil(preview.nodes.length / 4) * 110)
+  const positions = new Map(preview.nodes.map((node: any, index: number) => [node.id, { x: 95 + (index % 4) * 175, y: 55 + Math.floor(index / 4) * 105 }]))
+  return <div style={{ marginTop: 10, padding: 10, border: '1px solid var(--border)', borderRadius: 5 }}>
+    <strong>Impact Preview</strong>
+    <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>Affected elements and immediate declared relationships only.</div>
+    <div style={{ overflowX: 'auto', marginTop: 6 }}><svg role="img" aria-label="Architecture impact preview" viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', minWidth: 520, maxHeight: 360 }}>
+      {preview.edges.map((edge: any) => { const source: any = positions.get(edge.sourceId); const target: any = positions.get(edge.targetId); return source && target ? <g key={edge.id}><line x1={source.x} y1={source.y} x2={target.x} y2={target.y} stroke={changeColor(edge.change)} strokeWidth="2" strokeDasharray={edge.change === 'REMOVE' ? '5 4' : undefined} /><text x={(source.x + target.x) / 2} y={(source.y + target.y) / 2 - 4} textAnchor="middle" fill="var(--text-dim)" fontSize="9">{edge.label}</text></g> : null })}
+      {preview.nodes.map((node: any) => { const position: any = positions.get(node.id); return <g key={node.id} transform={`translate(${position.x - 65},${position.y - 23})`}><rect width="130" height="46" rx="6" fill="var(--navy-mid)" stroke={changeColor(node.change)} strokeWidth="2" /><text x="65" y="19" textAnchor="middle" fill="var(--text)" fontSize="10">{String(node.name).slice(0, 21)}</text><text x="65" y="34" textAnchor="middle" fill={changeColor(node.change)} fontSize="8">{node.change} · {String(node.type).slice(0, 18)}</text></g> })}
+    </svg></div>
+  </div>
+}
+
+function TransitionDecision({ outputId, value, onChanged }: { outputId: string; value: any; onChanged: (value: any) => void }) {
+  const [busy, setBusy] = useState(false)
+  if (!value?.recommended && !value?.decision) return null
+  const decide = async (decision: 'CREATE' | 'DIRECT_TO_TARGET') => {
+    setBusy(true)
+    try {
+      const result = await authFetch(`/adm-intelligence/outputs/${outputId}/architecture-impact/transition-decision`, { method: 'POST', body: JSON.stringify({ decision }) })
+      if (result?.statusCode) window.alert(result.message || 'Transition decision could not be recorded.')
+      else onChanged({ ...value, decision: result.decision, scenarioId: result.scenarioId })
+    } finally { setBusy(false) }
+  }
+  return <section style={{ marginTop: 10, padding: 10, border: '1px solid rgba(243,156,18,.45)', background: 'rgba(243,156,18,.06)', borderRadius: 5 }}>
+    <strong style={{ color: '#f39c12' }}>Transition Architecture Recommended</strong>
+    <div style={{ marginTop: 4 }}>{value.rationale}</div>
+    {value.indicators?.length > 0 && <div style={{ marginTop: 4, color: 'var(--text-dim)' }}>Indicators: {value.indicators.join(', ')}</div>}
+    {value.roadmapRefs?.length > 0 && <div style={{ marginTop: 4, color: 'var(--text-dim)' }}>Roadmap linkage: {value.roadmapRefs.join(', ')}</div>}
+    {value.decision ? <div style={{ marginTop: 7, color: 'var(--success)' }}>Decision recorded: {String(value.decision).replace(/_/g, ' ')}</div> : <div className="flex gap-2" style={{ marginTop: 8 }}>
+      <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => decide('CREATE')}>Create Transition Architecture</button>
+      <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => decide('DIRECT_TO_TARGET')}>Proceed Directly to Target</button>
+    </div>}
+  </section>
 }
 
 function ImpactAssessmentGroups({ assessment, busy = false, onResolveRelationship }: { assessment: any; busy?: boolean; onResolveRelationship?: (key: string, resolution: any, applyToEquivalent?: boolean) => void }) {
@@ -363,6 +489,33 @@ function ImpactChangeRows({ before, after }: { before: any; after: any }) {
   const display = (value: any) => value == null || value === '' ? '—' : typeof value === 'object' ? JSON.stringify(value) : String(value)
   return <div style={{ margin: '4px 0 0 10px' }}>
     {changed.map(key => <div key={key}><strong>{key.replace(/_/g, ' ')}:</strong> {display(beforeValues[key])} → {display(afterValues[key])}</div>)}
+  </div>
+}
+
+function CycleArchitecture({ cycle }: { cycle: any }) {
+  const navigate = useNavigate()
+  const [data, setData] = useState<any>(null)
+  const load = () => authFetch(`/adm-intelligence/cycles/${cycle.id}/architecture`).then(setData).catch(() => setData(null))
+  useEffect(() => { load() }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const refresh = () => load()
+    window.addEventListener('adm-sequential-updated', refresh)
+    return () => window.removeEventListener('adm-sequential-updated', refresh)
+  }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!data?.states?.length) return null
+  return <div className="card mb-4" style={{ padding: '12px 16px' }}>
+    <div style={{ fontWeight: 700, fontSize: 12 }}>Cycle Architecture</div>
+    <div style={{ color: 'var(--text-dim)', fontSize: 10, marginTop: 3 }}>Reusable EA Views and scenario states produced or linked by this ADM cycle.</div>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 8, marginTop: 10 }}>
+      {data.states.map((group: any) => <div key={group.state} style={{ padding: 9, border: '1px solid var(--border)', borderRadius: 5 }}>
+        <strong style={{ fontSize: 10, color: group.state === 'CURRENT' ? 'var(--accent)' : group.state === 'TARGET' ? 'var(--success)' : 'var(--gold)' }}>{group.state}</strong>
+        {group.scenarios?.map((scenario: any) => <div key={scenario.id} style={{ marginTop: 5, fontSize: 10 }}>{scenario.name}</div>)}
+        {group.views?.map((view: any) => <div key={view.id} style={{ marginTop: 6 }}>
+          <button className="btn btn-secondary btn-sm" style={{ width: '100%', textAlign: 'left', fontSize: 10 }} onClick={() => navigate(view.route)}>🗺 {view.name}</button>
+          {view.compareWithCurrentRoute && <button style={{ border: 0, background: 'none', padding: '4px 0 0', color: 'var(--accent)', cursor: 'pointer', fontSize: 9 }} onClick={() => navigate(view.compareWithCurrentRoute)}>Compare with Current</button>}
+        </div>)}
+      </div>)}
+    </div>
   </div>
 }
 
@@ -1267,7 +1420,7 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
 }
 
 // ── Phase Workspace (Step-based) ──────────────────────────
-function PhaseWorkspace({ cycle, phase, onClose }: any) {
+function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, onDecisionComplete }: any) {
   const { isAR, t, resolveText } = useLang()
   const api = useApi()
   const [phaseInputs, setPhaseInputs] = useState<any[]>([])
@@ -1299,7 +1452,12 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
       setPhaseDef(inp.phaseDef || out.phaseDef)
       // Auto-select first step
       const steps = inp.phaseDef?.steps || out.phaseDef?.steps || []
-      if (steps.length > 0) setActiveStep(steps[0].key)
+      if (steps.length > 0) setActiveStep(focusStep && steps.some((step: any) => step.key === focusStep) ? focusStep : steps[0].key)
+      if (focusOutputId && (out.outputs || []).some((item: any) => item.id === focusOutputId)) {
+        setExpandedOutputs(previous => new Set([...previous, focusOutputId]))
+        setExpandedOutput(focusOutputId)
+        setTimeout(() => scrollToElement(`adm-output-${focusOutputId}`), 0)
+      }
     }).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycle.id, phase])
@@ -1358,6 +1516,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
     setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
     // The approval endpoint authoritatively advances an active sequential run.
     window.dispatchEvent(new Event('adm-sequential-updated'))
+    onDecisionComplete?.()
     // Re-fetch inputs so next step gets auto-populated immediately
     setTimeout(async () => {
       try {
@@ -1365,6 +1524,13 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
         if (Array.isArray(inp.inputs) && inp.inputs.length > 0) setPhaseInputs(inp.inputs)
       } catch (_) {}
     }, 1500)
+  }
+
+  const decideOutput = async (outputId: string, status: 'REJECTED' | 'AI_DRAFT', complete = true) => {
+    const result = await api.put(`/adm-intelligence/outputs/${outputId}`, { status })
+    setPhaseOutputs(out => out.map(o => o.id === outputId ? { ...o, ...result } : o))
+    window.dispatchEvent(new Event('adm-sequential-updated'))
+    if (complete) onDecisionComplete?.()
   }
 
   const saveOutputEdit = async (outputId: string) => {
@@ -1520,7 +1686,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                     const statusColor = OUTPUT_STATUS_COLOR[out.status] || '#64748B'
                     const isExpanded = expandedOutputs.has(out.id)
                     return (
-                      <div key={out.id} style={{ marginBottom: 6, background: 'var(--navy)', border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)', overflow: 'hidden', transition: 'border-color 0.15s' }}>
+                      <div id={`adm-output-${out.id}`} key={out.id} style={{ marginBottom: 6, background: 'var(--navy)', border: `1px solid ${isExpanded ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)', overflow: 'hidden', transition: 'border-color 0.15s' }}>
                         {/* Collapsed header — always visible */}
                         <div
                           onClick={() => setExpandedOutputs(prev => { const s = new Set(prev); s.has(out.id) ? s.delete(out.id) : s.add(out.id); return s })}
@@ -1575,7 +1741,7 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                               <div style={{ color: 'var(--text-dim)' }}>The AI has organized and structured your collected architecture data. Review the output, make corrections if needed, then <strong style={{ color: 'var(--text)' }}>Approve</strong> to make it available as input to the next step.</div>
                             </div>
                           )}
-                          {(out.status === 'PENDING' || out.status === 'AI_DRAFT') && (() => {
+                          {(out.status === 'PENDING' || out.status === 'AI_DRAFT' || out.status === 'REJECTED') && (() => {
                             const behaviorType = def?.behaviorType || 'ANALYSIS'
                             const buttonConfig: Record<string, { label: string; icon: string; tooltip: string }> = {
                               DISCOVERY: { label: t('adm.analyze'), icon: '🔍', tooltip: isAR ? 'سيستخرج الذكاء الاصطناعي ويرتب الأدلة المعمارية من مدخلاتك' : 'AI will extract and organize architecture evidence from your inputs — not generate architecture' },
@@ -1607,6 +1773,10 @@ function PhaseWorkspace({ cycle, phase, onClose }: any) {
                           {out.content && out.status !== 'APPROVED' && (
                             <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, color: '#2ecc71', borderColor: 'rgba(22,163,74,0.4)' }} onClick={() => approveOutput(out.id)}>✓ Approve</button>
                           )}
+                          {out.content && out.status === 'AI_DRAFT' && <>
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, color: 'var(--danger)' }} onClick={() => decideOutput(out.id, 'REJECTED')}>Reject</button>
+                            <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, color: 'var(--gold)' }} onClick={() => { setEditingOutput(out.id); setOutputContent(out.content); decideOutput(out.id, 'AI_DRAFT', false) }}>Request Revision</button>
+                          </>}
                           {out.content && (
                             <>
                               <button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} onClick={() => setExpandedOutput(expandedOutput === out.id ? null : out.id)}>{expandedOutput === out.id ? '▲ Hide' : '▼ View'}</button>
@@ -1947,6 +2117,8 @@ export default function AdmPage() {
   const [selected, setSelected] = useState<any>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [activePhase, setActivePhase] = useState<string | null>(null)
+  const [actionTarget, setActionTarget] = useState<any>(null)
+  const [impactTarget, setImpactTarget] = useState<string | null>(null)
   const [cycleView, setCycleView] = useState<'phases' | 'repository'>('phases')
 
   const PHASES: Record<string, string[]> = {
@@ -1983,6 +2155,11 @@ export default function AdmPage() {
 
   const phases = PHASES[selected?.frameworkType] || PHASES.NORA
   const phaseNames = PHASE_NAMES[selected?.frameworkType] || PHASE_NAMES.NORA
+  const focusExecution = () => {
+    setActivePhase(null)
+    setActionTarget(null)
+    setTimeout(() => scrollToElement('adm-execution-panel', 'start'), 0)
+  }
 
   return (
     <div>
@@ -2078,8 +2255,11 @@ export default function AdmPage() {
                 {cycleView === 'repository' && <CycleRepositoryView cycle={selected} />}
                 {cycleView === 'phases' && (
                 <>
-                <SequentialExecutionPanel cycle={selected} />
-                <ArchitectureImpactReview cycle={selected} />
+                <SequentialExecutionPanel cycle={selected}
+                  onReviewOutput={(action: any) => { setActionTarget(action); setActivePhase(action.phase) }}
+                  onReviewImpact={(outputId: string) => { setImpactTarget(outputId); setTimeout(() => scrollToElement('architecture-impact-review', 'start'), 0) }} />
+                <ArchitectureImpactReview cycle={selected} focusOutputId={impactTarget} onDecisionComplete={() => { setImpactTarget(null); focusExecution() }} />
+                <CycleArchitecture cycle={selected} />
                 {/* Phase map */}
                 <div className="card mb-4">
                   <div className="flex items-center justify-between mb-4">
@@ -2113,7 +2293,7 @@ export default function AdmPage() {
 
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={create} t={t} />}
       {activePhase && selected && activePhase === '7' && <Phase7Workspace cycle={selected} steps={[]} onClose={() => setActivePhase(null)} />}
-      {activePhase && selected && activePhase !== '7' && <PhaseWorkspace cycle={selected} phase={activePhase} onClose={() => setActivePhase(null)} />}
+      {activePhase && selected && activePhase !== '7' && <PhaseWorkspace cycle={selected} phase={activePhase} focusStep={actionTarget?.step} focusOutputId={actionTarget?.output?.id} onDecisionComplete={focusExecution} onClose={() => { setActivePhase(null); setActionTarget(null) }} />}
     </div>
   )
 }
