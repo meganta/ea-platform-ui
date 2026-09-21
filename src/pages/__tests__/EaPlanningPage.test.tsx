@@ -33,6 +33,7 @@ function plan(overrides: Partial<Record<string, any>> = {}) {
     activities: [{ id: 'A1', name: 'Migrate Payments App', priority: 'HIGH' }],
     deliverables: [{ id: 'D1', name: 'Migration Runbook', type: 'Document' }],
     kpis: [], risks: [], scenarioId: null,
+    objectiveItems: [], initiatives: [], kpiItems: [],
     ...overrides,
   };
 }
@@ -148,6 +149,7 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
     await screen.findByText('45%');
     fireEvent.click(screen.getByText('📋 All Plans'));
     fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText('📋 Plan Content'));
     await screen.findByText('Migrate Payments App');
 
     fireEvent.click(screen.getAllByText('planning.link_asset')[0]);
@@ -169,6 +171,7 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
     await screen.findByText('45%');
     fireEvent.click(screen.getByText('📋 All Plans'));
     fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText('📋 Plan Content'));
     expect(await screen.findByTitle('planning.linked_to: Payments App')).toBeInTheDocument();
     expect(screen.getByText('planning.unlink')).toBeInTheDocument();
     expect(screen.queryByText('planning.link_asset')).not.toBeInTheDocument();
@@ -183,6 +186,7 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
     await screen.findByText('45%');
     fireEvent.click(screen.getByText('📋 All Plans'));
     fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText('📋 Plan Content'));
     fireEvent.click(await screen.findByText('planning.unlink'));
 
     await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
@@ -201,6 +205,7 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
     await screen.findByText('45%');
     fireEvent.click(screen.getByText('📋 All Plans'));
     fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText('📋 Plan Content'));
     await screen.findByText(/Migration Runbook/);
 
     // Two "link_asset" buttons exist (activity + deliverable) - click the second (deliverable's).
@@ -213,5 +218,198 @@ describe('EaPlanningPage - Plan Detail: activity/deliverable asset linking', () 
       expect.stringContaining('/ea-planning/plans/plan-1/deliverables/D1/asset'),
       expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ assetId: 'doc-1' }) }),
     ));
+  });
+});
+
+describe('EaPlanningPage - New Plan Wizard (multi-step)', () => {
+  // mockFetch matches by URL substring, not HTTP method, so GET '/ea-planning/plans'
+  // (list) and POST '/ea-planning/plans' (create) share a pattern - this override
+  // discriminates by method so create() gets back an object with a real id.
+  const PLANS_ROUTE = (url: string, options?: any) => options?.method === 'POST'
+    ? { id: 'new-plan-1', ...JSON.parse(options.body) }
+    : [plan()];
+
+  it('steps through Plan Type -> Context -> Import Previous -> Review, and creates the plan', async () => {
+    mockFetch({
+      ...BASE_ROUTES,
+      '/ea-planning/plans': PLANS_ROUTE,
+      '/ea-planning/plans?planTypeId=pt-1': [],
+    });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('+ New Plan'));
+
+    // Step 1: plan type card
+    fireEvent.click(await screen.findByText('Annual EA Master Plan'));
+    fireEvent.click(screen.getByText('Next: Define Context →'));
+
+    // Step 2: context
+    fireEvent.change(screen.getByPlaceholderText('Plan name'), { target: { value: 'FY2027 Plan' } });
+    fireEvent.click(screen.getByText('Next: Import Previous Work →'));
+
+    // Step 3: no previous plans of this type
+    await screen.findByText(/No previous plans of this type/);
+    fireEvent.click(screen.getByText('Next: Review & Create →'));
+
+    // Step 4: create
+    fireEvent.click(await screen.findByText('💾 Create Plan'));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans'),
+      expect.objectContaining({ method: 'POST' }),
+    ));
+  });
+
+  it('lets the user selectively import objectives from a previous plan of the same type', async () => {
+    mockFetch({
+      ...BASE_ROUTES,
+      '/ea-planning/plans': PLANS_ROUTE,
+      '/ea-planning/plans?planTypeId=pt-1': [{ id: 'plan-2025', nameEn: '2025 Plan', periodLabel: '2025', status: 'COMPLETED' }],
+      '/ea-planning/plans/plan-2025/objectives': [{ id: 'obj-1', title: 'Improve maturity', status: 'IN_PROGRESS' }],
+    });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('+ New Plan'));
+    fireEvent.click(await screen.findByText('Annual EA Master Plan'));
+    fireEvent.click(screen.getByText('Next: Define Context →'));
+    fireEvent.change(screen.getByPlaceholderText('Plan name'), { target: { value: 'FY2027 Plan' } });
+    fireEvent.click(screen.getByText('Next: Import Previous Work →'));
+
+    fireEvent.change(await screen.findByDisplayValue("Don't import - start fresh"), { target: { value: 'plan-2025' } });
+    fireEvent.click(await screen.findByLabelText(/Improve maturity/));
+    fireEvent.click(screen.getByText('Next: Review & Create →'));
+    fireEvent.click(await screen.findByText('💾 Create Plan'));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans/new-plan-1/import-objectives'),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ fromPlanId: 'plan-2025', objectiveIds: ['obj-1'], includeInitiatives: true }) }),
+    ));
+  });
+});
+
+describe('EaPlanningPage - Prioritization & Architecture Impact panels', () => {
+  it('expands an initiative to show scoring criteria and saves a score', async () => {
+    mockFetch({
+      ...BASE_ROUTES,
+      '/ea-planning/plans/plan-1': plan({ initiatives: [{ id: 'init-1', title: 'Stand up exception workflow', status: 'IN_PROGRESS', health: 'ON_TRACK', objectiveId: null, ownerId: 'user-1', linkedAssetIds: [] }] }),
+      '/ea-planning/prioritization-criteria': [{ id: 'crit-1', nameEn: 'Strategic Alignment', weight: 20 }],
+      '/ea-planning/plans/plan-1/initiatives/init-1/impact': { assets: [] },
+    });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('📋 All Plans'));
+    fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText(/🚀 Initiatives/));
+    fireEvent.click(await screen.findByText(/Stand up exception workflow/));
+
+    expect(await screen.findByText(/Strategic Alignment/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Save Score'));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans/plan-1/initiatives/init-1/score'),
+      expect.objectContaining({ method: 'PATCH' }),
+    ));
+  });
+
+  it('shows linked architecture assets and lets the user link a new one via search', async () => {
+    mockFetch({
+      ...BASE_ROUTES,
+      '/ea-planning/plans/plan-1': plan({ initiatives: [{ id: 'init-1', title: 'Stand up exception workflow', status: 'IN_PROGRESS', health: 'ON_TRACK', objectiveId: null, ownerId: 'user-1', linkedAssetIds: [] }] }),
+      '/ea-planning/prioritization-criteria': [],
+      '/ea-planning/plans/plan-1/initiatives/init-1/impact': { assets: [] },
+      '/ea-repository/assets?search=Payments': [{ id: 'app-1', name: 'Payments App', assetType: 'Application' }],
+    });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('📋 All Plans'));
+    fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText(/🚀 Initiatives/));
+    fireEvent.click(await screen.findByText(/Stand up exception workflow/));
+
+    fireEvent.click(await screen.findByText('+ Link Asset'));
+    fireEvent.change(screen.getByPlaceholderText('planning.search_asset'), { target: { value: 'Payments' } });
+    fireEvent.mouseDown(await screen.findByText('Payments App'));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans/plan-1/initiatives/init-1/assets'),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ assetId: 'app-1' }) }),
+    ));
+  });
+});
+
+describe('EaPlanningPage - KPIs tab', () => {
+  it('adds a KPI and posts it to the plan', async () => {
+    mockFetch({ ...BASE_ROUTES, '/ea-planning/plans/plan-1': plan() });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('📋 All Plans'));
+    fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText(/📈 KPIs/));
+    await screen.findByText(/No KPIs defined yet/);
+
+    fireEvent.click(screen.getByText('+ Add KPI'));
+    fireEvent.change(screen.getByPlaceholderText(/Metric, e.g/), { target: { value: '% exceptions via governed workflow' } });
+    fireEvent.click(screen.getByText('Add KPI'));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans/plan-1/kpis'),
+      expect.objectContaining({ method: 'POST' }),
+    ));
+  });
+});
+
+describe('EaPlanningPage - Objectives & Initiatives tabs', () => {
+  it('adds an objective and posts it to the plan', async () => {
+    mockFetch({ ...BASE_ROUTES, '/ea-planning/plans/plan-1': plan() });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('📋 All Plans'));
+    fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText(/🎯 Objectives/));
+    await screen.findByText(/No objectives defined yet/);
+
+    fireEvent.click(screen.getByText('+ Add Objective'));
+    fireEvent.change(screen.getByPlaceholderText('Objective title'), { target: { value: 'Improve maturity' } });
+    fireEvent.click(screen.getByText('Add Objective'));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans/plan-1/objectives'),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ title: 'Improve maturity' }) }),
+    ));
+  });
+
+  it('shows initiatives with health/status controls and flags one with no owner', async () => {
+    mockFetch({
+      ...BASE_ROUTES,
+      '/ea-planning/plans/plan-1': plan({
+        initiatives: [{ id: 'init-1', title: 'Stand up exception workflow', status: 'IN_PROGRESS', health: 'AT_RISK', objectiveId: null, ownerId: null }],
+      }),
+    });
+    render(<EaPlanningPage />);
+    await screen.findByText('45%');
+    fireEvent.click(screen.getByText('📋 All Plans'));
+    fireEvent.click(await screen.findByText('Cloud Migration Plan'));
+    fireEvent.click(await screen.findByText(/🚀 Initiatives/));
+
+    expect(await screen.findByText(/Stand up exception workflow/)).toBeInTheDocument();
+    expect(screen.getByText('👤 No owner')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByDisplayValue('AT RISK'), { target: { value: 'BLOCKED' } });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/ea-planning/plans/plan-1/initiatives/init-1'),
+      expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ health: 'BLOCKED' }) }),
+    ));
+  });
+
+  it('dashboard shows the needs-attention list and opens the initiatives tab of the right plan on click', async () => {
+    mockFetch({
+      ...BASE_ROUTES,
+      '/ea-planning/dashboard': { ...DASHBOARD, initiativesTotal: 1, initiativesByHealth: { ON_TRACK: 0, AT_RISK: 0, DELAYED: 0, BLOCKED: 1 },
+        needsAttention: [{ type: 'BLOCKED_INITIATIVE', initiativeId: 'init-1', planId: 'plan-1', planName: 'Cloud Migration Plan', title: 'Stand up exception workflow' }] },
+      '/ea-planning/plans/plan-1': plan({ initiatives: [{ id: 'init-1', title: 'Stand up exception workflow', status: 'IN_PROGRESS', health: 'BLOCKED', objectiveId: null, ownerId: 'user-1' }] }),
+    });
+    render(<EaPlanningPage />);
+    await screen.findByText('Stand up exception workflow');
+    fireEvent.click(screen.getByText('Stand up exception workflow'));
+    // Lands directly on the Initiatives tab rather than Overview.
+    expect(await screen.findByText('👤 user-1')).toBeInTheDocument();
   });
 });
