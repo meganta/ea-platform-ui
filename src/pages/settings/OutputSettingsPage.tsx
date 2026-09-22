@@ -1,26 +1,75 @@
 import { useState, useEffect } from 'react'
-import { authFetch } from './shared'
+import { authFetch, SETTINGS_API_URL } from './shared'
 
 export default function OutputSettingsPage() {
-  const [subTab, setSubTab] = useState<'diagrams' | 'export'>('diagrams')
+  const [subTab, setSubTab] = useState<'diagrams' | 'export' | 'templates'>('diagrams')
   return (
     <div>
       <div className="page-header">
         <div className="page-title">Output Preferences</div>
         <div className="page-subtitle">HOW DIAGRAMS AND DOCUMENTS ARE PRODUCED</div>
         <div className="page-tabs">
-          {[['diagrams', 'Diagrams'], ['export', 'Export']].map(([k, l]) => (
+          {[['diagrams', 'Diagrams'], ['export', 'Export'], ['templates', 'Document & Presentation Templates']].map(([k, l]) => (
             <button key={k} className={`tab-btn${subTab === k ? ' active' : ''}`} onClick={() => setSubTab(k as any)}>{l}</button>
           ))}
         </div>
       </div>
       <div className="page-body" style={{ maxWidth: 720 }}>
         <div className="card">
-          {subTab === 'diagrams' ? <DiagramSection /> : <ExportSection />}
+          {subTab === 'diagrams' ? <DiagramSection /> : subTab === 'export' ? <ExportSection /> : <TemplateSection />}
         </div>
       </div>
     </div>
   )
+}
+
+function TemplateSection() {
+  const [data, setData] = useState<any>(null)
+  const [format, setFormat] = useState<'PPTX' | 'DOCX'>('PPTX')
+  const [file, setFile] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const load = () => authFetch('/output-studio/templates').then(setData)
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const upload = async () => {
+    if (!file) return
+    setBusy(true); setMsg('')
+    try {
+      const body = new FormData(); body.append('file', file); body.append('format', format); body.append('name', file.name.replace(/\.(pptx|docx)$/i, ''))
+      const res = await fetch(`${SETTINGS_API_URL}/output-studio/templates/upload`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }, body })
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message || 'Upload failed')
+      setFile(null); setMsg('Template uploaded and set as the tenant default.'); await load()
+    } catch (e: any) { setMsg(e.message) } finally { setBusy(false) }
+  }
+  const setDefault = async (targetFormat: string, kind: 'TENANT' | 'GALLERY', id: string) => {
+    await authFetch(`/output-studio/templates/default/${targetFormat}`, { method: 'POST', body: JSON.stringify(kind === 'TENANT' ? { kind, templateId: id } : { kind, galleryId: id }) }); await load()
+  }
+  const remove = async (id: string) => { await authFetch(`/output-studio/templates/${id}`, { method: 'DELETE' }); await load() }
+  const selected = (targetFormat: string, kind: string, id: string) => {
+    const value = data?.defaults?.[targetFormat]
+    return value?.kind === kind && (value.templateId === id || value.galleryId === id)
+  }
+  return <div>
+    <div className="section-title" style={{ fontSize: 15 }}>Document & Presentation Templates</div>
+    <div style={{ fontSize: 12, color: 'var(--text-dim)', margin: '4px 0 16px' }}>Tenant-scoped Office templates are validated, versioned and profiled. ArchMind gallery templates remain available as fallback.</div>
+    {msg && <div className="alert" style={{ marginBottom: 10 }}>{msg}</div>}
+    <div style={{ display: 'flex', gap: 8, alignItems: 'end', padding: 12, border: '1px solid var(--border)', borderRadius: 5 }}>
+      <label style={{ fontSize: 11 }}>Type<select className="form-input" value={format} onChange={e => { setFormat(e.target.value as any); setFile(null) }} style={{ display: 'block', marginTop: 4 }}><option value="PPTX">PowerPoint (.pptx)</option><option value="DOCX">Word (.docx)</option></select></label>
+      <label style={{ fontSize: 11, flex: 1 }}>Template<input type="file" accept={format === 'PPTX' ? '.pptx' : '.docx'} onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'block', marginTop: 7 }} /></label>
+      <button className="btn btn-primary btn-sm" disabled={!file || busy} onClick={upload}>{busy ? 'Validating…' : 'Upload'}</button>
+    </div>
+    {(['PPTX', 'DOCX'] as const).map(targetFormat => <div key={targetFormat} style={{ marginTop: 18 }}>
+      <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 7 }}>{targetFormat === 'PPTX' ? 'PowerPoint' : 'Word'}</div>
+      {(data?.templates || []).filter((item: any) => item.format === targetFormat).map((item: any) => <div key={item.id} style={{ padding: 9, border: `1px solid ${selected(targetFormat, 'TENANT', item.id) ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 4, marginBottom: 5, fontSize: 11 }}>
+        <strong>{item.name}</strong> · v{item.version} · {(item.sizeBytes / 1024).toFixed(0)} KB
+        <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>Fonts: {item.profile?.fonts?.slice(0, 4).join(', ') || 'not declared'} · Layouts/styles: {item.profile?.layouts?.length || 0} · Media: {item.profile?.media?.length || 0}</div>
+        <div className="flex gap-2" style={{ marginTop: 5 }}><button className="btn btn-secondary btn-sm" onClick={() => setDefault(targetFormat, 'TENANT', item.id)}>{selected(targetFormat, 'TENANT', item.id) ? 'Default' : 'Set Default'}</button><button className="btn btn-secondary btn-sm" onClick={() => remove(item.id)}>Remove</button></div>
+      </div>)}
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', margin: '9px 0 5px' }}>ArchMind Template Gallery</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>{(data?.gallery || []).filter((item: any) => item.formats.includes(targetFormat)).map((item: any) => <button key={item.id} className="btn btn-secondary" onClick={() => setDefault(targetFormat, 'GALLERY', item.id)} style={{ textAlign: 'left', borderColor: selected(targetFormat, 'GALLERY', item.id) ? 'var(--accent)' : undefined }}><strong>{item.name}</strong><div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>{item.description}</div></button>)}</div>
+    </div>)}
+  </div>
 }
 
 function DiagramSection() {
