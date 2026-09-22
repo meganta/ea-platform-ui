@@ -202,6 +202,29 @@ describe('AdmPage - sequential execution and Architecture Impact Review', () => 
     expect(screen.getAllByText('Application Inventory').length).toBeGreaterThan(0);
   });
 
+  it('shows the exact required input and focuses it without a page refresh', async () => {
+    const phaseDef = { phase: '1', name: 'Scope', steps: [{ key: '1.1', title: 'Scope', inputs: [{ key: 'org_strategy', title: 'Organizational Strategy', source: 'EXTERNAL', required: true }], outputs: [{ key: 'drivers_list', title: 'EA Drivers List' }] }] };
+    mockFetch({
+      '/adm/cycles': [SAMPLE_CYCLE],
+      '/sequential': {
+        id: 'run-1', status: 'WAITING_INPUT', currentPhase: '1', currentStep: '1.1', completedOutputIds: [], remainingOutputIds: ['o1'],
+        waitingReason: 'Required input is missing: Organizational Strategy',
+        actionRequired: { type: 'INPUT_REQUIRED', phase: '1', step: '1.1', reason: 'Required evidence is missing.', requiredInput: { id: 'input-1', inputKey: 'org_strategy', title: 'Organizational Strategy' }, missingInputs: [], canResume: false },
+      },
+      '/phases/1/inputs': { phaseDef, inputs: [{ id: 'input-1', inputKey: 'org_strategy', title: 'Organizational Strategy', source: 'MISSING', content: '' }] },
+      '/phases/1/outputs': { phaseDef, outputs: [{ id: 'o1', outputKey: 'drivers_list', title: 'EA Drivers List', status: 'PENDING' }] },
+    });
+    render(<AdmPage />);
+    expect(await screen.findByText(/Required Input:/)).toBeInTheDocument();
+    expect(screen.getByText('Organizational Strategy')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload Evidence' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use Existing Evidence' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Provide Input' }));
+    await waitFor(() => expect(document.getElementById('adm-input-input-1')).toBeInTheDocument());
+    expect(document.querySelector('#adm-input-input-1 textarea')).toBeInTheDocument();
+  });
+
   it('warns about pending architecture impact and opens an explicit controlled proposal', async () => {
     mockFetch({
       '/adm/cycles': [SAMPLE_CYCLE],

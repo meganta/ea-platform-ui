@@ -142,15 +142,17 @@ function SequentialExecutionPanel({ cycle, onReviewOutput, onReviewImpact }: { c
     return () => window.removeEventListener('adm-sequential-updated', refresh)
   }, [cycle.id]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (run?.status !== 'RUNNING') return
-    const timer = setInterval(() => load(true), 3000)
+    if (!run || ['STOPPED', 'COMPLETED', 'PAUSED'].includes(run.status)) return
+    // One existing refresh loop owns all live transitions. RUNNING advances;
+    // every action-required state re-reads the enriched status payload.
+    const timer = setInterval(() => load(run.status === 'RUNNING'), 3000)
     return () => clearInterval(timer)
   }, [run?.status, run?.currentOutputId]) // eslint-disable-line react-hooks/exhaustive-deps
   const action = async (name: string) => {
     setBusy(true)
     try {
-      const next = await authFetch(`/adm-intelligence/cycles/${cycle.id}/sequential/${name}`, { method: 'POST' })
-      setRun(next?.id ? next : null)
+      await authFetch(`/adm-intelligence/cycles/${cycle.id}/sequential/${name}`, { method: 'POST' })
+      await load()
     }
     finally { setBusy(false) }
   }
@@ -171,7 +173,7 @@ function SequentialExecutionPanel({ cycle, onReviewOutput, onReviewImpact }: { c
           <div className="flex gap-2">
             {run.status === 'RUNNING' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => action('pause')}>Pause</button>}
             {['PAUSED', 'FAILED'].includes(run.status) && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('resume')}>Resume</button>}
-            {run.status === 'WAITING_INPUT' && !run.actionRequired?.output && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('resume')}>Resume</button>}
+            {run.status === 'WAITING_INPUT' && !run.actionRequired && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('resume')}>Resume</button>}
             <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => action('stop')}>Stop</button>
           </div>
         )}
@@ -187,11 +189,18 @@ function SequentialExecutionPanel({ cycle, onReviewOutput, onReviewImpact }: { c
           Phase {run.actionRequired.phase || '—'} · Step {run.actionRequired.step || '—'}
           {run.actionRequired.output?.title && <> · <strong>{run.actionRequired.output.title}</strong></>}
         </div>
+        {run.actionRequired.requiredInput?.title && <div style={{ fontSize: 11, marginTop: 5 }}>
+          Required Input: <strong>{run.actionRequired.requiredInput.title}</strong>
+        </div>}
         <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{run.actionRequired.reason}</div>
         <div className="flex gap-2" style={{ marginTop: 9, flexWrap: 'wrap' }}>
-          {['OUTPUT_REVIEW', 'INPUT_REQUIRED'].includes(run.actionRequired.type) && run.actionRequired.output && <button className="btn btn-primary btn-sm" onClick={() => onReviewOutput(run.actionRequired)}>
-            {run.actionRequired.type === 'INPUT_REQUIRED' ? 'Provide Required Input' : 'Review Output'}
-          </button>}
+          {run.actionRequired.type === 'OUTPUT_REVIEW' && run.actionRequired.output && <button className="btn btn-primary btn-sm" onClick={() => onReviewOutput(run.actionRequired)}>Review Output</button>}
+          {run.actionRequired.type === 'INPUT_REQUIRED' && run.actionRequired.requiredInput && <>
+            <button className="btn btn-primary btn-sm" onClick={() => onReviewOutput({ ...run.actionRequired, inputMode: 'PROVIDE' })}>Provide Input</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => onReviewOutput({ ...run.actionRequired, inputMode: 'UPLOAD' })}>Upload Evidence</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => onReviewOutput({ ...run.actionRequired, inputMode: 'EXISTING' })}>Use Existing Evidence</button>
+            {run.actionRequired.canResume && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => action('resume')}>Resume</button>}
+          </>}
           {run.actionRequired.type === 'ARCHITECTURE_IMPACT' && run.actionRequired.output && <button className="btn btn-primary btn-sm" onClick={() => onReviewImpact(run.actionRequired.output.id)}>Review Architecture Impact</button>}
           {run.status !== 'PAUSED' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => action('pause')}>Pause Execution</button>}
         </div>
@@ -733,9 +742,9 @@ function DiagramStatus({ outputId, onDone, outputStatus }: { outputId: string, o
 }
 
 // ── Input Source Panel ────────────────────────────────────
-function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
+function InputSourcePanel({ inp, cycleId, onUpdated, onEdit, initialMode }: any) {
   const { isAR, t } = useLang()
-  const [showOptions, setShowOptions] = useState(false)
+  const [showOptions, setShowOptions] = useState(initialMode === 'UPLOAD' || initialMode === 'EXISTING')
   const [kbQuery, setKbQuery] = useState('')
   const [kbSearching, setKbSearching] = useState(false)
   const [showRepoSearch, setShowRepoSearch] = useState(false)
@@ -751,6 +760,15 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
   const [uploading, setUploading] = useState(false)
   const token = () => localStorage.getItem('ea_token')
 
+  useEffect(() => {
+    if (initialMode === 'UPLOAD' || initialMode === 'EXISTING') setShowOptions(true)
+    if (initialMode === 'EXISTING' && !allRepoAssets.length) {
+      setShowRepoSearch(true)
+      loadRepoAssets()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMode])
+
   const pullFromKb = async () => {
     if (!kbQuery.trim()) return
     setKbSearching(true)
@@ -760,7 +778,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
         body: JSON.stringify({ query: kbQuery })
       })
       const updated = await res.json()
-      if (updated.id) { onUpdated(updated); setShowOptions(false) }
+      if (updated.id) { onUpdated(updated); window.dispatchEvent(new Event('adm-sequential-updated')); setShowOptions(false) }
       else alert(updated.message || isAR ? 'لم يتم العثور على محتوى' : 'No content found')
     } finally { setKbSearching(false) }
   }
@@ -786,6 +804,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
       const updated = await res.json()
       if (updated.id) {
         onUpdated(updated)
+        window.dispatchEvent(new Event('adm-sequential-updated'))
         setShowOptions(false)
         setShowRepoSearch(false)
       } else {
@@ -808,6 +827,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit }: any) {
       })
       const updated = await res.json()
       onUpdated(updated)
+      window.dispatchEvent(new Event('adm-sequential-updated'))
 
       // Optionally add to KB
       if (includeInKb) {
@@ -971,6 +991,11 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const { isAR, t } = useLang()
   const [mapping, setMapping] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [showExport, setShowExport] = useState(false)
+  const [preferences, setPreferences] = useState<any>(null)
+  const [format, setFormat] = useState<'DOCX' | 'PPTX'>('PPTX')
+  const [templateId, setTemplateId] = useState('')
+  const [options, setOptions] = useState({ language: isAR ? 'AR' : 'EN', includeExecutiveSummary: true, includeArchitectureVisuals: true, includeEvidenceAppendix: false, includeArchitectureImpact: true, includeComparison: true })
   const token = () => localStorage.getItem('ea_token')
 
   useEffect(() => {
@@ -982,12 +1007,20 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
     }).catch(() => {})
   }, [outputKey])
 
-  const download = async (format: 'docx' | 'pptx') => {
+  const openExport = async () => {
+    setShowExport(true)
+    if (!preferences) {
+      const res = await fetch(`${API_URL}/output-studio/templates`, { headers: { Authorization: `Bearer ${token()}` } })
+      if (res.ok) setPreferences(await res.json())
+    }
+  }
+
+  const download = async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (outputId) params.set('outputId', outputId)
-      const res = await fetch(`${API_URL}/adm-templates/output/${outputKey}/download/${format}?${params}`, {
+      const params = new URLSearchParams({ language: options.language, includeExecutiveSummary: String(options.includeExecutiveSummary), includeArchitectureVisuals: String(options.includeArchitectureVisuals), includeEvidenceAppendix: String(options.includeEvidenceAppendix), includeArchitectureImpact: String(options.includeArchitectureImpact), includeComparison: String(options.includeComparison) })
+      if (templateId) params.set('templateId', templateId)
+      const res = await fetch(`${API_URL}/output-studio/adm/outputs/${outputId}/export/${format.toLowerCase()}?${params}`, {
         headers: { Authorization: `Bearer ${token()}` }
       })
       if (!res.ok) {
@@ -998,7 +1031,7 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${outputKey}_template.${format}`
+      a.download = `${outputKey}.${format.toLowerCase()}`
       a.click()
       URL.revokeObjectURL(url)
     } catch (e: any) {
@@ -1019,14 +1052,23 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
         {isFilled && <span style={{ fontSize: 9, padding: '1px 6px', background: 'rgba(22,163,74,0.15)', color: 'var(--success)', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>AI CONTENT READY</span>}
       </div>
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? (mapping.purposeAr || mapping.purposeEn) : (mapping.purposeEn || mapping.purposeAr)}</div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(22,163,74,0.4)' } : {}) }} disabled={loading} onClick={() => download('docx')}>
-          📄 {loading ? '...' : isFilled ? t('adm.download_word') : t('adm.word_template')}
-        </button>
-        <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, ...(isFilled ? { color: 'var(--success)', borderColor: 'rgba(22,163,74,0.4)' } : {}) }} disabled={loading} onClick={() => download('pptx')}>
-          📊 {loading ? '...' : isFilled ? t('adm.download_ppt') : t('adm.ppt_template')}
-        </button>
-      </div>
+      <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, color: 'var(--success)', borderColor: 'rgba(22,163,74,0.4)' }} disabled={loading} onClick={openExport}>📤 Export</button>
+      {showExport && <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 5, background: 'var(--navy)' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>ArchMind Output Studio</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <label style={{ fontSize: 10 }}>Format<select className="form-input" value={format} onChange={e => { setFormat(e.target.value as any); setTemplateId('') }} style={{ width: '100%', marginTop: 3 }}><option value="PPTX">PowerPoint</option><option value="DOCX">Word</option></select></label>
+          <label style={{ fontSize: 10 }}>Template<select className="form-input" value={templateId} onChange={e => setTemplateId(e.target.value)} style={{ width: '100%', marginTop: 3 }}>
+            <option value="">Tenant Default</option>
+            {(preferences?.templates || []).filter((item: any) => item.format === format).map((item: any) => <option key={item.id} value={item.id}>{item.name} · v{item.version}</option>)}
+            {(preferences?.gallery || []).filter((item: any) => item.formats.includes(format)).map((item: any) => <option key={item.id} value={item.id}>ArchMind · {item.name}</option>)}
+          </select></label>
+          <label style={{ fontSize: 10 }}>Language<select className="form-input" value={options.language} onChange={e => setOptions(o => ({ ...o, language: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="AR">Arabic</option><option value="EN">English</option></select></label>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginTop: 9 }}>
+          {([['includeExecutiveSummary', 'Executive summary'], ['includeArchitectureVisuals', 'Architecture visuals'], ['includeEvidenceAppendix', 'Evidence appendix'], ['includeArchitectureImpact', 'Architecture Impact'], ['includeComparison', 'Current/Target comparison']] as const).map(([key, label]) => <label key={key} style={{ fontSize: 10 }}><input type="checkbox" checked={options[key]} onChange={e => setOptions(o => ({ ...o, [key]: e.target.checked }))} /> {label}</label>)}
+        </div>
+        <div className="flex gap-2" style={{ marginTop: 10 }}><button className="btn btn-primary btn-sm" disabled={loading} onClick={download}>{loading ? 'Generating…' : `Generate ${format}`}</button><button className="btn btn-secondary btn-sm" onClick={() => setShowExport(false)}>Cancel</button></div>
+      </div>}
     </div>
   )
 }
@@ -1420,7 +1462,7 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
 }
 
 // ── Phase Workspace (Step-based) ──────────────────────────
-function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, onDecisionComplete }: any) {
+function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, focusInputId, focusInputMode, onDecisionComplete }: any) {
   const { isAR, t, resolveText } = useLang()
   const api = useApi()
   const [phaseInputs, setPhaseInputs] = useState<any[]>([])
@@ -1458,6 +1500,14 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, onDec
         setExpandedOutput(focusOutputId)
         setTimeout(() => scrollToElement(`adm-output-${focusOutputId}`), 0)
       }
+      const targetInput = (inp.inputs || []).find((item: any) => item.id === focusInputId)
+      if (targetInput) {
+        if (focusInputMode === 'PROVIDE') {
+          setEditingInput(targetInput.id)
+          setInputContent(targetInput.content || '')
+        }
+        setTimeout(() => scrollToElement(`adm-input-${targetInput.id}`, 'center'), 0)
+      }
     }).finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycle.id, phase])
@@ -1467,6 +1517,7 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, onDec
     await api.put(`/adm-intelligence/inputs/${inputId}`, { content: inputContent, source: 'PROVIDED' })
     setPhaseInputs(inp => inp.map(i => i.id === inputId ? { ...i, content: inputContent, source: 'PROVIDED' } : i))
     setEditingInput(null)
+    window.dispatchEvent(new Event('adm-sequential-updated'))
   }
 
   const generateOutput = async (outputId: string) => {
@@ -1641,7 +1692,7 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, onDec
                     const sourceColor = SOURCE_COLORS[def?.source] || SOURCE_COLORS.EXTERNAL
                     const sourceBorder = SOURCE_BORDER[def?.source] || SOURCE_BORDER.EXTERNAL
                     return (
-                      <div key={inp.id} style={{ marginBottom: 10, padding: '10px 12px', background: sourceColor, border: `1px solid ${sourceBorder}`, borderRadius: 'var(--radius)' }}>
+                      <div id={`adm-input-${inp.id}`} key={inp.id} style={{ marginBottom: 10, padding: '10px 12px', background: sourceColor, border: `1px solid ${focusInputId === inp.id ? 'var(--accent)' : sourceBorder}`, borderRadius: 'var(--radius)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                           <div style={{ fontSize: 12, fontWeight: 500 }}>{isAR ? (inp.titleAr || inp.title) : (inp.title || inp.titleAr)}</div>
                           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -1668,7 +1719,7 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, onDec
                           <div>
                             {inp.content && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 6, maxHeight: 50, overflow: 'hidden', lineHeight: 1.5 }}>{inp.content.slice(0, 120)}{inp.content.length > 120 ? '...' : ''}</div>}
                             <RepositoryEvidenceSummary evidence={inp.repositoryEvidence} />
-                            <InputSourcePanel inp={inp} cycleId={cycle.id} onUpdated={(updated: any) => setPhaseInputs(prev => prev.map(i => i.id === updated.id ? updated : i))} onEdit={() => { setEditingInput(inp.id); setInputContent(inp.content || '') }} />
+                            <InputSourcePanel inp={inp} cycleId={cycle.id} initialMode={focusInputId === inp.id ? focusInputMode : undefined} onUpdated={(updated: any) => setPhaseInputs(prev => prev.map(i => i.id === updated.id ? updated : i))} onEdit={() => { setEditingInput(inp.id); setInputContent(inp.content || '') }} />
                           </div>
                         )}
                       </div>
@@ -2293,7 +2344,7 @@ export default function AdmPage() {
 
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreate={create} t={t} />}
       {activePhase && selected && activePhase === '7' && <Phase7Workspace cycle={selected} steps={[]} onClose={() => setActivePhase(null)} />}
-      {activePhase && selected && activePhase !== '7' && <PhaseWorkspace cycle={selected} phase={activePhase} focusStep={actionTarget?.step} focusOutputId={actionTarget?.output?.id} onDecisionComplete={focusExecution} onClose={() => { setActivePhase(null); setActionTarget(null) }} />}
+      {activePhase && selected && activePhase !== '7' && <PhaseWorkspace cycle={selected} phase={activePhase} focusStep={actionTarget?.step} focusOutputId={actionTarget?.output?.id} focusInputId={actionTarget?.requiredInput?.id} focusInputMode={actionTarget?.inputMode} onDecisionComplete={focusExecution} onClose={() => { setActivePhase(null); setActionTarget(null) }} />}
     </div>
   )
 }
