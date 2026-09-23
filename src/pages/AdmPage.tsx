@@ -995,7 +995,7 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const [preferences, setPreferences] = useState<any>(null)
   const [format, setFormat] = useState<'DOCX' | 'PPTX'>('PPTX')
   const [templateId, setTemplateId] = useState('')
-  const [options, setOptions] = useState({ language: isAR ? 'AR' : 'EN', includeExecutiveSummary: true, includeArchitectureVisuals: true, includeEvidenceAppendix: false, includeArchitectureImpact: true, includeComparison: true })
+  const [options, setOptions] = useState({ language: isAR ? 'AR' : 'EN', audience: 'ARCHITECTURE_TECHNICAL', detail: 'STANDARD', includeExecutiveSummary: true, includeArchitectureVisuals: true, includeEvidenceAppendix: false, includeArchitectureImpact: true, includeComparison: true })
   const token = () => localStorage.getItem('ea_token')
 
   useEffect(() => {
@@ -1018,7 +1018,7 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const download = async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ language: options.language, includeExecutiveSummary: String(options.includeExecutiveSummary), includeArchitectureVisuals: String(options.includeArchitectureVisuals), includeEvidenceAppendix: String(options.includeEvidenceAppendix), includeArchitectureImpact: String(options.includeArchitectureImpact), includeComparison: String(options.includeComparison) })
+      const params = new URLSearchParams({ language: options.language, audience: options.audience, detail: options.detail, includeExecutiveSummary: String(options.includeExecutiveSummary), includeArchitectureVisuals: String(options.includeArchitectureVisuals), includeEvidenceAppendix: String(options.includeEvidenceAppendix), includeArchitectureImpact: String(options.includeArchitectureImpact), includeComparison: String(options.includeComparison) })
       if (templateId) params.set('templateId', templateId)
       const res = await fetch(`${API_URL}/output-studio/adm/outputs/${outputId}/export/${format.toLowerCase()}?${params}`, {
         headers: { Authorization: `Bearer ${token()}` }
@@ -1063,6 +1063,8 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
             {(preferences?.gallery || []).filter((item: any) => item.formats.includes(format)).map((item: any) => <option key={item.id} value={item.id}>ArchMind · {item.name}</option>)}
           </select></label>
           <label style={{ fontSize: 10 }}>Language<select className="form-input" value={options.language} onChange={e => setOptions(o => ({ ...o, language: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="AR">Arabic</option><option value="EN">English</option></select></label>
+          {format === 'PPTX' && <label style={{ fontSize: 10 }}>Audience<select className="form-input" value={options.audience} onChange={e => setOptions(o => ({ ...o, audience: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="EXECUTIVE">Executive</option><option value="ARCHITECTURE_TECHNICAL">Architecture / Technical</option><option value="GENERAL_MANAGEMENT">General Management</option></select></label>}
+          {format === 'PPTX' && <label style={{ fontSize: 10 }}>Detail<select className="form-input" value={options.detail} onChange={e => setOptions(o => ({ ...o, detail: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="EXECUTIVE">Executive</option><option value="STANDARD">Standard</option><option value="DETAILED">Detailed</option></select></label>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginTop: 9 }}>
           {([['includeExecutiveSummary', 'Executive summary'], ['includeArchitectureVisuals', 'Architecture visuals'], ['includeEvidenceAppendix', 'Evidence appendix'], ['includeArchitectureImpact', 'Architecture Impact'], ['includeComparison', 'Current/Target comparison']] as const).map(([key, label]) => <label key={key} style={{ fontSize: 10 }}><input type="checkbox" checked={options[key]} onChange={e => setOptions(o => ({ ...o, [key]: e.target.checked }))} /> {label}</label>)}
