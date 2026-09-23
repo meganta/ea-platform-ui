@@ -67,8 +67,22 @@ function TemplateSection() {
         <div className="flex gap-2" style={{ marginTop: 5 }}><button className="btn btn-secondary btn-sm" onClick={() => setDefault(targetFormat, 'TENANT', item.id)}>{selected(targetFormat, 'TENANT', item.id) ? 'Default' : 'Set Default'}</button><button className="btn btn-secondary btn-sm" onClick={() => remove(item.id)}>Remove</button></div>
       </div>)}
       <div style={{ fontSize: 10, color: 'var(--text-dim)', margin: '9px 0 5px' }}>ArchMind Template Gallery</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>{(data?.gallery || []).filter((item: any) => item.formats.includes(targetFormat)).map((item: any) => <button key={item.id} className="btn btn-secondary" onClick={() => setDefault(targetFormat, 'GALLERY', item.id)} style={{ textAlign: 'left', borderColor: selected(targetFormat, 'GALLERY', item.id) ? 'var(--accent)' : undefined }}><strong>{item.name}</strong><div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3 }}>{item.description}</div></button>)}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: targetFormat === 'PPTX' ? 'repeat(3, minmax(0, 1fr))' : '1fr', gap: 8 }}>{(data?.gallery || []).filter((item: any) => item.formats.includes(targetFormat)).map((item: any) => <button key={item.id} className="btn btn-secondary" onClick={() => setDefault(targetFormat, 'GALLERY', item.id)} style={{ textAlign: 'left', padding: 0, overflow: 'hidden', borderColor: selected(targetFormat, 'GALLERY', item.id) ? 'var(--accent)' : undefined }}>{targetFormat === 'PPTX' && <DesignSystemPreview id={item.id} />}<div style={{ padding: 9 }}><strong>{item.name}</strong><div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3, whiteSpace: 'normal' }}>{item.description}</div></div></button>)}</div>
     </div>)}
+  </div>
+}
+
+function DesignSystemPreview({ id }: { id: string }) {
+  const designs: Record<string, { bg: string; ink: string; accent: string; mode: 'editorial' | 'institutional' | 'technical' }> = {
+    'executive-consulting': { bg: '#f7f5f0', ink: '#152a3a', accent: '#e05a47', mode: 'editorial' },
+    'government-executive': { bg: '#f4f7f5', ink: '#153f36', accent: '#b69a5b', mode: 'institutional' },
+    'architecture-professional': { bg: '#f3f7fa', ink: '#102a43', accent: '#00a6c8', mode: 'technical' },
+  }
+  const d = designs[id] || designs['architecture-professional']
+  return <div aria-label={`${id} representative slide preview`} style={{ height: 112, background: d.bg, position: 'relative', borderBottom: '1px solid var(--border)', overflow: 'hidden' }}>
+    {d.mode === 'editorial' && <><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '31%', background: d.accent }} /><div style={{ position: 'absolute', left: '39%', top: 20, width: '48%', height: 7, background: d.ink }} /><div style={{ position: 'absolute', left: '39%', top: 34, width: '36%', height: 4, background: '#89959d' }} /><div style={{ position: 'absolute', left: '39%', top: 58, display: 'flex', gap: 5 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 31, height: 31, background: i === 0 ? d.ink : '#fff', border: '1px solid #e7e2d9' }} />)}</div></>}
+    {d.mode === 'institutional' && <><div style={{ height: 8, background: d.accent }} /><div style={{ position: 'absolute', right: 0, top: 8, bottom: 0, width: 10, background: d.ink }} /><div style={{ position: 'absolute', right: 22, top: 23, width: '62%', height: 7, background: d.ink }} /><div style={{ position: 'absolute', right: 22, top: 43, width: '75%', height: 1, background: '#dce6e1' }} /><div style={{ position: 'absolute', right: 22, top: 58, display: 'flex', gap: 5 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 34, height: 30, background: '#fff', borderTop: `3px solid ${d.accent}`, borderInlineEnd: '1px solid #dce6e1' }} />)}</div></>}
+    {d.mode === 'technical' && <><div style={{ height: 5, background: d.accent }} />{[1, 2, 3, 4].map(i => <div key={i} style={{ position: 'absolute', left: 8 + i * 29, top: 12, bottom: 8, borderLeft: '1px solid #d9eaf0' }} />)}<div style={{ position: 'absolute', left: 14, top: 20, width: '68%', height: 7, background: d.ink }} /><div style={{ position: 'absolute', left: 18, top: 51, display: 'flex', gap: 12 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 31, height: 25, background: '#fff', border: `1px solid ${d.accent}`, borderRadius: 2 }} />)}</div><div style={{ position: 'absolute', left: 48, top: 62, width: 12, borderTop: `2px solid ${d.accent}` }} /><div style={{ position: 'absolute', left: 91, top: 62, width: 12, borderTop: `2px solid ${d.accent}` }} /></>}
   </div>
 }
 
