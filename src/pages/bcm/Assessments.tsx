@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import HelpTip from '../../components/HelpTip'
+import { useAuth } from '../../contexts/AuthContext'
 
 // Business Capability Assessments (Phase 2): list + detail (results,
 // validation, approval, publication) and the 9-step Assess Maturity wizard.
@@ -73,6 +74,7 @@ export function AssessmentsPanel({ L, isAR, can }: { L: LFn; isAR: boolean; can:
 }
 
 function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; isAR: boolean; can: { assess: boolean; validate: boolean; approve: boolean; publish: boolean }; onBack: () => void }) {
+  const { user } = useAuth()
   const [a, setA] = useState<any>(null)
   const [progress, setProgress] = useState<any>(null)
   const [caps, setCaps] = useState<Record<string, string>>({})
@@ -103,7 +105,9 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
         {can.assess && ['OPEN', 'RESPONSES_RECEIVED', 'VALIDATION'].includes(a.status) && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => api('POST', `${BASE}/${id}/analyze`))}>{a.status === 'VALIDATION' ? L('Recalculate', 'إعادة الحساب') : L('Close survey and analyze', 'إغلاق الاستبيان والتحليل')}</button>}
         {can.validate && a.status === 'VALIDATION' && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => api('POST', `${BASE}/${id}/submit-for-approval`))}>{L('Submit for approval', 'إرسال للاعتماد')}</button>}
-        {can.approve && a.status === 'APPROVAL' && !a.approvedAt && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => api('POST', `${BASE}/${id}/approve`))}>{L('Approve', 'اعتماد')}</button>}
+        {can.approve && a.status === 'APPROVAL' && !a.approvedAt && (a.createdBy === user?.userId
+          ? <span data-testid="needs-other-approver" style={{ fontSize: 12, color: 'var(--text-dim)', alignSelf: 'center' }}>{L('You created this assessment, so another authorized approver must approve it.', 'أنشأت هذا التقييم، لذا يجب أن يعتمده معتمد آخر مخوّل.')}</span>
+          : <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => api('POST', `${BASE}/${id}/approve`))}>{L('Approve', 'اعتماد')}</button>)}
         {can.approve && a.status === 'APPROVAL' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { const note = window.prompt(L('Reason for sending back', 'سبب الإعادة')); if (note) act(() => api('POST', `${BASE}/${id}/send-back`, { note })) }}>{L('Send back', 'إعادة للتحقق')}</button>}
         {can.publish && a.status === 'APPROVAL' && a.approvedAt && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => { if (window.confirm(L('Publishing updates the current maturity of the assessed capabilities. Continue?', 'النشر يحدّث مستوى النضج الحالي للقدرات. متابعة؟'))) act(() => api('POST', `${BASE}/${id}/publish`)) }}>{L('Publish results', 'نشر النتائج')}</button>}
       </div>
@@ -271,6 +275,8 @@ export function AssessWizard({ L, isAR, onClose }: { L: LFn; isAR: boolean; onCl
               <div style={{ marginTop: 8 }} data-testid="framework-rules">
                 {L(`Respondents disagreeing by more than ${fw.scoring?.varianceThreshold} level(s) are flagged for validation. At least ${Math.round((fw.scoring?.minimumCoverage ?? 0) * 100)}% of questions must be answered for a score.`, `يُحال التباين الأكبر من ${fw.scoring?.varianceThreshold} مستوى للتحقق. يلزم الإجابة على ${Math.round((fw.scoring?.minimumCoverage ?? 0) * 100)}% على الأقل من الأسئلة للحصول على درجة.`)}
                 {fw.scoring?.evidenceGate?.enabled && ' ' + L('Claims at a level that requires evidence count one level lower until the evidence is verified.', 'الادعاءات التي تتطلب أدلة تُحتسب بمستوى أقل حتى يتم التحقق منها.')}
+                {fw.scoring?.evidenceRequiredFromLevel && ' ' + L(`Verified evidence is required from level ${fw.scoring.evidenceRequiredFromLevel.critical} for critical capabilities and from level ${fw.scoring.evidenceRequiredFromLevel.default} otherwise. This is ArchMind's default configuration, not a universal maturity rule or an official CMMI requirement.`, `يلزم دليل متحقق منه من المستوى ${fw.scoring.evidenceRequiredFromLevel.critical} للقدرات الحرجة ومن المستوى ${fw.scoring.evidenceRequiredFromLevel.default} لغيرها. هذا إعداد افتراضي في ArchMind وليس قاعدة نضج عامة أو متطلباً رسمياً من CMMI.`)}
+                {' ' + L(`Respondents are combined using the ${fw.scoring?.respondentAggregation === 'MEAN' ? 'mean' : 'median'}; disagreement is flagged regardless.`, `تُجمع الردود باستخدام ${fw.scoring?.respondentAggregation === 'MEAN' ? 'المتوسط' : 'الوسيط'}؛ ويُحال التباين للتحقق في جميع الأحوال.`)}
               </div>
             </div>
           )}

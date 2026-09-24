@@ -3,6 +3,8 @@ import { AssessmentsPanel } from '../bcm/Assessments';
 import MySurveysPage from '../MySurveysPage';
 
 let mockIsAR = false;
+let mockUserId = 'someone';
+jest.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ user: { userId: mockUserId }, hasPermission: () => true }) }));
 jest.mock('../../contexts/LangContext', () => ({ useLang: () => ({ isAR: mockIsAR, locale: mockIsAR ? 'AR' : 'EN', t: (k: string) => k }) }));
 
 let calls: Array<{ url: string; method: string; body: any }> = [];
@@ -20,9 +22,9 @@ function mockFetch(routes: Record<string, any>) {
 }
 const L = (en: string, ar: string) => (mockIsAR ? ar : en);
 const ALL = { assess: true, validate: true, approve: true, publish: true };
-beforeEach(() => { mockIsAR = false; localStorage.setItem('ea_token', 't'); jest.spyOn(window, 'confirm').mockReturnValue(true); });
+beforeEach(() => { mockIsAR = false; mockUserId = 'someone'; localStorage.setItem('ea_token', 't'); jest.spyOn(window, 'confirm').mockReturnValue(true); });
 
-const FW = { id: 'fw', name: 'ArchMind Capability Maturity Model', version: 1, description: 'Five-level scale. Not an official CMMI appraisal.', levels: [1, 2, 3, 4, 5].map(l => ({ level: l, name: `L${l}`, definition: `d${l}` })), dimensions: [{ code: 'PROCESS', name: 'Process' }, { code: 'TECHNOLOGY', name: 'Technology / Applications' }], scoring: { varianceThreshold: 1, minimumCoverage: 0.7, evidenceGate: { enabled: true } } };
+const FW = { id: 'fw', name: 'ArchMind Capability Maturity Model', version: 1, description: 'Five-level scale. Not an official CMMI appraisal.', levels: [1, 2, 3, 4, 5].map(l => ({ level: l, name: `L${l}`, definition: `d${l}` })), dimensions: [{ code: 'PROCESS', name: 'Process' }, { code: 'TECHNOLOGY', name: 'Technology / Applications' }], scoring: { varianceThreshold: 1, minimumCoverage: 0.7, evidenceGate: { enabled: true }, respondentAggregation: 'MEDIAN', evidenceRequiredFromLevel: { critical: 3, default: 4 } } };
 
 describe('Assess Maturity wizard', () => {
   it('walks the 9 steps and launches with the chosen scope, dimensions, targets and respondents', async () => {
@@ -47,6 +49,7 @@ describe('Assess Maturity wizard', () => {
     fireEvent.click(await screen.findByLabelText('Last Mile Delivery'));
     fireEvent.click(screen.getByText('Next'));
     expect(await screen.findByTestId('framework-rules')).toHaveTextContent(/more than 1 level/);
+    expect(screen.getByTestId('framework-rules')).toHaveTextContent(/not a universal maturity rule or an official CMMI requirement/);
     fireEvent.click(screen.getByText('Next'));
     const dimSection = await screen.findByRole('region', { name: 'Last Mile Delivery' });
     fireEvent.click(within(dimSection).getByLabelText('Technology / Applications')); // untick a suggested dimension
@@ -112,6 +115,21 @@ describe('Assessment detail', () => {
     fireEvent.click(await screen.findByText('Q3'));
     fireEvent.click(await screen.findByText('Publish results'));
     expect(await screen.findByTestId('publication-report')).toHaveTextContent('Last Mile Delivery: updated');
+  });
+});
+
+describe('Segregation of duties in the UI', () => {
+  it('the creator sees that another approver is needed instead of an Approve button (even as tenant admin)', async () => {
+    mockUserId = 'creator';
+    mockFetch({
+      'GET /business-capabilities/assessments': [{ id: 'as1', name: 'Q3', status: 'APPROVAL', _count: { scope: 1 } }],
+      'GET /business-capabilities/assessments/as1/progress': { assessment: { id: 'as1', name: 'Q3', status: 'APPROVAL', createdBy: 'creator', approvedAt: null, results: [] }, assignments: [] },
+      'GET /business-capabilities/capabilities': [],
+    });
+    render(<AssessmentsPanel L={L} isAR={false} can={ALL} />);
+    fireEvent.click(await screen.findByText('Q3'));
+    expect(await screen.findByTestId('needs-other-approver')).toBeInTheDocument();
+    expect(screen.queryByText('Approve')).not.toBeInTheDocument();
   });
 });
 
