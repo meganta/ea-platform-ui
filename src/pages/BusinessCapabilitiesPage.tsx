@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
+import { AssessmentsPanel } from './bcm/Assessments'
 
 // Business Capabilities workspace - BCM Phase 1 foundation.
 // Capability Map · Capabilities (hierarchy) · Reference Library ·
@@ -28,7 +29,7 @@ async function call(method: string, path: string, body?: any) {
   return data
 }
 
-type Tab = 'map' | 'list' | 'library' | 'context' | 'setup'
+type Tab = 'map' | 'list' | 'assessments' | 'library' | 'context' | 'setup'
 
 const CLASS_LABEL: Record<string, [string, string]> = {
   ADMINISTRATIVE: ['Administrative', 'إدارية'],
@@ -58,7 +59,7 @@ export default function BusinessCapabilitiesPage() {
   const L = useCallback((en: string, ar: string) => (isAR ? ar : en), [isAR])
   const [tab, setTab] = useState<Tab>(() => {
     const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
-    return (['map', 'list', 'library', 'context', 'setup'] as Tab[]).includes(q as Tab) ? (q as Tab) : 'map'
+    return (['map', 'list', 'assessments', 'library', 'context', 'setup'] as Tab[]).includes(q as Tab) ? (q as Tab) : 'map'
   })
   const [ctx, setCtx] = useState<any>(null)
 
@@ -67,6 +68,11 @@ export default function BusinessCapabilitiesPage() {
     adopt: hasPermission('BusinessCapability.AdoptReference'),
     org: hasPermission('BusinessCapability.ManageOrgContext'),
     pack: hasPermission('BusinessCapability.ManageAttributePack'),
+    assess: hasPermission('BusinessCapability.Assess'),
+    validate: hasPermission('BusinessCapability.ValidateAssessment'),
+    approve: hasPermission('BusinessCapability.ApproveAssessment'),
+    publish: hasPermission('BusinessCapability.PublishAssessment'),
+    respond: hasPermission('Surveys.Respond'),
   }
 
   const loadCtx = useCallback(() => { call('GET', '/organization-context').then(setCtx).catch(() => setCtx(null)) }, [])
@@ -75,6 +81,7 @@ export default function BusinessCapabilitiesPage() {
   const tabs: Array<{ id: Tab; label: string; show: boolean }> = [
     { id: 'map', label: L('Capability Map', 'خريطة القدرات'), show: true },
     { id: 'list', label: L('Capabilities', 'القدرات'), show: true },
+    { id: 'assessments', label: L('Assessments', 'التقييمات'), show: true },
     { id: 'library', label: L('Reference Library', 'المكتبة المرجعية'), show: true },
     { id: 'context', label: L('Organization Context', 'سياق الجهة'), show: true },
     { id: 'setup', label: L('Model Setup', 'إعداد النموذج'), show: can.pack },
@@ -85,6 +92,7 @@ export default function BusinessCapabilitiesPage() {
       <div className="page-header">
         <div className="page-title">{L('Business Capabilities', 'قدرات الأعمال')}</div>
         <div className="page-subtitle">{L('What your organization does, independent of how it is organized or delivered', 'ما تقوم به الجهة بمعزل عن هيكلها التنظيمي أو طريقة التنفيذ')}</div>
+        {can.respond && <a href="/my-surveys" style={{ fontSize: 12, color: 'var(--accent)' }}>{L('My Surveys', 'استبياناتي')} →</a>}
         {ctx && ctx.classificationStatus !== 'CONFIRMED' && (
           <div role="status" data-testid="classification-banner" style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.3)', fontSize: 13, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
             <span>
@@ -104,6 +112,7 @@ export default function BusinessCapabilitiesPage() {
       <div className="page-body">
         {tab === 'map' && <CapabilityMap L={L} isAR={isAR} />}
         {tab === 'list' && <CapabilityList L={L} isAR={isAR} canManage={can.manage} />}
+        {tab === 'assessments' && <AssessmentsPanel L={L} isAR={isAR} can={{ assess: can.assess, validate: can.validate, approve: can.approve, publish: can.publish }} />}
         {tab === 'library' && <ReferenceLibrary L={L} isAR={isAR} canAdopt={can.adopt} />}
         {tab === 'context' && <OrganizationContext L={L} isAR={isAR} ctx={ctx} canEdit={can.org} onSaved={loadCtx} />}
         {tab === 'setup' && can.pack && <ModelSetup L={L} isAR={isAR} />}
