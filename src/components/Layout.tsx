@@ -68,6 +68,7 @@ export default function Layout() {
     { to: '/copilot', label: t('nav.copilot'), icon: '💬', permission: 'AIArchitect.Use' },
     { to: '/governance', label: '🏛 Governance', icon: '', permission: 'Reviews.View' },
     { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'Reviews.View', superadminOnly: true },
+    { to: '/business-capabilities', label: '🧱 ' + (locale === 'AR' ? 'قدرات الأعمال' : 'Business Capabilities'), icon: '', permission: 'BusinessCapability.View' },
     { to: '/strategy', label: '🎯 Strategy', icon: '', permission: 'Repository.View', superadminOnly: true },
     { to: '/ea-planning', label: '🗓 EA Planning', icon: '', permission: 'Repository.View' },
     { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Repository.View' },
