@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import { DiagramViewer } from '../components/DiagramViewer'
 import { Phase7Workspace } from '../components/Phase7Workspace'
 import HelpTip from '../components/HelpTip'
+import DesignPicker from '../components/DesignPicker'
 function DiagramBlock({ chart }: { chart: string }) {
   // Parse mermaid-style text into a readable styled block
   return (
@@ -995,6 +996,7 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const [preferences, setPreferences] = useState<any>(null)
   const [format, setFormat] = useState<'DOCX' | 'PPTX'>('PPTX')
   const [templateId, setTemplateId] = useState('')
+  const [baseDesign, setBaseDesign] = useState('architecture-professional')
   const [options, setOptions] = useState({ language: isAR ? 'AR' : 'EN', audience: 'ARCHITECTURE_TECHNICAL', detail: 'STANDARD', includeExecutiveSummary: true, includeArchitectureVisuals: true, includeEvidenceAppendix: false, includeArchitectureImpact: true, includeComparison: true })
   const token = () => localStorage.getItem('ea_token')
 
@@ -1020,6 +1022,7 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
     try {
       const params = new URLSearchParams({ language: options.language, audience: options.audience, detail: options.detail, includeExecutiveSummary: String(options.includeExecutiveSummary), includeArchitectureVisuals: String(options.includeArchitectureVisuals), includeEvidenceAppendix: String(options.includeEvidenceAppendix), includeArchitectureImpact: String(options.includeArchitectureImpact), includeComparison: String(options.includeComparison) })
       if (templateId) params.set('templateId', templateId)
+      if (format === 'PPTX' && (preferences?.templates || []).some((item: any) => item.id === templateId)) params.set('baseDesign', baseDesign)
       const res = await fetch(`${API_URL}/output-studio/adm/outputs/${outputId}/export/${format.toLowerCase()}?${params}`, {
         headers: { Authorization: `Bearer ${token()}` }
       })
@@ -1057,18 +1060,21 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
         <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>ArchMind Output Studio</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <label style={{ fontSize: 10 }}>Format<select className="form-input" value={format} onChange={e => { setFormat(e.target.value as any); setTemplateId('') }} style={{ width: '100%', marginTop: 3 }}><option value="PPTX">PowerPoint</option><option value="DOCX">Word</option></select></label>
-          <label style={{ fontSize: 10 }}>Template<select className="form-input" value={templateId} onChange={e => setTemplateId(e.target.value)} style={{ width: '100%', marginTop: 3 }}>
+          {format === 'DOCX' && <label style={{ fontSize: 10 }}>Template<select className="form-input" value={templateId} onChange={e => setTemplateId(e.target.value)} style={{ width: '100%', marginTop: 3 }}>
             <option value="">Tenant Default</option>
             {(preferences?.templates || []).filter((item: any) => item.format === format).map((item: any) => <option key={item.id} value={item.id}>{item.name} · v{item.version}</option>)}
             {(preferences?.gallery || []).filter((item: any) => item.formats.includes(format)).map((item: any) => <option key={item.id} value={item.id}>ArchMind · {item.name}</option>)}
-          </select></label>
+          </select></label>}
           <label style={{ fontSize: 10 }}>Language<select className="form-input" value={options.language} onChange={e => setOptions(o => ({ ...o, language: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="AR">Arabic</option><option value="EN">English</option></select></label>
           {format === 'PPTX' && <label style={{ fontSize: 10 }}>Audience<select className="form-input" value={options.audience} onChange={e => setOptions(o => ({ ...o, audience: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="EXECUTIVE">Executive</option><option value="ARCHITECTURE_TECHNICAL">Architecture / Technical</option><option value="GENERAL_MANAGEMENT">General Management</option></select></label>}
-          {format === 'PPTX' && <label style={{ fontSize: 10 }}>Detail<select className="form-input" value={options.detail} onChange={e => setOptions(o => ({ ...o, detail: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="EXECUTIVE">Executive</option><option value="STANDARD">Standard</option><option value="DETAILED">Detailed</option></select></label>}
+          {format === 'PPTX' && <div style={{ fontSize: 10 }}><div style={{ display: 'flex', alignItems: 'center' }}><label htmlFor="studio-detail">Detail</label><HelpTip text={t('studio.detail_help')} /></div><select id="studio-detail" className="form-input" value={options.detail} onChange={e => setOptions(o => ({ ...o, detail: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="EXECUTIVE">Executive</option><option value="STANDARD">Standard</option><option value="DETAILED">Detailed</option></select></div>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginTop: 9 }}>
-          {([['includeExecutiveSummary', 'Executive summary'], ['includeArchitectureVisuals', 'Architecture visuals'], ['includeEvidenceAppendix', 'Evidence appendix'], ['includeArchitectureImpact', 'Architecture Impact'], ['includeComparison', 'Current/Target comparison']] as const).map(([key, label]) => <label key={key} style={{ fontSize: 10 }}><input type="checkbox" checked={options[key]} onChange={e => setOptions(o => ({ ...o, [key]: e.target.checked }))} /> {label}</label>)}
+          {(format === 'PPTX'
+            ? ([['includeArchitectureVisuals', 'Architecture views bound to this output'], ['includeEvidenceAppendix', 'Structured input evidence (appendix)']] as const)
+            : ([['includeExecutiveSummary', 'Executive summary'], ['includeArchitectureVisuals', 'Architecture visuals'], ['includeEvidenceAppendix', 'Evidence appendix'], ['includeArchitectureImpact', 'Architecture Impact'], ['includeComparison', 'Current/Target comparison']] as const)).map(([key, label]) => <label key={key} style={{ fontSize: 10 }}><input type="checkbox" checked={options[key]} onChange={e => setOptions(o => ({ ...o, [key]: e.target.checked }))} /> {label}</label>)}
         </div>
+        {format === 'PPTX' && <DesignPicker gallery={preferences?.gallery || []} templates={preferences?.templates || []} defaultTemplateId={preferences?.defaults?.PPTX?.templateId} value={{ templateId, baseDesign }} onChange={value => { setTemplateId(value.templateId); setBaseDesign(value.baseDesign) }} previewLanguage={options.language === 'AR' ? 'AR' : 'EN'} />}
         <div className="flex gap-2" style={{ marginTop: 10 }}><button className="btn btn-primary btn-sm" disabled={loading} onClick={download}>{loading ? 'Generating…' : `Generate ${format}`}</button><button className="btn btn-secondary btn-sm" onClick={() => setShowExport(false)}>Cancel</button></div>
       </div>}
     </div>

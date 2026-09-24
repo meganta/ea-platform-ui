@@ -199,3 +199,15 @@ tr:hover td { background:rgba(3,105,161,0.03) }
 .section-title { font-family:var(--font-display); font-size:16px; font-weight:600; margin-bottom:16px; display:flex; align-items:center; gap:10px }
 .divider { height:1px; background:var(--border); margin:20px 0 }
 .truncate { overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+
+/* Presentation Studio design picker */
+.design-picker-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px }
+.design-card { border:1px solid var(--border); border-radius:6px; padding:8px; cursor:pointer; background:transparent; text-align:start; color:inherit; font:inherit }
+.design-card[aria-pressed="true"] { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) }
+.design-strip { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:3px; margin-top:6px }
+.design-strip img { width:100%; aspect-ratio:16/9; object-fit:cover; border:1px solid var(--border); border-radius:2px; display:block }
+.design-preview-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px }
+.design-preview-grid img { width:100%; border:1px solid var(--border); border-radius:3px; display:block }
+@media (max-width: 700px) {
+  .design-picker-grid, .design-preview-grid { grid-template-columns:1fr }
+}
