@@ -19,6 +19,26 @@ export type Locale = 'AR' | 'EN'
 // ── Static translation table ─────────────────────────────────────────────────
 // Keys map to both locales. NEVER use English as fallback for Arabic.
 const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
+  // Presentation Studio — design picker
+  'studio.design':               { EN: 'Design', AR: 'التصميم' },
+  'studio.your_org':             { EN: 'Your organization', AR: 'تصاميم مؤسستك' },
+  'studio.archmind_designs':     { EN: 'ArchMind designs', AR: 'تصاميم ArchMind' },
+  'studio.org_default':          { EN: 'Organization default', AR: 'الافتراضي للمؤسسة' },
+  'studio.org_default_hint':     { EN: 'Uses the design your administrator set as default.', AR: 'يستخدم التصميم الذي حدده مسؤول المؤسسة كافتراضي.' },
+  'studio.default_badge':        { EN: 'Default', AR: 'افتراضي' },
+  'studio.base_design':          { EN: 'Base design for your template', AR: 'التصميم الأساسي لقالب مؤسستك' },
+  'studio.base_design_hint':     { EN: 'Your template supplies colours and logo; the ArchMind design supplies layout and typography.', AR: 'يوفر قالب مؤسستك الألوان والشعار، ويوفر تصميم ArchMind التخطيط والخطوط.' },
+  'studio.preview':              { EN: 'Preview', AR: 'معاينة' },
+  'studio.close':                { EN: 'Close', AR: 'إغلاق' },
+  'studio.selected':             { EN: 'Selected', AR: 'محدد' },
+  'studio.audience':             { EN: 'Best for', AR: 'مناسب لـ' },
+  'studio.preview_cover':        { EN: 'Cover', AR: 'الغلاف' },
+  'studio.preview_summary':      { EN: 'Context', AR: 'السياق' },
+  'studio.preview_exhibit':      { EN: 'Analytical exhibit', AR: 'عرض تحليلي' },
+  'studio.preview_architecture': { EN: 'Architecture', AR: 'البنية' },
+  'studio.preview_roadmap':      { EN: 'Roadmap', AR: 'خارطة الطريق' },
+  'studio.help':                 { EN: 'The design only changes how the slides look. Every design presents exactly the same content from this output, in the same order, with the same source references.', AR: 'يغيّر التصميم مظهر الشرائح فقط. تعرض جميع التصاميم المحتوى نفسه من هذا المخرج، بالترتيب نفسه، ومع مراجع المصدر نفسها.' },
+  'studio.detail_help':          { EN: 'Detail level controls density, not meaning: Executive condenses, Detailed shows more on the slides. Full wording is always kept in the appendix and speaker notes.', AR: 'يتحكم مستوى التفصيل في الكثافة لا في المعنى: المستوى التنفيذي يختصر، والتفصيلي يعرض المزيد على الشرائح. ويبقى النص الكامل دائماً في الملحق وملاحظات المتحدث.' },
   // Strategy module
   'strategy.title':          { EN: 'Strategy', AR: 'الاستراتيجية' },
   'strategy.subtitle':       { EN: 'Strategic goals, capability alignment, and gap analysis', AR: 'الأهداف الاستراتيجية، مواءمة القدرات، وتحليل الفجوات' },
