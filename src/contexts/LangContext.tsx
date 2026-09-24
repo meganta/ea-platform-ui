@@ -54,6 +54,7 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'studio.generate_docx':        { EN: 'Generate Word', AR: 'إنشاء مستند Word' },
   'studio.generating':           { EN: 'Generating…', AR: 'جارٍ الإنشاء…' },
   'studio.cancel':               { EN: 'Cancel', AR: 'إلغاء' },
+  'studio.export_network_error': { EN: 'The export did not complete: the server did not respond. Please try again in a moment; if it keeps failing, contact your administrator.', AR: 'لم يكتمل التصدير لأن الخادم لم يستجب. يُرجى المحاولة مرة أخرى بعد قليل، وإذا تكرر الخطأ فتواصل مع مسؤول النظام.' },
   // Strategy module
   'strategy.title':          { EN: 'Strategy', AR: 'الاستراتيجية' },
   'strategy.subtitle':       { EN: 'Strategic goals, capability alignment, and gap analysis', AR: 'الأهداف الاستراتيجية، مواءمة القدرات، وتحليل الفجوات' },

@@ -1039,7 +1039,8 @@ export function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
       a.click()
       URL.revokeObjectURL(url)
     } catch (e: any) {
-      alert(e.message || 'Download failed')
+      // A network-level failure (TypeError "Failed to fetch") means no response reached the browser.
+      alert(e instanceof TypeError ? t('studio.export_network_error') : (e.message || 'Download failed'))
     } finally { setLoading(false) }
   }
 

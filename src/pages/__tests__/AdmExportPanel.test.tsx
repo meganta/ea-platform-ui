@@ -51,4 +51,13 @@ describe('ADM export panel', () => {
     expect(exportUrl).not.toMatch(/[?&]audience=/);
     expect(exportUrl).toContain('detail=STANDARD');
   });
+
+  it('explains a network failure instead of showing the raw browser error', async () => {
+    const alert = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    await openPanel();
+    (global.fetch as jest.Mock).mockImplementationOnce(() => Promise.reject(new TypeError('Failed to fetch')));
+    fireEvent.click(screen.getByText('studio.generate_pptx'));
+    await waitFor(() => expect(alert).toHaveBeenCalledWith('studio.export_network_error'));
+    alert.mockRestore();
+  });
 });
