@@ -988,7 +988,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit, initialMode }: any)
 
 
 // ── Template Panel ────────────────────────────────────────
-function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
+export function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const { isAR, t } = useLang()
   const [mapping, setMapping] = useState<any>(null)
   const [loading, setLoading] = useState(false)
@@ -997,7 +997,7 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const [format, setFormat] = useState<'DOCX' | 'PPTX'>('PPTX')
   const [templateId, setTemplateId] = useState('')
   const [baseDesign, setBaseDesign] = useState('architecture-professional')
-  const [options, setOptions] = useState({ language: isAR ? 'AR' : 'EN', audience: 'ARCHITECTURE_TECHNICAL', detail: 'STANDARD', includeExecutiveSummary: true, includeArchitectureVisuals: true, includeEvidenceAppendix: false, includeArchitectureImpact: true, includeComparison: true })
+  const [options, setOptions] = useState({ detail: 'STANDARD', includeExecutiveSummary: true, includeArchitectureVisuals: true, includeEvidenceAppendix: false, includeArchitectureImpact: true, includeComparison: true })
   const token = () => localStorage.getItem('ea_token')
 
   useEffect(() => {
@@ -1020,7 +1020,8 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const download = async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams({ language: options.language, audience: options.audience, detail: options.detail, includeExecutiveSummary: String(options.includeExecutiveSummary), includeArchitectureVisuals: String(options.includeArchitectureVisuals), includeEvidenceAppendix: String(options.includeEvidenceAppendix), includeArchitectureImpact: String(options.includeArchitectureImpact), includeComparison: String(options.includeComparison) })
+      // No language parameter: the export follows the output's own language (Arabic → RTL deck).
+      const params = new URLSearchParams({ detail: options.detail, includeExecutiveSummary: String(options.includeExecutiveSummary), includeArchitectureVisuals: String(options.includeArchitectureVisuals), includeEvidenceAppendix: String(options.includeEvidenceAppendix), includeArchitectureImpact: String(options.includeArchitectureImpact), includeComparison: String(options.includeComparison) })
       if (templateId) params.set('templateId', templateId)
       if (format === 'PPTX' && (preferences?.templates || []).some((item: any) => item.id === templateId)) params.set('baseDesign', baseDesign)
       const res = await fetch(`${API_URL}/output-studio/adm/outputs/${outputId}/export/${format.toLowerCase()}?${params}`, {
@@ -1057,25 +1058,23 @@ function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? (mapping.purposeAr || mapping.purposeEn) : (mapping.purposeEn || mapping.purposeAr)}</div>
       <button className="btn btn-secondary btn-sm" style={{ fontSize: 10, color: 'var(--success)', borderColor: 'rgba(22,163,74,0.4)' }} disabled={loading} onClick={openExport}>📤 Export</button>
       {showExport && <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--border)', borderRadius: 5, background: 'var(--navy)' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 10 }}>ArchMind Output Studio</div>
+        <div style={{ display: 'flex', alignItems: 'center', fontSize: 12, fontWeight: 700, marginBottom: 10 }}>{t('studio.export_title')}<HelpTip text={t('studio.language_help')} /></div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          <label style={{ fontSize: 10 }}>Format<select className="form-input" value={format} onChange={e => { setFormat(e.target.value as any); setTemplateId('') }} style={{ width: '100%', marginTop: 3 }}><option value="PPTX">PowerPoint</option><option value="DOCX">Word</option></select></label>
+          <label htmlFor="studio-format" style={{ fontSize: 10 }}>{t('studio.format')}<select id="studio-format" className="form-input" value={format} onChange={e => { setFormat(e.target.value as any); setTemplateId('') }} style={{ width: '100%', marginTop: 3 }}><option value="PPTX">{t('studio.format_pptx')}</option><option value="DOCX">{t('studio.format_docx')}</option></select></label>
           {format === 'DOCX' && <label style={{ fontSize: 10 }}>Template<select className="form-input" value={templateId} onChange={e => setTemplateId(e.target.value)} style={{ width: '100%', marginTop: 3 }}>
             <option value="">Tenant Default</option>
             {(preferences?.templates || []).filter((item: any) => item.format === format).map((item: any) => <option key={item.id} value={item.id}>{item.name} · v{item.version}</option>)}
             {(preferences?.gallery || []).filter((item: any) => item.formats.includes(format)).map((item: any) => <option key={item.id} value={item.id}>ArchMind · {item.name}</option>)}
           </select></label>}
-          <label style={{ fontSize: 10 }}>Language<select className="form-input" value={options.language} onChange={e => setOptions(o => ({ ...o, language: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="AR">Arabic</option><option value="EN">English</option></select></label>
-          {format === 'PPTX' && <label style={{ fontSize: 10 }}>Audience<select className="form-input" value={options.audience} onChange={e => setOptions(o => ({ ...o, audience: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="EXECUTIVE">Executive</option><option value="ARCHITECTURE_TECHNICAL">Architecture / Technical</option><option value="GENERAL_MANAGEMENT">General Management</option></select></label>}
-          {format === 'PPTX' && <div style={{ fontSize: 10 }}><div style={{ display: 'flex', alignItems: 'center' }}><label htmlFor="studio-detail">Detail</label><HelpTip text={t('studio.detail_help')} /></div><select id="studio-detail" className="form-input" value={options.detail} onChange={e => setOptions(o => ({ ...o, detail: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="EXECUTIVE">Executive</option><option value="STANDARD">Standard</option><option value="DETAILED">Detailed</option></select></div>}
+          {format === 'PPTX' && <div style={{ fontSize: 10 }}><div style={{ display: 'flex', alignItems: 'center' }}><label htmlFor="studio-detail">{t('studio.detail')}</label><HelpTip text={t('studio.detail_help')} /></div><select id="studio-detail" className="form-input" value={options.detail} onChange={e => setOptions(o => ({ ...o, detail: e.target.value }))} style={{ width: '100%', marginTop: 3 }}><option value="EXECUTIVE">{t('studio.detail_executive')}</option><option value="STANDARD">{t('studio.detail_standard')}</option><option value="DETAILED">{t('studio.detail_detailed')}</option></select></div>}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginTop: 9 }}>
           {(format === 'PPTX'
-            ? ([['includeArchitectureVisuals', 'Architecture views bound to this output'], ['includeEvidenceAppendix', 'Structured input evidence (appendix)']] as const)
+            ? ([['includeArchitectureVisuals', t('studio.include_views')], ['includeEvidenceAppendix', t('studio.include_evidence')]] as const)
             : ([['includeExecutiveSummary', 'Executive summary'], ['includeArchitectureVisuals', 'Architecture visuals'], ['includeEvidenceAppendix', 'Evidence appendix'], ['includeArchitectureImpact', 'Architecture Impact'], ['includeComparison', 'Current/Target comparison']] as const)).map(([key, label]) => <label key={key} style={{ fontSize: 10 }}><input type="checkbox" checked={options[key]} onChange={e => setOptions(o => ({ ...o, [key]: e.target.checked }))} /> {label}</label>)}
         </div>
-        {format === 'PPTX' && <DesignPicker gallery={preferences?.gallery || []} templates={preferences?.templates || []} defaultTemplateId={preferences?.defaults?.PPTX?.templateId} value={{ templateId, baseDesign }} onChange={value => { setTemplateId(value.templateId); setBaseDesign(value.baseDesign) }} previewLanguage={options.language === 'AR' ? 'AR' : 'EN'} />}
-        <div className="flex gap-2" style={{ marginTop: 10 }}><button className="btn btn-primary btn-sm" disabled={loading} onClick={download}>{loading ? 'Generating…' : `Generate ${format}`}</button><button className="btn btn-secondary btn-sm" onClick={() => setShowExport(false)}>Cancel</button></div>
+        {format === 'PPTX' && <DesignPicker gallery={preferences?.gallery || []} templates={preferences?.templates || []} defaultTemplateId={preferences?.defaults?.PPTX?.templateId} value={{ templateId, baseDesign }} onChange={value => { setTemplateId(value.templateId); setBaseDesign(value.baseDesign) }} previewLanguage={isAR ? 'AR' : 'EN'} />}
+        <div className="flex gap-2" style={{ marginTop: 10 }}><button className="btn btn-primary btn-sm" disabled={loading} onClick={download}>{loading ? t('studio.generating') : t(format === 'PPTX' ? 'studio.generate_pptx' : 'studio.generate_docx')}</button><button className="btn btn-secondary btn-sm" onClick={() => setShowExport(false)}>{t('studio.cancel')}</button></div>
       </div>}
     </div>
   )
