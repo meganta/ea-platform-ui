@@ -1,39 +1,112 @@
-name: EA Platform UI — Deploy
+name: EA Platform UI — Build & Deploy
 
-# Auto-deploy-on-push disabled — this team currently deploys the frontend
-# manually via `gcloud run deploy` from Cloud Shell (see repo docs / team
-# runbook). Switched to workflow_dispatch so this stays available to run
-# by hand from the Actions tab without racing the manual deploy on every
-# push to master. Re-enable the `push` trigger if/when the team moves to
-# CI-driven deploys.
+# Same model as the backend (meganta/ea-platform): every push to master is
+# tested, built into an image, pushed to Artifact Registry and deployed to
+# Cloud Run by image. Pull requests run the tests and the production build
+# only. workflow_dispatch redeploys the current master on demand.
 on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
   workflow_dispatch:
 
+# One deploy at a time per branch; never cancel a deploy mid-flight.
+concurrency:
+  group: deploy-ui-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGION: me-central1
+  SERVICE: ea-platform-ui
+  # Must match the API endpoint of the approved manual procedure.
+  REACT_APP_API_URL: https://ea-platform-api-693660680541.me-central1.run.app/api/v1
+
 jobs:
-  deploy:
+  test:
+    name: Test & Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # Node 20 is deprecated on Actions runners (see the backend workflow).
+          node-version: '22'
           cache: 'npm'
       - run: npm ci
+      - run: npx react-scripts test --watchAll=false
+        env:
+          CI: 'true'
       - run: npm run build
         env:
-          REACT_APP_API_URL: https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1
-      - uses: google-github-actions/auth@v2
+          # CRA treats lint warnings as errors when CI=true; the manual
+          # Cloud Shell build does not, so keep the same behaviour here.
+          CI: 'false'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: build/
+          retention-days: 3
+
+  deploy:
+    name: Build Image, Push & Deploy
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.ref_name == 'master' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    steps:
+      - uses: actions/checkout@v4
+
+      # Deploy exactly the build the tests ran against.
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: build/
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Compute image tag
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-8)
+          echo "IMAGE=${{ env.REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ea-platform/${{ env.SERVICE }}:master-${SHORT_SHA}" >> $GITHUB_ENV
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ env.IMAGE }}
+
+      # Image-only deploy: CPU, memory, instance limits, port and public
+      # access are left exactly as currently configured on the service.
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ea-platform-ui \
-            --source . \
-            --region me-central1 \
-            --allow-unauthenticated \
-            --port 8080 \
-            --cpu 1 \
-            --memory 512Mi \
-            --project ${{ secrets.GCP_PROJECT_ID }} \
+          echo "Previous revision: $(gcloud run services describe ${{ env.SERVICE }} --region=${{ env.REGION }} --project=${{ secrets.GCP_PROJECT_ID }} --format='value(status.latestReadyRevisionName)')"
+          gcloud run deploy ${{ env.SERVICE }} \
+            --image=${{ env.IMAGE }} \
+            --region=${{ env.REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
             --quiet
+
+      - name: Smoke check
+        run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE }} \
+            --region=${{ env.REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --format="value(status.url)")
+          echo "Deployed ${{ github.sha }} as $(gcloud run services describe ${{ env.SERVICE }} --region=${{ env.REGION }} --project=${{ secrets.GCP_PROJECT_ID }} --format='value(status.latestReadyRevisionName)')"
+          curl -fsS -o /dev/null "$URL/"
+          curl -fsS -o /dev/null "$URL/presentation-previews/executive-minimal/en-cover.png"
+          echo "🚀 UI live at: ${URL}"

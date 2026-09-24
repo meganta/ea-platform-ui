@@ -1,6 +1,6 @@
 # ArchMind EA Platform — Frontend (ea-platform-ui)
 
-React/TypeScript SPA for the ArchMind Enterprise Architecture platform. Deployed via Cloud Run, default branch `master`. Sibling backend repo: `meganta/ea-platform` (branch `main`) — see that repo's `CLAUDE.md` for backend architecture, module status, and the shared working-style/policy notes (communication style, non-negotiable rules, standing policies) that apply equally here and aren't repeated in full below.
+React/TypeScript SPA for the ArchMind Enterprise Architecture platform. Deployed to Cloud Run by `.github/workflows/deploy.yml` on every push to `master` (tests → build → image to Artifact Registry → image-only deploy that keeps the service's existing sizing/access), default branch `master`. Sibling backend repo: `meganta/ea-platform` (branch `main`) — see that repo's `CLAUDE.md` for backend architecture, module status, and the shared working-style/policy notes (communication style, non-negotiable rules, standing policies) that apply equally here and aren't repeated in full below.
 
 ## Standing policy (agreed mid-session, applies to every new page/feature)
 
