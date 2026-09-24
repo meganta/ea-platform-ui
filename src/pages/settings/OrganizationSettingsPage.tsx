@@ -7,7 +7,12 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660
 const authFetch = (path: string, opts: any = {}) =>
   fetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
 
-const SECTORS = [['GOVERNMENT', 'حكومي', 'Government'], ['HEALTH', 'صحة', 'Health'], ['EDUCATION', 'تعليم', 'Education'], ['FINANCE', 'مالية', 'Finance'], ['UTILITIES', 'خدمات عامة', 'Utilities'], ['OTHER', 'أخرى', 'Other']]
+// The legacy "Sector" selector was removed (BCM Phase 1.1): it mixed
+// organization type with industry and silently saved GOVERNMENT for any
+// tenant that never chose a value. The authoritative classification is
+// Organization type -> Industry -> Sub-sector -> Jurisdiction, confirmed by
+// an administrator under Business Capabilities > Organization Context.
+const ORG_TYPE_LABELS: Record<string, [string, string]> = { GOVERNMENT: ['Government', 'حكومية'], SEMI_GOVERNMENT: ['Semi-government', 'شبه حكومية'], PRIVATE: ['Private sector', 'قطاع خاص'] }
 const ENTITY_TYPES = [['MINISTRY', 'وزارة', 'Ministry'], ['AUTHORITY', 'هيئة', 'Authority'], ['ENTERPRISE', 'مؤسسة', 'Enterprise'], ['SME', 'شركة', 'Company']]
 const MATURITY_LABELS_AR = ['', 'بدائي', 'متطور', 'محدد', 'مُدار', 'مُحسَّن']
 const MATURITY_LABELS_EN = ['', 'Initial', 'Developing', 'Defined', 'Managed', 'Optimized']
@@ -54,8 +59,8 @@ export default function OrganizationSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [classification, setClassification] = useState<any>(null)
   const [form, setForm] = useState({
-    sector: 'GOVERNMENT',
     entityType: 'AUTHORITY', language: 'AR', eaMaturityLevel: 1,
     preferredFramework: 'NORA', domainsInScope: [] as string[],
     // Organizational Context fields — consolidated in from the Innovation
@@ -74,7 +79,6 @@ export default function OrganizationSettingsPage() {
         const liveDomains = rc?.metaModelDriven ? Object.keys(rc?.allDomains || {}) : (FALLBACK_DOMAINS[p?.preferredFramework || 'NORA'] || FALLBACK_DOMAINS.NORA)
         setForm(f => ({
           ...f,
-          sector: p?.sector || 'GOVERNMENT',
           entityType: p?.entityType || 'AUTHORITY',
           language: p?.language || 'AR',
           eaMaturityLevel: p?.eaMaturityLevel || 1,
@@ -88,6 +92,7 @@ export default function OrganizationSettingsPage() {
         }))
       })
       .finally(() => setLoading(false))
+    authFetch('/business-capabilities/organization-context').then(c => setClassification(c && !c.statusCode ? c : null)).catch(() => setClassification(null))
   }, [])
 
   const [subTab, setSubTab] = useState<'profile' | 'branding' | 'terminology'>('profile')
@@ -106,7 +111,7 @@ export default function OrganizationSettingsPage() {
       const r1 = await authFetch('/setup/profile', {
         method: 'PUT',
         body: JSON.stringify({
-          sector: form.sector, entityType: form.entityType, language: form.language, eaMaturityLevel: form.eaMaturityLevel,
+          entityType: form.entityType, language: form.language, eaMaturityLevel: form.eaMaturityLevel,
           preferredFramework: form.preferredFramework, domainsInScope: form.domainsInScope,
           industry: form.industry || undefined, organizationSize: form.organizationSize || undefined,
           primaryMandate: form.primaryMandate || undefined, orgDescriptionShort: form.orgDescriptionShort || undefined,
@@ -159,11 +164,17 @@ export default function OrganizationSettingsPage() {
             {isAR ? 'اسم المنظمة والشعار متاحان في تبويب "الهوية البصرية".' : 'Organization name and logo live under the "Branding" tab.'}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-            <div className="form-group">
-              <label className="form-label">{isAR ? 'القطاع' : 'Sector'}</label>
-              <select className="form-input" value={form.sector} onChange={e => setForm(f => ({ ...f, sector: e.target.value }))}>
-                {SECTORS.map(([v, ar, en]) => <option key={v} value={v}>{isAR ? ar : en}</option>)}
-              </select>
+            <div className="form-group" data-testid="org-classification-summary">
+              <label className="form-label">{isAR ? 'تصنيف الجهة' : 'Organization Classification'}</label>
+              <div style={{ fontSize: 13, padding: '8px 0' }}>
+                {classification?.classificationStatus === 'CONFIRMED'
+                  ? [classification.organizationType && (isAR ? ORG_TYPE_LABELS[classification.organizationType]?.[1] : ORG_TYPE_LABELS[classification.organizationType]?.[0]),
+                     classification.industry && (isAR ? (classification.industry.labelAr || classification.industry.labelEn) : classification.industry.labelEn),
+                     classification.subSector && (isAR ? (classification.subSector.labelAr || classification.subSector.labelEn) : classification.subSector.labelEn),
+                     classification.jurisdiction].filter(Boolean).join(' · ')
+                  : <span style={{ color: 'var(--warning)' }}>{isAR ? 'غير مؤكد' : 'Not confirmed'}</span>}
+                {' '}<a href="/business-capabilities?tab=context" style={{ color: 'var(--accent)', fontSize: 12 }}>{isAR ? 'إدارة' : 'Manage'}</a>
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">{isAR ? 'نوع الجهة' : 'Entity Type'}</label>

@@ -56,7 +56,10 @@ export default function BusinessCapabilitiesPage() {
   const { hasPermission } = useAuth()
   const { isAR } = useLang()
   const L = useCallback((en: string, ar: string) => (isAR ? ar : en), [isAR])
-  const [tab, setTab] = useState<Tab>('map')
+  const [tab, setTab] = useState<Tab>(() => {
+    const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
+    return (['map', 'list', 'library', 'context', 'setup'] as Tab[]).includes(q as Tab) ? (q as Tab) : 'map'
+  })
   const [ctx, setCtx] = useState<any>(null)
 
   const can = {
