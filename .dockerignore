@@ -1,0 +1,6 @@
+# The image only needs build/ (see Dockerfile); keep the Docker context small.
+.git
+node_modules/
+coverage/
+src/
+.env*
