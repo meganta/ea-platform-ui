@@ -204,6 +204,7 @@ export function CurationWorkspace({ L, isAR, userId }: { L: LFn; isAR: boolean; 
           {(models || []).flatMap(m => (m.versions || []).map((v: any) => <option key={v.id} value={v.id}>{m.name} · {v.version} · {VST[v.status] ? L(VST[v.status][0], VST[v.status][1]) : v.status}</option>))}
         </select>
         <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => run(() => bcm('POST', '/reference-library/curated-drafts/import'), L('Curated drafts imported (or already present).', 'تم استيراد المسودات (أو كانت موجودة).'))}>{L('Import ArchMind curated drafts', 'استيراد مسودات ArchMind')}</button>
+        <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => run(() => bcm('POST', '/reference-library/official-drafts/import'), L('NORA draft imported (or already present). Confirm its official source before publishing.', 'تم استيراد مسودة نورا (أو كانت موجودة). أكد المصدر الرسمي قبل النشر.'))}>{L('Import NORA draft', 'استيراد مسودة نورا')}</button>
       </div>
       {msg && <div role={msg.kind === 'err' ? 'alert' : 'status'} style={{ fontSize: 13, color: msg.kind === 'err' ? 'var(--danger)' : 'var(--success)', marginBottom: 8 }}>{msg.text}</div>}
       {summary && (
@@ -224,6 +225,7 @@ export function CurationWorkspace({ L, isAR, userId }: { L: LFn; isAR: boolean; 
         </div>
       )}
       {tree && versionId && <details style={{ ...card, marginBottom: 10 }}><summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{L('Sources & method', 'المصادر والمنهجية')}</summary><ModelSources versionId={versionId} version={tree.version} L={L} /></details>}
+      {tree && versionId && ['DRAFT', 'IN_REVIEW', 'APPROVED'].includes(status) && <SourceConfirmation versionId={versionId} L={L} onSaved={() => load(versionId)} />}
       {open && selected.size > 0 && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
           <span style={{ fontSize: 12 }}>{selected.size} {L('selected', 'محدد')}</span>
@@ -239,6 +241,7 @@ export function CurationWorkspace({ L, isAR, userId }: { L: LFn; isAR: boolean; 
             <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{i.description}</div>
             {i.curationNote && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Note', 'ملاحظة')}: {i.curationNote}</div>}
             {i.originalSnapshot && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Originally proposed as', 'المقترح الأصلي')}: {i.originalSnapshot.name}</div>}
+            {i.metadata?.englishNameProvenance === 'ARCHMIND_TRANSLATION' && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Official name', 'الاسم الرسمي')}: {i.metadata.officialName} · {L('English name is an ArchMind translation', 'الاسم الإنجليزي ترجمة من ArchMind')}</div>}
           </span>
           <span className="badge badge-draft">{CUR[i.curationStatus] ? L(CUR[i.curationStatus][0], CUR[i.curationStatus][1]) : i.curationStatus}</span>
           {open && <>
@@ -291,6 +294,32 @@ export function UpgradeReview({ modelId, L }: { modelId: string; L: LFn }) {
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{L('Comparison only. Your capabilities and mappings are never changed automatically.', 'مقارنة فقط. لا تتغير قدراتك أو روابطك تلقائياً.')}</div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Official sources must be fully identified before publication (enforced by the API).
+function SourceConfirmation({ versionId, L, onSaved }: { versionId: string; L: LFn; onSaved: () => void }) {
+  const [sources, setSources] = useState<any[]>([])
+  const [msg, setMsg] = useState<string | null>(null)
+  useEffect(() => { bcm('GET', `/reference-versions/${versionId}/sources`).then(r => setSources(Array.isArray(r) ? r : [])).catch(() => setSources([])) }, [versionId])
+  const pending = sources.filter(s => s.provenanceType === 'OFFICIAL_STANDARD' && (!s.publicationInfo || /TO BE CONFIRMED/i.test(s.publicationInfo)))
+  if (!pending.length) return null
+  return (
+    <div data-testid="source-confirmation" style={{ ...card, marginBottom: 10, borderColor: 'var(--warning)' }}>
+      <div style={{ fontSize: 13, fontWeight: 600 }}>{L('Official source not yet confirmed - publication is blocked', 'لم يتم تأكيد المصدر الرسمي - النشر موقوف')}</div>
+      {pending.map(s => (
+        <div key={s.id} style={{ fontSize: 12, marginTop: 6 }}>
+          {s.title}
+          <button className="btn btn-secondary btn-sm" style={{ marginInlineStart: 8 }} onClick={async () => {
+            const title = window.prompt(L('Official document title', 'عنوان الوثيقة الرسمية'), s.title); if (!title) return
+            const info = window.prompt(L('Version, publication date and page (e.g. "v2.0, 2023, p. 45")', 'الإصدار وتاريخ النشر والصفحة')); if (!info) return
+            const url = window.prompt(L('Official URL (optional, https)', 'الرابط الرسمي (اختياري)')) || undefined
+            try { await bcm('PUT', `/reference-versions/${versionId}/sources/${s.key}`, { title, publicationInfo: info, ...(url ? { url } : {}) }); setMsg(L('Source confirmed.', 'تم تأكيد المصدر.')); onSaved(); setSources(await bcm('GET', `/reference-versions/${versionId}/sources`)) } catch (e: any) { setMsg(e.message) }
+          }}>{L('Confirm source', 'تأكيد المصدر')}</button>
+        </div>
+      ))}
+      {msg && <div role="status" style={{ fontSize: 12, marginTop: 4 }}>{msg}</div>}
     </div>
   )
 }

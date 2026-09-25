@@ -226,3 +226,27 @@ describe('resilience', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/unavailable/);
   });
 });
+
+describe('NORA official reference in curation', () => {
+  it('separate NORA import; official source must be confirmed; official Arabic names shown with translation note', async () => {
+    mockFetch({
+      '/reference-models': [{ id: 'nora', name: 'NORA Business Reference Model', isPlatform: true, provenance: 'OFFICIAL_STANDARD', versions: [{ id: 'v9', version: 'NORA-BCM-draft-1', status: 'APPROVED' }] }],
+      '/reference-versions/v9/tree': { version: { status: 'APPROVED', model: { provenance: 'OFFICIAL_STANDARD' } }, tree: [{ item: { stableKey: 'NORA.ADM.STR', level: 1, name: 'Strategy', description: '', curationStatus: 'ACCEPTED', metadata: { officialName: 'الاستراتيجية', englishNameProvenance: 'ARCHMIND_TRANSLATION' } }, children: [] }] },
+      '/reference-versions/v9/curation': { status: 'APPROVED', counts: { ACCEPTED: 1 }, blockers: [] },
+      'GET /reference-versions/v9/sources': [{ id: 's', key: 'NORA-BCM', title: 'NORA BRM', provenanceType: 'OFFICIAL_STANDARD', publicationInfo: 'TO BE CONFIRMED before publication.' }],
+      'PUT /reference-versions/v9/sources/NORA-BCM': {}, 'POST /reference-library/official-drafts/import': [],
+    });
+    jest.spyOn(window, 'prompt').mockReturnValueOnce('NORA Business Reference Model').mockReturnValueOnce('v2.0, 2023, p. 45').mockReturnValueOnce('');
+    render(<CurationWorkspace L={L} isAR={false} userId="pa" />);
+    fireEvent.click(await screen.findByText('Import NORA draft'));
+    await waitFor(() => expect(calls.some(c => c.url.endsWith('/official-drafts/import'))).toBe(true));
+    await screen.findByRole('option', { name: /NORA-BCM-draft-1/ });
+    fireEvent.change(screen.getByLabelText('Reference model version'), { target: { value: 'v9' } });
+    expect(await screen.findByText(/Official name: الاستراتيجية · English name is an ArchMind translation/)).toBeInTheDocument();
+    const box = await screen.findByTestId('source-confirmation');
+    expect(box).toHaveTextContent(/publication is blocked/);
+    fireEvent.click(within(box).getByText('Confirm source'));
+    await waitFor(() => expect(calls.find(c => c.method === 'PUT')?.body).toEqual({ title: 'NORA Business Reference Model', publicationInfo: 'v2.0, 2023, p. 45' }));
+  });
+});
+
