@@ -2,12 +2,20 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import { api } from '../lib/api'
+import BrandLogo from '../brand/BrandLogo'
+import BrandPattern from '../brand/BrandPattern'
+import Icon, { IconName } from '../brand/icons'
+import { BRAND_LEGAL_NAME } from '../brand/assets'
+import '../brand/brand.css'
 import './LandingPage.css'
 
 type Copy = { EN: string; AR: string }
 type LocalizedItem = { title: Copy; body: Copy }
 
 const c = (EN: string, AR: string): Copy => ({ EN, AR })
+
+const problemIcons: IconName[] = ['fragmented', 'manual', 'visibility', 'framework']
+const capabilityIcons: IconName[] = ['layers', 'review', 'planning', 'decision', 'architects', 'radar']
 
 const problems: LocalizedItem[] = [
   { title: c('Fragmented Architecture Information', 'تشتت معلومات البنية المؤسسية'), body: c('Architecture information is distributed across documents, spreadsheets, and disconnected tools.', 'تتوزع معلومات البنية المؤسسية بين المستندات وجداول البيانات والأدوات غير المترابطة.') },
@@ -72,8 +80,6 @@ const labels = {
   signIn: c('Sign In', 'تسجيل الدخول'),
 }
 
-function Arrow() { return <span className="arq-arrow" aria-hidden="true">→</span> }
-
 export default function LandingPage() {
   const { locale, setLocale } = useLang()
   const L = (value: Copy) => value[locale]
@@ -104,6 +110,8 @@ export default function LandingPage() {
     setMeta('meta[property="og:title"]', 'content', seo.title)
     setMeta('meta[property="og:description"]', 'content', seo.description)
     setMeta('meta[property="og:locale"]', 'content', seo.ogLocale)
+    setMeta('meta[name="twitter:title"]', 'content', seo.title)
+    setMeta('meta[name="twitter:description"]', 'content', seo.description)
   }, [seo])
 
   const submitDemo = async (event: FormEvent<HTMLFormElement>) => {
@@ -156,128 +164,221 @@ export default function LandingPage() {
     setCopied(true)
   }
 
+
   return (
-    <div className="arq-site" data-locale={locale}>
-      <a className="arq-skip" href="#main">{L(c('Skip to content', 'انتقل إلى المحتوى'))}</a>
-      <header className="arq-nav-wrap">
-        <nav className="arq-nav" aria-label={L(c('Primary navigation', 'التنقل الرئيسي'))}>
-          <a className="arq-brand" href="#top" aria-label="ArchMind home"><span className="arq-mark">A</span><span>ArchMind</span></a>
-          <button className="arq-menu-button" aria-label={L(c('Open navigation', 'فتح قائمة التنقل'))} aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>☰</button>
-          <div className={`arq-nav-panel${menuOpen ? ' open' : ''}`}>
-            <div className="arq-nav-links">
+    <div className="am-root lp" data-locale={locale}>
+      <a className="lp-skip" href="#main">{L(c('Skip to content', 'انتقل إلى المحتوى'))}</a>
+      <header className="lp-header">
+        <nav className="lp-nav am-container wide" aria-label={L(c('Primary navigation', 'التنقل الرئيسي'))}>
+          <BrandLogo href="#top" tone="white" size={23} label="ArchMind home" />
+          <button className="lp-menu-button" aria-label={L(c('Open navigation', 'فتح قائمة التنقل'))} aria-expanded={menuOpen} aria-controls="lp-nav-panel" onClick={() => setMenuOpen(!menuOpen)}><Icon name={menuOpen ? 'close' : 'menu'} /></button>
+          <div id="lp-nav-panel" className={`lp-nav-panel${menuOpen ? ' open' : ''}`}>
+            <div className="lp-nav-links">
               {navItems.map((item) => <a key={item.href} href={item.href} onClick={() => setMenuOpen(false)}>{L(item.label)}</a>)}
             </div>
-            <div className="arq-nav-actions">
-              <button className="arq-lang" onClick={() => setLocale(locale === 'EN' ? 'AR' : 'EN')} aria-label={L(c('Switch to Arabic', 'التبديل إلى الإنجليزية'))}><span className={locale === 'EN' ? 'active' : ''}>EN</span><i /> <span className={locale === 'AR' ? 'active' : ''}>العربية</span></button>
-              <Link className="arq-signin" to="/login">{L(labels.signIn)}</Link>
-              <a className="arq-button small" href="#demo">{L(labels.requestDemo)}</a>
+            <div className="lp-nav-actions">
+              <LanguageToggle locale={locale} onToggle={() => setLocale(locale === 'EN' ? 'AR' : 'EN')} label={L(c('Switch to Arabic', 'التبديل إلى الإنجليزية'))} />
+              <Link className="lp-signin" to="/login">{L(labels.signIn)}</Link>
+              <a className="am-btn am-btn-primary sm" href="#demo">{L(labels.requestDemo)}</a>
             </div>
           </div>
         </nav>
       </header>
 
       <main id="main">
-        <section className="arq-hero" id="top">
-          <div className="arq-orbit arq-orbit-one" /><div className="arq-orbit arq-orbit-two" />
-          <div className="arq-container arq-hero-grid">
-            <div className="arq-hero-copy">
-              <div className="arq-kicker"><span />{L(c('ENTERPRISE ARCHITECTURE OPERATIONS', 'تشغيل البنية المؤسسية'))}</div>
-              <h1>{L(labels.heroTitle)}</h1>
-              <p>{L(labels.heroBody)}</p>
-              <div className="arq-hero-actions"><a className="arq-button" href="#demo">{L(labels.requestDemo)} <Arrow /></a><a className="arq-text-link" href="#platform">{L(labels.explore)} <Arrow /></a></div>
-              <div className="arq-trust-line"><span>{L(c('Built for complex organizations', 'مصممة للجهات ذات البيئات المعقدة'))}</span><span>{L(c('Bilingual by design', 'ثنائية اللغة من الأساس'))}</span></div>
+        <section className="lp-hero am-on-dark" id="top">
+          <BrandPattern variant="flow" intensity={0.55} />
+          <div className="am-container wide lp-hero-grid">
+            <div className="lp-hero-copy">
+              <div className="am-eyebrow am-label">{L(c('ENTERPRISE ARCHITECTURE OPERATIONS', 'تشغيل البنية المؤسسية'))}</div>
+              <h1 className="am-h1 lp-hero-title">{L(labels.heroTitle)}</h1>
+              <p className="am-body-lg">{L(labels.heroBody)}</p>
+              <div className="lp-hero-actions">
+                <a className="am-btn am-btn-brand" href="#demo">{L(labels.requestDemo)} <Arrow /></a>
+                <a className="am-btn am-btn-on-dark" href="#platform">{L(labels.explore)} <Arrow /></a>
+              </div>
+              <ul className="lp-trust-line">
+                <li><Icon name="check" size={16} />{L(c('Built for complex organizations', 'مصممة للجهات ذات البيئات المعقدة'))}</li>
+                <li><Icon name="check" size={16} />{L(c('Bilingual by design', 'ثنائية اللغة من الأساس'))}</li>
+              </ul>
             </div>
             <ProductComposition locale={locale} />
           </div>
         </section>
 
-        <section className="arq-section arq-problems" aria-labelledby="problems-title">
-          <div className="arq-container">
+        <section className="am-section lp-surface" aria-labelledby="problems-title">
+          <div className="am-container">
             <SectionHeading eyebrow={c('THE OPERATING CHALLENGE', 'تحديات التشغيل')} title={c('Move beyond disconnected architecture work', 'تجاوز العمل المعماري المتفرق')} body={c('Enterprise architecture creates value when information, governance, and transformation planning operate as one system.', 'تتحقق قيمة البنية المؤسسية عندما تعمل المعلومات والحوكمة وتخطيط التحول ضمن منظومة واحدة.')} L={L} id="problems-title" />
-            <div className="arq-problem-grid">{problems.map((item, index) => <article key={item.title.EN}><span>0{index + 1}</span><h3>{L(item.title)}</h3><p>{L(item.body)}</p></article>)}</div>
-            <div className="arq-answer"><strong>ArchMind</strong><span>{L(c('connects architecture definition, evidence, analysis, governance, and change in one operational environment.', 'تربط تعريف البنية المؤسسية وأدلتها وتحليلها وحوكمتها وتغييرها ضمن بيئة تشغيلية واحدة.'))}</span></div>
+            <div className="lp-grid-4">{problems.map((item, index) => <article className="am-card" key={item.title.EN}><div className="lp-card-top"><span className="am-icon-tile"><Icon name={problemIcons[index]} /></span><span className="am-index">0{index + 1}</span></div><h3 className="am-h4">{L(item.title)}</h3><p className="am-body-sm">{L(item.body)}</p></article>)}</div>
+            <div className="lp-answer"><BrandLogo variant="symbol" size={26} /><p className="am-body-lg">{L(c('connects architecture definition, evidence, analysis, governance, and change in one operational environment.', 'تربط تعريف البنية المؤسسية وأدلتها وتحليلها وحوكمتها وتغييرها ضمن بيئة تشغيلية واحدة.'))}</p></div>
           </div>
         </section>
 
-        <section className="arq-section arq-model-section" id="platform" aria-labelledby="model-title">
-          <div className="arq-container">
+        <section className="am-section lp-subtle" id="platform" aria-labelledby="model-title">
+          <div className="am-container">
             <SectionHeading eyebrow={c('PLATFORM OPERATING MODEL', 'نموذج تشغيل المنصة')} title={c('From architecture language to measurable transformation', 'من اللغة المعمارية إلى تحول قابل للقياس')} body={c('A continuous operating rhythm for the enterprise architecture office.', 'مسار تشغيلي متكامل ومستمر لمكتب البنية المؤسسية.')} L={L} id="model-title" />
-            <div className="arq-operating-flow">{operatingModel.map((item, index) => <div className="arq-flow-step" key={item.title.EN}><div><span>{index + 1}</span></div><h3>{L(item.title)}</h3><p>{L(item.body)}</p>{index < operatingModel.length - 1 && <Arrow />}</div>)}</div>
+            <ol className="lp-flow">{operatingModel.map((item, index) => <li className="lp-flow-step" key={item.title.EN}><span className="lp-flow-num">{index + 1}</span><h3 className="am-h4">{L(item.title)}</h3><p className="am-body-sm">{L(item.body)}</p></li>)}</ol>
           </div>
         </section>
 
-        <section className="arq-section" id="capabilities" aria-labelledby="capabilities-title">
-          <div className="arq-container">
+        <section className="am-section lp-surface" id="capabilities" aria-labelledby="capabilities-title">
+          <div className="am-container">
             <SectionHeading eyebrow={c('CONNECTED CAPABILITIES', 'قدرات مترابطة')} title={c('One platform for the architecture lifecycle', 'منصة واحدة لدورة حياة البنية المؤسسية')} body={c('Purpose-built capabilities connect architecture knowledge to governance and transformation work.', 'قدرات متخصصة تربط المعرفة المعمارية بأعمال الحوكمة والتحول.')} L={L} id="capabilities-title" />
-            <div className="arq-capability-grid">{capabilityGroups.map((group, index) => <article className="arq-capability" key={group.eyebrow.EN}><div className="arq-capability-top"><span>0{index + 1}</span><p>{L(group.eyebrow)}</p></div>{group.items.map((item) => <div className="arq-capability-item" key={item.title.EN}><h3>{L(item.title)}</h3><p>{L(item.body)}</p></div>)}</article>)}</div>
+            <div className="lp-grid-3">{capabilityGroups.map((group, index) => <article className="am-card interactive lp-capability" key={group.eyebrow.EN}><div className="lp-card-top"><span className="am-icon-tile"><Icon name={capabilityIcons[index]} /></span><span className="am-index">0{index + 1}</span></div><div className="am-label lp-capability-eyebrow">{L(group.eyebrow)}</div>{group.items.map((item) => <div className="lp-capability-item" key={item.title.EN}><h3 className="am-h5">{L(item.title)}</h3><p className="am-body-sm">{L(item.body)}</p></div>)}</article>)}</div>
           </div>
         </section>
 
-        <section className="arq-section arq-ai-section" id="ai-architects" aria-labelledby="ai-title">
-          <div className="arq-container arq-ai-grid">
-            <div><SectionHeading eyebrow={c('AI-ASSISTED ARCHITECTURE', 'البنية المؤسسية بمساعدة الذكاء الاصطناعي')} title={c('Architecture Expertise, Augmented by AI', 'خبرة معمارية معززة بالذكاء الاصطناعي')} body={c('ArchMind helps architects explore information, analyze relationships, review designs, evaluate alternatives, and accelerate architecture activities—grounded in organizational architecture context and under human direction.', 'تساعد ArchMind المعماريين على استكشاف المعلومات وتحليل العلاقات ومراجعة التصاميم وتقييم البدائل وتسريع الأنشطة المعمارية، استناداً إلى السياق المعماري للجهة وتحت إشراف بشري.')} L={L} id="ai-title" align="start" /></div>
-            <div className="arq-architect-panel"><div className="arq-chief"><span>A</span><div><small>{L(c('COORDINATING ROLE', 'دور تنسيقي'))}</small><strong>{L(architectRoles[0])}</strong></div></div><div className="arq-role-grid">{architectRoles.slice(1).map((role) => <div key={role.EN}><i />{L(role)}</div>)}</div><p>{L(c('AI assistance supports professional judgment; architecture decisions remain with authorized people.', 'تدعم المساعدة الذكية الحكم المهني، بينما تبقى القرارات المعمارية بيد أصحاب الصلاحية.'))}</p></div>
+        <section className="am-section lp-dark am-on-dark" id="ai-architects" aria-labelledby="ai-title">
+          <BrandPattern variant="topology" intensity={0.28} />
+          <div className="am-container lp-split">
+            <SectionHeading eyebrow={c('AI-ASSISTED ARCHITECTURE', 'البنية المؤسسية بمساعدة الذكاء الاصطناعي')} title={c('Architecture Expertise, Augmented by AI', 'خبرة معمارية معززة بالذكاء الاصطناعي')} body={c('ArchMind helps architects explore information, analyze relationships, review designs, evaluate alternatives, and accelerate architecture activities—grounded in organizational architecture context and under human direction.', 'تساعد ArchMind المعماريين على استكشاف المعلومات وتحليل العلاقات ومراجعة التصاميم وتقييم البدائل وتسريع الأنشطة المعمارية، استناداً إلى السياق المعماري للجهة وتحت إشراف بشري.')} L={L} id="ai-title" align="start" />
+            <div className="am-card am-card-dark lp-architects">
+              <div className="lp-chief"><span className="am-icon-tile"><Icon name="architects" /></span><div><small className="am-label">{L(c('COORDINATING ROLE', 'دور تنسيقي'))}</small><strong className="am-h4">{L(architectRoles[0])}</strong></div></div>
+              <ul className="lp-roles">{architectRoles.slice(1).map((role) => <li key={role.EN}><i aria-hidden="true" />{L(role)}</li>)}</ul>
+              <p className="am-body-sm">{L(c('AI assistance supports professional judgment; architecture decisions remain with authorized people.', 'تدعم المساعدة الذكية الحكم المهني، بينما تبقى القرارات المعمارية بيد أصحاب الصلاحية.'))}</p>
+            </div>
           </div>
         </section>
 
-        <section className="arq-section arq-language-section" aria-labelledby="language-title">
-          <div className="arq-container"><SectionHeading eyebrow={c('CONNECTED ARCHITECTURE', 'بنية مؤسسية مترابطة')} title={c('One Architecture Language. One Repository. Multiple Perspectives.', 'لغة معمارية موحدة، مستودع واحد، ومشاهد متعددة')} body={c('A governed chain from definition to insight.', 'سلسلة محكومة تبدأ بالتعريف وتنتهي بالرؤية المعمارية.')} L={L} id="language-title" />
-            <div className="arq-stack-flow"><FlowCard index="01" title={c('Meta Model', 'النموذج الوصفي')} body={c('Defines architecture building blocks, attributes, and relationships.', 'يعرّف اللبنات المعمارية والخصائص والعلاقات.')} L={L} /><Arrow /><FlowCard index="02" title={c('EA Repository', 'مستودع البنية المؤسسية')} body={c("Stores the organization's actual architecture instances.", 'يحفظ النسخ الفعلية لأصول البنية المؤسسية في الجهة.')} L={L} /><Arrow /><FlowCard index="03" title={c('EA Views', 'المشاهد المعمارية')} body={c('Visualizes how objects relate, depend on one another, and evolve.', 'يُظهر ترابط العناصر واعتمادها على بعضها وكيفية تطورها.')} L={L} /></div>
+        <section className="am-section lp-surface" aria-labelledby="language-title">
+          <div className="am-container">
+            <SectionHeading eyebrow={c('CONNECTED ARCHITECTURE', 'بنية مؤسسية مترابطة')} title={c('One Architecture Language. One Repository. Multiple Perspectives.', 'لغة معمارية موحدة، مستودع واحد، ومشاهد متعددة')} body={c('A governed chain from definition to insight.', 'سلسلة محكومة تبدأ بالتعريف وتنتهي بالرؤية المعمارية.')} L={L} id="language-title" />
+            <div className="lp-chain">
+              <FlowCard icon="framework" index="01" title={c('Meta Model', 'النموذج الوصفي')} body={c('Defines architecture building blocks, attributes, and relationships.', 'يعرّف اللبنات المعمارية والخصائص والعلاقات.')} L={L} />
+              <ChainLink />
+              <FlowCard icon="repository" index="02" title={c('EA Repository', 'مستودع البنية المؤسسية')} body={c("Stores the organization's actual architecture instances.", 'يحفظ النسخ الفعلية لأصول البنية المؤسسية في الجهة.')} L={L} />
+              <ChainLink />
+              <FlowCard icon="views" index="03" title={c('EA Views', 'المشاهد المعمارية')} body={c('Visualizes how objects relate, depend on one another, and evolve.', 'يُظهر ترابط العناصر واعتمادها على بعضها وكيفية تطورها.')} L={L} />
+            </div>
           </div>
         </section>
 
-        <section className="arq-section arq-governance-section" aria-labelledby="governance-title">
-          <div className="arq-container arq-split"><div><SectionHeading eyebrow={c('ARCHITECTURE GOVERNANCE', 'حوكمة البنية المؤسسية')} title={c('From Architecture Documents to Architecture Decisions', 'من الوثائق المعمارية إلى القرارات المعمارية')} body={c('Bring requests, organizational context, structured review, and evidence-based findings into a traceable decision flow.', 'اربط الطلبات والسياق المؤسسي والمراجعة المنظمة والنتائج المستندة إلى الأدلة ضمن مسار قرار قابل للتتبع.')} L={L} id="governance-title" align="start" /></div><ProcessRail items={[c('Architecture Request / Design', 'طلب أو تصميم معماري'), c('Architecture Context', 'السياق المعماري'), c('Structured Review', 'مراجعة منظمة'), c('Evidence-Based Findings', 'نتائج مستندة إلى الأدلة'), c('Architecture Decision', 'قرار معماري')]} L={L} /></div>
-        </section>
-
-        <section className="arq-section arq-transform-section" aria-labelledby="transform-title">
-          <div className="arq-container"><SectionHeading eyebrow={c('PLANNING & TRANSFORMATION', 'التخطيط والتحول')} title={c('Make architecture evolution visible', 'اجعل تطور البنية المؤسسية واضحاً')} body={c('Use scenarios and ADM planning to understand the path from today’s architecture to an intentional target state.', 'استخدم السيناريوهات وتخطيط ADM لفهم المسار من البنية الحالية إلى حالة مستهدفة مدروسة.')} L={L} id="transform-title" />
-            <div className="arq-state-track"><State label={c('Current State', 'الحالة الحالية')} note={c('Document the architecture baseline', 'وثّق خط الأساس المعماري')} L={L} /><Arrow /><State label={c('Transition', 'الحالة الانتقالية')} note={c('Sequence controlled change', 'رتّب التغيير بصورة محكومة')} L={L} /><Arrow /><State label={c('Target State', 'الحالة المستهدفة')} note={c('Align toward intended outcomes', 'وجّه البنية نحو النتائج المستهدفة')} L={L} /></div>
+        <section className="am-section lp-subtle" aria-labelledby="governance-title">
+          <div className="am-container lp-split">
+            <SectionHeading eyebrow={c('ARCHITECTURE GOVERNANCE', 'حوكمة البنية المؤسسية')} title={c('From Architecture Documents to Architecture Decisions', 'من الوثائق المعمارية إلى القرارات المعمارية')} body={c('Bring requests, organizational context, structured review, and evidence-based findings into a traceable decision flow.', 'اربط الطلبات والسياق المؤسسي والمراجعة المنظمة والنتائج المستندة إلى الأدلة ضمن مسار قرار قابل للتتبع.')} L={L} id="governance-title" align="start" />
+            <ProcessRail items={[c('Architecture Request / Design', 'طلب أو تصميم معماري'), c('Architecture Context', 'السياق المعماري'), c('Structured Review', 'مراجعة منظمة'), c('Evidence-Based Findings', 'نتائج مستندة إلى الأدلة'), c('Architecture Decision', 'قرار معماري')]} L={L} />
           </div>
         </section>
 
-        <section className="arq-section arq-framework-section" id="frameworks" aria-labelledby="framework-title">
-          <div className="arq-container arq-framework-grid"><div><SectionHeading eyebrow={c('FRAMEWORK-DRIVEN', 'منهجية قائمة على الأطر')} title={c('Designed for Framework-Driven Enterprise Architecture', 'مصممة لتطبيق أطر البنية المؤسسية عملياً')} body={c('ArchMind supports configurable enterprise architecture meta models and is being developed with NORA 2.0 as a primary framework for Saudi government architecture environments.', 'تدعم ArchMind نماذج وصفية قابلة للتخصيص، ويتم تطويرها مع اعتماد NORA 2.0 كأحد الأطر الرئيسية لبيئات البنية المؤسسية في الجهات الحكومية السعودية.')} L={L} id="framework-title" align="start" /><p className="arq-framework-note">{L(c('Framework configuration supports NORA 2.0, TOGAF-oriented, and custom meta-model structures. No certification claim is implied.', 'تدعم تهيئة الأطر هياكل NORA 2.0 والهياكل الموجهة بمنهجية TOGAF والنماذج الوصفية المخصصة، دون الإشارة إلى أي اعتماد رسمي.'))}</p></div><div className="arq-framework-visual"><span>NORA 2.0</span><span>TOGAF</span><span>{L(c('CUSTOM', 'مخصص'))}</span><div>{L(c('Configurable architecture language', 'لغة معمارية قابلة للتهيئة'))}</div></div></div>
-        </section>
-
-        <section className="arq-section arq-readiness" id="resources" aria-labelledby="readiness-title">
-          <div className="arq-container"><SectionHeading eyebrow={c('ENTERPRISE READINESS', 'الجاهزية المؤسسية')} title={c('Designed for governed enterprise environments', 'مصممة لبيئات مؤسسية محكومة')} body={c('Platform controls support accountable architecture operations without making unsupported certification claims.', 'تدعم ضوابط المنصة تشغيل البنية المؤسسية بمساءلة ووضوح دون ادعاءات اعتماد غير مثبتة.')} L={L} id="readiness-title" />
-            <div className="arq-readiness-grid">{[c('Multi-tenant architecture', 'بنية متعددة المستأجرين'), c('Tenant isolation', 'عزل بيانات الجهات'), c('Role-based access', 'وصول قائم على الأدوار'), c('Configurable AI provider and model', 'مزود ونموذج ذكاء اصطناعي قابلان للتهيئة'), c('Architecture-context-aware AI', 'ذكاء مدرك للسياق المعماري'), c('Structured architecture governance', 'حوكمة معمارية منظمة')].map((item) => <div key={item.EN}><span>✓</span>{L(item)}</div>)}</div>
+        <section className="am-section lp-surface" aria-labelledby="transform-title">
+          <div className="am-container">
+            <SectionHeading eyebrow={c('PLANNING & TRANSFORMATION', 'التخطيط والتحول')} title={c('Make architecture evolution visible', 'اجعل تطور البنية المؤسسية واضحاً')} body={c('Use scenarios and ADM planning to understand the path from today’s architecture to an intentional target state.', 'استخدم السيناريوهات وتخطيط ADM لفهم المسار من البنية الحالية إلى حالة مستهدفة مدروسة.')} L={L} id="transform-title" />
+            <div className="lp-states">
+              <State step={1} label={c('Current State', 'الحالة الحالية')} note={c('Document the architecture baseline', 'وثّق خط الأساس المعماري')} L={L} />
+              <State step={2} label={c('Transition', 'الحالة الانتقالية')} note={c('Sequence controlled change', 'رتّب التغيير بصورة محكومة')} L={L} />
+              <State step={3} label={c('Target State', 'الحالة المستهدفة')} note={c('Align toward intended outcomes', 'وجّه البنية نحو النتائج المستهدفة')} L={L} />
+            </div>
           </div>
         </section>
 
-        <section className="arq-demo" id="demo" aria-labelledby="demo-title">
-          <div className="arq-container arq-demo-grid"><div><div className="arq-kicker light"><span />{L(c('REQUEST A DEMONSTRATION', 'اطلب عرضاً توضيحياً'))}</div><h2 id="demo-title">{L(c('Ready to Operationalize Enterprise Architecture?', 'هل أنت مستعد لتفعيل البنية المؤسسية بشكل عملي؟'))}</h2><p>{L(c('Tell us about your architecture environment and the outcomes you want to enable.', 'عرّفنا ببيئة البنية المؤسسية لديكم والنتائج التي تسعون إلى تحقيقها.'))}</p><div className="arq-demo-assurance">{L(c('Your details are sent directly to the ArchMind team - no account required.', 'تُرسل بياناتك مباشرة إلى فريق ArchMind، دون الحاجة إلى إنشاء حساب.'))}</div></div><DemoForm locale={locale} errors={formErrors} requestDraft={requestDraft} copied={copied} submitting={submitting} submitted={submitted} onSubmit={submitDemo} onCopy={copyRequest} /></div>
+        <section className="am-section lp-dark am-on-dark" id="frameworks" aria-labelledby="framework-title">
+          <div className="am-container lp-split lp-framework">
+            <div>
+              <SectionHeading eyebrow={c('FRAMEWORK-DRIVEN', 'منهجية قائمة على الأطر')} title={c('Designed for Framework-Driven Enterprise Architecture', 'مصممة لتطبيق أطر البنية المؤسسية عملياً')} body={c('ArchMind supports configurable enterprise architecture meta models and is being developed with NORA 2.0 as a primary framework for Saudi government architecture environments.', 'تدعم ArchMind نماذج وصفية قابلة للتخصيص، ويتم تطويرها مع اعتماد NORA 2.0 كأحد الأطر الرئيسية لبيئات البنية المؤسسية في الجهات الحكومية السعودية.')} L={L} id="framework-title" align="start" />
+              <p className="am-caption lp-framework-note">{L(c('Framework configuration supports NORA 2.0, TOGAF-oriented, and custom meta-model structures. No certification claim is implied.', 'تدعم تهيئة الأطر هياكل NORA 2.0 والهياكل الموجهة بمنهجية TOGAF والنماذج الوصفية المخصصة، دون الإشارة إلى أي اعتماد رسمي.'))}</p>
+            </div>
+            <div className="lp-framework-visual">
+              <div className="lp-framework-row"><span>NORA 2.0</span><span>TOGAF</span><span>{L(c('CUSTOM', 'مخصص'))}</span></div>
+              <div className="lp-framework-base">{L(c('Configurable architecture language', 'لغة معمارية قابلة للتهيئة'))}</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="am-section lp-subtle" id="resources" aria-labelledby="readiness-title">
+          <div className="am-container">
+            <SectionHeading eyebrow={c('ENTERPRISE READINESS', 'الجاهزية المؤسسية')} title={c('Designed for governed enterprise environments', 'مصممة لبيئات مؤسسية محكومة')} body={c('Platform controls support accountable architecture operations without making unsupported certification claims.', 'تدعم ضوابط المنصة تشغيل البنية المؤسسية بمساءلة ووضوح دون ادعاءات اعتماد غير مثبتة.')} L={L} id="readiness-title" />
+            <ul className="lp-readiness">{[c('Multi-tenant architecture', 'بنية متعددة المستأجرين'), c('Tenant isolation', 'عزل بيانات الجهات'), c('Role-based access', 'وصول قائم على الأدوار'), c('Configurable AI provider and model', 'مزود ونموذج ذكاء اصطناعي قابلان للتهيئة'), c('Architecture-context-aware AI', 'ذكاء مدرك للسياق المعماري'), c('Structured architecture governance', 'حوكمة معمارية منظمة')].map((item) => <li key={item.EN}><span className="lp-check"><Icon name="check" size={16} /></span>{L(item)}</li>)}</ul>
+          </div>
+        </section>
+
+        <section className="am-section lp-demo am-on-dark" id="demo" aria-labelledby="demo-title">
+          <BrandPattern variant="flow" intensity={0.3} />
+          <div className="am-container lp-demo-grid">
+            <div>
+              <div className="am-eyebrow am-label">{L(c('REQUEST A DEMONSTRATION', 'اطلب عرضاً توضيحياً'))}</div>
+              <h2 className="am-h2" id="demo-title">{L(c('Ready to Operationalize Enterprise Architecture?', 'هل أنت مستعد لتفعيل البنية المؤسسية بشكل عملي؟'))}</h2>
+              <p className="am-body-lg">{L(c('Tell us about your architecture environment and the outcomes you want to enable.', 'عرّفنا ببيئة البنية المؤسسية لديكم والنتائج التي تسعون إلى تحقيقها.'))}</p>
+              <div className="lp-assurance"><Icon name="shield" size={20} /><span>{L(c('Your details are sent directly to the ArchMind team - no account required.', 'تُرسل بياناتك مباشرة إلى فريق ArchMind، دون الحاجة إلى إنشاء حساب.'))}</span></div>
+            </div>
+            <DemoForm locale={locale} errors={formErrors} requestDraft={requestDraft} copied={copied} submitting={submitting} submitted={submitted} onSubmit={submitDemo} onCopy={copyRequest} />
+          </div>
         </section>
       </main>
 
-      <footer className="arq-footer"><div className="arq-container arq-footer-grid"><div><a className="arq-brand footer" href="#top"><span className="arq-mark">A</span><span>ArchMind</span></a><p>{L(c('Enterprise architecture, operated with intent.', 'تشغيل البنية المؤسسية بوضوح وفاعلية.'))}</p></div><div className="arq-footer-links"><a href="#platform">{L(c('Platform', 'المنصة'))}</a><a href="#capabilities">{L(c('Capabilities', 'القدرات'))}</a><a href="#frameworks">{L(c('Frameworks', 'الأطر'))}</a><span title={L(c('Legal page not yet published', 'الصفحة القانونية غير منشورة بعد'))}>{L(c('Privacy · Coming soon', 'الخصوصية · قريباً'))}</span><span title={L(c('Legal page not yet published', 'الصفحة القانونية غير منشورة بعد'))}>{L(c('Terms · Coming soon', 'الشروط · قريباً'))}</span><a href="#demo">{L(c('Contact', 'تواصل معنا'))}</a><Link to="/login">{L(labels.signIn)}</Link></div><button className="arq-lang footer" onClick={() => setLocale(locale === 'EN' ? 'AR' : 'EN')}><span className={locale === 'EN' ? 'active' : ''}>EN</span><i /><span className={locale === 'AR' ? 'active' : ''}>العربية</span></button></div><div className="arq-container arq-copyright">© {new Date().getFullYear()} ArchMind</div></footer>
+      <footer className="lp-footer am-on-dark">
+        <div className="am-container lp-footer-grid">
+          <div className="lp-footer-brand">
+            <BrandLogo href="#top" tone="white" size={24} label="ArchMind home" />
+            <p className="am-body-sm">{L(c('Enterprise architecture, operated with intent.', 'تشغيل البنية المؤسسية بوضوح وفاعلية.'))}</p>
+          </div>
+          <nav className="lp-footer-col" aria-label={L(c('Product', 'المنتج'))}>
+            <h2 className="am-label">{L(c('Product', 'المنتج'))}</h2>
+            <a href="#platform">{L(c('Platform', 'المنصة'))}</a>
+            <a href="#capabilities">{L(c('Capabilities', 'القدرات'))}</a>
+            <a href="#frameworks">{L(c('Frameworks', 'الأطر'))}</a>
+          </nav>
+          <nav className="lp-footer-col" aria-label={L(c('Company', 'الشركة'))}>
+            <h2 className="am-label">{L(c('Company', 'الشركة'))}</h2>
+            <a href="#demo">{L(c('Contact', 'تواصل معنا'))}</a>
+            <Link to="/login">{L(labels.signIn)}</Link>
+          </nav>
+          <div className="lp-footer-col">
+            <h2 className="am-label">{L(c('Legal', 'قانوني'))}</h2>
+            <span title={L(c('Legal page not yet published', 'الصفحة القانونية غير منشورة بعد'))}>{L(c('Privacy · Coming soon', 'الخصوصية · قريباً'))}</span>
+            <span title={L(c('Legal page not yet published', 'الصفحة القانونية غير منشورة بعد'))}>{L(c('Terms · Coming soon', 'الشروط · قريباً'))}</span>
+          </div>
+        </div>
+        <div className="am-container lp-footer-bottom">
+          <span className="am-caption">© {new Date().getFullYear()} {BRAND_LEGAL_NAME}</span>
+          <LanguageToggle locale={locale} onToggle={() => setLocale(locale === 'EN' ? 'AR' : 'EN')} />
+        </div>
+      </footer>
     </div>
   )
 }
 
+function Arrow() { return <span className="am-arrow" aria-hidden="true">→</span> }
+
+function LanguageToggle({ locale, onToggle, label }: { locale: 'EN' | 'AR'; onToggle: () => void; label?: string }) {
+  return <button type="button" className="lp-lang" onClick={onToggle} aria-label={label}><Icon name="globe" size={16} /><span className={locale === 'EN' ? 'active' : ''} lang="en">EN</span><i aria-hidden="true" /><span className={locale === 'AR' ? 'active' : ''} lang="ar">العربية</span></button>
+}
+
 function SectionHeading({ eyebrow, title, body, L, id, align = 'center' }: { eyebrow: Copy; title: Copy; body: Copy; L: (copy: Copy) => string; id: string; align?: 'center' | 'start' }) {
-  return <div className={`arq-section-heading ${align}`}><div className="arq-kicker"><span />{L(eyebrow)}</div><h2 id={id}>{L(title)}</h2><p>{L(body)}</p></div>
+  return <div className={`am-section-header ${align === 'center' ? 'center' : ''}`}><div className="am-eyebrow am-label">{L(eyebrow)}</div><h2 className="am-h2" id={id}>{L(title)}</h2><p>{L(body)}</p></div>
 }
 
 function ProductComposition({ locale }: { locale: 'EN' | 'AR' }) {
   const L = (copy: Copy) => copy[locale]
-  return <div className="arq-product" aria-label={L(c('ArchMind platform interface composition', 'تصور لواجهة منصة ArchMind'))}><div className="arq-product-bar"><div className="arq-mini-mark">A</div><span>ArchMind</span><i /><i /><i /></div><div className="arq-product-body"><aside><b /><b /><b className="active" /><b /><b /></aside><div className="arq-product-canvas"><div className="arq-canvas-head"><div><small>{L(c('ARCHITECTURE OVERVIEW', 'نظرة عامة على البنية'))}</small><strong>{L(c('Operational architecture workspace', 'مساحة العمل المعمارية'))}</strong></div><span>{L(c('Current state', 'الحالة الحالية'))}</span></div><div className="arq-metric-row"><div><small>{L(c('Repository', 'المستودع'))}</small><strong>248</strong><em>+12</em></div><div><small>{L(c('Views', 'المشاهد'))}</small><strong>36</strong><em>Live</em></div><div><small>{L(c('Reviews', 'المراجعات'))}</small><strong>08</strong><em>Active</em></div></div><div className="arq-canvas-lower"><div className="arq-map-card"><div className="arq-card-label">{L(c('EA VIEW · DEPENDENCY MAP', 'مشهد الاعتماديات'))}</div><div className="arq-node n1">B</div><div className="arq-node n2">A</div><div className="arq-node n3">D</div><div className="arq-node n4">T</div><svg viewBox="0 0 300 150" aria-hidden="true"><path d="M52 38 C100 30 115 70 155 74 M155 74 C200 75 210 35 255 43 M155 74 C180 105 205 118 252 116" /></svg></div><div className="arq-ai-card"><div className="arq-ai-head"><span>AI</span><div><small>{L(c('CHIEF ARCHITECT', 'المعماري الرئيسي'))}</small><strong>{L(c('Architecture insight', 'رؤية معمارية'))}</strong></div></div><p>{L(c('Three applications support overlapping capabilities. Review consolidation options before the target-state transition.', 'تدعم ثلاثة تطبيقات قدرات متداخلة. راجع خيارات التوحيد قبل الانتقال إلى الحالة المستهدفة.'))}</p><div className="arq-ai-source">{L(c('Grounded in 14 architecture records', 'مستند إلى 14 سجلاً معمارياً'))}</div></div></div></div></div></div>
+  return <div className="lp-product" role="img" aria-label={L(c('ArchMind platform interface composition', 'تصور لواجهة منصة ArchMind'))}>
+    <div className="lp-product-bar" aria-hidden="true"><BrandLogo variant="symbol" size={13} /><i /><i /><i /></div>
+    <div className="lp-product-body" aria-hidden="true">
+      <aside><b /><b /><b className="active" /><b /><b /></aside>
+      <div className="lp-product-canvas">
+        <div className="lp-canvas-head"><div><small>{L(c('ARCHITECTURE OVERVIEW', 'نظرة عامة على البنية'))}</small><strong>{L(c('Operational architecture workspace', 'مساحة العمل المعمارية'))}</strong></div><span>{L(c('Current state', 'الحالة الحالية'))}</span></div>
+        <div className="lp-metrics"><div><small>{L(c('Repository', 'المستودع'))}</small><strong>248</strong><em>+12</em></div><div><small>{L(c('Views', 'المشاهد'))}</small><strong>36</strong><em>Live</em></div><div><small>{L(c('Reviews', 'المراجعات'))}</small><strong>08</strong><em>Active</em></div></div>
+        <div className="lp-canvas-lower">
+          <div className="lp-map"><div className="lp-card-label">{L(c('EA VIEW · DEPENDENCY MAP', 'مشهد الاعتماديات'))}</div><div className="lp-node n1">B</div><div className="lp-node n2">A</div><div className="lp-node n3">D</div><div className="lp-node n4">T</div><svg viewBox="0 0 300 150"><path d="M52 38 C100 30 115 70 155 74 M155 74 C200 75 210 35 255 43 M155 74 C180 105 205 118 252 116" /></svg></div>
+          <div className="lp-ai"><div className="lp-ai-head"><span>AI</span><div><small>{L(c('CHIEF ARCHITECT', 'المعماري الرئيسي'))}</small><strong>{L(c('Architecture insight', 'رؤية معمارية'))}</strong></div></div><p>{L(c('Three applications support overlapping capabilities. Review consolidation options before the target-state transition.', 'تدعم ثلاثة تطبيقات قدرات متداخلة. راجع خيارات التوحيد قبل الانتقال إلى الحالة المستهدفة.'))}</p><div className="lp-ai-source">{L(c('Grounded in 14 architecture records', 'مستند إلى 14 سجلاً معمارياً'))}</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
 }
 
-function FlowCard({ index, title, body, L }: { index: string; title: Copy; body: Copy; L: (copy: Copy) => string }) { return <article><span>{index}</span><h3>{L(title)}</h3><p>{L(body)}</p></article> }
-function State({ label, note, L }: { label: Copy; note: Copy; L: (copy: Copy) => string }) { return <div className="arq-state"><div><i /><i /><i /></div><strong>{L(label)}</strong><span>{L(note)}</span></div> }
-function ProcessRail({ items, L }: { items: Copy[]; L: (copy: Copy) => string }) { return <div className="arq-process-rail">{items.map((item, index) => <div key={item.EN}><span>{index + 1}</span><strong>{L(item)}</strong></div>)}</div> }
+function ChainLink() { return <div className="lp-chain-link" aria-hidden="true"><i className="lp-chain-line" /><Arrow /></div> }
+function FlowCard({ icon, index, title, body, L }: { icon: IconName; index: string; title: Copy; body: Copy; L: (copy: Copy) => string }) { return <article className="am-card am-card-accent"><div className="lp-card-top"><span className="am-icon-tile"><Icon name={icon} /></span><span className="am-index">{index}</span></div><h3 className="am-h3">{L(title)}</h3><p>{L(body)}</p></article> }
+function State({ step, label, note, L }: { step: number; label: Copy; note: Copy; L: (copy: Copy) => string }) { return <div className={`lp-state s${step}`}><div className="lp-state-bars" aria-hidden="true"><i /><i /><i /></div><strong className="am-h4">{L(label)}</strong><span className="am-body-sm">{L(note)}</span></div> }
+function ProcessRail({ items, L }: { items: Copy[]; L: (copy: Copy) => string }) { return <ol className="lp-rail">{items.map((item, index) => <li key={item.EN}><span>{index + 1}</span><strong>{L(item)}</strong></li>)}</ol> }
 
 function DemoForm({ locale, errors, requestDraft, copied, submitting, submitted, onSubmit, onCopy }: { locale: 'EN' | 'AR'; errors: Record<string, string>; requestDraft: string; copied: boolean; submitting: boolean; submitted: boolean; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onCopy: () => void }) {
   const L = (copy: Copy) => copy[locale]
-  const field = (name: string, label: Copy, type = 'text', optional = false) => <label><span>{L(label)}{optional && <small> {L(c('(optional)', '(اختياري)'))}</small>}</span><input name={name} type={type} aria-invalid={!!errors[name]} aria-describedby={errors[name] ? `${name}-error` : undefined} />{errors[name] && <em id={`${name}-error`}>{errors[name]}</em>}</label>
-  if (submitted) return <div className="arq-demo-form arq-demo-ready"><span className="arq-ready-mark">✓</span><h3>{L(c('Thank you', 'شكراً لك'))}</h3><p>{L(c('Your request has been received. An ArchMind representative will be in touch shortly.', 'تم استلام طلبك. سيتواصل معك أحد ممثلي ArchMind قريباً.'))}</p></div>
-  if (requestDraft) return <div className="arq-demo-form arq-demo-ready"><span className="arq-ready-mark">✓</span><h3>{L(c('Your request is ready', 'طلبك جاهز'))}</h3><p>{L(c("We couldn't submit this automatically. Copy the prepared details and share them with your ArchMind representative.", 'تعذّر إرسال الطلب تلقائياً. انسخ تفاصيل الطلب وشاركها مع ممثل ArchMind.'))}</p><button className="arq-button" type="button" onClick={onCopy}>{copied ? L(c('Copied', 'تم النسخ')) : L(c('Copy request details', 'نسخ تفاصيل الطلب'))}</button></div>
-  return <form className="arq-demo-form" noValidate onSubmit={onSubmit}>
-    <div className="arq-form-grid">{field('fullName', c('Full Name', 'الاسم الكامل'))}{field('organization', c('Organization', 'الجهة'))}{field('jobTitle', c('Job Title', 'المسمى الوظيفي'))}{field('email', c('Work Email', 'البريد الإلكتروني للعمل'), 'email')}{field('phone', c('Phone', 'رقم الهاتف'), 'tel', true)}<label><span>{L(c('Country', 'الدولة'))}</span><select name="country" defaultValue="Saudi Arabia" aria-invalid={!!errors.country}><option>Saudi Arabia</option><option>United Arab Emirates</option><option>Bahrain</option><option>Kuwait</option><option>Oman</option><option>Qatar</option><option>{L(c('Other', 'أخرى'))}</option></select>{errors.country && <em>{errors.country}</em>}</label></div>
-    <label><span>{L(c('Message', 'الرسالة'))}</span><textarea name="message" rows={4} aria-invalid={!!errors.message} placeholder={L(c('Tell us about your architecture priorities…', 'حدثنا عن أولويات البنية المؤسسية لديكم…'))} />{errors.message && <em>{errors.message}</em>}</label>
-    <fieldset><legend>{L(c('Preferred Language', 'اللغة المفضلة'))}</legend><label className="arq-radio"><input type="radio" name="preferredLanguage" value="English" defaultChecked={locale === 'EN'} /> English</label><label className="arq-radio"><input type="radio" name="preferredLanguage" value="Arabic" defaultChecked={locale === 'AR'} /> العربية</label>{errors.preferredLanguage && <em>{errors.preferredLanguage}</em>}</fieldset>
-    <button className="arq-button form-submit" type="submit" disabled={submitting}>{submitting ? L(c('Sending…', 'جارٍ الإرسال…')) : <>{L(labels.requestDemo)} <Arrow /></>}</button>
+  const field = (name: string, label: Copy, type = 'text', optional = false, autoComplete?: string) => <label className="am-field"><span>{L(label)}{optional && <small> {L(c('(optional)', '(اختياري)'))}</small>}</span><input className="am-input" name={name} type={type} autoComplete={autoComplete} aria-invalid={!!errors[name]} aria-describedby={errors[name] ? `${name}-error` : undefined} />{errors[name] && <em className="am-field-error" id={`${name}-error`}>{errors[name]}</em>}</label>
+  if (submitted) return <div className="lp-form lp-form-done" role="status"><span className="lp-done-mark"><Icon name="check" size={26} /></span><h3 className="am-h3">{L(c('Thank you', 'شكراً لك'))}</h3><p>{L(c('Your request has been received. An ArchMind representative will be in touch shortly.', 'تم استلام طلبك. سيتواصل معك أحد ممثلي ArchMind قريباً.'))}</p></div>
+  if (requestDraft) return <div className="lp-form lp-form-done" role="status"><span className="lp-done-mark"><Icon name="check" size={26} /></span><h3 className="am-h3">{L(c('Your request is ready', 'طلبك جاهز'))}</h3><p>{L(c("We couldn't submit this automatically. Copy the prepared details and share them with your ArchMind representative.", 'تعذّر إرسال الطلب تلقائياً. انسخ تفاصيل الطلب وشاركها مع ممثل ArchMind.'))}</p><button className="am-btn am-btn-primary" type="button" onClick={onCopy}>{copied ? L(c('Copied', 'تم النسخ')) : L(c('Copy request details', 'نسخ تفاصيل الطلب'))}</button></div>
+  return <form className="lp-form" noValidate onSubmit={onSubmit}>
+    <div className="lp-form-grid">{field('fullName', c('Full Name', 'الاسم الكامل'), 'text', false, 'name')}{field('organization', c('Organization', 'الجهة'), 'text', false, 'organization')}{field('jobTitle', c('Job Title', 'المسمى الوظيفي'), 'text', false, 'organization-title')}{field('email', c('Work Email', 'البريد الإلكتروني للعمل'), 'email', false, 'email')}{field('phone', c('Phone', 'رقم الهاتف'), 'tel', true, 'tel')}<label className="am-field"><span>{L(c('Country', 'الدولة'))}</span><select className="am-input" name="country" defaultValue="Saudi Arabia" aria-invalid={!!errors.country}><option>Saudi Arabia</option><option>United Arab Emirates</option><option>Bahrain</option><option>Kuwait</option><option>Oman</option><option>Qatar</option><option>{L(c('Other', 'أخرى'))}</option></select>{errors.country && <em className="am-field-error">{errors.country}</em>}</label></div>
+    <label className="am-field"><span>{L(c('Message', 'الرسالة'))}</span><textarea className="am-input" name="message" rows={4} aria-invalid={!!errors.message} aria-describedby={errors.message ? 'message-error' : undefined} placeholder={L(c('Tell us about your architecture priorities…', 'حدثنا عن أولويات البنية المؤسسية لديكم…'))} />{errors.message && <em className="am-field-error" id="message-error">{errors.message}</em>}</label>
+    <fieldset className="lp-fieldset"><legend className="am-field-label">{L(c('Preferred Language', 'اللغة المفضلة'))}</legend><label className="lp-radio"><input type="radio" name="preferredLanguage" value="English" defaultChecked={locale === 'EN'} /> English</label><label className="lp-radio"><input type="radio" name="preferredLanguage" value="Arabic" defaultChecked={locale === 'AR'} /> العربية</label>{errors.preferredLanguage && <em className="am-field-error">{errors.preferredLanguage}</em>}</fieldset>
+    <button className="am-btn am-btn-primary block" type="submit" disabled={submitting} aria-busy={submitting}>{submitting ? L(c('Sending…', 'جارٍ الإرسال…')) : <>{L(labels.requestDemo)} <Arrow /></>}</button>
   </form>
 }

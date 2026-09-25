@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, setToken } from '../lib/api'
+import BrandLogo from '../brand/BrandLogo'
+import BrandPattern from '../brand/BrandPattern'
+import Icon from '../brand/icons'
+import '../brand/brand.css'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -64,52 +68,44 @@ export default function InviteAcceptPage() {
 
   if (success) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--navy)' }}>
-        <div style={{ textAlign: 'center', padding: 40, background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', maxWidth: 400 }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-          <h2 style={{ marginBottom: 8 }}>Account Created!</h2>
-          <p style={{ color: 'var(--text-dim)' }}>Your account has been set up. Redirecting to the platform...</p>
+      <div className="login-page">
+        <BrandPattern variant="flow" intensity={0.35} />
+        <div className="login-card login-card-center" role="status">
+          <span className="login-done-mark"><Icon name="check" size={28} /></span>
+          <h2 className="login-title">Account Created!</h2>
+          <p className="login-muted">Your account has been set up. Redirecting to the platform...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: 'var(--navy)', padding: 20 }}>
-      <div style={{ width: 400, maxWidth: '100%', background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', padding: 32, boxShadow: 'var(--shadow-lg)' }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <div style={{ fontSize: 32, marginBottom: 8 }}>🎉</div>
-          <h1 style={{ fontSize: 20, fontWeight: 700 }}>You're Invited!</h1>
-          <p style={{ color: 'var(--text-dim)', fontSize: 13, marginTop: 4 }}>Set up your account to join the platform.</p>
-        </div>
+    <div className="login-page">
+      <BrandPattern variant="flow" intensity={0.35} />
+      <div className="login-card">
+        <BrandLogo size={24} />
+        <h1 className="login-title login-title-spaced">You're Invited!</h1>
+        <p className="login-muted">Set up your account to join the platform.</p>
 
-        {error && (
-          <div style={{ padding: '10px 14px', borderRadius: 8, marginBottom: 16, background: 'rgba(220,38,38,0.08)', color: 'var(--danger)', border: '1px solid rgba(220,38,38,0.2)', fontSize: 13 }}>
-            {error}
-          </div>
-        )}
+        {error && <div className="login-error" role="alert">{error}</div>}
 
         <form onSubmit={submit}>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>Full Name *</label>
-            <input type="text" value={fullName} onChange={e => setFullName(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 14 }} placeholder="Your full name" required />
+          <div className="form-group">
+            <label className="form-label" htmlFor="invite-name">Full Name *</label>
+            <input id="invite-name" className="form-input" type="text" autoComplete="name" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Your full name" required />
           </div>
-          <div style={{ marginBottom: 14 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>Password *</label>
-            <input type="password" value={password} onChange={e => setPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 14 }} placeholder="Min 8 characters" required minLength={8} />
+          <div className="form-group">
+            <label className="form-label" htmlFor="invite-password">Password *</label>
+            <input id="invite-password" className="form-input" type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Min 8 characters" required minLength={8} />
           </div>
-          <div style={{ marginBottom: 20 }}>
-            <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>Confirm Password *</label>
-            <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} style={{ width: '100%', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 14 }} placeholder="Repeat password" required minLength={8} />
+          <div className="form-group">
+            <label className="form-label" htmlFor="invite-confirm">Confirm Password *</label>
+            <input id="invite-confirm" className="form-input" type="password" autoComplete="new-password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat password" required minLength={8} />
           </div>
-          <button type="submit" style={{ width: '100%', padding: '12px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            Create Account
-          </button>
+          <button type="submit" className="btn btn-primary login-submit">Create Account</button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: 16, fontSize: 12, color: 'var(--text-dim)' }}>
-          Already have an account? <a href="/login" style={{ color: 'var(--accent)', fontWeight: 500 }}>Sign in</a>
-        </div>
+        <p className="login-muted login-footnote">Already have an account? <a href="/login">Sign in</a></p>
       </div>
     </div>
   )

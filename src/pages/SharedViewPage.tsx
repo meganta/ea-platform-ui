@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { API_BASE } from '../lib/api'
+import BrandLogo from '../brand/BrandLogo'
+import BrandPattern from '../brand/BrandPattern'
+import '../brand/brand.css'
 
 interface SharedViewSummary {
   id: string
@@ -45,6 +48,7 @@ export default function SharedViewPage() {
 
   return (
     <div className="login-page">
+      <BrandPattern variant="flow" intensity={0.35} />
       <div className="login-card" style={{ maxWidth: 480 }}>
         {view?.tenantSlug && view.branding?.hasLogo && !logoFailed ? (
           <img
@@ -54,7 +58,7 @@ export default function SharedViewPage() {
             onError={() => setLogoFailed(true)}
           />
         ) : (
-          <div className="login-logo" style={{ marginBottom: 8 }}>{orgName || 'EA Platform'}</div>
+          orgName ? <div className="login-logo" style={{ marginBottom: 8 }}>{orgName}</div> : <div style={{ marginBottom: 8 }}><BrandLogo size={24} /></div>
         )}
 
         {error ? (
@@ -69,7 +73,7 @@ export default function SharedViewPage() {
             {view.description && <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.6 }}>{view.description}</div>}
 
             <div style={{ marginTop: 20, padding: 14, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--text-dim)' }}>
-              This is a shared view from {orgName || 'an EA Platform workspace'}. Sign in to explore the live architecture data.
+              This is a shared view from {orgName || 'an ArchMind workspace'}. Sign in to explore the live architecture data.
             </div>
 
             <Link to={`/login${view.tenantSlug ? `?org=${encodeURIComponent(view.tenantSlug)}` : ''}`}>

@@ -118,3 +118,18 @@ describe('ArchMind landing page', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('ArchMind landing page — brand', () => {
+  it('shows the ArchMind brand in header and footer, and the legal name in the copyright', () => {
+    renderLanding()
+    expect(screen.getAllByRole('link', { name: 'ArchMind home' })).toHaveLength(2)
+    expect(screen.getByText(new RegExp(`© ${new Date().getFullYear()} ArchMindWorks`))).toBeInTheDocument()
+  })
+
+  it('keeps social metadata in sync with the language', () => {
+    const meta = document.createElement('meta'); meta.setAttribute('name', 'twitter:title'); document.head.appendChild(meta)
+    renderLanding('AR')
+    expect(meta.getAttribute('content')).toBe('ArchMind | منصة تشغيل البنية المؤسسية')
+    meta.remove()
+  })
+})
