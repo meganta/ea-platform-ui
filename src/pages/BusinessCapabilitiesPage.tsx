@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { AssessmentsPanel } from './bcm/Assessments'
+import { ModelSuggestions, ModelSources, ReferenceComparison, CurationWorkspace } from './bcm/ReferenceModels'
 
 // Business Capabilities workspace - BCM Phase 1 foundation.
 // Capability Map · Capabilities (hierarchy) · Reference Library ·
@@ -29,7 +30,7 @@ async function call(method: string, path: string, body?: any) {
   return data
 }
 
-type Tab = 'map' | 'list' | 'assessments' | 'library' | 'context' | 'setup'
+type Tab = 'map' | 'list' | 'assessments' | 'library' | 'curation' | 'context' | 'setup'
 
 const CLASS_LABEL: Record<string, [string, string]> = {
   ADMINISTRATIVE: ['Administrative', 'إدارية'],
@@ -54,12 +55,12 @@ const PROVENANCE: Record<string, { en: string; ar: string; tipEn: string; tipAr:
 }
 
 export default function BusinessCapabilitiesPage() {
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
   const { isAR } = useLang()
   const L = useCallback((en: string, ar: string) => (isAR ? ar : en), [isAR])
   const [tab, setTab] = useState<Tab>(() => {
     const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
-    return (['map', 'list', 'assessments', 'library', 'context', 'setup'] as Tab[]).includes(q as Tab) ? (q as Tab) : 'map'
+    return (['map', 'list', 'assessments', 'library', 'curation', 'context', 'setup'] as Tab[]).includes(q as Tab) ? (q as Tab) : 'map'
   })
   const [ctx, setCtx] = useState<any>(null)
 
@@ -83,6 +84,7 @@ export default function BusinessCapabilitiesPage() {
     { id: 'list', label: L('Capabilities', 'القدرات'), show: true },
     { id: 'assessments', label: L('Assessments', 'التقييمات'), show: true },
     { id: 'library', label: L('Reference Library', 'المكتبة المرجعية'), show: true },
+    { id: 'curation', label: L('Model curation', 'مراجعة النماذج'), show: !!user?.isPlatformAdmin },
     { id: 'context', label: L('Organization Context', 'سياق الجهة'), show: true },
     { id: 'setup', label: L('Model Setup', 'إعداد النموذج'), show: can.pack },
   ]
@@ -114,6 +116,7 @@ export default function BusinessCapabilitiesPage() {
         {tab === 'list' && <CapabilityList L={L} isAR={isAR} canManage={can.manage} />}
         {tab === 'assessments' && <AssessmentsPanel L={L} isAR={isAR} can={{ assess: can.assess, validate: can.validate, approve: can.approve, publish: can.publish }} />}
         {tab === 'library' && <ReferenceLibrary L={L} isAR={isAR} canAdopt={can.adopt} />}
+        {tab === 'curation' && user?.isPlatformAdmin && <CurationWorkspace L={L} isAR={isAR} userId={user?.userId} />}
         {tab === 'context' && <OrganizationContext L={L} isAR={isAR} ctx={ctx} canEdit={can.org} onSaved={loadCtx} />}
         {tab === 'setup' && can.pack && <ModelSetup L={L} isAR={isAR} />}
       </div>
@@ -450,6 +453,7 @@ function ReferenceLibrary({ L, isAR, canAdopt }: { L: LFn; isAR: boolean; canAdo
   const [decisions, setDecisions] = useState<any[]>([])
   const [item, setItem] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
+  const [view, setView] = useState<'tree' | 'compare' | 'sources'>('tree')
 
   useEffect(() => { call('GET', `/reference-models?applicable=${onlyApplicable}`).then(setModels).catch(e => setError(e.message)) }, [onlyApplicable])
   const model = models?.find(m => m.id === modelId)
@@ -464,6 +468,7 @@ function ReferenceLibrary({ L, isAR, canAdopt }: { L: LFn; isAR: boolean; canAdo
   return (
     <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
       <div style={{ flex: '0 1 300px', minWidth: 240 }}>
+        <ModelSuggestions L={L} onPick={(id) => { setModelId(id); setView('tree') }} />
         <label style={{ display: 'flex', gap: 6, fontSize: 12, alignItems: 'center', marginBottom: 8 }}>
           <input type="checkbox" checked={onlyApplicable} onChange={e => setOnlyApplicable(e.target.checked)} />
           {L('Only models relevant to my organization', 'النماذج ذات الصلة بجهتي فقط')}
@@ -511,7 +516,14 @@ function ReferenceLibrary({ L, isAR, canAdopt }: { L: LFn; isAR: boolean; canAdo
                     {publishedVersions.map((v: any) => <option key={v.id} value={v.id}>{v.version}</option>)}
                   </select>
                 </label>
-                {tree && <RefTree nodes={tree.tree} L={L} isAR={isAR} decisionFor={decisionFor} onSelect={setItem} selectedId={item?.id} />}
+                <div role="tablist" aria-label={L('Model views', 'طرق العرض')} style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+                  {([['tree', L('Capabilities', 'القدرات')], ['compare', L('Compare with our model', 'مقارنة بنموذجنا')], ['sources', L('Sources & method', 'المصادر والمنهجية')]] as const).map(([k, label]) => (
+                    <button key={k} role="tab" aria-selected={view === k} className={`btn btn-sm ${view === k ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setView(k)}>{label}</button>
+                  ))}
+                </div>
+                {view === 'tree' && tree && <RefTree nodes={tree.tree} L={L} isAR={isAR} decisionFor={decisionFor} onSelect={setItem} selectedId={item?.id} />}
+                {view === 'compare' && versionId && <ReferenceComparison versionId={versionId} L={L} isAR={isAR} onReview={setItem} />}
+                {view === 'sources' && versionId && <ModelSources versionId={versionId} version={tree?.version} L={L} />}
               </>
             )}
           </>

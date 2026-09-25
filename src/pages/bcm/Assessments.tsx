@@ -81,6 +81,7 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [report, setReport] = useState<any[] | null>(null)
+  const [resetNotice, setResetNotice] = useState<number>(0)
   const load = useCallback(async () => {
     try {
       const p = await api('GET', `${BASE}/${id}/progress`)
@@ -89,7 +90,7 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
   }, [id])
   useEffect(() => { load(); api('GET', '/business-capabilities/capabilities').then((cs: any[]) => setCaps(Object.fromEntries(cs.map(c => [c.id, (isAR && c.nameAr) || c.name])))).catch(() => undefined) }, [load, isAR])
 
-  const act = async (fn: () => Promise<any>) => { setBusy(true); setError(null); try { const r = await fn(); if (r?.report) setReport(r.report); await load() } catch (e: any) { setError(e.message) } finally { setBusy(false) } }
+  const act = async (fn: () => Promise<any>) => { setBusy(true); setError(null); try { const r = await fn(); if (r?.report) setReport(r.report); if (typeof r?.validationsReset === 'number') setResetNotice(r.validationsReset); await load() } catch (e: any) { setError(e.message) } finally { setBusy(false) } }
   if (!a) return <div>{error ? <div role="alert" style={{ color: 'var(--danger)' }}>{error}</div> : L('Loading…', 'جارٍ التحميل…')}</div>
   const submitted = (progress?.assignments || []).filter((x: any) => x.status === 'SUBMITTED').length
 
@@ -103,7 +104,11 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
       </div>
       {error && <div role="alert" style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 8 }}>{error}</div>}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        {can.assess && ['OPEN', 'RESPONSES_RECEIVED', 'VALIDATION'].includes(a.status) && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => api('POST', `${BASE}/${id}/analyze`))}>{a.status === 'VALIDATION' ? L('Recalculate', 'إعادة الحساب') : L('Close survey and analyze', 'إغلاق الاستبيان والتحليل')}</button>}
+        {can.assess && ['OPEN', 'RESPONSES_RECEIVED', 'VALIDATION'].includes(a.status) && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => {
+          const validated = (a.results || []).filter((r: any) => r.status === 'VALIDATED').length
+          if (a.status === 'VALIDATION' && validated > 0 && !window.confirm(L(`Recalculating replaces the results. ${validated} validation decision(s) will be cleared and must be made again. Continue?`, `إعادة الحساب تستبدل النتائج، وسيُلغى ${validated} من قرارات التحقق ويجب إعادتها. متابعة؟`))) return
+          act(() => api('POST', `${BASE}/${id}/analyze`))
+        }}>{a.status === 'VALIDATION' ? L('Recalculate', 'إعادة الحساب') : L('Close survey and analyze', 'إغلاق الاستبيان والتحليل')}</button>}
         {can.validate && a.status === 'VALIDATION' && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => api('POST', `${BASE}/${id}/submit-for-approval`))}>{L('Submit for approval', 'إرسال للاعتماد')}</button>}
         {can.approve && a.status === 'APPROVAL' && !a.approvedAt && (a.createdBy === user?.userId
           ? <span data-testid="needs-other-approver" style={{ fontSize: 12, color: 'var(--text-dim)', alignSelf: 'center' }}>{L('You created this assessment, so another authorized approver must approve it.', 'أنشأت هذا التقييم، لذا يجب أن يعتمده معتمد آخر مخوّل.')}</span>
@@ -111,6 +116,7 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
         {can.approve && a.status === 'APPROVAL' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { const note = window.prompt(L('Reason for sending back', 'سبب الإعادة')); if (note) act(() => api('POST', `${BASE}/${id}/send-back`, { note })) }}>{L('Send back', 'إعادة للتحقق')}</button>}
         {can.publish && a.status === 'APPROVAL' && a.approvedAt && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => { if (window.confirm(L('Publishing updates the current maturity of the assessed capabilities. Continue?', 'النشر يحدّث مستوى النضج الحالي للقدرات. متابعة؟'))) act(() => api('POST', `${BASE}/${id}/publish`)) }}>{L('Publish results', 'نشر النتائج')}</button>}
       </div>
+      {resetNotice > 0 && <div role="status" data-testid="validations-reset" style={{ fontSize: 13, padding: 10, marginBottom: 12, borderRadius: 6, border: '1px solid var(--warning)' }}>{L(`Results were recalculated. ${resetNotice} earlier validation decision(s) no longer apply - please validate these results again.`, `أُعيد حساب النتائج. لم تعد ${resetNotice} من قرارات التحقق السابقة سارية - يرجى التحقق من النتائج مجدداً.`)}</div>}
       {report && (
         <div data-testid="publication-report" style={{ fontSize: 12, marginBottom: 12, padding: 10, border: '1px solid var(--border)', borderRadius: 6 }}>
           {report.map((r: any) => <div key={r.capabilityAssetId}>{caps[r.capabilityAssetId] || r.capabilityAssetId}: {r.projected.length ? L('updated', 'تم التحديث') : L('not updated', 'لم يُحدَّث')}{r.reason ? ` - ${r.reason}` : ''}</div>)}

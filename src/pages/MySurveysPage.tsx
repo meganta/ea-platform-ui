@@ -106,7 +106,7 @@ function Respond({ id, L, isAR, onBack }: { id: string; L: (en: string, ar: stri
           {q.evidenceRequirement !== 'NONE' && editable && (
             <div style={{ marginTop: 6 }}>
               {(data.evidence || []).filter((e: any) => e.questionId === q.id).map((e: any) => <div key={e.id} style={{ fontSize: 11, color: 'var(--text-dim)' }}>📎 {e.title || e.url || e.statement} · {e.verification === 'VERIFIED' ? L('verified', 'متحقق منه') : e.verification === 'REJECTED' ? L('rejected', 'مرفوض') : L('awaiting verification', 'بانتظار التحقق')}</div>)}
-              {evidenceFor === q.id ? <EvidenceForm L={L} onCancel={() => setEvidenceFor(null)} onSubmit={async (ev) => { try { await api('POST', `/surveys/my/assignments/${id}/evidence`, { questionId: q.id, ...ev }); setEvidenceFor(null); await load() } catch (e: any) { setMsg({ kind: 'err', text: e.message }) } }} />
+              {evidenceFor === q.id ? <EvidenceForm assignmentId={id} L={L} onCancel={() => setEvidenceFor(null)} onSubmit={async (ev) => { try { await api('POST', `/surveys/my/assignments/${id}/evidence`, { questionId: q.id, ...ev }); setEvidenceFor(null); await load() } catch (e: any) { setMsg({ kind: 'err', text: e.message }) } }} />
                 : <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEvidenceFor(q.id)}>+ {L('Add evidence', 'إضافة دليل')}</button>}
             </div>
           )}
@@ -151,23 +151,57 @@ function Answer({ q, a, onChange, L, isAR }: { q: any; a?: { value: any; notAppl
   }
 }
 
-function EvidenceForm({ L, onSubmit, onCancel }: { L: (en: string, ar: string) => string; onSubmit: (e: any) => void; onCancel: () => void }) {
-  const [kind, setKind] = useState('URL')
+function EvidenceForm({ assignmentId, L, onSubmit, onCancel }: { assignmentId: string; L: (en: string, ar: string) => string; onSubmit: (e: any) => void; onCancel: () => void }) {
+  const [kind, setKind] = useState('DOCUMENT')
   const [val, setVal] = useState('')
   const [title, setTitle] = useState('')
-  const body = kind === 'URL' ? { kind, url: val, title } : kind === 'STATEMENT' ? { kind, statement: val, title } : { kind, refId: val, title }
+  const [q, setQ] = useState('')
+  const [options, setOptions] = useState<any[] | null>(null)
+  const [picked, setPicked] = useState<any>(null)
+  const pickable = ['DOCUMENT', 'ATTACHMENT', 'REPOSITORY_OBJECT'].includes(kind)
+  useEffect(() => {
+    if (!pickable) return
+    setPicked(null)
+    const t = setTimeout(() => {
+      api('GET', `/surveys/my/assignments/${assignmentId}/evidence-options?kind=${kind}&q=${encodeURIComponent(q)}`).then(setOptions).catch(() => setOptions([]))
+    }, 250)
+    return () => clearTimeout(t)
+  }, [assignmentId, kind, q, pickable])
+  const body = pickable ? (picked ? { kind, refId: picked.id, title: title || picked.label } : null)
+    : kind === 'URL' ? { kind, url: val, title } : { kind, statement: val, title }
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 6 }}>
-      <select aria-label={L('Evidence type', 'نوع الدليل')} className="form-input" style={{ width: 180 }} value={kind} onChange={e => setKind(e.target.value)}>
-        <option value="URL">{L('Link (policy, dashboard, report)', 'رابط (سياسة، لوحة، تقرير)')}</option>
-        <option value="DOCUMENT">{L('Knowledge document ID', 'معرّف مستند المعرفة')}</option>
-        <option value="REPOSITORY_OBJECT">{L('Architecture object ID', 'معرّف عنصر البنية')}</option>
-        <option value="STATEMENT">{L('Written statement', 'إفادة مكتوبة')}</option>
-      </select>
-      <input aria-label={L('Title', 'العنوان')} className="form-input" style={{ width: 160 }} placeholder={L('Title', 'العنوان')} value={title} onChange={e => setTitle(e.target.value)} />
-      <input aria-label={L('Evidence', 'الدليل')} className="form-input" style={{ flex: 1, minWidth: 180 }} value={val} onChange={e => setVal(e.target.value)} />
-      <button type="button" className="btn btn-primary btn-sm" disabled={!val.trim()} onClick={() => onSubmit(body)}>{L('Attach', 'إرفاق')}</button>
-      <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>{L('Cancel', 'إلغاء')}</button>
+    <div style={{ display: 'grid', gap: 6, marginTop: 6, maxWidth: 640 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <select aria-label={L('Evidence type', 'نوع الدليل')} className="form-input" style={{ width: 220 }} value={kind} onChange={e => { setKind(e.target.value); setVal(''); setQ('') }}>
+          <option value="DOCUMENT">{L('Knowledge document', 'مستند معرفي')}</option>
+          <option value="ATTACHMENT">{L('Architecture attachment', 'مرفق معماري')}</option>
+          <option value="REPOSITORY_OBJECT">{L('Architecture object', 'عنصر معماري')}</option>
+          <option value="URL">{L('Link (policy, dashboard, report)', 'رابط (سياسة، لوحة، تقرير)')}</option>
+          <option value="STATEMENT">{L('Written statement', 'إفادة مكتوبة')}</option>
+        </select>
+        <input aria-label={L('Title', 'العنوان')} className="form-input" style={{ width: 180 }} placeholder={L('Title (optional)', 'العنوان (اختياري)')} value={title} onChange={e => setTitle(e.target.value)} />
+      </div>
+      {pickable ? (
+        <div>
+          <input aria-label={L('Search', 'بحث')} className="form-input" placeholder={L('Search by name…', 'ابحث بالاسم…')} value={q} onChange={e => setQ(e.target.value)} />
+          <div role="listbox" aria-label={L('Matching items', 'العناصر المطابقة')} style={{ maxHeight: 160, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 6, marginTop: 4 }}>
+            {!options ? <div style={{ padding: 6, fontSize: 12 }}>{L('Searching…', 'جارٍ البحث…')}</div>
+              : !options.length ? <div data-testid="no-evidence-options" style={{ padding: 6, fontSize: 12, color: 'var(--text-dim)' }}>{kind === 'DOCUMENT' ? L('No matching documents.', 'لا توجد مستندات مطابقة.') : L('Nothing found, or you do not have access to architecture content.', 'لا توجد نتائج، أو لا تملك صلاحية الوصول لمحتوى البنية.')}</div>
+              : options.map(o => (
+                <button key={o.id} type="button" role="option" aria-selected={picked?.id === o.id} onClick={() => setPicked(o)} style={{ display: 'block', width: '100%', textAlign: 'start', padding: '4px 8px', border: 'none', background: picked?.id === o.id ? 'rgba(3,105,161,0.10)' : 'transparent', cursor: 'pointer', fontSize: 12, color: 'var(--text)' }}>
+                  {o.label} <span style={{ color: 'var(--text-dim)' }}>{o.detail}</span>
+                </button>
+              ))}
+          </div>
+        </div>
+      ) : (
+        <input aria-label={L('Evidence', 'الدليل')} className="form-input" placeholder={kind === 'URL' ? 'https://' : ''} value={val} onChange={e => setVal(e.target.value)} />
+      )}
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button type="button" className="btn btn-primary btn-sm" disabled={!body || (!pickable && !val.trim())} onClick={() => body && onSubmit(body)}>{L('Attach', 'إرفاق')}</button>
+        <button type="button" className="btn btn-secondary btn-sm" onClick={onCancel}>{L('Cancel', 'إلغاء')}</button>
+      </div>
+      <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Evidence is linked, not copied. A reviewer verifies it separately.', 'يُربط الدليل ولا يُنسخ، ويتحقق منه مراجع بشكل مستقل.')}</div>
     </div>
   )
 }
