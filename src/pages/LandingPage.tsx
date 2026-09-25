@@ -64,11 +64,28 @@ const architectRoles: Copy[] = [
   c('Security Architect', 'معماري الأمن السيبراني'),
 ]
 
+/**
+ * Customers shown on the public portal. Add an entry per customer who has agreed to be listed.
+ * `logo`: the customer's official logo file under public/customers/ (taken from the customer's own
+ * published material — never redrawn). Without a logo file the card shows the organization's name.
+ */
+type Customer = { id: string; name: Copy; shortName?: Copy; sector: Copy; logo?: string }
+const customers: Customer[] = [
+  {
+    id: 'hrdf',
+    name: c('Human Resources Development Fund', 'صندوق تنمية الموارد البشرية'),
+    shortName: c('HRDF', 'هدف'),
+    sector: c('Government · Kingdom of Saudi Arabia', 'جهة حكومية · المملكة العربية السعودية'),
+    logo: '/customers/hrdf.svg',
+  },
+]
+
 const navItems = [
   { href: '#platform', label: c('Platform', 'المنصة') },
   { href: '#capabilities', label: c('Capabilities', 'القدرات') },
   { href: '#ai-architects', label: c('AI Architects', 'المعماريون الأذكياء') },
   { href: '#frameworks', label: c('Frameworks', 'الأطر') },
+  { href: '#customers', label: c('Customers', 'عملاؤنا') },
   { href: '#resources', label: c('Resources', 'الموارد') },
 ]
 
@@ -291,6 +308,13 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section className="am-section lp-surface" id="customers" aria-labelledby="customers-title">
+          <div className="am-container">
+            <SectionHeading eyebrow={c('OUR CUSTOMERS', 'عملاؤنا')} title={c('Organizations operating enterprise architecture with ArchMind', 'جهات تشغّل بنيتها المؤسسية مع ArchMind')} body={c('Public-sector and enterprise architecture teams use ArchMind to run their architecture practice.', 'تعتمد فرق البنية المؤسسية في القطاع الحكومي والمؤسسات على ArchMind في تشغيل ممارساتها المعمارية.')} L={L} id="customers-title" />
+            <ul className="lp-customers">{customers.map((customer) => <CustomerCard key={customer.id} customer={customer} L={L} />)}</ul>
+          </div>
+        </section>
+
         <section className="am-section lp-demo am-on-dark" id="demo" aria-labelledby="demo-title">
           <BrandPattern variant="flow" intensity={0.3} />
           <div className="am-container lp-demo-grid">
@@ -319,6 +343,7 @@ export default function LandingPage() {
           </nav>
           <nav className="lp-footer-col" aria-label={L(c('Company', 'الشركة'))}>
             <h2 className="am-label">{L(c('Company', 'الشركة'))}</h2>
+            <a href="#customers">{L(c('Customers', 'عملاؤنا'))}</a>
             <a href="#demo">{L(c('Contact', 'تواصل معنا'))}</a>
             <Link to="/login">{L(labels.signIn)}</Link>
           </nav>
@@ -363,6 +388,19 @@ function ProductComposition({ locale }: { locale: 'EN' | 'AR' }) {
       </div>
     </div>
   </div>
+}
+
+function CustomerCard({ customer, L }: { customer: Customer; L: (copy: Copy) => string }) {
+  const [logoFailed, setLogoFailed] = useState(false)
+  return <li className="am-card lp-customer">
+    {customer.logo && !logoFailed
+      ? <span className="lp-customer-logo-wrap"><img className="lp-customer-logo" src={customer.logo} alt={`${L(customer.name)} logo`} onError={() => setLogoFailed(true)} /></span>
+      : <span className="lp-customer-mark" aria-hidden="true">{customer.shortName ? L(customer.shortName) : ''}</span>}
+    <div>
+      <h3 className="am-h5">{L(customer.name)}{customer.shortName && <span className="lp-customer-short"> ({L(customer.shortName)})</span>}</h3>
+      <p className="am-body-sm">{L(customer.sector)}</p>
+    </div>
+  </li>
 }
 
 function ChainLink() { return <div className="lp-chain-link" aria-hidden="true"><i className="lp-chain-line" /><Arrow /></div> }
