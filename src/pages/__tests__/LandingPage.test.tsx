@@ -140,7 +140,7 @@ describe('ArchMind landing page — customers', () => {
     const section = screen.getByRole('heading', { level: 2, name: 'Organizations operating enterprise architecture with ArchMind' }).closest('section')!
     expect(section).toHaveAttribute('id', 'customers')
     expect(screen.getByRole('heading', { level: 3, name: /Human Resources Development Fund \(HRDF\)/ })).toBeInTheDocument()
-    expect(screen.getByAltText('Human Resources Development Fund logo')).toHaveAttribute('src', '/customers/hrdf.svg')
+    expect(screen.getByAltText('Human Resources Development Fund logo')).toHaveAttribute('src', '/customers/hrdf.png')
     expect(screen.getAllByRole('link', { name: 'Customers' })[0]).toHaveAttribute('href', '#customers')
   })
 

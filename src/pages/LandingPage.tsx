@@ -66,8 +66,9 @@ const architectRoles: Copy[] = [
 
 /**
  * Customers shown on the public portal. Add an entry per customer who has agreed to be listed.
- * `logo`: the customer's official logo file under public/customers/ (taken from the customer's own
- * published material — never redrawn). Without a logo file the card shows the organization's name.
+ * `logo`: the customer's official logo file under public/customers/ (from the customer's own
+ * published material — never redrawn). With a logo the name is kept for assistive technology only
+ * (official logos already carry the name); without one the card shows the name.
  */
 type Customer = { id: string; name: Copy; shortName?: Copy; sector: Copy; logo?: string }
 const customers: Customer[] = [
@@ -76,7 +77,7 @@ const customers: Customer[] = [
     name: c('Human Resources Development Fund', 'صندوق تنمية الموارد البشرية'),
     shortName: c('HRDF', 'هدف'),
     sector: c('Government · Kingdom of Saudi Arabia', 'جهة حكومية · المملكة العربية السعودية'),
-    logo: '/customers/hrdf.svg',
+    logo: '/customers/hrdf.png',
   },
 ]
 
@@ -392,12 +393,14 @@ function ProductComposition({ locale }: { locale: 'EN' | 'AR' }) {
 
 function CustomerCard({ customer, L }: { customer: Customer; L: (copy: Copy) => string }) {
   const [logoFailed, setLogoFailed] = useState(false)
-  return <li className="am-card lp-customer">
-    {customer.logo && !logoFailed
-      ? <span className="lp-customer-logo-wrap"><img className="lp-customer-logo" src={customer.logo} alt={`${L(customer.name)} logo`} onError={() => setLogoFailed(true)} /></span>
+  const showLogo = !!customer.logo && !logoFailed
+  const name = <>{L(customer.name)}{customer.shortName && <span className="lp-customer-short"> ({L(customer.shortName)})</span>}</>
+  return <li className={`am-card lp-customer${showLogo ? ' has-logo' : ''}`}>
+    {showLogo
+      ? <img className="lp-customer-logo" src={customer.logo} alt={`${L(customer.name)} logo`} onError={() => setLogoFailed(true)} />
       : <span className="lp-customer-mark" aria-hidden="true">{customer.shortName ? L(customer.shortName) : ''}</span>}
-    <div>
-      <h3 className="am-h5">{L(customer.name)}{customer.shortName && <span className="lp-customer-short"> ({L(customer.shortName)})</span>}</h3>
+    <div className="lp-customer-body">
+      <h3 className={showLogo ? 'am-visually-hidden' : 'am-h5'}>{name}</h3>
       <p className="am-body-sm">{L(customer.sector)}</p>
     </div>
   </li>
