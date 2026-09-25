@@ -377,6 +377,11 @@ export function ExecutiveOverview({ L, onOpenCapability }: { L: LFn; onOpenCapab
           {!ids.length ? <div style={small}>{L('Nothing here.', 'لا شيء هنا.')}</div> : ids.slice(0, 200).map(id => <button key={id} onClick={() => onOpenCapability(id)} style={{ display: 'block', width: '100%', textAlign: 'start', padding: '5px 0', border: 'none', borderTop: '1px solid var(--border)', background: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: 13 }}>{d.names?.[id] ?? L('Capability', 'قدرة')}</button>)}
         </div>
       )}
+      <details style={{ ...box, marginTop: 12, fontSize: 12 }} data-testid="about-measures">
+        <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{L('About these measures', 'حول هذه المؤشرات')}</summary>
+        <p>{L('Maturity uses the ArchMind Capability Maturity Model (five levels, inspired by CMMI - not an official CMMI appraisal). Equal dimension weights, median of respondents, evidence rules, materiality bands (HIGH ≥ 60, MEDIUM ≥ 35) and the 12-month reassessment cycle are ArchMind defaults that your organization can change - not requirements of NORA, CMMI or TOGAF.', 'يُستخدم نموذج ArchMind لنضج القدرات (خمسة مستويات مستوحاة من CMMI - وليس تقييماً رسمياً لـ CMMI). الأوزان المتساوية ووسيط المستجيبين وقواعد الأدلة وحدود الأهمية (مرتفعة ≥ 60، متوسطة ≥ 35) ودورة إعادة التقييم كل 12 شهراً إعدادات افتراضية في ArchMind يمكن لجهتك تغييرها - وليست متطلبات من NORA أو CMMI أو TOGAF.')}</p>
+        <p>{L('"Insufficient data" means information is missing - not that the capability is low priority. Targets are goals, not forecasts.', '"بيانات غير كافية" تعني نقص المعلومات - وليس أن القدرة منخفضة الأولوية. المستهدفات أهداف وليست توقعات.')}</p>
+      </details>
       <ReportsPanel L={L} />
     </div>
   )
