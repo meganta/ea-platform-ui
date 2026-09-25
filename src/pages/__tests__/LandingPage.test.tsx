@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { LangProvider } from '../../contexts/LangContext'
 import LandingPage from '../LandingPage'
 
@@ -131,5 +131,29 @@ describe('ArchMind landing page — brand', () => {
     renderLanding('AR')
     expect(meta.getAttribute('content')).toBe('ArchMind | منصة تشغيل البنية المؤسسية')
     meta.remove()
+  })
+})
+
+describe('ArchMind landing page — customers', () => {
+  it('lists HRDF with its official logo and bilingual name', () => {
+    renderLanding()
+    const section = screen.getByRole('heading', { level: 2, name: 'Organizations operating enterprise architecture with ArchMind' }).closest('section')!
+    expect(section).toHaveAttribute('id', 'customers')
+    expect(screen.getByRole('heading', { level: 3, name: /Human Resources Development Fund \(HRDF\)/ })).toBeInTheDocument()
+    expect(screen.getByAltText('Human Resources Development Fund logo')).toHaveAttribute('src', '/customers/hrdf.png')
+    expect(screen.getAllByRole('link', { name: 'Customers' })[0]).toHaveAttribute('href', '#customers')
+  })
+
+  it('shows the Arabic name in Arabic', () => {
+    renderLanding('AR')
+    expect(screen.getByRole('heading', { level: 3, name: /صندوق تنمية الموارد البشرية \(هدف\)/ })).toBeInTheDocument()
+  })
+
+  it('falls back to the short name if the logo file cannot load', () => {
+    renderLanding()
+    const logo = screen.getByAltText('Human Resources Development Fund logo')
+    act(() => { logo.dispatchEvent(new Event('error')) })
+    expect(screen.queryByAltText('Human Resources Development Fund logo')).toBeNull()
+    expect(document.querySelector('.lp-customer-mark')).toHaveTextContent('HRDF')
   })
 })
