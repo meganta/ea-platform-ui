@@ -33,8 +33,13 @@ const KIND: Record<string, [string, string]> = {
 
 export function ModelSuggestions({ L, onPick }: { L: LFn; onPick: (modelId: string) => void }) {
   const [data, setData] = useState<any>(null)
-  useEffect(() => { bcm('GET', '/reference-recommendations').then(setData).catch(() => setData({ recommendations: [], limitation: null })) }, [])
-  if (!data) return null
+  useEffect(() => {
+    bcm('GET', '/reference-recommendations')
+      .then(d => setData({ recommendations: Array.isArray(d?.recommendations) ? d.recommendations : [], limitation: d?.limitation ?? null }))
+      .catch(() => setData({ recommendations: [], limitation: null }))
+  }, [])
+  // Suggestions are an optional aid: never break the library when unavailable.
+  if (!data || (!data.recommendations.length && !data.limitation)) return null
   return (
     <section aria-label={L('Suggested for your organization', 'مقترحة لجهتك')} style={{ ...card, marginBottom: 12 }}>
       <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{L('Suggested for your organization', 'مقترحة لجهتك')}</div>
@@ -62,7 +67,7 @@ export function ModelSources({ versionId, version, L }: { versionId: string; ver
       {version?.assumptions && <div><strong>{L('Assumptions', 'الافتراضات')}</strong><div style={{ color: 'var(--text-dim)', marginTop: 4 }}>{version.assumptions}</div></div>}
       <div>
         <strong>{L('Sources', 'المصادر')}</strong>
-        {!sources ? <div>{L('Loading…', 'جارٍ التحميل…')}</div> : !sources.length ? <div style={{ color: 'var(--text-dim)' }}>{L('No structured sources recorded.', 'لا توجد مصادر مسجلة.')}</div> : sources.map(s => (
+        {!sources ? <div>{L('Loading…', 'جارٍ التحميل…')}</div> : !Array.isArray(sources) || !sources.length ? <div style={{ color: 'var(--text-dim)' }}>{L('No structured sources recorded.', 'لا توجد مصادر مسجلة.')}</div> : sources.map(s => (
           <div key={s.id} style={{ borderTop: '1px solid var(--border)', padding: '6px 0' }}>
             <div><strong>{s.organization}</strong> - {s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a> : s.title}</div>
             <div style={{ color: 'var(--text-dim)' }}>{[s.publicationInfo, s.provenanceType].filter(Boolean).join(' · ')}</div>
@@ -91,6 +96,7 @@ export function ReferenceComparison({ versionId, L, isAR, onReview }: { versionI
   useEffect(() => { setData(null); bcm('GET', `/reference-versions/${versionId}/compare`).then(setData).catch(e => setError(e.message)) }, [versionId])
   if (error) return <div role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</div>
   if (!data) return <div>{L('Comparing…', 'جارٍ المقارنة…')}</div>
+  if (!Array.isArray(data.reference) || !Array.isArray(data.tenant)) return <div role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{L('Comparison is unavailable right now.', 'المقارنة غير متاحة حالياً.')}</div>
   const refRows = data.reference.filter((r: any) => r.cls === filter)
   const tenantRows = data.tenant.filter((r: any) => r.cls === filter)
   return (

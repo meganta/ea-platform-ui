@@ -210,3 +210,17 @@ describe('recalculation warning', () => {
     expect(calls.some(c => c.url.endsWith('/analyze'))).toBe(false);
   });
 });
+
+describe('resilience', () => {
+  it('suggestions render nothing (and never crash) on an unexpected response', async () => {
+    mockFetch({ '/reference-recommendations': {} });
+    const { container } = render(<ModelSuggestions L={L} onPick={jest.fn()} />);
+    await waitFor(() => expect(calls.length).toBe(1));
+    expect(container).toBeEmptyDOMElement();
+  });
+  it('comparison shows a message instead of crashing on an unexpected response', async () => {
+    mockFetch({ '/reference-versions/v1/compare': { summary: {} } });
+    render(<ReferenceComparison versionId="v1" L={L} isAR={false} onReview={jest.fn()} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/unavailable/);
+  });
+});
