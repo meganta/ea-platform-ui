@@ -20,24 +20,43 @@ The public portal consists of the landing page (`/` on archmindworks.com) and th
 - **Typography.** Latin text uses Manrope. Arabic text uses IBM Plex Sans Arabic, and Arabic headings have no negative tracking.
 - **Motion.** Every duration becomes 0 under `prefers-reduced-motion`.
 
-## Logo assets: action required from design
+## Logo assets
 
-Only the brand board image has been supplied. It is a presentation board, not a production asset, and the approved
-symbol must not be redrawn. Until vector files arrive, `BrandLogo` renders the brand name as accessible text in the
-approved hierarchy, with no symbol.
+The logo system was produced from the approved concept board. The masters are vector files, and the wordmark
+text is converted to outlines, so each file renders identically in `<img>`, email and print. Everything is
+generated, so changes are made in the generator rather than by editing individual files:
 
-Export these from the vector master into `public/brand/logos/` and register each one in `assets.ts`:
+```bash
+pip install fonttools
+curl -L -o /tmp/Manrope.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/manrope/Manrope%5Bwght%5D.ttf"
+python3 scripts/brand/generate_brand_svgs.py /tmp/Manrope.ttf     # all SVG masters
+npm i --no-save sharp && node scripts/brand/rasterize.js         # PNG / ICO derivatives
+```
 
-- `archmind-horizontal-color.svg`, `archmind-horizontal-white.svg`, `archmind-horizontal-dark.svg`
-- `archmind-stacked-color.svg`, `archmind-stacked-white.svg`, `archmind-stacked-dark.svg`
-- `archmind-symbol-color.svg`, `archmind-symbol-white.svg`, `archmind-symbol-dark.svg`
+**Lockups.** Files are in `public/brand/logos/` and are all registered in `assets.ts`. Each is named
+`archmind-{horizontal|stacked|symbol}-{color|reverse|white|dark}.svg`, where the tone means:
 
-Once the symbol is available, add these to `public/` and reference them from `index.html` and `manifest.json`:
+- `color`: full colour, for light backgrounds.
+- `reverse`: full-colour symbol with a white wordmark, for navy backgrounds. The header and footer use this.
+- `white` and `dark`: monochrome versions.
 
-- `favicon.ico` (16/32/48)
-- `favicon.svg`
-- `apple-touch-icon.png` (180)
-- `icon-72.png` through `icon-512.png`: 72, 96, 128, 144, 152, 192, 384 and 512
-- A 1200×630 social sharing image
+**Favicons.**
+- `public/favicon.svg`
+- `public/favicon.ico` (16, 32 and 48)
+- `brand/icons/favicon-{16,32,48}.png`
 
-Until then, the existing favicon stays in place.
+**App and PWA icons.** `brand/icons/icon-{72,96,128,144,152,192,256,384,512,1024}.png`. Sizes below 72px use a
+simplified symbol with fewer, heavier lines so they stay legible.
+
+**Apple touch icon.** `public/apple-touch-icon.png` (180×180).
+
+**Social.**
+- `brand/social/archmind-og-1200x630.png`, referenced by `og:image` and `twitter:image`.
+- `archmind-profile-1024.png`, for profile images.
+- `archmind-og.svg`, the vector master.
+
+**Usage.**
+- `--am-logo-size` on `BrandLogo` is the cap height of "ArchMind", and image heights follow from it.
+- Keep at least the height of the "A" as clear space around the logo. `BrandLogo` builds this in.
+- The minimum on-screen width for the horizontal lockup is 113px.
+- Never recolour, stretch, rotate or add effects to the logo.
