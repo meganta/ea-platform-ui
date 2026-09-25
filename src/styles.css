@@ -161,12 +161,34 @@ tr:hover td { background:rgba(3,105,161,0.03) }
 .phase-dot.done { background:var(--success); border-color:var(--success); color:var(--navy) }
 .phase-dot.active { background:var(--accent); border-color:var(--accent); color:var(--navy); box-shadow:0 0 12px rgba(3,105,161,0.4) }
 .phase-label { font-size:9px; color:var(--text-dim); font-family:var(--font-mono) }
-.login-page { min-height:100vh; background:linear-gradient(160deg,#EFF4FA 0%,#F7F9FC 55%,#EAF2F8 100%); display:flex; align-items:center; justify-content:center }
-.login-card { background:var(--navy-light); border:1px solid var(--border); border-radius:12px; padding:40px; width:420px; box-shadow:var(--shadow-lg) }
-.login-logo { font-family:var(--font-display); font-size:24px; font-weight:800; color:var(--accent); margin-bottom:4px }
-.login-tagline { font-family:var(--font-mono); font-size:11px; color:var(--text-dim); margin-bottom:32px }
-.login-title { font-family:var(--font-display); font-size:18px; font-weight:600; margin-bottom:24px }
-.login-error { background:rgba(220,38,38,0.08); border:1px solid rgba(220,38,38,0.25); color:var(--danger); padding:10px 14px; border-radius:var(--radius); font-size:12px; margin-bottom:16px }
+/* ── Public entry pages (sign-in, register, invite, shared view) — ArchMind brand tokens ── */
+.login-page { position:relative; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:var(--am-space-10) var(--am-gutter); overflow:hidden; background:var(--am-gradient-navy); font-family:var(--am-font) }
+.login-page[data-locale='AR'] { font-family:var(--am-font-arabic) }
+.login-page.login-page-top { align-items:flex-start }
+/* Legacy app variables used by inline styles on these pages, mapped to the brand for this scope only. */
+.login-page { --accent:var(--am-blue); --accent-dim:var(--am-blue-700); --accent-hover:var(--am-blue-700); --font-display:var(--am-font); --font-body:var(--am-font); --font-mono:var(--am-font); --text:var(--am-text-primary); --text-dim:var(--am-text-muted); --border:var(--am-border); --navy:var(--am-surface-subtle); --navy-light:var(--am-surface); --danger:var(--am-error); --success:var(--am-success); --radius:var(--am-radius-sm) }
+.login-page[data-locale='AR'] { --font-display:var(--am-font-arabic); --font-body:var(--am-font-arabic); --font-mono:var(--am-font-arabic) }
+.login-card { position:relative; z-index:1; width:440px; max-width:100%; padding:var(--am-space-10); background:var(--am-surface); border-radius:var(--am-radius-lg); box-shadow:var(--am-shadow-modal); color:var(--am-text-primary) }
+.login-card-center { text-align:center; display:flex; flex-direction:column; align-items:center; gap:var(--am-space-3) }
+.login-logo { font-family:var(--am-font); font-size:22px; font-weight:var(--am-weight-bold); letter-spacing:-0.01em; color:var(--am-navy); margin-bottom:4px }
+.login-tagline { margin:var(--am-space-4) 0 var(--am-space-8); color:var(--am-text-muted); font-size:var(--am-label-size); font-weight:var(--am-weight-semibold); letter-spacing:0.12em; text-transform:uppercase }
+.login-title { font-family:var(--am-font); font-size:var(--am-h3-size); line-height:var(--am-h3-lh); font-weight:var(--am-weight-bold); letter-spacing:var(--am-h3-ls); color:var(--am-text-primary); margin-bottom:var(--am-space-6) }
+.login-title-spaced { margin:var(--am-space-8) 0 var(--am-space-2) }
+.login-muted { color:var(--am-text-muted); font-size:var(--am-body-sm-size); margin-bottom:var(--am-space-6) }
+.login-footnote { text-align:center; margin:var(--am-space-6) 0 0 }
+.login-footnote a { color:var(--am-link); font-weight:var(--am-weight-semibold) }
+.login-error { background:var(--am-error-bg); border:1px solid rgba(180,35,24,0.25); color:var(--am-error); padding:10px 14px; border-radius:var(--am-radius-sm); font-size:var(--am-body-sm-size); margin-bottom:var(--am-space-4) }
+.login-done-mark { display:grid; place-items:center; width:60px; height:60px; border-radius:50%; background:var(--am-success-bg); color:var(--am-success) }
+.login-lang { background:transparent; border:1px solid var(--am-border-strong); border-radius:var(--am-radius-pill); color:var(--am-text-secondary); padding:6px 12px; font-size:var(--am-caption-size); cursor:pointer }
+.login-lang:hover { border-color:var(--am-blue); color:var(--am-blue-700) }
+.login-card .form-label { color:var(--am-text-secondary); font-size:var(--am-body-sm-size); font-weight:var(--am-weight-semibold); font-family:var(--am-font); letter-spacing:0; text-transform:none }
+.login-card .form-input { min-height:46px; border:1px solid var(--am-border-strong); border-radius:var(--am-radius-sm); background:var(--am-white); color:var(--am-text-primary); font-size:var(--am-body-size) }
+.login-card .form-input:focus { outline:none; border-color:var(--am-blue); box-shadow:0 0 0 3px rgba(37,99,235,0.22) }
+.login-card .btn-primary { min-height:46px; border-radius:var(--am-radius-md); background:var(--am-blue); font-family:var(--am-font); font-size:var(--am-button-size); font-weight:var(--am-weight-semibold) }
+.login-card .btn-primary:hover { background:var(--am-blue-700) }
+.login-card .btn:focus-visible, .login-lang:focus-visible, .login-card a:focus-visible { outline:3px solid var(--am-focus); outline-offset:2px }
+.login-submit { width:100%; justify-content:center; margin-top:var(--am-space-2) }
+@media (max-width:480px) { .login-card { padding:var(--am-space-6) var(--am-space-5) } }
 .copilot-wrap { display:flex; flex-direction:column; height:100vh }
 .copilot-header { padding:20px 32px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px }
 .copilot-messages { flex:1; overflow-y:auto; padding:24px 32px; display:flex; flex-direction:column; gap:16px }

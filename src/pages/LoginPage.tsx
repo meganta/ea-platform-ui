@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import { API_BASE } from '../lib/api'
+import BrandLogo from '../brand/BrandLogo'
+import BrandPattern from '../brand/BrandPattern'
+import '../brand/brand.css'
 
 interface PublicBrandingSummary {
   organizationNameEn?: string | null
@@ -58,13 +61,14 @@ export default function LoginPage() {
     finally { setLoading(false) }
   }
   return (
-    <div className="login-page">
+    <div className="login-page" data-locale={locale}>
+      <BrandPattern variant="flow" intensity={0.35} />
       <div className="login-card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
           {orgBranding?.hasLogo && !logoFailed
             ? <img src={`${API_BASE}/public/branding/${encodeURIComponent(form.tenantSlug.trim())}/logo`} alt={orgName || 'Logo'} style={{ maxHeight: 28, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />
-            : <div className="login-logo">{orgName || 'EA Platform'}</div>}
-          <button onClick={()=>setLocale(locale==='EN'?'AR':'EN')} style={{background:'none',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--text-dim)',padding:'4px 10px',fontSize:11,cursor:'pointer'}}>
+            : orgName ? <div className="login-logo">{orgName}</div> : <BrandLogo size={24} />}
+          <button type="button" className="login-lang" onClick={()=>setLocale(locale==='EN'?'AR':'EN')}>
             {locale==='EN'?'🌐 العربية':'🌐 English'}
           </button>
         </div>

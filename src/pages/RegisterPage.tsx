@@ -1,6 +1,9 @@
 import { useState, FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
+import BrandLogo from '../brand/BrandLogo'
+import BrandPattern from '../brand/BrandPattern'
+import '../brand/brand.css'
 
 const API_BASE = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -97,12 +100,13 @@ export default function RegisterPage() {
   const slugMsg = slugStatus === 'available' ? (isAR ? '✓ متاح' : '✓ Available') : slugStatus === 'taken' ? (isAR ? '✗ محجوز' : '✗ Already taken') : slugStatus === 'checking' ? (isAR ? 'جارٍ التحقق...' : 'Checking...') : ''
 
   return (
-    <div className="login-page" style={{alignItems:'flex-start',paddingTop:40,paddingBottom:40}}>
+    <div className="login-page login-page-top" data-locale={locale}>
+      <BrandPattern variant="flow" intensity={0.35} />
       <div className="login-card" style={{width:520,maxWidth:'95vw'}}>
         {/* Header */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
-          <div className="login-logo">EA Platform</div>
-          <button onClick={()=>setLocale(locale==='EN'?'AR':'EN')} style={{background:'none',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--text-dim)',padding:'4px 10px',fontSize:11,cursor:'pointer'}}>
+          <BrandLogo size={24} />
+          <button type="button" className="login-lang" onClick={()=>setLocale(locale==='EN'?'AR':'EN')}>
             {locale==='EN'?'🌐 العربية':'🌐 English'}
           </button>
         </div>
@@ -227,8 +231,8 @@ export default function RegisterPage() {
             </div>
             <div style={{fontSize:13,color:'var(--text-dim)',marginBottom:24}}>
               {isAR
-                ? `مرحباً بمنظمة ${result.tenant.name} في منصة EA`
-                : `Welcome, ${result.tenant.name} — your EA Platform is ready`}
+                ? `مرحباً بمنظمة ${result.tenant.name} في منصة ArchMind`
+                : `Welcome, ${result.tenant.name} — your ArchMind workspace is ready`}
             </div>
             <div className="card" style={{textAlign:'start',marginBottom:20}}>
               <div style={{fontSize:11,color:'var(--text-dim)',fontFamily:'var(--font-mono)',marginBottom:8}}>

@@ -47,7 +47,7 @@ describe('SharedViewPage', () => {
   it('falls back to a generic org name when branding has none', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ...SAMPLE_VIEW, branding: null }) });
     render(<SharedViewPage />);
-    expect(await screen.findByText(/shared view from an EA Platform workspace/)).toBeInTheDocument();
+    expect(await screen.findByText(/shared view from an ArchMind workspace/)).toBeInTheDocument();
   });
 
   it('shows a fallback error message when the server returns an error without a message field', async () => {

@@ -1,0 +1,141 @@
+/*
+ * ArchMind brand tokens — the single source of truth for the public portal.
+ * Components consume these custom properties; they never hard-code brand values.
+ * Source: approved "Abstract Tech" ArchMind identity board.
+ */
+:root {
+  /* ── Brand colours ─────────────────────────────────────────────── */
+  --am-navy-900: #061528;
+  --am-navy: #081F3B;            /* Primary Navy — dark surfaces, nav, footer */
+  --am-navy-700: #0D2B50;
+  --am-navy-600: #143A66;
+  --am-blue: #2563EB;            /* Primary Blue — actions, links, active states */
+  --am-blue-700: #1D4ED8;
+  --am-blue-800: #1E40AF;
+  --am-blue-100: #DBEAFE;
+  --am-cyan: #06B6D4;            /* Accent Cyan — intelligence, data accents */
+  --am-cyan-300: #67E8F9;
+  --am-teal: #14B8A6;            /* Accent Teal — progress, transformation */
+  --am-teal-700: #0F766E;
+  --am-neutral-light: #E6F0FF;   /* Light Neutral — soft surfaces */
+
+  /* Neutral scale (cool, navy-tinted) */
+  --am-white: #FFFFFF;
+  --am-grey-25: #FAFCFF;         /* near-white */
+  --am-grey-50: #F4F7FB;
+  --am-grey-100: #EAF0F7;
+  --am-grey-200: #D8E2EE;
+  --am-grey-300: #BFCCDC;
+  --am-grey-400: #94A3B8;
+  --am-grey-500: #64748B;
+  --am-grey-600: #475569;
+  --am-grey-700: #334155;
+  --am-grey-900: #0B1B30;
+
+  /* Semantic */
+  --am-text-primary: #0B1B30;
+  --am-text-secondary: #334155;
+  --am-text-muted: #5B6B80;                 /* 5.3:1 on white */
+  --am-text-inverse: #FFFFFF;
+  --am-text-inverse-secondary: #C5D3E8;     /* on navy: 10:1 */
+  --am-text-inverse-muted: #93A7C4;         /* on navy: 6.4:1 */
+  --am-link: var(--am-blue-700);
+  --am-border: #D8E2EE;
+  --am-border-strong: #BFCCDC;
+  --am-border-inverse: rgba(255, 255, 255, 0.14);
+  --am-surface: #FFFFFF;
+  --am-surface-subtle: #F4F7FB;
+  --am-surface-soft: var(--am-neutral-light);
+  --am-surface-inverse: var(--am-navy);
+  --am-surface-inverse-raised: #0F2A4D;
+  --am-disabled-bg: #E2E8F0;
+  --am-disabled-text: #7C8A9C;
+  --am-focus: #2563EB;
+  --am-focus-inverse: #67E8F9;
+  --am-success: #0F766E;
+  --am-success-bg: #E6F7F4;
+  --am-warning: #B45309;
+  --am-warning-bg: #FEF3E2;
+  --am-error: #B42318;
+  --am-error-bg: #FDECEA;
+
+  /* ── Brand gradient (use selectively) ───────────────────────────── */
+  --am-gradient: linear-gradient(100deg, #2563EB 0%, #06B6D4 55%, #14B8A6 100%);
+  --am-gradient-primary: linear-gradient(90deg, #2563EB 0%, #06B6D4 100%);
+  --am-gradient-secondary: linear-gradient(90deg, #0B1F3B 0%, #14B8A6 100%);
+  /* Action gradient: same hue path, darkened so white button text stays ≥ 4.5:1 end to end */
+  --am-gradient-action: linear-gradient(90deg, #2563EB 0%, #0E7490 100%);
+  --am-gradient-navy: linear-gradient(160deg, #0A2547 0%, #081F3B 55%, #061528 100%);
+
+  /* ── Typography ─────────────────────────────────────────────────── */
+  --am-font-latin: 'Manrope', 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --am-font-arabic: 'IBM Plex Sans Arabic', 'Manrope', system-ui, sans-serif;
+  --am-font: var(--am-font-latin);
+  --am-font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', monospace;
+
+  --am-weight-regular: 400;
+  --am-weight-medium: 500;
+  --am-weight-semibold: 600;
+  --am-weight-bold: 700;
+  --am-weight-extrabold: 800;
+
+  /* size / line-height / tracking — fluid between 360px and 1440px */
+  --am-display-size: clamp(2.5rem, 1.6rem + 3.6vw, 4.25rem);   --am-display-lh: 1.06; --am-display-ls: -0.035em;
+  --am-h1-size: clamp(2.25rem, 1.6rem + 2.6vw, 3.5rem);        --am-h1-lh: 1.1;  --am-h1-ls: -0.03em;
+  --am-h2-size: clamp(1.875rem, 1.45rem + 1.7vw, 2.75rem);     --am-h2-lh: 1.15; --am-h2-ls: -0.025em;
+  --am-h3-size: clamp(1.25rem, 1.12rem + 0.5vw, 1.5rem);       --am-h3-lh: 1.3;  --am-h3-ls: -0.015em;
+  --am-h4-size: 1.125rem;                                       --am-h4-lh: 1.4;  --am-h4-ls: -0.01em;
+  --am-h5-size: 1rem;                                           --am-h5-lh: 1.45; --am-h5-ls: 0;
+  --am-body-lg-size: clamp(1.0625rem, 1rem + 0.25vw, 1.1875rem); --am-body-lg-lh: 1.7;
+  --am-body-size: 1rem;                                         --am-body-lh: 1.65;
+  --am-body-sm-size: 0.875rem;                                  --am-body-sm-lh: 1.6;
+  --am-label-size: 0.75rem;                                     --am-label-lh: 1.3; --am-label-ls: 0.14em;
+  --am-caption-size: 0.75rem;                                   --am-caption-lh: 1.5;
+  --am-button-size: 0.9375rem;                                  --am-button-ls: 0.005em;
+  --am-nav-size: 0.9375rem;
+
+  /* ── Spacing (4px base) ─────────────────────────────────────────── */
+  --am-space-1: 0.25rem;  --am-space-2: 0.5rem;   --am-space-3: 0.75rem;  --am-space-4: 1rem;
+  --am-space-5: 1.25rem;  --am-space-6: 1.5rem;   --am-space-8: 2rem;     --am-space-10: 2.5rem;
+  --am-space-12: 3rem;    --am-space-16: 4rem;    --am-space-20: 5rem;    --am-space-24: 6rem;
+  --am-space-32: 8rem;
+
+  /* ── Radius ─────────────────────────────────────────────────────── */
+  --am-radius-sm: 6px;
+  --am-radius-md: 10px;
+  --am-radius-lg: 16px;
+  --am-radius-card: 14px;
+  --am-radius-pill: 999px;
+
+  /* ── Shadows (restrained, navy-tinted) ──────────────────────────── */
+  --am-shadow-subtle: 0 1px 2px rgba(8, 31, 59, 0.06);
+  --am-shadow-card: 0 1px 2px rgba(8, 31, 59, 0.05), 0 6px 18px rgba(8, 31, 59, 0.06);
+  --am-shadow-elevated: 0 18px 40px rgba(8, 31, 59, 0.12);
+  --am-shadow-modal: 0 30px 70px rgba(6, 21, 40, 0.28);
+
+  /* ── Borders ────────────────────────────────────────────────────── */
+  --am-border-width: 1px;
+  --am-border-default: 1px solid var(--am-border);
+  --am-border-subtle: 1px solid var(--am-grey-100);
+  --am-border-on-dark: 1px solid var(--am-border-inverse);
+
+  /* ── Layout ─────────────────────────────────────────────────────── */
+  --am-content-max: 1200px;
+  --am-content-wide: 1320px;
+  --am-content-narrow: 760px;
+  --am-gutter: clamp(1rem, 0.6rem + 1.8vw, 2rem);
+  --am-section-y: clamp(4.5rem, 3rem + 5vw, 7.5rem);
+  --am-header-h: 76px;
+  /* Breakpoints (reference — CSS media queries cannot read custom properties):
+     sm 600px · md 820px · lg 1080px · xl 1280px */
+
+  /* ── Motion ─────────────────────────────────────────────────────── */
+  --am-duration-fast: 120ms;
+  --am-duration-normal: 200ms;
+  --am-duration-slow: 360ms;
+  --am-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --am-duration-fast: 0ms; --am-duration-normal: 0ms; --am-duration-slow: 0ms; }
+}
