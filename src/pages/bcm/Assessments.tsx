@@ -38,12 +38,13 @@ export function AssessmentsPanel({ L, isAR, can }: { L: LFn; isAR: boolean; can:
   const [list, setList] = useState<any[] | null>(null)
   const [openId, setOpenId] = useState<string | null>(null)
   const [wizard, setWizard] = useState(false)
+  const [resumeId, setResumeId] = useState<string | undefined>(undefined)
   const [error, setError] = useState<string | null>(null)
   const load = useCallback(() => { api('GET', BASE).then(setList).catch(e => setError(e.message)) }, [])
   useEffect(() => { load() }, [load])
 
-  if (wizard) return <AssessWizard L={L} isAR={isAR} onClose={(id) => { setWizard(false); load(); if (id) setOpenId(id) }} />
-  if (openId) return <AssessmentDetail id={openId} L={L} isAR={isAR} can={can} onBack={() => { setOpenId(null); load() }} />
+  if (wizard) return <AssessWizard L={L} isAR={isAR} resumeId={resumeId} onClose={(id) => { setWizard(false); setResumeId(undefined); load(); setOpenId(id ?? null) }} />
+  if (openId) return <AssessmentDetail id={openId} L={L} isAR={isAR} can={can} onBack={() => { setOpenId(null); load() }} onResume={() => { setResumeId(openId); setOpenId(null); setWizard(true) }} />
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, alignItems: 'center' }}>
@@ -74,7 +75,7 @@ export function AssessmentsPanel({ L, isAR, can }: { L: LFn; isAR: boolean; can:
   )
 }
 
-function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; isAR: boolean; can: { assess: boolean; validate: boolean; approve: boolean; publish: boolean }; onBack: () => void }) {
+function AssessmentDetail({ id, L, isAR, can, onBack, onResume }: { id: string; L: LFn; isAR: boolean; can: { assess: boolean; validate: boolean; approve: boolean; publish: boolean }; onBack: () => void; onResume?: () => void }) {
   const { user } = useAuth()
   const [a, setA] = useState<any>(null)
   const [progress, setProgress] = useState<any>(null)
@@ -84,6 +85,9 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
   const [report, setReport] = useState<any[] | null>(null)
   const [resetNotice, setResetNotice] = useState<number>(0)
   const [reassessed, setReassessed] = useState<string | null>(null)
+  const [reminded, setReminded] = useState<number | null>(null)
+  const [userNames, setUserNames] = useState<Record<string, string>>({})
+  useEffect(() => { api('GET', '/users').then((u: any) => { const list = Array.isArray(u) ? u : u?.users || u?.items || []; setUserNames(Object.fromEntries(list.map((x: any) => [x.id, x.name || x.fullName || x.email]))) }).catch(() => undefined) }, [])
   const load = useCallback(async () => {
     try {
       const p = await api('GET', `${BASE}/${id}/progress`)
@@ -115,6 +119,11 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
         {can.approve && a.status === 'APPROVAL' && !a.approvedAt && (a.createdBy === user?.userId
           ? <span data-testid="needs-other-approver" style={{ fontSize: 12, color: 'var(--text-dim)', alignSelf: 'center' }}>{L('You created this assessment, so another authorized approver must approve it.', 'أنشأت هذا التقييم، لذا يجب أن يعتمده معتمد آخر مخوّل.')}</span>
           : <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => api('POST', `${BASE}/${id}/approve`))}>{L('Approve', 'اعتماد')}</button>)}
+        {['DRAFT', 'SURVEY_DESIGN'].includes(a.status) && (can.assess && onResume
+          ? <button className="btn btn-primary btn-sm" data-testid="continue-setup" disabled={busy} onClick={onResume}>{L('Continue setup', 'متابعة الإعداد')}</button>
+          : <span style={{ fontSize: 12, color: 'var(--text-dim)', alignSelf: 'center' }}>{L('This assessment is still being set up.', 'هذا التقييم لا يزال قيد الإعداد.')}</span>)}
+        {can.assess && ['OPEN', 'RESPONSES_RECEIVED'].includes(a.status) && a.surveyId && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => act(async () => { const r = await api('POST', `/surveys/${a.surveyId}/remind`, {}); setReminded(r?.reminded ?? 0) })}>{L('Send reminder', 'إرسال تذكير')}</button>}
+        {can.assess && !['PUBLISHED', 'ARCHIVED'].includes(a.status) && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { if (window.confirm(L('Archive this assessment? It cannot be continued afterwards.', 'أرشفة هذا التقييم؟ لا يمكن متابعته بعد ذلك.'))) act(() => api('POST', `${BASE}/${id}/archive`, {})) }}>{L('Archive', 'أرشفة')}</button>}
         {can.assess && a.status === 'PUBLISHED' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => act(async () => { const r = await api('POST', `${BASE}/${id}/reassess`, {}); setReassessed(r?.assessment?.id ?? null) })}>{L('Create reassessment', 'إنشاء إعادة تقييم')}</button>}
         {reassessed && <span role="status" data-testid="reassessment-created" style={{ fontSize: 12, alignSelf: 'center' }}>{L('Reassessment created in survey design. Previous results are context only; nothing is copied as an answer.', 'أُنشئت إعادة التقييم في مرحلة تصميم الاستبيان. النتائج السابقة سياق فقط ولا تُنسخ كإجابات.')}</span>}
         {can.approve && a.status === 'APPROVAL' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { const note = window.prompt(L('Reason for sending back', 'سبب الإعادة')); if (note) act(() => api('POST', `${BASE}/${id}/send-back`, { note })) }}>{L('Send back', 'إعادة للتحقق')}</button>}
@@ -127,6 +136,27 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
         </div>
       )}
       {a.status === 'VALIDATION' && can.validate && (a.results || []).some((r: any) => (r.varianceFlags || []).length) && <ConsensusWorkspace id={id} L={L} onChange={load} />}
+      {reminded != null && <div role="status" style={{ fontSize: 12, marginBottom: 8 }}>{L(`Reminder sent to ${reminded} respondent(s) who have not submitted.`, `أُرسل تذكير إلى ${reminded} من المستجيبين الذين لم يرسلوا.`)}</div>}
+      {['DRAFT', 'SURVEY_DESIGN'].includes(a.status) && (
+        <div data-testid="setup-summary" style={{ fontSize: 13, border: '1px solid var(--border)', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>{L('Setup progress', 'تقدم الإعداد')}</div>
+          <div>{(a.scope || []).length ? '✓' : '○'} {L('Capabilities in scope', 'القدرات ضمن النطاق')}: {(a.scope || []).length}</div>
+          <div>{a.surveyId ? '✓' : '○'} {L('Questionnaire generated', 'تم إنشاء الاستبيان')}</div>
+          <div>○ {L('Respondents assigned and launched', 'تعيين المستجيبين والإطلاق')}</div>
+        </div>
+      )}
+      {['OPEN', 'RESPONSES_RECEIVED'].includes(a.status) && (progress?.assignments || []).length > 0 && (
+        <div style={{ overflowX: 'auto', marginBottom: 12 }}>
+          <table data-testid="respondent-progress" style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+            <thead><tr><th style={{ textAlign: 'start' }}>{L('Respondent', 'المستجيب')}</th><th style={{ textAlign: 'start' }}>{L('Role', 'الدور')}</th><th style={{ textAlign: 'start' }}>{L('Status', 'الحالة')}</th></tr></thead>
+            <tbody>{progress.assignments.map((x: any) => (
+              <tr key={x.id} style={{ borderTop: '1px solid var(--border)' }}>
+                <td>{userNames[x.respondentUserId] || L('User', 'مستخدم')}</td><td>{x.role || '—'}</td>
+                <td>{x.status === 'SUBMITTED' ? L('Submitted', 'تم الإرسال') : x.status === 'IN_PROGRESS' ? L('In progress', 'قيد الإجابة') : L('Not started', 'لم يبدأ')}</td>
+              </tr>))}</tbody>
+          </table>
+        </div>
+      )}
       {a.status === 'PUBLISHED' && a.recommendedNextAssessmentAt && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{L('Recommended next assessment', 'التقييم التالي الموصى به')}: {String(a.recommendedNextAssessmentAt).slice(0, 10)}</div>}
       {['PUBLISHED', 'APPROVAL', 'VALIDATION'].includes(a.status) && <ReportsPanel L={L} assessmentId={id} />}
       {(a.results || []).length > 0 && (
@@ -181,8 +211,10 @@ function ResultCard({ r, name, L, canValidate, onValidate }: { r: any; name: str
 // ── 9-step Assess Maturity wizard ──────────────────────────────────────────
 const STEPS: Array<[string, string]> = [['Details', 'التفاصيل'], ['Scope', 'النطاق'], ['Framework', 'الإطار'], ['Dimensions', 'الأبعاد'], ['Target maturity', 'النضج المستهدف'], ['Respondents', 'المستجيبون'], ['Questionnaire', 'الاستبيان'], ['Review', 'المراجعة'], ['Launch', 'الإطلاق']]
 
-export function AssessWizard({ L, isAR, onClose }: { L: LFn; isAR: boolean; onClose: (id?: string) => void }) {
+export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boolean; onClose: (id?: string) => void; resumeId?: string }) {
   const [step, setStep] = useState(0)
+  const [filter, setFilter] = useState('')
+  const [resuming, setResuming] = useState(!!resumeId)
   const [details, setDetails] = useState({ name: '', description: '' })
   const [caps, setCaps] = useState<any[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -201,10 +233,37 @@ export function AssessWizard({ L, isAR, onClose }: { L: LFn; isAR: boolean; onCl
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    api('GET', '/business-capabilities/capabilities').then(setCaps).catch(() => setCaps([]))
-    api('GET', `${BASE}/frameworks`).then((fs: any[]) => { setFrameworks(fs); if (fs[0]) setFrameworkId(fs[0].id) }).catch(() => undefined)
+    api('GET', '/business-capabilities/capabilities').then((c: any) => setCaps(Array.isArray(c) ? c : c?.items || [])).catch(() => setCaps([]))
+    api('GET', `${BASE}/frameworks`).then((fs: any) => { const list = Array.isArray(fs) ? fs : []; setFrameworks(list); if (list[0]) setFrameworkId(id => id || list[0].id) }).catch(() => setFrameworks([]))
     api('GET', '/users').then((u: any) => setUsers(Array.isArray(u) ? u : u?.users || u?.items || [])).catch(() => setUsers([]))
   }, [])
+
+  // Resume an assessment that is still being set up (DRAFT / SURVEY_DESIGN): restore everything already saved on the server.
+  useEffect(() => {
+    if (!resumeId) return
+    ;(async () => {
+      try {
+        const a = await api('GET', `${BASE}/${resumeId}`)
+        if (!['DRAFT', 'SURVEY_DESIGN'].includes(a?.status)) { onClose(resumeId); return }
+        setAssessment(a)
+        setDetails({ name: a.name || '', description: a.description || '' })
+        setFrameworkId(a.frameworkId)
+        const scope: any[] = Array.isArray(a.scope) ? a.scope : []
+        setSelected(new Set(scope.map(x => x.capabilityAssetId)))
+        setTargets(Object.fromEntries(scope.filter(x => x.targetMaturity != null).map(x => [x.capabilityAssetId, String(x.targetMaturity)])))
+        if (!scope.length) { setStep(1); return }
+        const sug = await api('POST', `${BASE}/${a.id}/scope/suggest`, { capabilityIds: scope.map(x => x.capabilityAssetId) })
+        setSuggestions(Array.isArray(sug) ? sug : [])
+        setDims(Object.fromEntries(scope.map(x => [x.capabilityAssetId, new Set<string>(x.dimensionCodes || [])])))
+        if (a.surveyId) {
+          const sv = await api('GET', `/surveys/${a.surveyId}`)
+          setSurvey(sv)
+          setQuestionnaire({ surveyId: a.surveyId, questions: sv?.version?.questions?.length ?? 0 })
+          setStep(5) // questionnaire exists: continue with respondents, then review and launch
+        } else setStep(3) // scope saved: continue with dimensions
+      } catch (e: any) { setError(e.message) } finally { setResuming(false) }
+    })()
+  }, [resumeId]) // eslint-disable-line react-hooks/exhaustive-deps
   const fw = frameworks.find(f => f.id === frameworkId)
   const capName = useCallback((id: string) => { const c = caps.find(x => x.id === id); return c ? (isAR && c.nameAr) || c.name : id }, [caps, isAR])
   const run = async (fn: () => Promise<void>) => { setBusy(true); setError(null); try { await fn() } catch (e: any) { setError(e.message) } finally { setBusy(false) } }
@@ -213,14 +272,19 @@ export function AssessWizard({ L, isAR, onClose }: { L: LFn; isAR: boolean; onCl
     if (step === 0 && !details.name.trim()) throw new Error(L('Name is required', 'الاسم مطلوب'))
     if (step === 1 && !selected.size) throw new Error(L('Select at least one capability', 'اختر قدرة واحدة على الأقل'))
     if (step === 2) {
-      const a = assessment ?? await api('POST', BASE, { name: details.name, description: details.description || undefined, frameworkId })
+      if (!assessment && !frameworks.length) throw new Error(L('No maturity framework is available. Ask your administrator.', 'لا يتوفر إطار نضج. تواصل مع المسؤول.'))
+      const a = assessment ?? await api('POST', BASE, { name: details.name, description: details.description || undefined, ...(frameworkId ? { frameworkId } : {}) })
       setAssessment(a)
       const s = await api('POST', `${BASE}/${a.id}/scope/suggest`, { capabilityIds: [...selected] })
-      setSuggestions(s)
-      setDims(Object.fromEntries(s.map((x: any) => [x.capabilityAssetId, new Set(x.suggestions.filter((d: any) => d.applicable).map((d: any) => d.code))])))
+      const list = Array.isArray(s) ? s : []
+      setSuggestions(list)
+      // keep dimension choices already made (resume / going back); suggest for newly added capabilities only
+      setDims(prev => Object.fromEntries(list.map((x: any) => [x.capabilityAssetId, prev[x.capabilityAssetId] ?? new Set((x.suggestions || []).filter((d: any) => d.applicable).map((d: any) => d.code))])))
     }
     if (step === 4) {
       await api('PUT', `${BASE}/${assessment.id}/scope`, { scope: [...selected].map(id => ({ capabilityAssetId: id, dimensionCodes: [...(dims[id] || [])], targetMaturity: targets[id] ? Number(targets[id]) : null })) })
+      // Scope (re)saved: any earlier questionnaire no longer matches - it must be generated again.
+      if (questionnaire) { setQuestionnaire(null); setSurvey(null) }
     }
     if (step === 5 && !respondents.length) throw new Error(L('Add at least one respondent', 'أضف مستجيباً واحداً على الأقل'))
     if (step === 6 && !questionnaire) throw new Error(L('Generate the questionnaire first', 'أنشئ الاستبيان أولاً'))
@@ -259,6 +323,7 @@ export function AssessWizard({ L, isAR, onClose }: { L: LFn; isAR: boolean; onCl
         {STEPS.map(([en, ar], i) => <li key={en} aria-current={i === step ? 'step' : undefined} style={{ fontSize: 12, padding: '4px 8px', borderRadius: 12, background: i === step ? 'var(--accent)' : 'var(--navy-mid)', color: i === step ? '#fff' : 'var(--text-dim)' }}>{i + 1}. {L(en, ar)}</li>)}
       </ol>
       {error && <div role="alert" style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 8 }}>{error}</div>}
+      {resuming && <div role="status" style={{ fontSize: 13, marginBottom: 8 }}>{L('Loading the saved assessment…', 'جارٍ تحميل التقييم المحفوظ…')}</div>}
 
       {step === 0 && (
         <div style={{ display: 'grid', gap: 10, maxWidth: 560 }}>
@@ -266,18 +331,35 @@ export function AssessWizard({ L, isAR, onClose }: { L: LFn; isAR: boolean; onCl
           <label className="form-group"><span className="form-label">{L('Purpose (optional)', 'الغرض (اختياري)')}</span><textarea className="form-input" rows={2} value={details.description} onChange={e => setDetails({ ...details, description: e.target.value })} /></label>
         </div>
       )}
-      {step === 1 && (
-        <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
-          {caps.filter(c => c.status !== 'DEPRECATED').map(c => (
-            <label key={c.id} style={{ display: 'flex', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
-              <input type="checkbox" checked={selected.has(c.id)} onChange={() => setSelected(s => { const n = new Set(s); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n })} />{(isAR && c.nameAr) || c.name}
-            </label>
-          ))}
-          {!caps.length && <div style={{ padding: 12, fontSize: 13, color: 'var(--text-dim)' }}>{L('No capabilities found.', 'لا توجد قدرات.')}</div>}
-        </div>
-      )}
+      {step === 1 && (() => {
+        const all = caps.filter(c => c.status !== 'DEPRECATED').sort((x, y) => String(x.name).localeCompare(String(y.name)))
+        const q = filter.trim().toLowerCase()
+        const shown = q ? all.filter(c => `${c.name} ${c.nameAr || ''}`.toLowerCase().includes(q)) : all
+        const allShownSelected = shown.length > 0 && shown.every(c => selected.has(c.id))
+        return (
+          <div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 8 }}>
+              <input aria-label={L('Search capabilities', 'بحث في القدرات')} className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder={L('Search capabilities…', 'ابحث في القدرات…')} value={filter} onChange={e => setFilter(e.target.value)} />
+              <button type="button" className="btn btn-secondary btn-sm" disabled={!shown.length || allShownSelected} onClick={() => setSelected(sel => { const n = new Set(sel); shown.forEach(c => n.add(c.id)); return n })}>{q ? L('Select all shown', 'تحديد كل المعروض') : L('Select all', 'تحديد الكل')}</button>
+              <button type="button" className="btn btn-secondary btn-sm" disabled={!selected.size} onClick={() => setSelected(new Set())}>{L('Clear', 'مسح')}</button>
+              <span data-testid="scope-count" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{selected.size} / {all.length} {L('selected', 'محددة')}</span>
+            </div>
+            {selected.size > 50 && <div style={{ fontSize: 12, color: 'var(--warning)', marginBottom: 6 }}>{L('Large scopes create long questionnaires. Consider assessing in batches.', 'النطاقات الكبيرة تنتج استبيانات طويلة. يُفضل التقييم على دفعات.')}</div>}
+            <div style={{ maxHeight: 360, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8 }}>
+              {shown.map(c => (
+                <label key={c.id} style={{ display: 'flex', gap: 8, padding: '6px 10px', borderBottom: '1px solid var(--border)', fontSize: 13 }}>
+                  <input type="checkbox" checked={selected.has(c.id)} onChange={() => setSelected(sel => { const n = new Set(sel); n.has(c.id) ? n.delete(c.id) : n.add(c.id); return n })} />{(isAR && c.nameAr) || c.name}
+                </label>
+              ))}
+              {!all.length && <div style={{ padding: 12, fontSize: 13, color: 'var(--text-dim)' }}>{L('No capabilities found. Create or adopt capabilities first.', 'لا توجد قدرات. أنشئ أو اعتمد قدرات أولاً.')}</div>}
+              {!!all.length && !shown.length && <div style={{ padding: 12, fontSize: 13, color: 'var(--text-dim)' }}>{L('No capability matches your search.', 'لا توجد قدرة مطابقة للبحث.')}</div>}
+            </div>
+          </div>
+        )
+      })()}
       {step === 2 && (
         <div style={{ maxWidth: 640 }}>
+          {!frameworks.length && <div role="alert" style={{ color: 'var(--warning)', fontSize: 13, marginBottom: 6 }}>{L('No maturity framework is available. Ask your administrator.', 'لا يتوفر إطار نضج. تواصل مع المسؤول.')}</div>}
           <select aria-label={L('Framework', 'الإطار')} className="form-input" value={frameworkId} onChange={e => setFrameworkId(e.target.value)} disabled={!!assessment}>
             {frameworks.map(f => <option key={f.id} value={f.id}>{(isAR && f.nameAr) || f.name} v{f.version}</option>)}
           </select>
@@ -390,7 +472,7 @@ export function AssessWizard({ L, isAR, onClose }: { L: LFn; isAR: boolean; onCl
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-        {step > 0 && step !== 3 && step !== 8 && <button className="btn btn-secondary btn-sm" disabled={busy || (step >= 5 && step <= 6 && !!questionnaire)} onClick={() => setStep(s => s - 1)}>{L('Back', 'السابق')}</button>}
+        {step > 0 && step !== 8 && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setStep(s => s - 1)}>{L('Back', 'السابق')}</button>}
         {step < 8 && <button className="btn btn-primary btn-sm" disabled={busy} onClick={next}>{L('Next', 'التالي')}</button>}
       </div>
     </div>
