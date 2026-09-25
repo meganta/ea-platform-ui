@@ -25,6 +25,23 @@ export async function bcm(method: string, path: string, body?: any) {
 const card: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: 8, padding: 12, background: 'var(--navy-light)' }
 const nm = (x: any, isAR: boolean) => (isAR && x?.nameAr) || x?.name
 
+// ── Provenance is not status ───────────────────────────────────────────────
+const PROV: Record<string, [string, string]> = {
+  OFFICIAL_STANDARD: ['Official standard', 'معيار رسمي'], PUBLISHED_FRAMEWORK: ['Published framework', 'إطار منشور'], ARCHMIND_CURATED: ['ArchMind curated', 'منسّق من ArchMind'],
+  AI_ASSISTED_DRAFT: ['AI-assisted draft', 'مسودة بمساعدة الذكاء الاصطناعي'], TENANT_PRIVATE: ['Your organization', 'جهتك'],
+}
+const STATUS_LBL: Record<string, [string, string]> = { DRAFT: ['Draft', 'مسودة'], IN_REVIEW: ['In review', 'قيد المراجعة'], APPROVED: ['Approved', 'معتمد'], PUBLISHED: ['Published', 'منشور'], RETIRED: ['Retired', 'متقاعد'] }
+/** Always shows provenance and lifecycle status as two separate facts. Publishing never makes a curated model official. */
+export function ProvenanceStatus({ provenance, status, L }: { provenance?: string; status?: string; L: LFn }) {
+  return (
+    <div data-testid="provenance-status" style={{ fontSize: 12, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+      <span>{L('Provenance', 'المصدر')}: <strong>{provenance && PROV[provenance] ? L(PROV[provenance][0], PROV[provenance][1]) : provenance ?? '—'}</strong></span>
+      <span>{L('Status', 'الحالة')}: <strong>{status && STATUS_LBL[status] ? L(STATUS_LBL[status][0], STATUS_LBL[status][1]) : status ?? '—'}</strong></span>
+      {provenance === 'ARCHMIND_CURATED' && <span style={{ color: 'var(--text-dim)' }}>{L('Reviewed and approved by ArchMind for use - not an official industry standard.', 'مراجَع ومعتمد من ArchMind للاستخدام - وليس معياراً رسمياً للقطاع.')}</span>}
+    </div>
+  )
+}
+
 // ── Suggestions ────────────────────────────────────────────────────────────
 const KIND: Record<string, [string, string]> = {
   OFFICIAL_REFERENCE: ['Official reference', 'مرجع رسمي'], INDUSTRY_MODEL: ['Industry model', 'نموذج قطاعي'],
@@ -63,6 +80,7 @@ export function ModelSources({ versionId, version, L }: { versionId: string; ver
   useEffect(() => { bcm('GET', `/reference-versions/${versionId}/sources`).then(setSources).catch(() => setSources([])) }, [versionId])
   return (
     <div style={{ fontSize: 12, display: 'grid', gap: 10 }} data-testid="model-sources">
+      {version && <ProvenanceStatus provenance={version.model?.provenance} status={version.status} L={L} />}
       {version?.methodology && <div><strong>{L('How this model was created', 'كيف أُعدّ هذا النموذج')}</strong><div style={{ color: 'var(--text-dim)', marginTop: 4 }}>{version.methodology}</div></div>}
       {version?.assumptions && <div><strong>{L('Assumptions', 'الافتراضات')}</strong><div style={{ color: 'var(--text-dim)', marginTop: 4 }}>{version.assumptions}</div></div>}
       <div>
@@ -97,6 +115,16 @@ export function ReferenceComparison({ versionId, L, isAR, onReview }: { versionI
   if (error) return <div role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{error}</div>
   if (!data) return <div>{L('Comparing…', 'جارٍ المقارنة…')}</div>
   if (!Array.isArray(data.reference) || !Array.isArray(data.tenant)) return <div role="alert" style={{ color: 'var(--danger)', fontSize: 13 }}>{L('Comparison is unavailable right now.', 'المقارنة غير متاحة حالياً.')}</div>
+  const reload = () => bcm('GET', `/reference-versions/${versionId}/compare`).then(setData).catch(e => setError(e.message))
+  const dispose = async (r: any, disposition: string) => {
+    const rationale = window.prompt(L('Rationale (required)', 'المبرر (مطلوب)'))
+    if (!rationale) return
+    const body: any = { referenceVersionId: versionId, stableKey: r.reference.stableKey, disposition, rationale }
+    if (disposition === 'DEFERRED') { const d = window.prompt(L('Review again on (YYYY-MM-DD)', 'المراجعة مجدداً في (YYYY-MM-DD)')); if (!d) return; body.deferUntil = d }
+    if (disposition === 'ALREADY_COVERED') { const c = r.candidates?.[0]?.id ?? window.prompt(L('ID of the capability that covers it', 'معرّف القدرة التي تغطيها')); if (!c) return; body.coveredByAssetId = c }
+    try { await bcm('POST', '/reference-gap-dispositions', body); await reload() } catch (e: any) { setError(e.message) }
+  }
+  const DISP: Record<string, [string, string]> = { NOT_APPLICABLE: ['Not applicable', 'غير منطبقة'], DEFERRED: ['Deferred', 'مؤجلة'], ALREADY_COVERED: ['Already covered', 'مغطاة مسبقاً'], RECOMMENDATION_REJECTED: ['Recommendation rejected', 'رُفضت التوصية'] }
   const refRows = data.reference.filter((r: any) => r.cls === filter)
   const tenantRows = data.tenant.filter((r: any) => r.cls === filter)
   return (
@@ -108,7 +136,9 @@ export function ReferenceComparison({ versionId, L, isAR, onReview }: { versionI
           </button>
         ))}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{L('Candidate differences only. You decide every mapping.', 'فروقات مرشحة فقط. أنت من يقرر كل ربط.')}</div>
+      <ProvenanceStatus provenance={data.model?.provenance} status={data.version?.status} L={L} />
+      {data.versionAwareness?.updateAvailable && <div role="status" data-testid="reference-update" style={{ fontSize: 12, margin: '6px 0', padding: 8, border: '1px solid var(--accent)', borderRadius: 6 }}>{L(`Reference model update: your mappings use ${data.versionAwareness.tenantVersion.version}; ${data.versionAwareness.latestVersion.version} is available. Nothing is migrated automatically.`, `تحديث للنموذج المرجعي: روابطك مبنية على ${data.versionAwareness.tenantVersion.version}، ويتوفر ${data.versionAwareness.latestVersion.version}. لا يُنقل شيء تلقائياً.`)}</div>}
+      <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '6px 0 8px' }}>{L('Candidate differences only. A reference gap is not automatically a deficiency - you decide every mapping and disposition.', 'فروقات مرشحة فقط. الفجوة المرجعية ليست قصوراً بالضرورة - أنت من يقرر كل ربط وتصنيف.')} <span data-testid="unresolved-count">{L('Unresolved', 'غير محسومة')}: {data.summary.UNRESOLVED ?? '—'} · {L('Dispositioned', 'مصنّفة')}: {data.summary.DISPOSITIONED ?? '—'}</span></div>
       {refRows.map((r: any) => (
         <div key={r.reference.id} style={{ borderTop: '1px solid var(--border)', padding: '8px 0', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderInlineStart: `3px solid ${CLS[r.cls][2]}`, paddingInlineStart: 8 }}>
           <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>
@@ -116,7 +146,14 @@ export function ReferenceComparison({ versionId, L, isAR, onReview }: { versionI
             {r.previouslyRejected && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Previously rejected', 'رُفضت سابقاً')}{r.rejectionRationale ? `: ${r.rejectionRationale}` : ''}</div>}
             {r.candidates?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Resembles', 'تشبه')}: {r.candidates.map((c: any) => c.name).join(', ')}</div>}
           </span>
-          {r.cls !== 'EXISTING' && <button className="btn btn-secondary btn-sm" onClick={() => onReview(r.reference)}>{L('Review', 'مراجعة')}</button>}
+          {r.disposition && <span data-testid={`disposition-${r.reference.stableKey}`} style={{ fontSize: 11 }}><span className="badge badge-draft">{DISP[r.disposition.disposition] ? L(DISP[r.disposition.disposition][0], DISP[r.disposition.disposition][1]) : r.disposition.disposition}</span>{r.disposition.stale ? ` ${L('- reference changed, review again', '- تغيّر المرجع، أعد المراجعة')}` : ''}</span>}
+          {r.cls !== 'EXISTING' && <button className="btn btn-secondary btn-sm" onClick={() => onReview(r.reference)}>{L('Adopt / map', 'اعتماد / ربط')}</button>}
+          {r.cls !== 'EXISTING' && (!r.resolved || r.disposition?.stale) && (
+            <select aria-label={`${L('Disposition', 'التصنيف')} ${r.reference.name}`} className="form-input" style={{ width: 'auto', fontSize: 12 }} value="" onChange={e => e.target.value && dispose(r, e.target.value)}>
+              <option value="">{L('Disposition…', 'تصنيف…')}</option>
+              {Object.entries(DISP).map(([k, [en, ar]]) => <option key={k} value={k}>{L(en, ar)}</option>)}
+            </select>
+          )}
         </div>
       ))}
       {tenantRows.map((r: any) => (

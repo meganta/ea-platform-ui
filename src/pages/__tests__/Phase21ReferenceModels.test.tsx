@@ -74,12 +74,12 @@ describe('reference vs tenant comparison', () => {
     expect(await screen.findByText('Customs & Cross-Border Trade')).toBeInTheDocument();
     expect(screen.getByText(/Previously rejected: Domestic only/)).toBeInTheDocument();
     expect(screen.getByTestId('count-MISSING')).toHaveTextContent('(1)');
-    fireEvent.click(screen.getByText('Review'));
+    fireEvent.click(screen.getByText('Adopt / map'));
     expect(onReview).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
     fireEvent.click(screen.getByRole('tab', { name: /Possible match/ }));
     expect(screen.getByText(/Resembles: Sortation Operations/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('tab', { name: /Already in your model/ }));
-    expect(screen.queryByText('Review')).not.toBeInTheDocument(); // existing items are not re-reviewed from here
+    expect(screen.queryByText('Adopt / map')).not.toBeInTheDocument(); // existing items are not re-reviewed from here
     fireEvent.click(screen.getByRole('tab', { name: /Only in your model/ }));
     expect(screen.getByText('Drone Innovation Lab')).toBeInTheDocument();
   });

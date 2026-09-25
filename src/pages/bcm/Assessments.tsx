@@ -122,6 +122,7 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
           {report.map((r: any) => <div key={r.capabilityAssetId}>{caps[r.capabilityAssetId] || r.capabilityAssetId}: {r.projected.length ? L('updated', 'تم التحديث') : L('not updated', 'لم يُحدَّث')}{r.reason ? ` - ${r.reason}` : ''}</div>)}
         </div>
       )}
+      {a.status === 'VALIDATION' && can.validate && (a.results || []).some((r: any) => (r.varianceFlags || []).length) && <ConsensusWorkspace id={id} L={L} onChange={load} />}
       {(a.results || []).length > 0 && (
         <div style={{ display: 'grid', gap: 10 }}>
           {a.results.map((r: any) => <ResultCard key={r.id} r={r} name={caps[r.capabilityAssetId] || r.capabilityAssetId} L={L} canValidate={can.validate && a.status === 'VALIDATION'} onValidate={(body) => act(() => api('POST', `${BASE}/${id}/results/${r.id}/validate`, body))} />)}
@@ -387,5 +388,56 @@ export function AssessWizard({ L, isAR, onClose }: { L: LFn; isAR: boolean; onCl
         {step < 8 && <button className="btn btn-primary btn-sm" disabled={busy} onClick={next}>{L('Next', 'التالي')}</button>}
       </div>
     </div>
+  )
+}
+
+// ── Consensus workspace (Phase 3): per flagged dimension ───────────────────
+function ConsensusWorkspace({ id, L, onChange }: { id: string; L: LFn; onChange: () => void }) {
+  const [data, setData] = useState<any>(null)
+  const [form, setForm] = useState<Record<string, { score: string; rationale: string }>>({})
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null)
+  const load = useCallback(() => api('GET', `${BASE}/${id}/consensus`).then(setData).catch(e => setMsg({ kind: 'err', text: e.message })), [id])
+  useEffect(() => { load() }, [load])
+  // Optional aid: never break the assessment view on an unexpected response.
+  if (!data || !Array.isArray(data.items) || !data.items.length) return null
+  const key = (i: any) => `${i.resultId}:${i.dimension}`
+  const save = async (i: any) => {
+    const f = form[key(i)] || { score: '', rationale: '' }
+    setMsg(null)
+    try {
+      const r = await api('POST', `${BASE}/${id}/results/${i.resultId}/dimensions/validate`, { dimension: i.dimension, agreedScore: Number(f.score), rationale: f.rationale })
+      setMsg({ kind: 'ok', text: r?.result ? L('All flagged dimensions agreed - the capability result is validated.', 'تم الاتفاق على جميع الأبعاد - تم التحقق من نتيجة القدرة.') : L('Agreed score recorded.', 'تم تسجيل الدرجة المتفق عليها.') })
+      await load(); onChange()
+    } catch (e: any) { setMsg({ kind: 'err', text: e.message }) }
+  }
+  return (
+    <section aria-label={L('Consensus workspace', 'مساحة التوافق')} data-testid="consensus-workspace" style={{ border: '1px solid var(--warning)', borderRadius: 8, padding: 12, marginBottom: 12 }}>
+      <div style={{ fontWeight: 600, fontSize: 14 }}>{L('Consensus workspace', 'مساحة التوافق')}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{L('Respondents disagree on these dimensions. Original answers are never changed; you record an agreed score within the evidence-supported range, with a rationale.', 'يختلف المستجيبون في هذه الأبعاد. لا تُعدَّل الإجابات الأصلية؛ تسجل درجة متفقاً عليها ضمن النطاق المدعوم بالأدلة مع المبرر.')}</div>
+      {msg && <div role={msg.kind === 'err' ? 'alert' : 'status'} style={{ fontSize: 13, color: msg.kind === 'err' ? 'var(--danger)' : 'var(--success)', marginBottom: 6 }}>{msg.text}</div>}
+      {data.items.map((i: any) => {
+        const f = form[key(i)] || { score: '', rationale: '' }
+        return (
+          <div key={key(i)} data-testid={`consensus-${i.dimension}`} style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}>
+            <div style={{ fontSize: 13 }}><strong>{i.dimension}</strong> · {L('spread', 'التباين')} {i.spread} ({L('threshold', 'الحد')} {i.threshold}) · {L('provisional median', 'الوسيط المؤقت')} {i.provisionalMedian ?? '—'} · {L('previous', 'السابق')} {i.previousPublished ?? '—'} · {L('target', 'المستهدف')} {i.targetMaturity ?? '—'}</div>
+            <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', margin: '4px 0' }}>
+              <thead><tr><th style={{ textAlign: 'start' }}>{L('Role', 'الدور')}</th><th style={{ textAlign: 'start' }}>{L('Claimed', 'المُدّعى')}</th><th style={{ textAlign: 'start' }}>{L('Evidence-adjusted', 'بعد الأدلة')}</th><th style={{ textAlign: 'start' }}>{L('Evidence', 'الأدلة')}</th><th style={{ textAlign: 'start' }}>{L('Comments', 'التعليقات')}</th></tr></thead>
+              <tbody>{i.respondents.map((r: any) => (
+                <tr key={r.assignmentId}><td>{r.role ?? '—'}</td><td>{r.rawScore ?? '—'}</td><td>{r.evidenceAdjustedScore ?? '—'}</td>
+                  <td>{r.evidence.length ? r.evidence.map((e: any) => (e.verified ? '✓' : '✗')).join(' ') : '—'}</td><td>{r.comments.join(' | ') || '—'}</td></tr>
+              ))}</tbody>
+            </table>
+            {i.validation ? <div style={{ fontSize: 12 }}>{L('Agreed', 'المتفق عليه')}: <strong>{i.validation.agreedScore}</strong> - {i.validation.rationale}</div> : null}
+            {i.bounds && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                <input aria-label={`${L('Agreed score', 'الدرجة المتفق عليها')} ${i.dimension}`} className="form-input" type="number" step="0.1" min={i.bounds.lower} max={i.bounds.upper} style={{ width: 90 }} value={f.score} placeholder={`${i.bounds.lower}-${i.bounds.upper}`} onChange={e => setForm({ ...form, [key(i)]: { ...f, score: e.target.value } })} />
+                <input aria-label={`${L('Rationale', 'المبرر')} ${i.dimension}`} className="form-input" style={{ flex: 1, minWidth: 200 }} value={f.rationale} placeholder={L('Rationale (required)', 'المبرر (مطلوب)')} onChange={e => setForm({ ...form, [key(i)]: { ...f, rationale: e.target.value } })} />
+                <button className="btn btn-secondary btn-sm" disabled={!f.score || !f.rationale.trim()} onClick={() => save(i)}>{i.validation ? L('Revise', 'تعديل') : L('Record agreement', 'تسجيل الاتفاق')}</button>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </section>
   )
 }

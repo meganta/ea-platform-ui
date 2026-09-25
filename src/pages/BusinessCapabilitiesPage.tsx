@@ -4,6 +4,7 @@ import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { AssessmentsPanel } from './bcm/Assessments'
 import { ModelSuggestions, ModelSources, ReferenceComparison, CurationWorkspace } from './bcm/ReferenceModels'
+import { ExecutiveInsights, CapabilityInsight, ImprovementActions, CapabilityAdvisor } from './bcm/Insights'
 
 // Business Capabilities workspace - BCM Phase 1 foundation.
 // Capability Map · Capabilities (hierarchy) · Reference Library ·
@@ -30,7 +31,7 @@ async function call(method: string, path: string, body?: any) {
   return data
 }
 
-type Tab = 'map' | 'list' | 'assessments' | 'library' | 'curation' | 'context' | 'setup'
+type Tab = 'insights' | 'map' | 'list' | 'assessments' | 'actions' | 'advisor' | 'library' | 'curation' | 'context' | 'setup'
 
 const CLASS_LABEL: Record<string, [string, string]> = {
   ADMINISTRATIVE: ['Administrative', 'إدارية'],
@@ -56,11 +57,12 @@ const PROVENANCE: Record<string, { en: string; ar: string; tipEn: string; tipAr:
 
 export default function BusinessCapabilitiesPage() {
   const { hasPermission, user } = useAuth()
+  const [insightCap, setInsightCap] = useState<string | null>(null)
   const { isAR } = useLang()
   const L = useCallback((en: string, ar: string) => (isAR ? ar : en), [isAR])
   const [tab, setTab] = useState<Tab>(() => {
     const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
-    return (['map', 'list', 'assessments', 'library', 'curation', 'context', 'setup'] as Tab[]).includes(q as Tab) ? (q as Tab) : 'map'
+    return (['insights', 'map', 'list', 'assessments', 'actions', 'advisor', 'library', 'curation', 'context', 'setup'] as Tab[]).includes(q as Tab) ? (q as Tab) : 'map'
   })
   const [ctx, setCtx] = useState<any>(null)
 
@@ -74,15 +76,23 @@ export default function BusinessCapabilitiesPage() {
     approve: hasPermission('BusinessCapability.ApproveAssessment'),
     publish: hasPermission('BusinessCapability.PublishAssessment'),
     respond: hasPermission('Surveys.Respond'),
+    manageActions: hasPermission('BusinessCapability.ManageImprovementActions'),
+    approveActions: hasPermission('BusinessCapability.ApproveImprovementActions'),
+    linkInitiatives: hasPermission('BusinessCapability.LinkInitiatives'),
+    useAdvisor: hasPermission('BusinessCapability.UseAdvisor'),
+    decideRecs: hasPermission('BusinessCapability.DecideRecommendations'),
   }
 
   const loadCtx = useCallback(() => { call('GET', '/organization-context').then(setCtx).catch(() => setCtx(null)) }, [])
   useEffect(() => { loadCtx() }, [loadCtx])
 
   const tabs: Array<{ id: Tab; label: string; show: boolean }> = [
+    { id: 'insights', label: L('Overview', 'نظرة عامة'), show: true },
     { id: 'map', label: L('Capability Map', 'خريطة القدرات'), show: true },
     { id: 'list', label: L('Capabilities', 'القدرات'), show: true },
     { id: 'assessments', label: L('Assessments', 'التقييمات'), show: true },
+    { id: 'actions', label: L('Improvement actions', 'إجراءات التحسين'), show: true },
+    { id: 'advisor', label: L('Advisor', 'المستشار'), show: true },
     { id: 'library', label: L('Reference Library', 'المكتبة المرجعية'), show: true },
     { id: 'curation', label: L('Model curation', 'مراجعة النماذج'), show: !!user?.isPlatformAdmin },
     { id: 'context', label: L('Organization Context', 'سياق الجهة'), show: true },
@@ -113,6 +123,9 @@ export default function BusinessCapabilitiesPage() {
       </div>
       <div className="page-body">
         {tab === 'map' && <CapabilityMap L={L} isAR={isAR} />}
+        {tab === 'insights' && (insightCap ? <CapabilityInsight id={insightCap} L={L} isAR={isAR} onClose={() => setInsightCap(null)} /> : <ExecutiveInsights L={L} onOpenCapability={setInsightCap} />)}
+        {tab === 'actions' && <ImprovementActions L={L} can={{ manage: can.manageActions, approve: can.approveActions, link: can.linkInitiatives }} userId={user?.userId} />}
+        {tab === 'advisor' && <CapabilityAdvisor L={L} can={{ run: can.useAdvisor, decide: can.decideRecs }} />}
         {tab === 'list' && <CapabilityList L={L} isAR={isAR} canManage={can.manage} />}
         {tab === 'assessments' && <AssessmentsPanel L={L} isAR={isAR} can={{ assess: can.assess, validate: can.validate, approve: can.approve, publish: can.publish }} />}
         {tab === 'library' && <ReferenceLibrary L={L} isAR={isAR} canAdopt={can.adopt} />}
