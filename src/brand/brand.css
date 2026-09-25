@@ -94,9 +94,11 @@
 /* Clear space: ≈ the cap height of "A" in ArchMind (≈0.72em of the wordmark size). */
 .am-logo { --am-logo-size: 22px; display: inline-flex; align-items: center; gap: 0.5em; padding: calc(var(--am-logo-size) * 0.18); margin: calc(var(--am-logo-size) * -0.18); color: var(--am-navy); text-decoration: none; line-height: 1; font-size: var(--am-logo-size); }
 .am-logo:focus-visible { outline: 3px solid var(--am-focus); outline-offset: 2px; border-radius: var(--am-radius-sm); }
-.am-logo img { display: block; height: 1.9em; width: auto; }
+/* --am-logo-size = cap height of "ArchMind"; image heights follow the artwork proportions. */
+.am-logo img { display: block; height: 2.06em; width: auto; max-width: none; }
+.am-logo.symbol img { height: 1.7em; }
 .am-logo.stacked { flex-direction: column; }
-.am-logo.stacked img { height: 4.2em; }
+.am-logo.stacked img { height: 4.21em; }
 .am-logo.tone-white { color: var(--am-white); }
 .am-logo.tone-white:focus-visible { outline-color: var(--am-focus-inverse); }
 /* Text wordmark — used only until the approved vector logo files are supplied. */

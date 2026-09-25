@@ -170,7 +170,7 @@ export default function LandingPage() {
       <a className="lp-skip" href="#main">{L(c('Skip to content', 'انتقل إلى المحتوى'))}</a>
       <header className="lp-header">
         <nav className="lp-nav am-container wide" aria-label={L(c('Primary navigation', 'التنقل الرئيسي'))}>
-          <BrandLogo href="#top" tone="white" size={23} label="ArchMind home" />
+          <BrandLogo href="#top" tone="reverse" size={21} label="ArchMind home" />
           <button className="lp-menu-button" aria-label={L(c('Open navigation', 'فتح قائمة التنقل'))} aria-expanded={menuOpen} aria-controls="lp-nav-panel" onClick={() => setMenuOpen(!menuOpen)}><Icon name={menuOpen ? 'close' : 'menu'} /></button>
           <div id="lp-nav-panel" className={`lp-nav-panel${menuOpen ? ' open' : ''}`}>
             <div className="lp-nav-links">
@@ -210,7 +210,7 @@ export default function LandingPage() {
           <div className="am-container">
             <SectionHeading eyebrow={c('THE OPERATING CHALLENGE', 'تحديات التشغيل')} title={c('Move beyond disconnected architecture work', 'تجاوز العمل المعماري المتفرق')} body={c('Enterprise architecture creates value when information, governance, and transformation planning operate as one system.', 'تتحقق قيمة البنية المؤسسية عندما تعمل المعلومات والحوكمة وتخطيط التحول ضمن منظومة واحدة.')} L={L} id="problems-title" />
             <div className="lp-grid-4">{problems.map((item, index) => <article className="am-card" key={item.title.EN}><div className="lp-card-top"><span className="am-icon-tile"><Icon name={problemIcons[index]} /></span><span className="am-index">0{index + 1}</span></div><h3 className="am-h4">{L(item.title)}</h3><p className="am-body-sm">{L(item.body)}</p></article>)}</div>
-            <div className="lp-answer"><BrandLogo variant="symbol" size={26} /><p className="am-body-lg">{L(c('connects architecture definition, evidence, analysis, governance, and change in one operational environment.', 'تربط تعريف البنية المؤسسية وأدلتها وتحليلها وحوكمتها وتغييرها ضمن بيئة تشغيلية واحدة.'))}</p></div>
+            <div className="lp-answer"><BrandLogo size={20} /><p className="am-body-lg">{L(c('connects architecture definition, evidence, analysis, governance, and change in one operational environment.', 'تربط تعريف البنية المؤسسية وأدلتها وتحليلها وحوكمتها وتغييرها ضمن بيئة تشغيلية واحدة.'))}</p></div>
           </div>
         </section>
 
@@ -308,7 +308,7 @@ export default function LandingPage() {
       <footer className="lp-footer am-on-dark">
         <div className="am-container lp-footer-grid">
           <div className="lp-footer-brand">
-            <BrandLogo href="#top" tone="white" size={24} label="ArchMind home" />
+            <BrandLogo href="#top" tone="reverse" size={22} label="ArchMind home" />
             <p className="am-body-sm">{L(c('Enterprise architecture, operated with intent.', 'تشغيل البنية المؤسسية بوضوح وفاعلية.'))}</p>
           </div>
           <nav className="lp-footer-col" aria-label={L(c('Product', 'المنتج'))}>
@@ -350,7 +350,7 @@ function SectionHeading({ eyebrow, title, body, L, id, align = 'center' }: { eye
 function ProductComposition({ locale }: { locale: 'EN' | 'AR' }) {
   const L = (copy: Copy) => copy[locale]
   return <div className="lp-product" role="img" aria-label={L(c('ArchMind platform interface composition', 'تصور لواجهة منصة ArchMind'))}>
-    <div className="lp-product-bar" aria-hidden="true"><BrandLogo variant="symbol" size={13} /><i /><i /><i /></div>
+    <div className="lp-product-bar" aria-hidden="true"><BrandLogo size={10} /><i /><i /><i /></div>
     <div className="lp-product-body" aria-hidden="true">
       <aside><b /><b /><b className="active" /><b /><b /></aside>
       <div className="lp-product-canvas">

@@ -20,7 +20,7 @@ interface BrandLogoProps {
  */
 export default function BrandLogo({ variant = 'horizontal', tone = 'color', size = 22, href, label, className = '' }: BrandLogoProps) {
   const asset = logoAsset(variant, tone)
-  const classes = ['am-logo', variant === 'stacked' ? 'stacked' : '', `tone-${tone === 'dark' ? 'mono' : tone}`, className].filter(Boolean).join(' ')
+  const classes = ['am-logo', variant === 'horizontal' ? '' : variant, `tone-${tone === 'dark' ? 'mono' : tone === 'reverse' ? 'white' : tone}`, className].filter(Boolean).join(' ')
   const style = { '--am-logo-size': `${size}px` } as CSSProperties
   // Without an approved file, a symbol request falls back to the name alone — never a drawn mark.
   const content = asset
