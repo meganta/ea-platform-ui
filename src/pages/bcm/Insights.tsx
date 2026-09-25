@@ -205,7 +205,25 @@ export function ImprovementActions({ L, can, userId }: { L: LFn; can: { manage: 
               <input aria-label={L('Search initiatives', 'بحث المبادرات')} className="form-input" placeholder={L('Search existing initiatives…', 'ابحث في المبادرات الحالية…')} value={iniQ} onChange={e => setIniQ(e.target.value)} />
               {iniOpts.map(i => <button key={i.id} className="btn btn-secondary btn-sm" style={{ margin: 2 }} onClick={() => act(() => bcm('POST', `/insights/actions/${open.id}/initiative`, { id: i.id }))}>{i.name}</button>)}
               {['ACCEPTED', 'PLANNED'].includes(open.status) && !open.initiativeAssetId && <button className="btn btn-secondary btn-sm" onClick={() => { const n = window.prompt(L('Proposed initiative name', 'اسم المبادرة المقترحة')); if (n) act(() => bcm('POST', `/insights/actions/${open.id}/propose-initiative`, { name: n })) }}>{L('Propose a new initiative', 'اقتراح مبادرة جديدة')}</button>}
-              {open.proposedInitiative && <div data-testid="initiative-proposal" style={small}>{L('Proposal (not created)', 'مقترح (لم يُنشأ)')}: {open.proposedInitiative.name}</div>}
+              {open.proposedInitiative && (
+                <div data-testid="initiative-proposal" style={{ ...small, marginTop: 4 }}>
+                  {L('Initiative proposal', 'مقترح مبادرة')}: <strong>{open.proposedInitiative.name}</strong> · {open.proposedInitiative.status}
+                  {open.proposedInitiative.possibleDuplicates?.length > 0 && <div style={{ color: 'var(--warning)' }}>{L('Possible existing initiatives', 'مبادرات قائمة محتملة')}: {open.proposedInitiative.possibleDuplicates.map((x: any) => x.name).join(', ')}</div>}
+                  {open.proposedInitiative.status === 'PROPOSED' && can.approve && (open.proposedInitiative.proposedBy === userId
+                    ? <div>{L('You proposed it, so another approver must decide.', 'أنت من اقترحها، لذا يجب أن يقرر معتمد آخر.')}</div>
+                    : <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                        <button className="btn btn-secondary btn-sm" onClick={() => act(() => bcm('POST', `/insights/actions/${open.id}/initiative-proposal/decision`, { decision: 'APPROVED' }))}>{L('Approve proposal', 'اعتماد المقترح')}</button>
+                        <button className="btn btn-secondary btn-sm" onClick={() => { const r = window.prompt(L('Reason for rejecting', 'سبب الرفض')); if (r) act(() => bcm('POST', `/insights/actions/${open.id}/initiative-proposal/decision`, { decision: 'REJECTED', rationale: r })) }}>{L('Reject proposal', 'رفض المقترح')}</button>
+                      </div>)}
+                  {open.proposedInitiative.status === 'APPROVED' && can.link && (
+                    <button className="btn btn-primary btn-sm" style={{ marginTop: 4 }} onClick={() => {
+                      const dup = open.proposedInitiative.possibleDuplicates?.length > 0
+                      if (!window.confirm(dup ? L('Similar initiatives exist. Create a NEW initiative in the repository anyway?', 'توجد مبادرات مشابهة. إنشاء مبادرة جديدة في المستودع رغم ذلك؟') : L('Create this approved initiative in the architecture repository?', 'إنشاء هذه المبادرة المعتمدة في مستودع البنية؟'))) return
+                      act(() => bcm('POST', `/insights/actions/${open.id}/initiative-proposal/create`, { acknowledgeDuplicates: dup }))
+                    }}>{L('Create in repository', 'إنشاء في المستودع')}</button>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <details style={{ fontSize: 12, marginTop: 8 }}><summary>{L('Decision history', 'سجل القرارات')} ({open.events?.length ?? 0})</summary>
@@ -255,6 +273,150 @@ export function CapabilityAdvisor({ L, can }: { L: LFn; can: { run: boolean; dec
           )}
         </section>
       ))}
+    </div>
+  )
+}
+
+// ── Phase 4: Executive overview (KPIs -> drill-down) + reports ─────────────
+const API_BASE = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+export async function downloadReport(type: string, format: 'csv' | 'xlsx' | 'docx', assessmentId?: string) {
+  const res = await fetch(`${API_BASE}/business-capabilities/insights/reports/${type}?format=${format}${assessmentId ? `&assessmentId=${assessmentId}` : ''}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const blob = await res.blob()
+  const cd = res.headers.get('Content-Disposition') || ''
+  const name = /filename="([^"]+)"/.exec(cd)?.[1] || `${type.toLowerCase()}.${format}`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
+}
+
+const REPORTS: Array<[string, string, string]> = [
+  ['EXECUTIVE', 'Executive capability report', 'تقرير القدرات التنفيذي'], ['CAPABILITY_MODEL', 'Business capability model', 'نموذج قدرات الأعمال'],
+  ['HEALTH_GAP', 'Capability health & gaps', 'سلامة القدرات والفجوات'], ['IMPROVEMENT_PLAN', 'Improvement plan', 'خطة التحسين'],
+]
+
+export function ReportsPanel({ L, assessmentId }: { L: LFn; assessmentId?: string }) {
+  const [view, setView] = useState<any>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const list = assessmentId ? [['MATURITY_ASSESSMENT', 'Maturity assessment report', 'تقرير تقييم النضج'] as [string, string, string]] : REPORTS
+  const run = async (fn: () => Promise<any>) => { setErr(null); try { await fn() } catch (e: any) { setErr(e.message) } }
+  return (
+    <section aria-label={L('Reports', 'التقارير')} style={{ ...box, marginTop: 12 }}>
+      <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{L('Reports', 'التقارير')}</div>
+      {err && <div role="alert" style={{ color: 'var(--danger)', fontSize: 12 }}>{err}</div>}
+      {list.map(([type, en, ar]) => (
+        <div key={type} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', padding: '4px 0', borderTop: '1px solid var(--border)' }}>
+          <span style={{ flex: 1, minWidth: 200, fontSize: 13 }}>{L(en, ar)}</span>
+          <button className="btn btn-secondary btn-sm" onClick={() => run(async () => setView(await bcm('GET', `/insights/reports/${type}?format=json${assessmentId ? `&assessmentId=${assessmentId}` : ''}`)))}>{L('View / PDF', 'عرض / PDF')}</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => run(() => downloadReport(type, 'xlsx', assessmentId))}>Excel</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => run(() => downloadReport(type, 'docx', assessmentId))}>Word</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => run(() => downloadReport(type, 'csv', assessmentId))}>CSV</button>
+        </div>
+      ))}
+      {view && (
+        <div data-testid="report-view" className="bcm-report-print" style={{ marginTop: 10 }}>
+          <style>{'@media print { body * { visibility: hidden !important; } .bcm-report-print, .bcm-report-print * { visibility: visible !important; } .bcm-report-print { position: absolute; inset-inline-start: 0; top: 0; width: 100%; } .no-print { display: none !important; } }'}</style>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }} className="no-print">
+            <button className="btn btn-primary btn-sm" onClick={() => window.print()}>{L('Print / save as PDF', 'طباعة / حفظ PDF')}</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setView(null)}>{L('Close', 'إغلاق')}</button>
+          </div>
+          <h2 style={{ fontSize: 16 }}>{view.title}</h2>
+          <div style={small}>{L('Generated', 'تاريخ الإنشاء')} {String(view.generatedAt).slice(0, 10)} · {Object.entries(view.provenance || {}).filter(([k]) => k !== 'tenantId').map(([k, v]) => `${k}: ${v ?? '—'}`).join(' · ')}</div>
+          <table style={{ fontSize: 12, margin: '8px 0' }}><tbody>{(view.summary || []).map((s: any) => <tr key={s.label}><td style={{ paddingInlineEnd: 12 }}>{s.label}</td><td><strong>{s.value ?? '—'}</strong></td></tr>)}</tbody></table>
+          {(view.sections || []).map((s: any) => (
+            <div key={s.title} style={{ marginBottom: 10, overflowX: 'auto' }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{s.title}</div>
+              {s.note && <div style={small}>{s.note}</div>}
+              <table style={{ fontSize: 11, borderCollapse: 'collapse', width: '100%' }}>
+                <thead><tr>{s.columns.map((c: string) => <th key={c} style={{ textAlign: 'start', borderBottom: '1px solid var(--border)', padding: 3 }}>{c}</th>)}</tr></thead>
+                <tbody>{s.rows.map((r: any[], i: number) => <tr key={i}>{r.map((c, j) => <td key={j} style={{ padding: 3, borderBottom: '1px solid var(--border)' }}>{c ?? '—'}</td>)}</tr>)}</tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+const KPI_LIST: Array<[string, string, string]> = [
+  ['assessedCapabilities', 'Assessed capabilities', 'القدرات المقيّمة'], ['materialGaps', 'Material maturity gaps', 'فجوات نضج جوهرية'],
+  ['criticalBelowTarget', 'Critical capabilities below target', 'قدرات حرجة دون المستهدف'], ['lowEvidenceConfidence', 'Low evidence confidence', 'موثوقية أدلة منخفضة'],
+  ['deteriorating', 'Deteriorating capabilities', 'قدرات متراجعة'], ['assessmentsDue', 'Assessments due soon', 'تقييمات مستحقة قريباً'],
+  ['assessmentsOverdue', 'Assessments overdue', 'تقييمات متأخرة'], ['neverAssessed', 'Never assessed', 'لم تُقيَّم'],
+]
+export function ExecutiveOverview({ L, onOpenCapability }: { L: LFn; onOpenCapability: (id: string) => void }) {
+  const [d, setD] = useState<any>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [drill, setDrill] = useState<string | null>(null)
+  useEffect(() => { bcm('GET', '/insights/executive').then(setD).catch(e => setErr(e.message)) }, [])
+  if (err) return <div role="alert" style={{ color: 'var(--danger)' }}>{err}</div>
+  if (!d) return <div>{L('Loading…', 'جارٍ التحميل…')}</div>
+  const k = d.kpis
+  if (!k) return <div role="alert" style={{ color: 'var(--danger)' }}>{L('Overview is unavailable right now.', 'النظرة العامة غير متاحة حالياً.')}</div>
+  if (!k.totalCapabilities) return <div style={{ ...box, textAlign: 'center', ...small }}>{L('No capabilities yet. Start in Capabilities or adopt from a reference model.', 'لا توجد قدرات بعد. ابدأ من القدرات أو اعتمد من نموذج مرجعي.')}</div>
+  const head: Array<[string, any, string]> = [
+    [L('Total capabilities', 'إجمالي القدرات'), k.totalCapabilities, 'total'], [L('Assessment coverage', 'تغطية التقييم'), k.assessmentCoverage == null ? '—' : `${k.assessmentCoverage}%`, 'coverage'],
+    [L('Median maturity', 'وسيط النضج'), k.medianMaturity ?? '—', 'median'], [L('Average target maturity', 'متوسط النضج المستهدف'), k.averageTargetMaturity ?? '—', 'target'],
+    [L('Open improvement actions', 'إجراءات تحسين مفتوحة'), k.openImprovementActions, 'open'], [L('Actions without initiative', 'إجراءات بلا مبادرة'), k.actionsWithoutInitiative, 'noini'],
+  ]
+  const ids: string[] = drill ? k[drill]?.ids ?? [] : []
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 8, marginBottom: 10 }}>
+        {head.map(([label, value, key]) => <div key={key} style={box} data-testid={`kpi-${key}`}><div style={{ fontSize: 22, fontWeight: 700 }}>{value}</div><div style={small}>{label}</div></div>)}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 8 }}>
+        {KPI_LIST.map(([key, en, ar]) => (
+          <button key={key} data-testid={`kpi-${key}`} aria-pressed={drill === key} onClick={() => setDrill(drill === key ? null : key)} style={{ ...box, textAlign: 'start', cursor: 'pointer', color: 'var(--text)', outline: drill === key ? '2px solid var(--accent)' : 'none' }}>
+            <div style={{ fontSize: 20, fontWeight: 700 }}>{k[key]?.value ?? 0}</div><div style={small}>{L(en, ar)}</div>
+          </button>
+        ))}
+      </div>
+      {drill && (
+        <div style={{ ...box, marginTop: 10 }} data-testid="kpi-drill">
+          {!ids.length ? <div style={small}>{L('Nothing here.', 'لا شيء هنا.')}</div> : ids.slice(0, 200).map(id => <button key={id} onClick={() => onOpenCapability(id)} style={{ display: 'block', width: '100%', textAlign: 'start', padding: '5px 0', border: 'none', borderTop: '1px solid var(--border)', background: 'none', cursor: 'pointer', color: 'var(--text)', fontSize: 13 }}>{d.names?.[id] ?? L('Capability', 'قدرة')}</button>)}
+        </div>
+      )}
+      <ReportsPanel L={L} />
+    </div>
+  )
+}
+
+// ── Phase 4: cross-domain traceability & initiative coverage ──────────────
+export function TraceabilityPanel({ L, onOpenCapability }: { L: LFn; onOpenCapability: (id: string) => void }) {
+  const [d, setD] = useState<any>(null)
+  useEffect(() => { bcm('GET', '/insights/traceability').then(setD).catch(() => setD({})) }, [])
+  if (!d) return null
+  const q = (title: string, items: any[] | undefined, render: (x: any) => any) => (
+    <details style={{ ...box, marginTop: 8 }}><summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{title} ({items?.length ?? 0})</summary>{(items || []).map(render)}</details>
+  )
+  return (
+    <section aria-label={L('Cross-domain traceability', 'التتبع عبر المجالات')} data-testid="traceability" style={{ marginTop: 12 }}>
+      {q(L('Applications supporting low-maturity critical capabilities', 'تطبيقات تدعم قدرات حرجة منخفضة النضج'), d.applicationsSupportingLowMaturityCriticalCapabilities, (x: any) => <div key={x.capability.id} style={{ fontSize: 12, padding: '3px 0' }}><button className="btn btn-link btn-sm" onClick={() => onOpenCapability(x.capability.id)}>{x.capability.name}</button> ({x.capability.maturity}): {x.applications.map((a: any) => a.name).join(', ') || L('no linked applications', 'لا تطبيقات مرتبطة')}</div>)}
+      {q(L('Strategic objectives depending on material gaps', 'أهداف استراتيجية تعتمد على فجوات جوهرية'), d.objectivesDependingOnMaterialGaps, (x: any, i?: number) => <div key={`${x.objective.id}-${x.capability.id}`} style={{ fontSize: 12, padding: '3px 0' }}>{x.objective.name} ← {x.capability.name}</div>)}
+      {q(L('Capability gaps without initiative coverage', 'فجوات بلا تغطية بمبادرة'), d.gapsWithoutInitiativeCoverage, (x: any) => <div key={x.id} style={{ fontSize: 12, padding: '3px 0' }}><button className="btn btn-link btn-sm" onClick={() => onOpenCapability(x.id)}>{x.name}</button> {x.gaps.join(', ')}</div>)}
+      {q(L('Capabilities on unhealthy or obsolete architecture', 'قدرات على بنية غير سليمة أو متقادمة'), d.capabilitiesOnUnhealthyArchitecture, (x: any) => <div key={x.id} style={{ fontSize: 12, padding: '3px 0' }}>{x.name}{x.architectureHealth ? ` · ${x.architectureHealth}` : ''}{x.obsoleteComponents?.length ? ` · ${x.obsoleteComponents.map((c: any) => `${c.name} (${c.status})`).join(', ')}` : ''}</div>)}
+      <div style={{ ...small, marginTop: 6 }}>{L('Based only on repository relationships, strategy alignments and recorded attributes.', 'مبني فقط على علاقات المستودع ومواءمات الاستراتيجية والسمات المسجلة.')}</div>
+    </section>
+  )
+}
+
+export function InitiativeCoverage({ L }: { L: LFn }) {
+  const [d, setD] = useState<any>(null)
+  const [err, setErr] = useState<string | null>(null)
+  useEffect(() => { bcm('GET', '/insights/initiative-coverage').then(setD).catch(e => setErr(e.message)) }, [])
+  if (err) return <div role="alert" style={{ color: 'var(--danger)' }}>{err}</div>
+  if (!d) return <div>{L('Loading…', 'جارٍ التحميل…')}</div>
+  const sec = (key: string, title: string, render: (x: any) => any) => (
+    <section key={key} style={{ ...box, marginBottom: 8 }} data-testid={`coverage-${key}`}><div style={{ fontWeight: 600, fontSize: 13 }}>{title} ({(d[key] || []).length})</div>{(d[key] || []).map(render)}</section>
+  )
+  return (
+    <div>
+      {sec('gapsWithInitiativeCoverage', L('Gaps covered by an initiative', 'فجوات مغطاة بمبادرة'), (x: any) => <div key={x.actionId} style={{ fontSize: 12 }}>{x.capability.name}: {x.action} → <strong>{x.initiative?.name}</strong></div>)}
+      {sec('acceptedActionsWithoutInitiative', L('Accepted actions without an initiative', 'إجراءات معتمدة بلا مبادرة'), (x: any) => <div key={x.actionId} style={{ fontSize: 12 }}>{x.capability.name}: {x.action} <span className="badge badge-draft">{x.status}</span></div>)}
+      {sec('initiativesAddressingMultipleCapabilities', L('Initiatives addressing several capabilities', 'مبادرات تعالج عدة قدرات'), (x: any) => <div key={x.initiative.id} style={{ fontSize: 12 }}><strong>{x.initiative.name}</strong>: {x.capabilities.map((c: any) => c.name).join(', ')}</div>)}
+      {sec('improvementsNotYetPlanned', L('Improvements not yet planned', 'تحسينات لم تُخطط بعد'), (x: any) => <div key={x.actionId} style={{ fontSize: 12 }}>{x.capability.name}: {x.action} <span className="badge badge-draft">{x.status}</span></div>)}
+      <div style={small}>{L('Schedule initiatives on the roadmap in EA Planning.', 'جدولة المبادرات على خارطة الطريق تتم في تخطيط البنية المؤسسية.')}</div>
     </div>
   )
 }

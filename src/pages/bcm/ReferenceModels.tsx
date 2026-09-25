@@ -138,6 +138,7 @@ export function ReferenceComparison({ versionId, L, isAR, onReview }: { versionI
       </div>
       <ProvenanceStatus provenance={data.model?.provenance} status={data.version?.status} L={L} />
       {data.versionAwareness?.updateAvailable && <div role="status" data-testid="reference-update" style={{ fontSize: 12, margin: '6px 0', padding: 8, border: '1px solid var(--accent)', borderRadius: 6 }}>{L(`Reference model update: your mappings use ${data.versionAwareness.tenantVersion.version}; ${data.versionAwareness.latestVersion.version} is available. Nothing is migrated automatically.`, `تحديث للنموذج المرجعي: روابطك مبنية على ${data.versionAwareness.tenantVersion.version}، ويتوفر ${data.versionAwareness.latestVersion.version}. لا يُنقل شيء تلقائياً.`)}</div>}
+      {data.versionAwareness?.updateAvailable && data.model?.id && <UpgradeReview modelId={data.model.id} L={L} />}
       <div style={{ fontSize: 11, color: 'var(--text-dim)', margin: '6px 0 8px' }}>{L('Candidate differences only. A reference gap is not automatically a deficiency - you decide every mapping and disposition.', 'فروقات مرشحة فقط. الفجوة المرجعية ليست قصوراً بالضرورة - أنت من يقرر كل ربط وتصنيف.')} <span data-testid="unresolved-count">{L('Unresolved', 'غير محسومة')}: {data.summary.UNRESOLVED ?? '—'} · {L('Dispositioned', 'مصنّفة')}: {data.summary.DISPOSITIONED ?? '—'}</span></div>
       {refRows.map((r: any) => (
         <div key={r.reference.id} style={{ borderTop: '1px solid var(--border)', padding: '8px 0', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', borderInlineStart: `3px solid ${CLS[r.cls][2]}`, paddingInlineStart: 8 }}>
@@ -260,6 +261,34 @@ export function CurationWorkspace({ L, isAR, userId }: { L: LFn; isAR: boolean; 
             <button className="btn btn-primary btn-sm" disabled={busy || !editing.note.trim()} onClick={() => { const e = editing; setEditing(null); run(() => bcm('POST', `/reference-versions/${versionId}/curate`, { stableKeys: [e.stableKey], decision: 'MODIFY', note: e.note, edits: { name: e.name, nameAr: e.nameAr, description: e.description } })) }}>{L('Save modification', 'حفظ التعديل')}</button>
             <button className="btn btn-secondary btn-sm" onClick={() => setEditing(null)}>{L('Cancel', 'إلغاء')}</button>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Phase 4: reference upgrade review (current vs latest) ─────────────────
+const IMPACT: Record<string, [string, string]> = {
+  DECISION_CARRIES_FORWARD: ['Your decision carries forward', 'قرارك ينتقل تلقائياً'], REVIEW_YOUR_DECISION: ['Changed - review your decision', 'تغيّرت - راجع قرارك'],
+  REVIEW_OPTIONAL: ['Changed', 'تغيّرت'], IMPACT_REVIEW: ['Removed - review impact on your mapping', 'أُزيلت - راجع الأثر على ربطك'], CONSIDER_NEW_CAPABILITY: ['New - consider', 'جديدة - للدراسة'], NONE: ['No action', 'لا إجراء'],
+}
+export function UpgradeReview({ modelId, L }: { modelId: string; L: LFn }) {
+  const [d, setD] = useState<any>(null)
+  const [open, setOpen] = useState(false)
+  const load = () => { setOpen(!open); if (!d) bcm('GET', `/reference-models/${modelId}/upgrade`).then(setD).catch(() => setD({ items: [] })) }
+  return (
+    <div style={{ margin: '6px 0' }}>
+      <button className="btn btn-secondary btn-sm" onClick={load}>{open ? L('Hide update review', 'إخفاء مراجعة التحديث') : L('Review what changed', 'مراجعة ما تغيّر')}</button>
+      {open && d && (
+        <div data-testid="upgrade-review" style={{ ...card, marginTop: 6 }}>
+          <div style={{ fontSize: 12 }}>{L('Current', 'الحالي')}: <strong>{d.tenantVersion?.version ?? '—'}</strong> · {L('Latest', 'الأحدث')}: <strong>{d.latestVersion?.version ?? '—'}</strong></div>
+          <div style={{ fontSize: 12, margin: '4px 0' }}>{['UNCHANGED', 'MODIFIED', 'NEW', 'REMOVED'].map(k => `${k}: ${d.counts?.[k] ?? 0}`).join(' · ')}</div>
+          {(d.items || []).filter((i: any) => i.changeClass !== 'UNCHANGED' || i.impact === 'DECISION_CARRIES_FORWARD').slice(0, 300).map((i: any) => (
+            <div key={i.stableKey} style={{ fontSize: 12, borderTop: '1px solid var(--border)', padding: '3px 0' }}>
+              <span className="badge badge-draft">{i.changeClass}</span> {i.name}{i.changedFields?.length ? ` (${i.changedFields.join(', ')})` : ''} - {IMPACT[i.impact] ? L(IMPACT[i.impact][0], IMPACT[i.impact][1]) : i.impact}
+            </div>
+          ))}
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{L('Comparison only. Your capabilities and mappings are never changed automatically.', 'مقارنة فقط. لا تتغير قدراتك أو روابطك تلقائياً.')}</div>
         </div>
       )}
     </div>

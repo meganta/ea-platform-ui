@@ -91,6 +91,7 @@ describe('BusinessCapabilitiesPage', () => {
     });
     render(<BusinessCapabilitiesPage />);
     await screen.findByTestId('classification-banner'); // context loaded
+    fireEvent.click(screen.getByRole('tab', { name: 'Reference Models' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Organization Context' }));
     const selects = await screen.findAllByRole('combobox');
     fireEvent.change(selects[0], { target: { value: 'PRIVATE' } });
@@ -110,6 +111,7 @@ describe('BusinessCapabilitiesPage', () => {
       '/adoption/decisions': [],
     });
     render(<BusinessCapabilitiesPage />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Reference Models' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Reference Library' }));
     fireEvent.click(await screen.findByRole('option', { name: /NORA BCM/ }));
     expect(await screen.findByTestId('no-published-content')).toHaveTextContent(/authoritative source/);
@@ -126,6 +128,7 @@ describe('BusinessCapabilitiesPage', () => {
       '/adoption/preview': [{ possibleDuplicates: [{ assetId: 'x', name: 'Fleet Mgmt', strength: 'HIGH' }], parent: null }],
     });
     render(<BusinessCapabilitiesPage />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Reference Models' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Reference Library' }));
     fireEvent.click(await screen.findByRole('option', { name: /Logistics Reference/ }));
     fireEvent.click(await screen.findByText('Fleet Management'));
@@ -164,6 +167,7 @@ describe('BusinessCapabilitiesPage', () => {
       '/setup/attribute-pack': (o: any) => (JSON.parse(o.body).dryRun === false ? { status: 'APPLIED', plan: { targets: [] } } : { status: 'WOULD_APPLY', plan: { targets: [{ objectTypeCode: 'GovCapability', toAdd: [{ name: 'Strategic Importance' }], conflicts: [], possibleEquivalents: [] }] } }),
     });
     render(<BusinessCapabilitiesPage />);
+    fireEvent.click(screen.getByRole('tab', { name: 'Reference Models' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Model Setup' }));
     fireEvent.click(screen.getByText('Analyze'));
     expect(await screen.findByText(/Will add: Strategic Importance/)).toBeInTheDocument();

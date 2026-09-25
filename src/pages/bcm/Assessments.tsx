@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { useAuth } from '../../contexts/AuthContext'
+import { ReportsPanel } from './Insights'
 
 // Business Capability Assessments (Phase 2): list + detail (results,
 // validation, approval, publication) and the 9-step Assess Maturity wizard.
@@ -82,6 +83,7 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
   const [busy, setBusy] = useState(false)
   const [report, setReport] = useState<any[] | null>(null)
   const [resetNotice, setResetNotice] = useState<number>(0)
+  const [reassessed, setReassessed] = useState<string | null>(null)
   const load = useCallback(async () => {
     try {
       const p = await api('GET', `${BASE}/${id}/progress`)
@@ -113,6 +115,8 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
         {can.approve && a.status === 'APPROVAL' && !a.approvedAt && (a.createdBy === user?.userId
           ? <span data-testid="needs-other-approver" style={{ fontSize: 12, color: 'var(--text-dim)', alignSelf: 'center' }}>{L('You created this assessment, so another authorized approver must approve it.', 'أنشأت هذا التقييم، لذا يجب أن يعتمده معتمد آخر مخوّل.')}</span>
           : <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => act(() => api('POST', `${BASE}/${id}/approve`))}>{L('Approve', 'اعتماد')}</button>)}
+        {can.assess && a.status === 'PUBLISHED' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => act(async () => { const r = await api('POST', `${BASE}/${id}/reassess`, {}); setReassessed(r?.assessment?.id ?? null) })}>{L('Create reassessment', 'إنشاء إعادة تقييم')}</button>}
+        {reassessed && <span role="status" data-testid="reassessment-created" style={{ fontSize: 12, alignSelf: 'center' }}>{L('Reassessment created in survey design. Previous results are context only; nothing is copied as an answer.', 'أُنشئت إعادة التقييم في مرحلة تصميم الاستبيان. النتائج السابقة سياق فقط ولا تُنسخ كإجابات.')}</span>}
         {can.approve && a.status === 'APPROVAL' && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => { const note = window.prompt(L('Reason for sending back', 'سبب الإعادة')); if (note) act(() => api('POST', `${BASE}/${id}/send-back`, { note })) }}>{L('Send back', 'إعادة للتحقق')}</button>}
         {can.publish && a.status === 'APPROVAL' && a.approvedAt && <button className="btn btn-primary btn-sm" disabled={busy} onClick={() => { if (window.confirm(L('Publishing updates the current maturity of the assessed capabilities. Continue?', 'النشر يحدّث مستوى النضج الحالي للقدرات. متابعة؟'))) act(() => api('POST', `${BASE}/${id}/publish`)) }}>{L('Publish results', 'نشر النتائج')}</button>}
       </div>
@@ -123,6 +127,8 @@ function AssessmentDetail({ id, L, isAR, can, onBack }: { id: string; L: LFn; is
         </div>
       )}
       {a.status === 'VALIDATION' && can.validate && (a.results || []).some((r: any) => (r.varianceFlags || []).length) && <ConsensusWorkspace id={id} L={L} onChange={load} />}
+      {a.status === 'PUBLISHED' && a.recommendedNextAssessmentAt && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{L('Recommended next assessment', 'التقييم التالي الموصى به')}: {String(a.recommendedNextAssessmentAt).slice(0, 10)}</div>}
+      {['PUBLISHED', 'APPROVAL', 'VALIDATION'].includes(a.status) && <ReportsPanel L={L} assessmentId={id} />}
       {(a.results || []).length > 0 && (
         <div style={{ display: 'grid', gap: 10 }}>
           {a.results.map((r: any) => <ResultCard key={r.id} r={r} name={caps[r.capabilityAssetId] || r.capabilityAssetId} L={L} canValidate={can.validate && a.status === 'VALIDATION'} onValidate={(body) => act(() => api('POST', `${BASE}/${id}/results/${r.id}/validate`, body))} />)}

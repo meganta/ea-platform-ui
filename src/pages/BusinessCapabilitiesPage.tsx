@@ -4,7 +4,7 @@ import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { AssessmentsPanel } from './bcm/Assessments'
 import { ModelSuggestions, ModelSources, ReferenceComparison, CurationWorkspace } from './bcm/ReferenceModels'
-import { ExecutiveInsights, CapabilityInsight, ImprovementActions, CapabilityAdvisor } from './bcm/Insights'
+import { ExecutiveInsights, CapabilityInsight, ImprovementActions, CapabilityAdvisor, ExecutiveOverview, TraceabilityPanel, InitiativeCoverage } from './bcm/Insights'
 
 // Business Capabilities workspace - BCM Phase 1 foundation.
 // Capability Map · Capabilities (hierarchy) · Reference Library ·
@@ -31,7 +31,14 @@ async function call(method: string, path: string, body?: any) {
   return data
 }
 
-type Tab = 'insights' | 'map' | 'list' | 'assessments' | 'actions' | 'advisor' | 'library' | 'curation' | 'context' | 'setup'
+type Tab = 'overview' | 'map' | 'list' | 'assessments' | 'health' | 'improvement' | 'reference'
+type Sub = 'actions' | 'advisor' | 'coverage' | 'library' | 'curation' | 'context' | 'setup'
+// Phase 4 navigation: 7 primary sections. Legacy ?tab= values keep working (deep links / bookmarks).
+const LEGACY: Record<string, [Tab, Sub?]> = {
+  insights: ['health'], actions: ['improvement', 'actions'], advisor: ['improvement', 'advisor'], coverage: ['improvement', 'coverage'],
+  library: ['reference', 'library'], curation: ['reference', 'curation'], context: ['reference', 'context'], setup: ['reference', 'setup'],
+}
+const TABS: Tab[] = ['overview', 'map', 'list', 'assessments', 'health', 'improvement', 'reference']
 
 const CLASS_LABEL: Record<string, [string, string]> = {
   ADMINISTRATIVE: ['Administrative', 'إدارية'],
@@ -57,13 +64,13 @@ const PROVENANCE: Record<string, { en: string; ar: string; tipEn: string; tipAr:
 
 export default function BusinessCapabilitiesPage() {
   const { hasPermission, user } = useAuth()
-  const [insightCap, setInsightCap] = useState<string | null>(null)
+  const [insightCap, setInsightCap] = useState<string | null>(() => (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('cap') : null))
   const { isAR } = useLang()
   const L = useCallback((en: string, ar: string) => (isAR ? ar : en), [isAR])
-  const [tab, setTab] = useState<Tab>(() => {
-    const q = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null
-    return (['insights', 'map', 'list', 'assessments', 'actions', 'advisor', 'library', 'curation', 'context', 'setup'] as Tab[]).includes(q as Tab) ? (q as Tab) : 'map'
-  })
+  const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams()
+  const initial = (() => { const q = params.get('tab') || ''; if (TABS.includes(q as Tab)) return [q as Tab, (params.get('sub') as Sub) || undefined] as [Tab, Sub?]; if (LEGACY[q]) return LEGACY[q]; if (params.get('cap')) return ['health'] as [Tab]; return ['map'] as [Tab] })()
+  const [tab, setTab] = useState<Tab>(initial[0])
+  const [sub, setSub] = useState<Sub | undefined>(initial[1])
   const [ctx, setCtx] = useState<any>(null)
 
   const can = {
@@ -87,17 +94,29 @@ export default function BusinessCapabilitiesPage() {
   useEffect(() => { loadCtx() }, [loadCtx])
 
   const tabs: Array<{ id: Tab; label: string; show: boolean }> = [
-    { id: 'insights', label: L('Overview', 'نظرة عامة'), show: true },
+    { id: 'overview', label: L('Overview', 'نظرة عامة'), show: true },
     { id: 'map', label: L('Capability Map', 'خريطة القدرات'), show: true },
     { id: 'list', label: L('Capabilities', 'القدرات'), show: true },
     { id: 'assessments', label: L('Assessments', 'التقييمات'), show: true },
-    { id: 'actions', label: L('Improvement actions', 'إجراءات التحسين'), show: true },
-    { id: 'advisor', label: L('Advisor', 'المستشار'), show: true },
-    { id: 'library', label: L('Reference Library', 'المكتبة المرجعية'), show: true },
-    { id: 'curation', label: L('Model curation', 'مراجعة النماذج'), show: !!user?.isPlatformAdmin },
-    { id: 'context', label: L('Organization Context', 'سياق الجهة'), show: true },
-    { id: 'setup', label: L('Model Setup', 'إعداد النموذج'), show: can.pack },
+    { id: 'health', label: L('Health & Gaps', 'السلامة والفجوات'), show: true },
+    { id: 'improvement', label: L('Improvement', 'التحسين'), show: true },
+    { id: 'reference', label: L('Reference Models', 'النماذج المرجعية'), show: true },
   ]
+  const subTabs: Record<string, Array<{ id: Sub; label: string; show: boolean }>> = {
+    improvement: [
+      { id: 'actions', label: L('Improvement actions', 'إجراءات التحسين'), show: true },
+      { id: 'advisor', label: L('Advisor', 'المستشار'), show: true },
+      { id: 'coverage', label: L('Initiative coverage', 'تغطية المبادرات'), show: true },
+    ],
+    reference: [
+      { id: 'library', label: L('Reference Library', 'المكتبة المرجعية'), show: true },
+      { id: 'curation', label: L('Model curation', 'مراجعة النماذج'), show: !!user?.isPlatformAdmin },
+      { id: 'context', label: L('Organization Context', 'سياق الجهة'), show: true },
+      { id: 'setup', label: L('Model Setup', 'إعداد النموذج'), show: can.pack },
+    ],
+  }
+  const activeSub: Sub | undefined = subTabs[tab] ? (subTabs[tab].find(x => x.id === sub && x.show)?.id ?? subTabs[tab][0].id) : undefined
+  const openCapability = (id: string) => { setTab('health'); setInsightCap(id) }
 
   return (
     <div>
@@ -112,26 +131,33 @@ export default function BusinessCapabilitiesPage() {
                 ? L('Your organization type and industry need confirmation. Reference models are shown unfiltered until then.', 'يلزم تأكيد نوع الجهة والقطاع. تُعرض النماذج المرجعية دون تصفية حتى يتم التأكيد.')
                 : L('Your organization type and industry are not set yet.', 'لم يتم تحديد نوع الجهة والقطاع بعد.')}
             </span>
-            <button className="btn btn-secondary btn-sm" onClick={() => setTab('context')}>{L('Review', 'مراجعة')}</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => { setTab('reference'); setSub('context') }}>{L('Review', 'مراجعة')}</button>
           </div>
         )}
         <div className="page-tabs" role="tablist" style={{ overflowX: 'auto' }}>
           {tabs.filter(t => t.show).map(t => (
-            <button key={t.id} role="tab" aria-selected={tab === t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>
+            <button key={t.id} role="tab" aria-selected={tab === t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`} onClick={() => { setTab(t.id); if (t.id !== 'health') setInsightCap(null) }}>{t.label}</button>
           ))}
         </div>
+        {activeSub && (
+          <div role="tablist" aria-label={L('Sections', 'الأقسام')} style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
+            {subTabs[tab].filter(x => x.show).map(x => <button key={x.id} role="tab" aria-selected={activeSub === x.id} className={`btn btn-sm ${activeSub === x.id ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSub(x.id)}>{x.label}</button>)}
+          </div>
+        )}
       </div>
       <div className="page-body">
         {tab === 'map' && <CapabilityMap L={L} isAR={isAR} />}
-        {tab === 'insights' && (insightCap ? <CapabilityInsight id={insightCap} L={L} isAR={isAR} onClose={() => setInsightCap(null)} /> : <ExecutiveInsights L={L} onOpenCapability={setInsightCap} />)}
-        {tab === 'actions' && <ImprovementActions L={L} can={{ manage: can.manageActions, approve: can.approveActions, link: can.linkInitiatives }} userId={user?.userId} />}
-        {tab === 'advisor' && <CapabilityAdvisor L={L} can={{ run: can.useAdvisor, decide: can.decideRecs }} />}
+        {tab === 'overview' && <ExecutiveOverview L={L} onOpenCapability={openCapability} />}
+        {tab === 'health' && (insightCap ? <CapabilityInsight id={insightCap} L={L} isAR={isAR} onClose={() => setInsightCap(null)} /> : <><ExecutiveInsights L={L} onOpenCapability={setInsightCap} /><TraceabilityPanel L={L} onOpenCapability={setInsightCap} /></>)}
+        {tab === 'improvement' && activeSub === 'actions' && <ImprovementActions L={L} can={{ manage: can.manageActions, approve: can.approveActions, link: can.linkInitiatives }} userId={user?.userId} />}
+        {tab === 'improvement' && activeSub === 'advisor' && <CapabilityAdvisor L={L} can={{ run: can.useAdvisor, decide: can.decideRecs }} />}
+        {tab === 'improvement' && activeSub === 'coverage' && <InitiativeCoverage L={L} />}
         {tab === 'list' && <CapabilityList L={L} isAR={isAR} canManage={can.manage} />}
         {tab === 'assessments' && <AssessmentsPanel L={L} isAR={isAR} can={{ assess: can.assess, validate: can.validate, approve: can.approve, publish: can.publish }} />}
-        {tab === 'library' && <ReferenceLibrary L={L} isAR={isAR} canAdopt={can.adopt} />}
-        {tab === 'curation' && user?.isPlatformAdmin && <CurationWorkspace L={L} isAR={isAR} userId={user?.userId} />}
-        {tab === 'context' && <OrganizationContext L={L} isAR={isAR} ctx={ctx} canEdit={can.org} onSaved={loadCtx} />}
-        {tab === 'setup' && can.pack && <ModelSetup L={L} isAR={isAR} />}
+        {tab === 'reference' && activeSub === 'library' && <ReferenceLibrary L={L} isAR={isAR} canAdopt={can.adopt} />}
+        {tab === 'reference' && activeSub === 'curation' && user?.isPlatformAdmin && <CurationWorkspace L={L} isAR={isAR} userId={user?.userId} />}
+        {tab === 'reference' && activeSub === 'context' && <OrganizationContext L={L} isAR={isAR} ctx={ctx} canEdit={can.org} onSaved={loadCtx} />}
+        {tab === 'reference' && activeSub === 'setup' && can.pack && <ModelSetup L={L} isAR={isAR} />}
       </div>
     </div>
   )
@@ -468,7 +494,7 @@ function ReferenceLibrary({ L, isAR, canAdopt }: { L: LFn; isAR: boolean; canAdo
   const [error, setError] = useState<string | null>(null)
   const [view, setView] = useState<'tree' | 'compare' | 'sources'>('tree')
 
-  useEffect(() => { call('GET', `/reference-models?applicable=${onlyApplicable}`).then(setModels).catch(e => setError(e.message)) }, [onlyApplicable])
+  useEffect(() => { call('GET', `/reference-models?applicable=${onlyApplicable}`).then((ms: any) => setModels(Array.isArray(ms) ? ms : [])).catch(e => setError(e.message)) }, [onlyApplicable])
   const model = models?.find(m => m.id === modelId)
   const publishedVersions = (model?.versions || []).filter((v: any) => v.status === 'PUBLISHED')
 

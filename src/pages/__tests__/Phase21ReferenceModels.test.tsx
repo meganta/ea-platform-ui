@@ -142,11 +142,13 @@ describe('curation tab visibility', () => {
   it('hidden for tenant users, visible to platform administrators', async () => {
     mockFetch(base);
     const { unmount } = render(<BusinessCapabilitiesPage />);
-    await screen.findByRole('tab', { name: /Reference library|Reference Library/ });
+    fireEvent.click(await screen.findByRole('tab', { name: 'Reference Models' }));
+    await screen.findByRole('tab', { name: 'Reference Library' });
     expect(screen.queryByRole('tab', { name: 'Model curation' })).not.toBeInTheDocument();
     unmount();
     mockUser = { userId: 'pa', role: 'SUPERADMIN', isPlatformAdmin: true };
     render(<BusinessCapabilitiesPage />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Reference Models' }));
     expect(await screen.findByRole('tab', { name: 'Model curation' })).toBeInTheDocument();
   });
 });
