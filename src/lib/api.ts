@@ -45,5 +45,4 @@ export const api = {
   getDocuments: () => req('GET', '/knowledge/documents'),
   searchKnowledge: (query: string) => req('POST', '/knowledge/search', { query }),
   getGlossary: () => req('GET', '/glossary'),
-  chatSync: (message: string, sessionId: string, locale = 'EN') => req('POST', '/copilot/chat/sync', { message, sessionId, locale }),
 }
