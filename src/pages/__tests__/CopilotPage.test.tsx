@@ -276,6 +276,29 @@ const AUTHORITATIVE_EVIDENCE = [
   { sourceType: 'EA_ASSET', sourceId: 'asset-1', title: 'Payment Gateway', excerpt: 'Core payment processing service', assetType: 'APPLICATION', domain: 'APPLICATION', version: '1.0', status: 'APPROVED', validityClassification: 'CURRENT', sourceAuthorityLevel: 'AUTHORITATIVE', effectiveFrom: null, effectiveUntil: null, retrievalReason: 'EXACT_NAME_MATCH', score: 1.0, targetRef: { type: 'EA_ASSET', id: 'asset-1' } },
 ];
 
+describe('CopilotPage - answer provenance (Tenant Intelligence)', () => {
+  it('renders the "Based on" panel from the done event\'s evidence and trace, with ADM as the system of record', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [
+        { type: 'meta', conversationId: 'conv-1' },
+        { type: 'text', content: 'The latest cycle is in Phase 2.' },
+        { type: 'done', conversationId: 'conv-1',
+          evidence: [{ sourceType: 'ADM_CYCLE', sourceId: 'c2', title: 'ADM Cycle: EA Cycle H1 2026', excerpt: 'ACTIVE', module: 'ADM', evidenceType: 'ADM_FACT', authorityRole: 'PRIMARY', sourceAuthorityLevel: 'AUTHORITATIVE', retrievalReason: 'ADM_SYSTEM_OF_RECORD', score: 1, targetRef: { type: 'ADM_CYCLE', id: 'c2' } }],
+          trace: { intent: 'ADM_CYCLE_STATUS', primaryModule: 'ADM', temporal: 'LATEST', modulesExecuted: ['ADM'], steps: [{ id: 's1', module: 'ADM', capability: 'adm_get_cycle_status', status: 'OK' }], answerQuality: 'HIGH' } },
+      ] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/);
+    fireEvent.change(input, { target: { value: 'What is the status of the latest ADM cycle?' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(await screen.findByTestId('copilot-provenance')).toBeInTheDocument();
+    expect(screen.getByText('copilot.prov.module.ADM · 1')).toBeInTheDocument();
+    expect(screen.getByTestId('copilot-provenance-quality')).toHaveTextContent('copilot.prov.basis.HIGH');
+  });
+});
+
 describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
   const openSpy = jest.fn();
   beforeEach(() => { window.open = openSpy; openSpy.mockClear(); });

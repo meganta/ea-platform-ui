@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import ReactMarkdown from 'react-markdown'
+import CopilotProvenance, { ProvenanceTrace } from '../components/CopilotProvenance'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -16,8 +17,14 @@ function useApi() {
 }
 
 interface EvidenceItem {
-  sourceType: 'EA_ASSET' | 'EA_RELATIONSHIP' | 'DERIVED_PATH' | 'GOVERNANCE_REVIEW' | 'DOCUMENT'
-  groundingType?: 'REPOSITORY_FACT' | 'REPOSITORY_RELATIONSHIP' | 'DERIVED_PATH' | 'DOCUMENT_EVIDENCE'
+  // Repository/document types plus the Tenant Intelligence module sources
+  // (ADM_CYCLE, ADM_OUTPUT, SCENARIO, SCENARIO_DELTA, TENANT_VIEW,
+  // GOVERNANCE_FINDING, EA_PLAN, ARCH_DECISION, ...).
+  sourceType: string
+  groundingType?: string
+  module?: string
+  evidenceType?: string
+  authorityRole?: 'PRIMARY' | 'LINKED' | 'SUPPLEMENTARY'
   sourceId: string
   title: string
   excerpt: string
@@ -33,7 +40,7 @@ interface EvidenceItem {
   score: number
   targetRef: { type: string; id: string }
 }
-interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[]; remainingSpeech?: string | null; failed?: boolean }
+interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[]; trace?: ProvenanceTrace | null; remainingSpeech?: string | null; failed?: boolean }
 interface Architect { id: string; code: string; name: string; role: string; domain?: string; avatar: string; description?: string; isChief: boolean; aiModel: string; isActive: boolean }
 
 // Phase 1: authority-level color coding, matching the same caveat
@@ -56,7 +63,13 @@ function evidenceSourceUrl(item: EvidenceItem): string | null {
   // non-functional deep link to the specific review - a real follow-up,
   // not silently pretended to already work.
   if (item.targetRef?.type === 'EA_ASSET' || item.sourceType === 'EA_ASSET') return `/repository?assetId=${item.targetRef?.id || item.sourceId}`
-  if (item.sourceType === 'GOVERNANCE_REVIEW') return '/governance'
+  // EaViewsPage reads ?viewId= and ?scenario=; the other module pages have
+  // no deep-link parameter yet, so they open the module's own list.
+  if (item.sourceType === 'TENANT_VIEW') return `/ea-views?viewId=${item.targetRef?.id || item.sourceId}`
+  if (item.sourceType === 'SCENARIO') return `/ea-views?scenario=${item.targetRef?.id || item.sourceId}`
+  if (item.sourceType === 'GOVERNANCE_REVIEW' || item.sourceType === 'GOVERNANCE_FINDING' || item.sourceType === 'GOVERNANCE_DECISION') return '/governance'
+  if (item.sourceType.startsWith('ADM_')) return '/adm'
+  if (item.sourceType === 'EA_PLAN') return '/ea-planning'
   return null
 }
 
@@ -70,6 +83,14 @@ function evidenceTypeLabel(item: EvidenceItem): string {
   if (item.groundingType === 'DERIVED_PATH' || item.sourceType === 'DERIVED_PATH') return 'Derived repository path'
   if (item.sourceType === 'DOCUMENT') return 'Tenant document'
   if (item.sourceType === 'GOVERNANCE_REVIEW') return 'Governance review'
+  if (item.sourceType === 'GOVERNANCE_FINDING') return 'Governance finding'
+  if (item.sourceType === 'GOVERNANCE_DECISION') return 'Governance decision'
+  if (item.sourceType.startsWith('ADM_')) return 'ADM record'
+  if (item.sourceType === 'SCENARIO') return 'Architecture scenario'
+  if (item.sourceType === 'SCENARIO_DELTA') return 'Scenario change'
+  if (item.sourceType === 'TENANT_VIEW') return 'EA View'
+  if (item.sourceType === 'EA_PLAN') return 'EA plan'
+  if (item.sourceType === 'ARCH_DECISION') return 'Architecture decision'
   return `EA Repository · ${item.assetType || 'Asset'}`
 }
 
@@ -980,7 +1001,7 @@ export default function CopilotPage() {
         await streamSse('/copilot/chat', { message: msg, architectCode: selectedArchitect.code, conversationId: activeConvId }, (d) => {
           if (d.type === 'meta') setActiveConvId(d.conversationId)
           if (d.type === 'text') setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, content: msg2.content + d.content } : msg2))
-          if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations(); setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, evidence: d.evidence } : msg2)) }
+          if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations(); setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, evidence: d.evidence, trace: d.trace ?? null } : msg2)) }
           if (d.type === 'error') setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, content: d.error || 'Copilot could not complete this request. Please try again.', failed: true } : msg2))
         })
       } else {
@@ -1187,6 +1208,7 @@ export default function CopilotPage() {
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>
                   {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
+                {m.role === 'architect' && <CopilotProvenance evidence={m.evidence} trace={m.trace} />}
                 {m.role === 'architect' && <EvidenceDrawer evidence={m.evidence} />}
                 {m.role === 'architect' && m.remainingSpeech && (
                   <button onClick={() => speakMore(m)} style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)', background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '3px 9px', cursor: 'pointer' }}>
