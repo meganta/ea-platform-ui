@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, ReactNode } from 're
 import { useAuth } from '../contexts/AuthContext'
 import ReactMarkdown from 'react-markdown'
 import CopilotProvenance, { ProvenanceTrace } from '../components/CopilotProvenance'
+import EaQuestionExplorer from '../components/EaQuestionExplorer'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -1040,13 +1041,6 @@ export default function CopilotPage() {
     api.get('/copilot/conversations').then((d: any) => setConversations(Array.isArray(d) ? d : []))
   }
 
-  const QUICK_QUESTIONS = [
-    'What are the major architectural risks in our current application portfolio?',
-    'Review our data architecture from a governance perspective',
-    'What capabilities are not supported by any application?',
-    'What technology components are approaching end of life?',
-  ]
-
   const archColor = (code?: string) => DOMAIN_COLOR[code || 'CHIEF'] || '#7f8c8d'
 
   return (
@@ -1165,21 +1159,14 @@ export default function CopilotPage() {
         {/* Messages */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
           {messages.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 20 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100%', gap: 20 }}>
               <div style={{ fontSize: 56 }}>{selectedArchitect?.avatar || '🤖'}</div>
               <div style={{ fontSize: 20, fontWeight: 700 }}>{mode === 'single' ? (selectedArchitect?.name || 'EA Copilot') : 'Multi-Architect Consultation'}</div>
               <div style={{ fontSize: 14, color: 'var(--text-dim)', maxWidth: 400, textAlign: 'center' }}>
                 {mode === 'single' ? (selectedArchitect?.description || 'Ask me anything about enterprise architecture') : 'Multiple domain architects will analyze your question from different perspectives'}
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 500 }}>
-                {QUICK_QUESTIONS.map(q => (
-                  <button key={q} onClick={() => setInput(q)} style={{ padding: '10px 14px', background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text-dim)', cursor: 'pointer', fontSize: 13, textAlign: 'left', transition: 'all 0.15s' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.color = 'var(--text)' }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-dim)' }}>
-                    {q}
-                  </button>
-                ))}
-              </div>
+              {/* Suggested EA questions: choosing one fills the composer, exactly as if typed. */}
+              <EaQuestionExplorer onSelect={q => { setInput(q); inputRef.current?.focus() }} />
             </div>
           )}
 

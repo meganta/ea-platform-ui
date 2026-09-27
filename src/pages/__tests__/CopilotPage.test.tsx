@@ -706,3 +706,62 @@ describe('CopilotPage - Action Draft review (Copilot Phase 3)', () => {
     expect(await screen.findByText(/created new-asset-42/)).toBeInTheDocument();
   });
 });
+
+describe('CopilotPage - suggested EA questions', () => {
+  const { ALL_EA_QUESTIONS, FEATURED_EA_QUESTIONS, EA_QUESTION_LIBRARY } = jest.requireActual('../../lib/eaQuestionLibrary');
+
+  it('replaces the old quick questions with a few featured questions from the approved library - not all 53', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    expect(screen.queryByText('What are the major architectural risks in our current application portfolio?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Review our data architecture from a governance perspective')).not.toBeInTheDocument();
+    for (const q of FEATURED_EA_QUESTIONS) expect(screen.getByText(q.text)).toBeInTheDocument();
+    const shown = ALL_EA_QUESTIONS.filter((q: any) => screen.queryByText(q.text));
+    expect(shown).toHaveLength(FEATURED_EA_QUESTIONS.length);
+    expect(screen.getByRole('button', { name: 'Explore EA Questions (53)' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('Explore EA Questions shows the 9 categories and each category\'s questions, and can go back', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByRole('button', { name: 'Explore EA Questions (53)' }));
+
+    const group = screen.getByRole('group', { name: 'EA question categories' });
+    const chips = group.querySelectorAll('button');
+    expect(chips).toHaveLength(9);
+    expect(screen.getByRole('button', { name: /^Transparency/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('list', { name: 'Transparency questions' }).querySelectorAll('[role="listitem"]')).toHaveLength(12);
+
+    fireEvent.click(screen.getByRole('button', { name: /^Finance/ }));
+    const finance = EA_QUESTION_LIBRARY.find((c: any) => c.id === 'finance');
+    for (const q of finance.questions) expect(screen.getByText(q.text)).toBeInTheDocument();
+    expect(screen.queryByText('What is our application portfolio?')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '← Back to suggested questions' }));
+    expect(screen.queryByRole('group', { name: 'EA question categories' })).not.toBeInTheDocument();
+    expect(screen.getByText(FEATURED_EA_QUESTIONS[0].text)).toBeInTheDocument();
+  });
+
+  it('choosing a library question fills the composer and sends through the normal Copilot chat flow', async () => {
+    mockFetchWithSse(
+      { '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] },
+      { '/copilot/chat': [{ type: 'meta', conversationId: 'conv-1' }, { type: 'text', content: 'Here is the answer.' }, { type: 'done', conversationId: 'conv-1', evidence: [] }] },
+    );
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    fireEvent.click(screen.getByRole('button', { name: 'Explore EA Questions (53)' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Risk/ }));
+    fireEvent.click(screen.getByText('Where do we have SLA violations?'));
+
+    const input = screen.getByPlaceholderText(/Enter to send/) as HTMLTextAreaElement;
+    expect(input.value).toBe('Where do we have SLA violations?');
+    expect(document.activeElement).toBe(input);
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(await screen.findByText('Here is the answer.')).toBeInTheDocument();
+    const chatCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/copilot/chat'));
+    expect(JSON.parse(chatCall[1].body).message).toBe('Where do we have SLA violations?');
+  });
+});
