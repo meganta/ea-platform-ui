@@ -1,3 +1,4 @@
+import GovernanceExportDialog, { GovernanceExportFormat } from '../components/GovernanceExportDialog'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -2529,6 +2530,7 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
   const [generating, setGenerating] = useState(false)
   const [genError, setGenError] = useState('')
   const [exporting, setExporting] = useState(false)
+  const [showExport, setShowExport] = useState(false)
   const [converting, setConverting] = useState(false)
   const [addingAssumption, setAddingAssumption] = useState(false)
   const [assumptionForm, setAssumptionForm] = useState({ label: '', value: '' })
@@ -2556,16 +2558,17 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
     setAssumptionForm({ label: '', value: '' }); setAddingAssumption(false); await load()
   }
 
-  const exportDocx = async () => {
+  const exportStudy = async (language: 'en'|'ar', format: GovernanceExportFormat) => {
+    setShowExport(false)
     setExporting(true)
     try {
       const token = localStorage.getItem('ea_token')
-      const res = await fetch(`${API}/innovation/studies/${studyId}/export/docx`, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch(`${API}/innovation/studies/${studyId}/export/${format === 'word' ? 'docx' : 'pptx'}?lang=${language}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) throw new Error('Export failed')
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `study-${studyId}.docx`
+      a.href = url; a.download = `Innovation_Study_${language.toUpperCase()}.${format === 'word' ? 'docx' : 'pptx'}`
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
     } catch (e: any) {
@@ -2597,12 +2600,13 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
 
   return (
     <div>
+      {showExport && <GovernanceExportDialog subject='study' onClose={() => setShowExport(false)} onExport={exportStudy} />}
       <div style={{ ...S.row, marginBottom: 16, flexWrap: 'wrap' as const }}>
         <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{t('innov.back_to_studies')}</button>
         <div style={{ flex: 1, fontSize: 18, fontWeight: 700 }}>{title}</div>
         <span style={S.badge(STUDY_STATUS_COLOR[study.status])}>{isAR ? STUDY_STATUS_LABEL[study.status]?.ar : STUDY_STATUS_LABEL[study.status]?.en}</span>
         {hasGeneratedContent && (
-          <button style={S.btn()} onClick={exportDocx} disabled={exporting}>{exporting ? t('innov.exporting') : t('innov.export_docx')}</button>
+          <button style={S.btn()} onClick={() => setShowExport(true)} disabled={exporting}>{exporting ? t('innov.exporting') : (isAR ? 'تصدير' : 'Export')}</button>
         )}
         {hasGeneratedContent && study.status !== 'PILOT_INITIATIVE' && study.status !== 'IMPLEMENTED' && (
           <button style={S.btn('primary')} onClick={convertToInitiative} disabled={converting}>{converting ? t('innov.converting') : t('innov.convert_to_initiative')}</button>

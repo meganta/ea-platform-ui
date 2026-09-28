@@ -1005,7 +1005,7 @@ describe('InnovationPage - Studies tab: Export & Convert to Initiative (Innovati
     fireEvent.click(await screen.findByText('innov.tab_studies'));
     fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
     await screen.findByText('innov.not_generated_yet');
-    expect(screen.queryByText('innov.export_docx')).not.toBeInTheDocument();
+    expect(screen.queryByText('Export')).not.toBeInTheDocument();
     expect(screen.queryByText('innov.convert_to_initiative')).not.toBeInTheDocument();
   });
 
@@ -1014,8 +1014,12 @@ describe('InnovationPage - Studies tab: Export & Convert to Initiative (Innovati
     render(<InnovationPage />);
     fireEvent.click(await screen.findByText('innov.tab_studies'));
     fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
-    expect(await screen.findByText('innov.export_docx')).toBeInTheDocument();
+    expect(await screen.findByText('Export')).toBeInTheDocument();
     expect(screen.getByText('innov.convert_to_initiative')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Export'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Export format')).toHaveValue('powerpoint');
+    expect(screen.getByLabelText('Language')).toHaveValue('en');
   });
 
   it('hides the Convert to Initiative button once a study is already PILOT_INITIATIVE', async () => {
@@ -1024,7 +1028,7 @@ describe('InnovationPage - Studies tab: Export & Convert to Initiative (Innovati
     render(<InnovationPage />);
     fireEvent.click(await screen.findByText('innov.tab_studies'));
     fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
-    await screen.findByText('innov.export_docx');
+    await screen.findByText('Export');
     expect(screen.queryByText('innov.convert_to_initiative')).not.toBeInTheDocument();
   });
 
