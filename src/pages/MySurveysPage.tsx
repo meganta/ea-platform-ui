@@ -61,7 +61,14 @@ function Respond({ id, L, isAR, onBack }: { id: string; L: (en: string, ar: stri
 
   const sections = useMemo(() => {
     if (!data) return []
-    const withQs = data.sections.map((s: any) => ({ ...s, questions: data.questions.filter((q: any) => q.sectionId === s.id) }))
+    const withQs = data.sections.flatMap((s: any) => {
+      const questions = data.questions.filter((q: any) => q.sectionId === s.id)
+      const dimensions = [...new Set(questions.map((q: any) => q.dimension || ''))]
+      if (dimensions.length <= 1) return questions.length ? [{ ...s, questions }] : []
+      // Older assessments used one section per capability. Group these too,
+      // without rewriting their locked questionnaire or saved answers.
+      return dimensions.map(dimension => ({ ...s, id: `${s.id}:${dimension}`, title: `${s.title} — ${dimension || L('General', 'عام')}`, titleAr: `${s.titleAr || s.title} — ${dimension || L('General', 'عام')}`, questions: questions.filter((q: any) => (q.dimension || '') === dimension) }))
+    })
     const loose = data.questions.filter((q: any) => !q.sectionId)
     return loose.length ? [...withQs, { id: '-', title: L('General', 'عام'), questions: loose }] : withQs
   }, [data, L])
@@ -98,6 +105,7 @@ function Respond({ id, L, isAR, onBack }: { id: string; L: (en: string, ar: stri
           {sections.map((s: any, i: number) => <button key={s.id} role="tab" aria-selected={i === section} className={`btn btn-sm ${i === section ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setSection(i)}>{(isAR && s.titleAr) || s.title}</button>)}
         </div>
       )}
+      {cur && <h3 style={{ fontSize: 15 }}>{(isAR && cur.titleAr) || cur.title}</h3>}
       {cur && cur.questions.map((q: any) => (
         <fieldset key={q.id} disabled={!editable} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
           <legend style={{ fontSize: 13, fontWeight: 600, padding: '0 4px' }}>{(isAR && q.textAr) || q.text}{q.required && <span style={{ color: 'var(--danger)' }} aria-label={L('required', 'مطلوب')}> *</span>}</legend>

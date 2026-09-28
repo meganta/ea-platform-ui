@@ -170,3 +170,28 @@ describe('My Surveys (respondent)', () => {
     expect(screen.getByText('استبياناتي')).toBeInTheDocument();
   });
 });
+
+it('groups an existing survey by dimension without losing saved answers', async () => {
+  mockIsAR = false;
+  mockFetch({
+    'GET /surveys/my/assignments': [{ id: 'as1', status: 'IN_PROGRESS', survey: { title: 'Grouped survey', status: 'OPEN' } }],
+    'GET /surveys/my/assignments/as1': {
+      assignment: { id: 'as1', status: 'IN_PROGRESS' }, survey: { title: 'Grouped survey', acceptsResponses: true },
+      sections: [{ id: 'sec1', title: 'Delivery' }],
+      questions: [
+        { id: 'q1', sectionId: 'sec1', dimension: 'PROCESS', text: 'Process first', type: 'YES_NO', evidenceRequirement: 'NONE' },
+        { id: 'q2', sectionId: 'sec1', dimension: 'PEOPLE', text: 'People first', type: 'YES_NO', evidenceRequirement: 'NONE' },
+        { id: 'q3', sectionId: 'sec1', dimension: 'PROCESS', text: 'Process second', type: 'YES_NO', evidenceRequirement: 'NONE' },
+      ], responses: [{ questionId: 'q2', value: true }], evidence: [],
+    },
+  });
+  render(<MySurveysPage />);
+  fireEvent.click(await screen.findByText('Grouped survey'));
+  await screen.findByText('Process first');
+  expect(screen.getByText('Process second')).toBeInTheDocument();
+  expect(screen.queryByText('People first')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('tab', { name: 'Delivery — PEOPLE' }));
+  expect(screen.getByText('People first')).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: 'Yes' })).toBeChecked();
+  expect(screen.getByTestId('survey-progress')).toHaveTextContent('1/3');
+});

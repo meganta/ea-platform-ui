@@ -102,3 +102,60 @@ describe('assessment detail per status', () => {
     expect(await screen.findByText(/Reminder sent to 1 respondent/)).toBeInTheDocument();
   });
 });
+
+describe('group and user assignment', () => {
+  function setup() {
+    mockFetch({
+      'GET /business-capabilities/capabilities': CAPS, 'GET /business-capabilities/assessments/frameworks': [FW],
+      'GET /users': [{ id: 'u1', name: 'Sara' }, { id: 'u2', name: 'Omar' }],
+      'GET /business-capabilities/assessments/respondent-groups': [{ id: 'g1', name: 'Operations', userIds: ['u1'] }, { id: 'g2', name: 'Finance', userIds: ['u2'] }],
+      'POST /business-capabilities/assessments/respondent-groups': { id: 'g3', name: 'New team', userIds: ['u1', 'u2'] },
+      'GET /business-capabilities/assessments/a1': { id: 'a1', name: 'Q4', status: 'SURVEY_DESIGN', frameworkId: 'fw', surveyId: 's1', scope: [{ capabilityAssetId: 'c7', dimensionCodes: ['PROCESS'] }] },
+      'POST /business-capabilities/assessments/a1/scope/suggest': [],
+      'GET /surveys/s1': { version: { questions: [{ id: 'q1', subjectId: 'c7', dimension: 'PROCESS', text: 'Process question' }, { id: 'q2', subjectId: 'c7', dimension: 'PEOPLE', text: 'People question' }, { id: 'q3', subjectId: 'c7', dimension: 'PROCESS', text: 'Another process question' }] } },
+    });
+  }
+  it('launches with multiple groups and users and previews questions grouped by dimension', async () => {
+    setup();
+    const close = jest.fn();
+    render(<AssessWizard L={L} isAR={false} resumeId="a1" onClose={close} />);
+    await screen.findByText('+ Add respondent');
+    for (const id of ['g1', 'g2']) {
+      fireEvent.click(screen.getByText('+ Add respondent'));
+      const types = screen.getAllByLabelText('Recipient type');
+      fireEvent.change(types[types.length - 1], { target: { value: 'group' } });
+      const groups = screen.getAllByLabelText('Respondent group');
+      fireEvent.change(groups[groups.length - 1], { target: { value: id } });
+    }
+    for (const id of ['u1', 'u2']) {
+      fireEvent.click(screen.getByText('+ Add respondent'));
+      const users = screen.getAllByLabelText('Respondent');
+      fireEvent.change(users[users.length - 1], { target: { value: id } });
+    }
+    fireEvent.click(screen.getByText('Next'));
+    expect(await screen.findByRole('region', { name: 'Process' })).toHaveTextContent('Process questionAnother process question');
+    expect(screen.getByRole('region', { name: 'PEOPLE' })).toHaveTextContent('People question');
+    fireEvent.click(screen.getByText('Next'));
+    await screen.findByTestId('wizard-review');
+    fireEvent.click(screen.getByText('Next'));
+    fireEvent.click(await screen.findByText('Launch assessment'));
+    await waitFor(() => expect(close).toHaveBeenCalledWith('a1'));
+    expect(calls.find(c => c.url.endsWith('/a1/launch'))?.body.respondents).toEqual([
+      { groupId: 'g1', role: 'OWNER' }, { groupId: 'g2', role: 'OWNER' }, { userId: 'u1', role: 'OWNER' }, { userId: 'u2', role: 'OWNER' },
+    ]);
+  });
+  it('creates a reusable group and rejects blank assignment rows', async () => {
+    setup();
+    render(<AssessWizard L={L} isAR={false} resumeId="a1" onClose={jest.fn()} />);
+    fireEvent.click(await screen.findByText('Create group'));
+    fireEvent.change(screen.getByLabelText('Group name'), { target: { value: 'New team' } });
+    fireEvent.click(screen.getByLabelText('Sara'));
+    fireEvent.click(screen.getByLabelText('Omar'));
+    fireEvent.click(screen.getByText('Save group'));
+    await waitFor(() => expect(screen.queryByLabelText('Group name')).not.toBeInTheDocument());
+    expect(calls.find(c => c.method === 'POST' && c.url.endsWith('/respondent-groups'))?.body.userIds).toEqual(['u1', 'u2']);
+    fireEvent.click(screen.getByText('+ Add respondent'));
+    fireEvent.click(screen.getByText('Next'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Select a user or group');
+  });
+});
