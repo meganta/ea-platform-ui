@@ -225,7 +225,9 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
   const [dims, setDims] = useState<Record<string, Set<string>>>({})
   const [targets, setTargets] = useState<Record<string, string>>({})
   const [users, setUsers] = useState<any[]>([])
-  const [respondents, setRespondents] = useState<Array<{ userId: string; role: string }>>([])
+  const [respondents, setRespondents] = useState<Array<{ userId?: string; groupId?: string; role: string }>>([])
+  const [groups, setGroups] = useState<any[]>([])
+  const [groupForm, setGroupForm] = useState<{ id?: string; name: string; nameAr: string; userIds: string[] } | null>(null)
   const [questionnaire, setQuestionnaire] = useState<any>(null)
   const [survey, setSurvey] = useState<any>(null)
   const [aiDrafts, setAiDrafts] = useState(false)
@@ -236,6 +238,7 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
     api('GET', '/business-capabilities/capabilities').then((c: any) => setCaps(Array.isArray(c) ? c : c?.items || [])).catch(() => setCaps([]))
     api('GET', `${BASE}/frameworks`).then((fs: any) => { const list = Array.isArray(fs) ? fs : []; setFrameworks(list); if (list[0]) setFrameworkId(id => id || list[0].id) }).catch(() => setFrameworks([]))
     api('GET', '/users').then((u: any) => setUsers(Array.isArray(u) ? u : u?.users || u?.items || [])).catch(() => setUsers([]))
+    api('GET', `${BASE}/respondent-groups`).then(g => setGroups(Array.isArray(g) ? g : [])).catch(e => setError(e.message))
   }, [])
 
   // Resume an assessment that is still being set up (DRAFT / SURVEY_DESIGN): restore everything already saved on the server.
@@ -286,7 +289,7 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
       // Scope (re)saved: any earlier questionnaire no longer matches - it must be generated again.
       if (questionnaire) { setQuestionnaire(null); setSurvey(null) }
     }
-    if (step === 5 && !respondents.length) throw new Error(L('Add at least one respondent', 'أضف مستجيباً واحداً على الأقل'))
+    if (step === 5 && (!respondents.length || respondents.some(r => !r.userId && !r.groupId))) throw new Error(L('Select a user or group for every respondent row', 'اختر مستخدماً أو مجموعة لكل صف من المستجيبين'))
     if (step === 6 && !questionnaire) throw new Error(L('Generate the questionnaire first', 'أنشئ الاستبيان أولاً'))
     setStep(s => s + 1)
   })
@@ -414,10 +417,13 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
         <div style={{ maxWidth: 640 }}>
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 8 }}>{L('Respondents are users of your organization. Invite several roles so scores reflect more than one view.', 'المستجيبون من مستخدمي جهتكم. أشرك عدة أدوار لتعكس النتائج أكثر من رأي.')}</div>
           {respondents.map((r, i) => (
-            <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-              <select aria-label={L('Respondent', 'المستجيب')} className="form-input" value={r.userId} onChange={e => setRespondents(rs => rs.map((x, j) => (j === i ? { ...x, userId: e.target.value } : x)))}>
-                <option value="">{L('— Select user —', '— اختر مستخدماً —')}</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name || u.fullName || u.email}</option>)}
+            <div key={i} style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 6 }}>
+              <select aria-label={L('Recipient type', 'نوع المستلم')} className="form-input" style={{ width: 130 }} value={r.groupId !== undefined ? 'group' : 'user'} onChange={e => setRespondents(rs => rs.map((x, j) => j === i ? { role: x.role, ...(e.target.value === 'group' ? { groupId: '' } : { userId: '' }) } : x))}>
+                <option value="user">{L('User', 'مستخدم')}</option><option value="group">{L('Group', 'مجموعة')}</option>
+              </select>
+              <select aria-label={r.groupId !== undefined ? L('Respondent group', 'مجموعة المستجيبين') : L('Respondent', 'المستجيب')} className="form-input" style={{ flex: 1, minWidth: 180 }} value={r.groupId ?? r.userId ?? ''} onChange={e => setRespondents(rs => rs.map((x, j) => (j === i ? { ...x, ...(r.groupId !== undefined ? { groupId: e.target.value } : { userId: e.target.value }) } : x)))}>
+                <option value="">{L('— Select —', '— اختر —')}</option>
+                {(r.groupId !== undefined ? groups : users).map(u => <option key={u.id} value={u.id}>{(isAR && u.nameAr) || u.name || u.fullName || u.email}</option>)}
               </select>
               <select aria-label={L('Role', 'الدور')} className="form-input" style={{ width: 200 }} value={r.role} onChange={e => setRespondents(rs => rs.map((x, j) => (j === i ? { ...x, role: e.target.value } : x)))}>
                 {[['OWNER', 'Capability owner', 'مالك القدرة'], ['BUSINESS_SME', 'Business SME', 'خبير أعمال'], ['OPERATIONS', 'Operations', 'العمليات'], ['IT', 'IT', 'تقنية المعلومات'], ['DATA', 'Data', 'البيانات'], ['EA', 'Enterprise Architecture', 'البنية المؤسسية']].map(([v, en, ar]) => <option key={v} value={v}>{L(en, ar)}</option>)}
@@ -426,6 +432,22 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
             </div>
           ))}
           <button className="btn btn-secondary btn-sm" onClick={() => setRespondents(rs => [...rs, { userId: '', role: 'OWNER' }])}>+ {L('Add respondent', 'إضافة مستجيب')}</button>
+          <HelpTip text={L('Add one or more users, groups, or both. Active group members are assigned at launch. Overlapping selections receive one survey per role. Later group edits do not change launched assignments.', 'أضف مستخدماً أو أكثر، أو مجموعات، أو كليهما. يُعيَّن أعضاء المجموعة النشطون عند الإطلاق، ويتلقى المستخدم استبياناً واحداً لكل دور حتى عند تكرار اختياره. لا تؤثر تعديلات المجموعة اللاحقة على التعيينات السابقة.')} />
+          <button className="btn btn-secondary btn-sm" onClick={() => setGroupForm({ name: '', nameAr: '', userIds: [] })}>{L('Create group', 'إنشاء مجموعة')}</button>
+          {groups.length > 0 && <select aria-label={L('Edit group', 'تعديل مجموعة')} className="form-input" value="" onChange={e => { const g = groups.find(x => x.id === e.target.value); if (g) setGroupForm({ ...g, nameAr: g.nameAr || '' }) }}>
+            <option value="">{L('Edit group…', 'تعديل مجموعة…')}</option>{groups.map(g => <option key={g.id} value={g.id}>{(isAR && g.nameAr) || g.name}</option>)}
+          </select>}
+          {groupForm && <fieldset style={{ marginTop: 12, border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+            <legend>{L('Respondent group', 'مجموعة المستجيبين')}</legend>
+            <label htmlFor="group-name">{L('Group name', 'اسم المجموعة')}</label><input id="group-name" className="form-input" value={groupForm.name} onChange={e => setGroupForm({ ...groupForm, name: e.target.value })} />
+            <label htmlFor="group-name-ar">{L('Arabic group name', 'اسم المجموعة بالعربية')}</label><input id="group-name-ar" className="form-input" value={groupForm.nameAr} onChange={e => setGroupForm({ ...groupForm, nameAr: e.target.value })} />
+            <div style={{ maxHeight: 220, overflowY: 'auto' }}>{users.map(u => <label key={u.id} style={{ display: 'block' }}><input type="checkbox" checked={groupForm.userIds.includes(u.id)} onChange={e => setGroupForm({ ...groupForm, userIds: e.target.checked ? [...groupForm.userIds, u.id] : groupForm.userIds.filter(id => id !== u.id) })} />{u.name || u.fullName || u.email}</label>)}</div>
+            <button className="btn btn-primary btn-sm" disabled={busy || !groupForm.name.trim() || !groupForm.userIds.length} onClick={() => run(async () => {
+              const g = await api(groupForm.id ? 'PUT' : 'POST', `${BASE}/respondent-groups${groupForm.id ? '/' + groupForm.id : ''}`, { name: groupForm.name, nameAr: groupForm.nameAr, userIds: groupForm.userIds })
+              setGroups(gs => [...gs.filter(x => x.id !== g.id), g]); setGroupForm(null)
+            })}>{L('Save group', 'حفظ المجموعة')}</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setGroupForm(null)}>{L('Cancel', 'إلغاء')}</button>
+          </fieldset>}
         </div>
       )}
       {step === 6 && (
@@ -441,7 +463,11 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
               {Object.entries(byCap).map(([capId, qs]) => (
                 <details key={capId} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 8, marginBottom: 6 }}>
                   <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{capName(capId)} ({qs.length})</summary>
-                  {qs.map((q: any) => (
+                  {[...new Set(qs.map((q: any) => q.dimension || 'GENERAL'))].map(code => {
+                    const dim = fw?.dimensions?.find((d: any) => d.code === code)
+                    const label = (isAR && dim?.nameAr) || dim?.name || (code === 'GENERAL' ? L('General', 'عام') : code)
+                    return <section key={code} aria-label={label}><h4>{label}</h4>
+                    {qs.filter((q: any) => (q.dimension || 'GENERAL') === code).map((q: any) => (
                     <div key={q.id} style={{ fontSize: 12, padding: '4px 0', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span style={{ flex: 1, minWidth: 200 }}>{(isAR && q.textAr) || q.text}</span>
                       {q.evidenceRequirement === 'REQUIRED' && <span className="badge badge-review">{L('Evidence', 'دليل')}</span>}
@@ -450,7 +476,8 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
                         : q.reviewStatus === 'REJECTED' ? <span className="badge badge-draft">{L('Rejected', 'مرفوض')}</span>
                         : <span style={{ display: 'flex', gap: 4 }}><span className="badge badge-review">{L('AI suggestion', 'اقتراح آلي')}</span><button className="btn btn-secondary btn-sm" onClick={() => review(q.id, 'APPROVED')}>{L('Approve', 'اعتماد')}</button><button className="btn btn-secondary btn-sm" onClick={() => review(q.id, 'REJECTED')}>{L('Reject', 'رفض')}</button></span>)}
                     </div>
-                  ))}
+                    ))}</section>
+                  })}
                 </details>
               ))}
             </div>
@@ -460,7 +487,7 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
       {step === 7 && (
         <div style={{ fontSize: 13, display: 'grid', gap: 4 }} data-testid="wizard-review">
           <div><strong>{details.name}</strong> · {fw ? (isAR && fw.nameAr) || fw.name : ''}</div>
-          <div>{selected.size} {L('capabilities', 'قدرات')} · {respondents.length} {L('respondents', 'مستجيبين')} · {questionnaire?.questions ?? 0} {L('questions', 'أسئلة')}</div>
+          <div>{selected.size} {L('capabilities', 'قدرات')} · {respondents.length} {L('user/group selections', 'اختيارات المستخدمين والمجموعات')} · {questionnaire?.questions ?? 0} {L('questions', 'أسئلة')}</div>
           {pendingAi.length > 0 && <div style={{ color: 'var(--warning)' }}>{L(`${pendingAi.length} AI suggestions still need review.`, `${pendingAi.length} اقتراحات آلية بحاجة للمراجعة.`)}</div>}
         </div>
       )}
