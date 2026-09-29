@@ -1005,7 +1005,7 @@ describe('InnovationPage - Studies tab: Export & Convert to Initiative (Innovati
     fireEvent.click(await screen.findByText('innov.tab_studies'));
     fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
     await screen.findByText('innov.not_generated_yet');
-    expect(screen.queryByText('innov.export_docx')).not.toBeInTheDocument();
+    expect(screen.queryByText('Export')).not.toBeInTheDocument();
     expect(screen.queryByText('innov.convert_to_initiative')).not.toBeInTheDocument();
   });
 
@@ -1014,8 +1014,29 @@ describe('InnovationPage - Studies tab: Export & Convert to Initiative (Innovati
     render(<InnovationPage />);
     fireEvent.click(await screen.findByText('innov.tab_studies'));
     fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
-    expect(await screen.findByText('innov.export_docx')).toBeInTheDocument();
+    expect(await screen.findByText('Export')).toBeInTheDocument();
     expect(screen.getByText('innov.convert_to_initiative')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Export'));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Export format')).toHaveValue('powerpoint');
+    expect(screen.getByLabelText('Language')).toHaveValue('en');
+  });
+
+  it('requests the default English PPTX endpoint and surfaces an actionable export error', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_APPROVED_STUDY], '/innovation/studies/study-1': GENERATED_APPROVED_STUDY });
+    const normalFetch = global.fetch;
+    global.fetch = jest.fn((url: any, options?: any) => String(url).includes('/export/pptx?lang=en')
+      ? Promise.resolve({ ok: false, json: async () => ({ message: 'The translation provider is temporarily rate limited.' }) } as Response)
+      : normalFetch(url, options));
+    const alertSpy = jest.spyOn(window, 'alert').mockImplementation(() => {});
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    fireEvent.click(await screen.findByText('Export'));
+    fireEvent.click(screen.getByText('Generate and Download'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('The translation provider is temporarily rate limited.'));
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/innovation/studies/study-1/export/pptx?lang=en'), expect.anything());
+    alertSpy.mockRestore();
   });
 
   it('hides the Convert to Initiative button once a study is already PILOT_INITIATIVE', async () => {
@@ -1024,7 +1045,7 @@ describe('InnovationPage - Studies tab: Export & Convert to Initiative (Innovati
     render(<InnovationPage />);
     fireEvent.click(await screen.findByText('innov.tab_studies'));
     fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
-    await screen.findByText('innov.export_docx');
+    await screen.findByText('Export');
     expect(screen.queryByText('innov.convert_to_initiative')).not.toBeInTheDocument();
   });
 
