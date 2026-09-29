@@ -2564,7 +2564,7 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
     try {
       const token = localStorage.getItem('ea_token')
       const res = await fetch(`${API}/innovation/studies/${studyId}/export/${format === 'word' ? 'docx' : 'pptx'}?lang=${language}`, { headers: { Authorization: `Bearer ${token}` } })
-      if (!res.ok) throw new Error('Export failed')
+      if (!res.ok) { const error = await res.json().catch(() => ({})); throw new Error(typeof error.message === 'string' ? error.message : t('innov.export_failed')) }
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -2572,7 +2572,7 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
     } catch (e: any) {
-      alert(t('innov.export_failed'))
+      alert(e?.message || t('innov.export_failed'))
     } finally {
       setExporting(false)
     }
