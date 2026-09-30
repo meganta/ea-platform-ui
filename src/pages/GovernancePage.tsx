@@ -1572,6 +1572,29 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   const finScore = extScores.financialScore || 0
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
 
+  // Report profile of this review type (backend governance-report-type-profiles.ts): which sections
+  // and score dimensions this type shows. Until it loads (or if it cannot), every section is shown.
+  const [profile, setProfile] = React.useState<any>(null)
+  React.useEffect(() => {
+    let live = true
+    if (!review?.reviewType) return
+    fetch(`${process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'}/governance/report-profiles/${review.reviewType}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+      .then(r => (r.ok ? r.json() : null)).then(p => { if (live && p && Array.isArray(p.excluded)) setProfile(p) }).catch(() => {})
+    return () => { live = false }
+  }, [review?.reviewType])
+  const sectionVisible = (key: string): boolean => {
+    if (!profile) return true
+    if (profile.excluded.includes(key)) return false
+    if (profile.alwaysShown.includes(key)) return true
+    if (profile.conditional.includes(key)) {
+      // A conditional section is shown only when this report's own decision says its evidence was found.
+      const decision = Array.isArray(report.sectionDecisions) ? report.sectionDecisions.find((d: any) => d.key === key) : undefined
+      return decision ? !!decision.show : true
+    }
+    return true
+  }
+  const dimensionVisible = (dim: string): boolean => !profile || profile.scoringDimensionsDisplayed.includes(dim)
+
   // ── Edit helpers ──────────────────────────────────────────────────────────
   const apiUrl = (process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1')
   const token = () => localStorage.getItem('ea_token') || ''
@@ -1822,7 +1845,16 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     { key: 'risk', label: t('gov.risk_register') },
     { key: 'future', label: t('gov.future_state') },
     { key: 'financial', label: t('gov.financial') },
-  ]
+  ].filter(tabDef => {
+    const sectionsOfTab: Record<string, string[]> = {
+      domains: ['domainAssessment', 'validatedFindings'], strategic: ['strategicAlignment'], compliance: ['complianceMatrix'],
+      risk: ['risksAndActions'], future: ['futureStateAlignment'], financial: ['financialAssessment'],
+    }
+    const keys = sectionsOfTab[tabDef.key]
+    return !keys || keys.some(sectionVisible)
+  })
+  // A tab this review type does not have (e.g. deep-linked) falls back to the summary.
+  React.useEffect(() => { if (!tabs.some(tabDef => tabDef.key === tab)) setTab('summary') }, [tabs.map(tabDef => tabDef.key).join(','), tab])
 
   return (
     <div dir={isAR ? 'rtl' : 'ltr'}>
@@ -1854,34 +1886,47 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Score Row — use rescoreResult when available for live updates */}
       <div className="stat-grid-6" style={{ marginBottom: 24 }}>
         <ScoreCircle score={uScores.overall} label='Overall' help="This is the big-picture health score for this review, combining everything below into one number. Green (75+) means things look solid; orange (60-74) means there are some things to fix; red (below 60) means significant issues need addressing before this can move forward." />
+        {dimensionVisible('strategic') && (
         <ScoreCircle score={(() => {
-          // Strategic = weighted alignment % from tenant objectives
-          const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
-          const NATIONAL_T = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
-          const tenantObjs = localObjectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_T.includes((o.strategyType||'').toUpperCase()))
-          const allNA = tenantObjs.length > 0 && tenantObjs.every((o:any) => o.alignmentStatus === 'NOT_APPLICABLE')
-          if (allNA) return 100
-          if (tenantObjs.length === 0) return Math.round(rescoreResult?.strategicScore ?? report.strategicScore ?? 0)
-          const tGrouped: Record<string,any[]> = {}
-          for (const o of tenantObjs) { const k = o.strategyType || 'EA_STRATEGY'; if (!tGrouped[k]) tGrouped[k]=[]; tGrouped[k].push(o) }
-          let wSum = 0, wTot = 0
-          for (const [sType, sobjs] of Object.entries(tGrouped) as [string,any[]][]) {
-            const w = STRAT_W[sType] || 0.10
-            const sc = sobjs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
-            const av = sc.length ? sc.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/sc.length : 0
-            wSum += av * w; wTot += w
-          }
-          return wTot > 0 ? Math.round(wSum / wTot) : 0
-        })()} label='Strategic' help="How well this solution connects to your organization's stated goals and priorities. A low score means the proposal doesn't clearly explain how it supports where the organization is heading." />
+            // Strategic = weighted alignment % from tenant objectives
+            const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
+            const NATIONAL_T = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
+            const tenantObjs = localObjectives.filter((o:any) => o.isTenantStrategy !== false && !NATIONAL_T.includes((o.strategyType||'').toUpperCase()))
+            const allNA = tenantObjs.length > 0 && tenantObjs.every((o:any) => o.alignmentStatus === 'NOT_APPLICABLE')
+            if (allNA) return 100
+            if (tenantObjs.length === 0) return Math.round(rescoreResult?.strategicScore ?? report.strategicScore ?? 0)
+            const tGrouped: Record<string,any[]> = {}
+            for (const o of tenantObjs) { const k = o.strategyType || 'EA_STRATEGY'; if (!tGrouped[k]) tGrouped[k]=[]; tGrouped[k].push(o) }
+            let wSum = 0, wTot = 0
+            for (const [sType, sobjs] of Object.entries(tGrouped) as [string,any[]][]) {
+              const w = STRAT_W[sType] || 0.10
+              const sc = sobjs.filter((o:any) => o.alignmentStatus !== 'NOT_APPLICABLE')
+              const av = sc.length ? sc.reduce((s:number,o:any)=>s+(o.alignmentPercentage||0),0)/sc.length : 0
+              wSum += av * w; wTot += w
+            }
+            return wTot > 0 ? Math.round(wSum / wTot) : 0
+          })()} label='Strategic' help="How well this solution connects to your organization's stated goals and priorities. A low score means the proposal doesn't clearly explain how it supports where the organization is heading." />
+        )}
+        {dimensionVisible('compliance') && (
         <ScoreCircle score={uScores.compliance} label='Compliance' help="How well this solution follows required standards, policies, and principles - both your organization's own rules and relevant national standards. A low score points to rules that may need to be addressed before approval." />
+        )}
+        {dimensionVisible('risk') && (
         <ScoreCircle score={uScores.risk} label='Risk' help="How much this proposal could go wrong, and how well those risks have been thought through. A high score means risks are well understood and managed; a low score means there are unaddressed concerns." />
+        )}
+        {dimensionVisible('futureState') && (
         <ScoreCircle score={uScores.future} label='Future State' help="Whether this solution fits with the long-term technology direction the organization is heading toward, not just what works today." />
+        )}
+        {dimensionVisible('financial') && (
         <ScoreCircle score={uScores.financial} label='Financial' help="Whether this proposal makes efficient use of money - for example, reusing something the organization already owns instead of buying something new and duplicating cost." />
+        )}
+        {dimensionVisible('domainQuality') && (
         <ScoreCircle score={uScores.domains} label='Domains' help="An average of how this solution scores across every architecture area it touches - things like security, data, business processes, and technology." />
+        )}
       </div>
 
-      {/* Score formula explainer — shows actual computed values */}
-      {(() => {
+      {/* Score formula explainer — shows actual computed values. It weights all six dimensions, so it is
+          shown only for review types that display all six (the others score with their own weights). */}
+      {['strategic', 'compliance', 'risk', 'futureState', 'financial', 'domainQuality'].every(dimensionVisible) && (() => {
         // Use uScores — single source of truth for all score displays
         const critCount = uScores.critCount
         const penalty = uScores.penalty
@@ -2136,7 +2181,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               set it, phase 24) and only shown for the ones actually
               hidden. */}
           {Array.isArray((report as any).sectionDecisions) && (() => {
-            const hidden = (report as any).sectionDecisions.filter((d: any) => !d.show)
+            // Sections outside this review type are simply not offered; only an applicable section omitted for lack of evidence is explained.
+            const hidden = (report as any).sectionDecisions.filter((d: any) => !d.show && d.basis !== 'excluded')
             if (hidden.length === 0) return null
             const SECTION_LABEL: Record<string, string> = {
               strategicAlignment: 'Strategic Alignment', futureStateAlignment: 'Future-State Alignment',

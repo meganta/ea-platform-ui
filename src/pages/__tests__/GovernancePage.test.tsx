@@ -473,3 +473,56 @@ describe('GovernancePage - report view: READY_FOR_REVIEW status must not be show
     expect(screen.queryByText('gov.requires_manual_review')).not.toBeInTheDocument();
   });
 });
+
+describe('GovernancePage - report view: sections and scores follow the review type report profile', () => {
+  const PROFILES: Record<string, any> = {
+    RFP_SOW: { reviewType: 'RFP_SOW', version: 1, alwaysShown: ['executiveSummary', 'domainAssessment', 'validatedFindings', 'risksAndActions', 'rfpRequirementQuality', 'complianceMatrix'], conditional: [], excluded: ['strategicAlignment', 'futureStateAlignment', 'financialAssessment', 'implementationRoadmap'], sectionOrder: [], scoringDimensionsDisplayed: ['compliance', 'risk'] },
+    HLD_REVIEW: { reviewType: 'HLD_REVIEW', version: 1, alwaysShown: ['executiveSummary', 'domainAssessment', 'validatedFindings', 'risksAndActions', 'complianceMatrix', 'strategicAlignment'], conditional: ['futureStateAlignment', 'financialAssessment'], excluded: ['implementationRoadmap'], sectionOrder: [], scoringDimensionsDisplayed: ['strategic', 'compliance', 'risk', 'futureState', 'financial', 'domainQuality'] },
+  };
+  const report = (overrides: Record<string, any> = {}) => ({ decision: 'REQUIRES_CHANGES', decisionRationale: 'Changes needed.', executiveSummary: 'Summary.', overallScore: 60, strategicAlignment: { objectives: [] }, financialOpportunities: { opportunities: [] }, ...overrides });
+  function mockWithProfile(review: any, rpt: any, profileOk = true) {
+    mockReportView(review, rpt);
+    const base = global.fetch as jest.Mock;
+    global.fetch = jest.fn().mockImplementation((url: string, opts?: any) => {
+      if (url.includes('/governance/report-profiles/')) {
+        const type = url.split('/governance/report-profiles/')[1];
+        return profileOk ? Promise.resolve({ ok: true, json: () => Promise.resolve(PROFILES[type]) }) : Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+      }
+      return base(url, opts);
+    }) as any;
+  }
+
+  it('an RFP/SOW review shows only its sections: no strategic, future-state or financial tab or score', async () => {
+    mockWithProfile(makeReview({ reviewType: 'RFP_SOW', title: 'Tender RFP' }), report());
+    render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('Tender RFP'));
+    await screen.findByText('gov.compliance');
+    await waitFor(() => expect(screen.queryByText('gov.strategic')).toBeNull());
+    expect(screen.queryByText('gov.future_state')).toBeNull();
+    expect(screen.queryByText('gov.financial')).toBeNull();
+    expect(screen.getByText('gov.risk_register')).toBeTruthy();
+    expect(screen.getByText('Domains & Findings')).toBeTruthy();
+    expect(screen.queryByText('Strategic')).toBeNull();
+    expect(screen.queryByText('Financial')).toBeNull();
+    expect(screen.queryByText('Future State')).toBeNull();
+    expect(screen.getByText('Compliance')).toBeTruthy();
+  });
+
+  it('an HLD review hides a conditional section the report omitted for lack of evidence, and keeps the rest', async () => {
+    mockWithProfile(makeReview(), report({ sectionDecisions: [{ key: 'futureStateAlignment', show: false }, { key: 'financialAssessment', show: true }] }));
+    render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    await screen.findByText('gov.strategic');
+    await waitFor(() => expect(screen.queryByText('gov.future_state')).toBeNull());
+    expect(screen.getByText('gov.financial')).toBeTruthy();
+    expect(screen.getByText('gov.compliance')).toBeTruthy();
+  });
+
+  it('shows every section when the profile cannot be loaded (never hides content on a failed lookup)', async () => {
+    mockWithProfile(makeReview({ reviewType: 'RFP_SOW', title: 'Tender RFP' }), report(), false);
+    render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('Tender RFP'));
+    expect(await screen.findByText('gov.strategic')).toBeTruthy();
+    expect(screen.getByText('gov.financial')).toBeTruthy();
+  });
+});
