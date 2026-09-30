@@ -1916,10 +1916,75 @@ const STUDY_SECTIONS: { key: string; en: string; ar: string; shape: 'text' | 'li
   { key: 'USE_CASES', en: 'Potential Use Cases', ar: 'حالات الاستخدام المحتملة', shape: 'list' },
   { key: 'ARCHITECTURE_FIT', en: 'Architecture Fit Assessment', ar: 'تقييم توافق البنية', shape: 'text' },
   { key: 'TECHNOLOGY_OPTIONS', en: 'Recommended Technology Options', ar: 'خيارات التقنية الموصى بها', shape: 'list' },
+  { key: 'BENCHMARK', en: 'Product Benchmark', ar: 'المقارنة المعيارية للمنتجات', shape: 'list' },
   { key: 'RISKS_MITIGATION', en: 'Risks & Mitigation', ar: 'المخاطر والتخفيف', shape: 'list' },
   { key: 'FINANCIAL_ASSESSMENT', en: 'Financial Assessment', ar: 'التقييم المالي', shape: 'text' },
   { key: 'RECOMMENDATION', en: 'Recommendation', ar: 'التوصية', shape: 'recommendation' },
 ]
+
+// Column headings for study register sections (options, benchmark, risks, use cases, capabilities).
+const STUDY_FIELD_LABELS: Record<string, { en: string; ar: string }> = {
+  capability: { en: 'Capability', ar: 'القدرة' }, currentMaturity: { en: 'Current Maturity', ar: 'مستوى النضج الحالي' }, expectedImpact: { en: 'Expected Impact', ar: 'الأثر المتوقع' }, priority: { en: 'Priority', ar: 'الأولوية' },
+  useCase: { en: 'Use Case', ar: 'حالة الاستخدام' }, businessProblem: { en: 'Business Problem', ar: 'المشكلة' }, targetUsers: { en: 'Target Users', ar: 'المستخدمون المستهدفون' }, expectedBenefit: { en: 'Expected Benefit', ar: 'الفائدة المتوقعة' }, complexity: { en: 'Complexity', ar: 'التعقيد' },
+  option: { en: 'Option', ar: 'الخيار' }, type: { en: 'Approach', ar: 'نوع الخيار' }, products: { en: 'Named Products', ar: 'المنتجات المقترحة' }, marketRecognition: { en: 'Market Standing', ar: 'المكانة في السوق' }, rationale: { en: 'Rationale', ar: 'المبررات' }, fitScore: { en: 'Fit', ar: 'درجة التوافق' },
+  product: { en: 'Product', ar: 'المنتج' }, functionalFit: { en: 'Functional Fit', ar: 'الملاءمة الوظيفية' }, integrationFit: { en: 'Integration', ar: 'التكامل' }, securityCompliance: { en: 'Security & Compliance', ar: 'الأمن والامتثال' }, scalability: { en: 'Scalability', ar: 'قابلية التوسع' }, costEfficiency: { en: 'Cost Efficiency', ar: 'كفاءة التكلفة' }, basis: { en: 'Basis', ar: 'الأساس' }, evidence: { en: 'Evidence', ar: 'الدليل' },
+  risk: { en: 'Risk', ar: 'الخطر' }, category: { en: 'Category', ar: 'الفئة' }, likelihood: { en: 'Likelihood', ar: 'الاحتمالية' }, impact: { en: 'Impact', ar: 'الأثر' }, mitigation: { en: 'Mitigation', ar: 'إجراءات التخفيف' },
+}
+const STUDY_VALUE_LABELS: Record<string, { en: string; ar: string }> = {
+  HIGH: { en: 'High', ar: 'عالٍ' }, MEDIUM: { en: 'Medium', ar: 'متوسط' }, LOW: { en: 'Low', ar: 'منخفض' },
+  REUSE: { en: 'Reuse', ar: 'إعادة الاستخدام' }, EXTEND: { en: 'Extend', ar: 'التوسعة' }, BUILD: { en: 'Build', ar: 'البناء' }, BUY: { en: 'Buy', ar: 'الشراء' }, SAAS: { en: 'SaaS', ar: 'خدمة سحابية' }, OPEN_SOURCE: { en: 'Open Source', ar: 'مفتوح المصدر' },
+  EVIDENCE: { en: 'Recorded evidence', ar: 'أدلة موثقة' }, AI_QUALITATIVE: { en: 'AI qualitative', ar: 'تقييم نوعي آلي' }, MANUAL: { en: 'Reviewer assessment', ar: 'تقييم المراجع' },
+}
+// On these ratings High is the good outcome (green); on risk-style ratings High is the concern (red).
+const STUDY_BENEFIT_FIELDS = new Set(['fitScore', 'functionalFit', 'integrationFit', 'securityCompliance', 'scalability', 'costEfficiency'])
+const RATING_COLOR = { good: '#2ecc71', mid: '#f39c12', bad: '#e74c3c' }
+const fieldLabel = (k: string, isAR: boolean) => STUDY_FIELD_LABELS[k]?.[isAR ? 'ar' : 'en'] || k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase())
+
+/** Where the options' products and the benchmark's ratings come from — shown with the section so nobody reads a qualitative rating as a measurement. */
+export function studySourceNote(sectionKey: string, content: any, isAR: boolean): string | null {
+  if (sectionKey === 'TECHNOLOGY_OPTIONS') return isAR
+    ? 'المنتجات وتصنيفات المحللين مبنية على المعرفة العامة للذكاء الاصطناعي بالسوق — يلزم التحقق منها في أحدث تقارير المحللين قبل الشراء.'
+    : 'Products and analyst standing reflect the AI’s general market knowledge — verify against current analyst reports before procurement.'
+  if (sectionKey !== 'BENCHMARK' || !Array.isArray(content) || !content.length) return null
+  const backed = content.filter((r: any) => r?.basis === 'EVIDENCE').length
+  if (backed === content.length) return isAR ? 'جميع التقييمات مستندة إلى أدلة موثقة في رادار التقنية.' : 'Every rating cites recorded Tech Radar evidence.'
+  if (backed) return isAR ? 'الصفوف الموسومة «أدلة موثقة» مستندة إلى أدلة رادار التقنية؛ والبقية تقييمات نوعية وليست قياسات.' : 'Rows marked “Recorded evidence” cite Tech Radar evidence; the rest are qualitative assessments, not measurements.'
+  return isAR ? 'تقييم نوعي وليس مقارنة معيارية مقاسة: لا توجد أدلة موثقة لهذه المنتجات.' : 'Qualitative assessment, not a measured benchmark: no recorded evidence exists for these products.'
+}
+
+/** A study register (a list of flat records) as one labelled table; scrolls sideways on narrow screens instead of squeezing. */
+export function StudyRegisterTable({ rows, isAR }: { rows: any[]; isAR: boolean }) {
+  const records = rows.filter(r => r && typeof r === 'object' && !Array.isArray(r))
+  const columns: string[] = []
+  for (const r of records) for (const [k, v] of Object.entries(r)) if (v !== null && v !== undefined && String(v).trim() && !columns.includes(k)) columns.push(k)
+  const cell = (k: string, v: any) => {
+    if (v === null || v === undefined || !String(v).trim()) return null
+    const text = typeof v === 'object' ? JSON.stringify(v) : String(v)
+    if (/^(HIGH|MEDIUM|LOW)$/.test(text)) {
+      const good = STUDY_BENEFIT_FIELDS.has(k)
+      const color = text === 'MEDIUM' ? RATING_COLOR.mid : (text === 'HIGH') === good ? RATING_COLOR.good : RATING_COLOR.bad
+      return <span data-rating={text} style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, color, background: `${color}22`, whiteSpace: 'nowrap' as const }}>{STUDY_VALUE_LABELS[text][isAR ? 'ar' : 'en']}</span>
+    }
+    if (k === 'products') return <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 4 }}>{text.split(/;\s*/).filter(Boolean).map(p => <span key={p} style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: 'var(--navy)', border: '1px solid var(--border)', whiteSpace: 'nowrap' as const }}>{p}</span>)}</div>
+    return STUDY_VALUE_LABELS[text]?.[isAR ? 'ar' : 'en'] || text
+  }
+  return (
+    <div style={{ overflowX: 'auto' as const, WebkitOverflowScrolling: 'touch' as any }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 12, minWidth: Math.min(columns.length * 120, 900) }}>
+        <thead>
+          <tr>{columns.map(k => <th key={k} scope="col" style={{ textAlign: isAR ? 'right' as const : 'left' as const, padding: '8px 10px', background: 'var(--navy)', color: 'var(--text-dim)', fontWeight: 700, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' as const }}>{fieldLabel(k, isAR)}</th>)}</tr>
+        </thead>
+        <tbody>
+          {records.map((r, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+              {columns.map((k, c) => <td key={k} style={{ padding: '8px 10px', verticalAlign: 'top' as const, lineHeight: 1.5, fontWeight: c === 0 ? 600 : 400 }}>{cell(k, r[k])}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
 
 function ScoreRing({ score, label }: { score: number | null; label: string }) {
   const color = score == null ? '#7f8c8d' : score >= 70 ? '#2ecc71' : score >= 50 ? '#f39c12' : '#e74c3c'
@@ -2313,6 +2378,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
   const def = STUDY_SECTIONS.find(d => d.key === section.sectionKey)
   const title = def ? (isAR ? def.ar : def.en) : section.title
   const content = section.content
+  const sourceNote = studySourceNote(section.sectionKey, content, isAR)
 
   // ── Innovation-P4: section-level edit / regenerate / approve / lock /
   // comment, version history, cross-section impact preview ────────────────
@@ -2399,7 +2465,15 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
   return (
     <div style={{ ...S.card, marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' as const }}>
-        <div style={{ fontWeight: 700, fontSize: 14, flex: 1 }}>{title}</div>
+        <div style={{ fontWeight: 700, fontSize: 14, flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+          {title}
+          {section.sectionKey === 'TECHNOLOGY_OPTIONS' && <HelpTip text={isAR
+            ? 'كل خيار يسمّي منتجات حقيقية من السوق ومكانتها لدى المحللين (مثل Gartner Magic Quadrant) وفق معرفة الذكاء الاصطناعي، مرتبة: إعادة الاستخدام ثم التوسعة ثم البناء ثم الشراء. تحقق من أحدث التقارير قبل الشراء.'
+            : 'Each option names real market products and their analyst standing (e.g. Gartner Magic Quadrant) from the AI’s market knowledge, ordered reuse → extend → build → buy. Verify against current reports before procurement.'} />}
+          {section.sectionKey === 'BENCHMARK' && <HelpTip text={isAR
+            ? 'يقارن المنتجات المسماة في خيارات التقنية على خمسة معايير. يُعد الصف مستندًا إلى أدلة فقط عندما يستشهد بدليل موثق في رادار التقنية للتقنية محل الدراسة؛ وإلا فهو تقييم نوعي وليس قياسًا. التعديل اليدوي لا يمكنه إضافة دليل.'
+            : 'Compares the products named in the technology options on five criteria. A row counts as evidence-backed only when it cites recorded Tech Radar evidence for the study’s technology; otherwise it is a qualitative assessment, not a measurement. Manual edits cannot add evidence.'} />}
+        </div>
         <span style={S.badge(STATUS_COLOR[section.status] || '#64748B')}>{section.status?.replace(/_/g, ' ')}</span>
         {locked && <span style={S.badge('#64748B')}>🔒 {isAR ? 'مقفل' : 'Locked'}</span>}
         {content != null && !editing && (
@@ -2470,17 +2544,9 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
           <div style={{ fontSize: 13, lineHeight: 1.7, marginTop: 10 }}>{content.rationale}</div>
         </div>
       ) : Array.isArray(content) ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {content.map((item: any, i: number) => (
-            <div key={i} style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
-              {Object.entries(item).map(([k, v]) => (
-                <div key={k} style={{ fontSize: 12, marginBottom: 4 }}>
-                  <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>{k}: </span>
-                  <span>{String(v)}</span>
-                </div>
-              ))}
-            </div>
-          ))}
+        <div>
+          {content.length ? <StudyRegisterTable rows={content} isAR={isAR} /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد عناصر' : 'No items'}</div>}
+          {sourceNote && <div data-testid="study-source-note" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8, fontStyle: 'italic' as const }}>{sourceNote}</div>}
         </div>
       ) : (
         <div style={{ fontSize: 13 }}>{JSON.stringify(content)}</div>
@@ -2596,7 +2662,9 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
 
   const title = isAR && study.titleAr ? study.titleAr : study.title
   const hasGeneratedContent = (study.sections || []).some((s: any) => s.content != null)
-  const sortedSections = [...(study.sections || [])].sort((a: any, b: any) => a.orderIndex - b.orderIndex)
+  // Study order comes from the section definitions: a section added later (the benchmark) must not tie with older sections' stored orderIndex.
+  const sectionRank = (sec: any) => { const i = STUDY_SECTIONS.findIndex(d => d.key === sec.sectionKey); return i < 0 ? 1000 + (sec.orderIndex ?? 0) : i }
+  const sortedSections = [...(study.sections || [])].sort((a: any, b: any) => sectionRank(a) - sectionRank(b))
 
   return (
     <div>

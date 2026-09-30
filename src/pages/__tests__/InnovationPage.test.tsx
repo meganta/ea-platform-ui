@@ -910,6 +910,44 @@ describe('InnovationPage - Studies tab: detail and generation', () => {
     expect(screen.getByText('Worth testing first')).toBeInTheDocument(); // recommendation shape
   });
 
+  it('technology options show labelled columns and named product chips, with the market-knowledge note', async () => {
+    const study = { ...GENERATED_STUDY, sections: [
+      { id: 'sec-o', sectionKey: 'TECHNOLOGY_OPTIONS', title: 'Options', orderIndex: 6, status: 'AI_DRAFT', content: [{ option: 'Extend testing with AI add-ons', type: 'EXTEND', products: 'Tricentis Tosca; Katalon TrueTest', marketRecognition: 'Leader - Gartner MQ (2025)', rationale: 'Adds test generation.', fitScore: 'HIGH' }] },
+    ] };
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [study], '/innovation/studies/study-1': study });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    expect(await screen.findByRole('columnheader', { name: 'Named Products' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Market Standing' })).toBeInTheDocument();
+    expect(screen.getByText('Tricentis Tosca')).toBeInTheDocument();
+    expect(screen.getByText('Katalon TrueTest')).toBeInTheDocument();
+    expect(screen.getByText('Extend')).toBeInTheDocument();
+    expect(screen.getByTestId('study-source-note')).toHaveTextContent(/verify against current analyst reports/);
+  });
+
+  it('the product benchmark appears after the options and before the risks, and says when it is not measured', async () => {
+    const study = { ...GENERATED_STUDY, sections: [
+      // The risks row predates the benchmark and shares its stored orderIndex; study order still wins.
+      { id: 'sec-r', sectionKey: 'RISKS_MITIGATION', title: 'Risks', orderIndex: 7, status: 'AI_DRAFT', content: [{ risk: 'Lock-in', impact: 'HIGH' }] },
+      { id: 'sec-b', sectionKey: 'BENCHMARK', title: 'Product Benchmark', orderIndex: 7, status: 'AI_DRAFT', content: [
+        { product: 'Katalon TrueTest', functionalFit: 'HIGH', integrationFit: 'MEDIUM', securityCompliance: 'MEDIUM', scalability: 'MEDIUM', costEfficiency: 'LOW', basis: 'AI_QUALITATIVE', evidence: '' },
+      ] },
+      { id: 'sec-o', sectionKey: 'TECHNOLOGY_OPTIONS', title: 'Options', orderIndex: 6, status: 'AI_DRAFT', content: [{ option: 'Extend', products: 'Katalon TrueTest' }] },
+    ] };
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [study], '/innovation/studies/study-1': study });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    const bench = await screen.findByText('Product Benchmark');
+    const text = document.body.textContent || '';
+    expect(text.indexOf('Recommended Technology Options')).toBeLessThan(text.indexOf('Product Benchmark'));
+    expect(text.indexOf('Product Benchmark')).toBeLessThan(text.indexOf('Risks & Mitigation'));
+    expect(bench).toBeInTheDocument();
+    expect(screen.getByText('AI qualitative')).toBeInTheDocument();
+    expect(screen.getAllByTestId('study-source-note').some(n => /not a measured benchmark/.test(n.textContent || ''))).toBe(true);
+  });
+
   it('shows the quality score and recommendation badge for a generated study', async () => {
     mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_STUDY], '/innovation/studies/study-1': GENERATED_STUDY });
     render(<InnovationPage />);
@@ -1682,5 +1720,22 @@ describe('InnovationPage - Value Realization', () => {
       expect(call).toBeDefined();
       expect(JSON.parse(call[1].body).actual).toBe('68k');
     });
+  });
+});
+
+describe('StudyRegisterTable / studySourceNote', () => {
+  const { StudyRegisterTable, studySourceNote } = require('../InnovationPage');
+  it('colours a High benefit rating green and a High risk rating red, in Arabic labels', () => {
+    render(<StudyRegisterTable isAR rows={[{ product: 'Kong Gateway', functionalFit: 'HIGH', impact: 'HIGH' }]} />);
+    const [fit, risk] = screen.getAllByText('عالٍ');
+    expect(fit).toHaveStyle({ color: '#2ecc71' });
+    expect(risk).toHaveStyle({ color: '#e74c3c' });
+    expect(screen.getByRole('columnheader', { name: 'الملاءمة الوظيفية' })).toBeInTheDocument();
+  });
+  it('the benchmark note distinguishes fully evidenced, mixed and unmeasured benchmarks', () => {
+    expect(studySourceNote('BENCHMARK', [{ basis: 'EVIDENCE' }], false)).toMatch(/Every rating cites recorded/);
+    expect(studySourceNote('BENCHMARK', [{ basis: 'EVIDENCE' }, { basis: 'AI_QUALITATIVE' }], false)).toMatch(/the rest are qualitative/);
+    expect(studySourceNote('BENCHMARK', [{ basis: 'AI_QUALITATIVE' }], true)).toMatch(/ليس مقارنة معيارية مقاسة/);
+    expect(studySourceNote('RISKS_MITIGATION', [{}], false)).toBeNull();
   });
 });
