@@ -1918,6 +1918,7 @@ const STUDY_SECTIONS: { key: string; en: string; ar: string; shape: 'text' | 'li
   { key: 'TECHNOLOGY_OPTIONS', en: 'Recommended Technology Options', ar: 'خيارات التقنية الموصى بها', shape: 'list' },
   { key: 'BENCHMARK', en: 'Product Benchmark', ar: 'المقارنة المعيارية للمنتجات', shape: 'list' },
   { key: 'RISKS_MITIGATION', en: 'Risks & Mitigation', ar: 'المخاطر والتخفيف', shape: 'list' },
+  { key: 'COST_ESTIMATE', en: 'Cost Estimate (CAPEX / OPEX)', ar: 'تقدير التكاليف (الرأسمالية / التشغيلية)', shape: 'list' },
   { key: 'FINANCIAL_ASSESSMENT', en: 'Financial Assessment', ar: 'التقييم المالي', shape: 'text' },
   { key: 'RECOMMENDATION', en: 'Recommendation', ar: 'التوصية', shape: 'recommendation' },
 ]
@@ -1927,12 +1928,14 @@ const STUDY_FIELD_LABELS: Record<string, { en: string; ar: string }> = {
   capability: { en: 'Capability', ar: 'القدرة' }, currentMaturity: { en: 'Current Maturity', ar: 'مستوى النضج الحالي' }, expectedImpact: { en: 'Expected Impact', ar: 'الأثر المتوقع' }, priority: { en: 'Priority', ar: 'الأولوية' },
   useCase: { en: 'Use Case', ar: 'حالة الاستخدام' }, businessProblem: { en: 'Business Problem', ar: 'المشكلة' }, targetUsers: { en: 'Target Users', ar: 'المستخدمون المستهدفون' }, expectedBenefit: { en: 'Expected Benefit', ar: 'الفائدة المتوقعة' }, complexity: { en: 'Complexity', ar: 'التعقيد' },
   option: { en: 'Option', ar: 'الخيار' }, type: { en: 'Approach', ar: 'نوع الخيار' }, products: { en: 'Named Products', ar: 'المنتجات المقترحة' }, marketRecognition: { en: 'Market Standing', ar: 'المكانة في السوق' }, rationale: { en: 'Rationale', ar: 'المبررات' }, fitScore: { en: 'Fit', ar: 'درجة التوافق' },
+  costItem: { en: 'Cost Item', ar: 'بند التكلفة' }, low: { en: 'Low Estimate', ar: 'التقدير الأدنى' }, high: { en: 'High Estimate', ar: 'التقدير الأعلى' }, calculation: { en: 'Calculation', ar: 'طريقة الحساب' },
   product: { en: 'Product', ar: 'المنتج' }, functionalFit: { en: 'Functional Fit', ar: 'الملاءمة الوظيفية' }, integrationFit: { en: 'Integration', ar: 'التكامل' }, securityCompliance: { en: 'Security & Compliance', ar: 'الأمن والامتثال' }, scalability: { en: 'Scalability', ar: 'قابلية التوسع' }, costEfficiency: { en: 'Cost Efficiency', ar: 'كفاءة التكلفة' }, basis: { en: 'Basis', ar: 'الأساس' }, evidence: { en: 'Evidence', ar: 'الدليل' },
   risk: { en: 'Risk', ar: 'الخطر' }, category: { en: 'Category', ar: 'الفئة' }, likelihood: { en: 'Likelihood', ar: 'الاحتمالية' }, impact: { en: 'Impact', ar: 'الأثر' }, mitigation: { en: 'Mitigation', ar: 'إجراءات التخفيف' },
 }
 const STUDY_VALUE_LABELS: Record<string, { en: string; ar: string }> = {
   HIGH: { en: 'High', ar: 'عالٍ' }, MEDIUM: { en: 'Medium', ar: 'متوسط' }, LOW: { en: 'Low', ar: 'منخفض' },
   REUSE: { en: 'Reuse', ar: 'إعادة الاستخدام' }, EXTEND: { en: 'Extend', ar: 'التوسعة' }, BUILD: { en: 'Build', ar: 'البناء' }, BUY: { en: 'Buy', ar: 'الشراء' }, SAAS: { en: 'SaaS', ar: 'خدمة سحابية' }, OPEN_SOURCE: { en: 'Open Source', ar: 'مفتوح المصدر' },
+  CAPEX: { en: 'CAPEX (one-time)', ar: 'رأسمالية (لمرة واحدة)' }, OPEX: { en: 'OPEX (per year)', ar: 'تشغيلية (سنوياً)' },
   EVIDENCE: { en: 'Recorded evidence', ar: 'أدلة موثقة' }, AI_QUALITATIVE: { en: 'AI qualitative', ar: 'تقييم نوعي آلي' }, MANUAL: { en: 'Reviewer assessment', ar: 'تقييم المراجع' },
 }
 // On these ratings High is the good outcome (green); on risk-style ratings High is the concern (red).
@@ -1942,6 +1945,9 @@ const fieldLabel = (k: string, isAR: boolean) => STUDY_FIELD_LABELS[k]?.[isAR ? 
 
 /** Where the options' products and the benchmark's ratings come from — shown with the section so nobody reads a qualitative rating as a measurement. */
 export function studySourceNote(sectionKey: string, content: any, isAR: boolean): string | null {
+  if (sectionKey === 'COST_ESTIMATE') return isAR
+    ? 'نطاقات تقديرية مبنية على معرفة الذكاء الاصطناعي بالسوق وافتراضات الدراسة وليست عروض أسعار — يلزم التأكيد بعروض الموردين. الإجماليات محسوبة من البنود.'
+    : 'Indicative ranges from the AI’s market knowledge and the study assumptions, not quotations — confirm with vendor quotes. Totals are computed from the lines.'
   if (sectionKey === 'TECHNOLOGY_OPTIONS') return isAR
     ? 'المنتجات وتصنيفات المحللين مبنية على المعرفة العامة للذكاء الاصطناعي بالسوق — يلزم التحقق منها في أحدث تقارير المحللين قبل الشراء.'
     : 'Products and analyst standing reflect the AI’s general market knowledge — verify against current analyst reports before procurement.'
@@ -1952,8 +1958,47 @@ export function studySourceNote(sectionKey: string, content: any, isAR: boolean)
   return isAR ? 'تقييم نوعي وليس مقارنة معيارية مقاسة: لا توجد أدلة موثقة لهذه المنتجات.' : 'Qualitative assessment, not a measured benchmark: no recorded evidence exists for these products.'
 }
 
+// Mirrors apps/api/src/innovation/study-cost-estimate.ts: totals are computed from the saved lines, never stored.
+export const COST_TCO_YEARS = 3
+const formatSar = (n: number, currency = 'SAR') => `${currency}\u00A0${Math.round(n).toLocaleString('en-US')}`
+const costRange = (low: number, high: number, currency?: string) => (low === high ? formatSar(low, currency) : `${formatSar(low, currency)} – ${formatSar(high, currency)}`)
+export function studyCostTotals(lines: any[]) {
+  const valid = (lines || []).filter(l => l && (l.category === 'CAPEX' || l.category === 'OPEX') && Number.isFinite(l.low) && Number.isFinite(l.high))
+  if (!valid.length) return null
+  const sum = (cat: string, k: 'low' | 'high') => valid.filter(l => l.category === cat).reduce((a, l) => a + l[k], 0)
+  const capex = { low: sum('CAPEX', 'low'), high: sum('CAPEX', 'high') }
+  const opex = { low: sum('OPEX', 'low'), high: sum('OPEX', 'high') }
+  return { currency: valid[0].currency || 'SAR', capex, opex, tco: { low: capex.low + COST_TCO_YEARS * opex.low, high: capex.high + COST_TCO_YEARS * opex.high } }
+}
+
+/** CAPEX / OPEX estimate: headline totals, then every line with its calculation and rationale. */
+export function StudyCostEstimate({ lines, isAR }: { lines: any[]; isAR: boolean }) {
+  const totals = studyCostTotals(lines)
+  const tiles = totals ? [
+    { key: 'capex', label: isAR ? 'إجمالي التكاليف الرأسمالية (لمرة واحدة)' : 'Total CAPEX (one-time)', r: totals.capex, color: '#3498db' },
+    { key: 'opex', label: isAR ? 'إجمالي التكاليف التشغيلية (سنوياً)' : 'Total OPEX (per year)', r: totals.opex, color: '#9b59b6' },
+    { key: 'tco', label: isAR ? `إجمالي تكلفة الملكية لمدة ${COST_TCO_YEARS} سنوات` : `${COST_TCO_YEARS}-year total cost of ownership`, r: totals.tco, color: '#f39c12' },
+  ] : []
+  const rows = (lines || []).map(l => ({ costItem: l.costItem, category: l.category, low: Number.isFinite(l.low) ? formatSar(l.low, l.currency) : l.low, high: Number.isFinite(l.high) ? formatSar(l.high, l.currency) : l.high, calculation: l.calculation, rationale: l.rationale }))
+  return (
+    <div>
+      {totals && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 12 }}>
+          {tiles.map(t => (
+            <div key={t.key} data-testid={`cost-total-${t.key}`} style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderTop: `3px solid ${t.color}`, borderRadius: 8, padding: 10 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{t.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>{costRange(t.r.low, t.r.high, totals.currency)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <StudyRegisterTable rows={rows} isAR={isAR} numeric={['low', 'high']} />
+    </div>
+  )
+}
+
 /** A study register (a list of flat records) as one labelled table; scrolls sideways on narrow screens instead of squeezing. */
-export function StudyRegisterTable({ rows, isAR }: { rows: any[]; isAR: boolean }) {
+export function StudyRegisterTable({ rows, isAR, numeric = [] }: { rows: any[]; isAR: boolean; numeric?: string[] }) {
   const records = rows.filter(r => r && typeof r === 'object' && !Array.isArray(r))
   const columns: string[] = []
   for (const r of records) for (const [k, v] of Object.entries(r)) if (v !== null && v !== undefined && String(v).trim() && !columns.includes(k)) columns.push(k)
@@ -1977,7 +2022,7 @@ export function StudyRegisterTable({ rows, isAR }: { rows: any[]; isAR: boolean 
         <tbody>
           {records.map((r, i) => (
             <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-              {columns.map((k, c) => <td key={k} style={{ padding: '8px 10px', verticalAlign: 'top' as const, lineHeight: 1.5, fontWeight: c === 0 ? 600 : 400 }}>{cell(k, r[k])}</td>)}
+              {columns.map((k, c) => <td key={k} style={{ padding: '8px 10px', verticalAlign: 'top' as const, lineHeight: 1.5, fontWeight: c === 0 ? 600 : 400, ...(numeric.includes(k) ? { textAlign: isAR ? 'left' as const : 'right' as const, whiteSpace: 'nowrap' as const } : {}) }}>{cell(k, r[k])}</td>)}
             </tr>
           ))}
         </tbody>
@@ -2470,6 +2515,9 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
           {section.sectionKey === 'TECHNOLOGY_OPTIONS' && <HelpTip text={isAR
             ? 'كل خيار يسمّي منتجات حقيقية من السوق ومكانتها لدى المحللين (مثل Gartner Magic Quadrant) وفق معرفة الذكاء الاصطناعي، مرتبة: إعادة الاستخدام ثم التوسعة ثم البناء ثم الشراء. تحقق من أحدث التقارير قبل الشراء.'
             : 'Each option names real market products and their analyst standing (e.g. Gartner Magic Quadrant) from the AI’s market knowledge, ordered reuse → extend → build → buy. Verify against current reports before procurement.'} />}
+          {section.sectionKey === 'COST_ESTIMATE' && <HelpTip text={isAR
+            ? 'تكاليف تنفيذ الخيار الأنسب: الرأسمالية لمرة واحدة والتشغيلية سنوياً، لكل بند نطاق وطريقة حساب ومبررات. أضف افتراضات الدراسة (مثل عدد المستخدمين) قبل التوليد لتحسين الدقة. الإجماليات وتكلفة الملكية لثلاث سنوات تُحسب تلقائياً من البنود.'
+            : 'Cost of implementing the best-fit option: one-time CAPEX and yearly OPEX, each line with a range, its calculation and rationale. Add study assumptions (e.g. user numbers) before generating for sharper figures. Totals and the 3-year cost of ownership are computed from the lines.'} />}
           {section.sectionKey === 'BENCHMARK' && <HelpTip text={isAR
             ? 'يقارن المنتجات المسماة في خيارات التقنية على خمسة معايير. يُعد الصف مستندًا إلى أدلة فقط عندما يستشهد بدليل موثق في رادار التقنية للتقنية محل الدراسة؛ وإلا فهو تقييم نوعي وليس قياسًا. التعديل اليدوي لا يمكنه إضافة دليل.'
             : 'Compares the products named in the technology options on five criteria. A row counts as evidence-backed only when it cites recorded Tech Radar evidence for the study’s technology; otherwise it is a qualitative assessment, not a measurement. Manual edits cannot add evidence.'} />}
@@ -2545,7 +2593,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
         </div>
       ) : Array.isArray(content) ? (
         <div>
-          {content.length ? <StudyRegisterTable rows={content} isAR={isAR} /> : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد عناصر' : 'No items'}</div>}
+          {content.length ? (section.sectionKey === 'COST_ESTIMATE' ? <StudyCostEstimate lines={content} isAR={isAR} /> : <StudyRegisterTable rows={content} isAR={isAR} />) : <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لا توجد عناصر' : 'No items'}</div>}
           {sourceNote && <div data-testid="study-source-note" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8, fontStyle: 'italic' as const }}>{sourceNote}</div>}
         </div>
       ) : (

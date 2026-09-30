@@ -1739,3 +1739,27 @@ describe('StudyRegisterTable / studySourceNote', () => {
     expect(studySourceNote('RISKS_MITIGATION', [{}], false)).toBeNull();
   });
 });
+
+describe('StudyCostEstimate', () => {
+  const { StudyCostEstimate, studyCostTotals } = require('../InnovationPage');
+  const lines = [
+    { costItem: 'Copilot Studio licences', category: 'OPEX', low: 180000, high: 240000, currency: 'SAR', calculation: '500 users × SAR 30–40 × 12', rationale: 'Per-user subscription.' },
+    { costItem: 'Implementation', category: 'CAPEX', low: 400000, high: 650000, currency: 'SAR', calculation: '8 people × 4 months', rationale: 'Integration work.' },
+  ];
+  it('computes CAPEX, annual OPEX and a 3-year TCO from the lines', () => {
+    expect(studyCostTotals(lines)).toMatchObject({ capex: { low: 400000, high: 650000 }, opex: { low: 180000, high: 240000 }, tco: { low: 940000, high: 1370000 } });
+    expect(studyCostTotals([])).toBeNull();
+  });
+  it('shows the totals as tiles and every line with its calculation and rationale (EN)', () => {
+    render(<StudyCostEstimate lines={lines} isAR={false} />);
+    expect(screen.getByTestId('cost-total-tco').textContent?.replace(/\u00A0/g, ' ')).toContain('SAR 940,000 – SAR 1,370,000');
+    expect(screen.getByRole('columnheader', { name: 'Calculation' })).toBeInTheDocument();
+    expect(screen.getByText('500 users × SAR 30–40 × 12')).toBeInTheDocument();
+    expect(screen.getByText('OPEX (per year)')).toBeInTheDocument();
+  });
+  it('labels the totals and categories in Arabic', () => {
+    render(<StudyCostEstimate lines={lines} isAR />);
+    expect(screen.getByText('إجمالي تكلفة الملكية لمدة 3 سنوات')).toBeInTheDocument();
+    expect(screen.getByText('رأسمالية (لمرة واحدة)')).toBeInTheDocument();
+  });
+});
