@@ -765,3 +765,16 @@ describe('CopilotPage - suggested EA questions', () => {
     expect(JSON.parse(chatCall[1].body).message).toBe('Where do we have SLA violations?');
   });
 });
+
+describe('CopilotPage - handoff from EA Views (Continue in Copilot)', () => {
+  afterEach(() => window.history.replaceState({}, '', '/'));
+  it('prefills the question from ?ask= without sending it', async () => {
+    window.history.replaceState({}, '', '/copilot?ask=' + encodeURIComponent('Portfolio (Target): explain what this view shows'));
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] });
+    render(<CopilotPage />);
+    await screen.findByText('Business Architect');
+    const input = screen.getByPlaceholderText(/Enter to send/) as HTMLTextAreaElement;
+    expect(input.value).toBe('Portfolio (Target): explain what this view shows');
+    expect((global.fetch as jest.Mock).mock.calls.some(([u, o]) => o?.method === 'POST')).toBe(false);
+  });
+});

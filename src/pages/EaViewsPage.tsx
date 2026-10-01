@@ -390,6 +390,10 @@ function MyViews({ api, onOpen, initialArchitectureState }: { api: any, onOpen: 
 // ── View Viewer (graph + matrix + heatmap + capability map) ───────────────────
 function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view: any, onBack: () => void, onRefresh: () => void }) {
   const { t, isAR } = useLang()
+  // Progressive disclosure: actions appear only for people who can use them.
+  // (TENANT_ADMIN passes every check inside hasPermission.)
+  const auth = useAuth() as any
+  const can = (code: string) => typeof auth?.hasPermission === 'function' ? auth.hasPermission(code) : true
   // publish()/approveView()/rejectView()/requestApproval() all return the
   // updated view from the backend, but the parent's onRefresh only
   // refreshes dashboard stats, not this specific view object it passed
@@ -651,11 +655,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [showVersionHistory, setShowVersionHistory] = useState(false)
   const [versions, setVersions] = useState<any[]>([])
   const [versionsLoading, setVersionsLoading] = useState(false)
-  const [showAiPanel, setShowAiPanel] = useState(false)
-  const [aiQuestion, setAiQuestion] = useState('')
-  const [aiAnalysis, setAiAnalysis] = useState('')
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -897,6 +896,11 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // this wrapper's job is only to surface the result, never to
   // second-guess it.
   const activeScenarioObj = scenarios.find((s: any) => s.id === committedScenarioId)
+  // Edit/States split: editing the shown state is separate from viewing it
+  // and appears only for people who author change (editing Current keeps
+  // its explicit confirmation step).
+  const canAuthorState = can('Scenario.Author')
+  const canSnapshot = can('Views.CreateSnapshot')
 
   const runAuthoringAction = async (action: () => Promise<any>) => {
     if (requiresCurrentEditConfirmation(activeScenarioObj) && !authoringConfirmedCurrent) {
@@ -965,7 +969,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     setAiTab(action)
     setAiAssistLoading(true)
     setAiAssistError(null)
-    api.post(`/ea-views/${view.id}/ai/explain`, { action, question: action === 'question' ? aiAssistQuestion : undefined }).then((d: any) => {
+    api.post(`/ea-views/${view.id}/ai/explain`, { action, question: action === 'question' ? aiAssistQuestion : undefined, ...(committedScenarioId ? { scenarioId: committedScenarioId } : {}) }).then((d: any) => {
       if (myToken !== aiRequestTokenRef.current) return // superseded by a newer AI request or scenario/view switch
       if (d?.statusCode) { setAiAssistError(d.message || 'The AI assistant could not generate a response.'); return }
       setAiExplanation(d)
@@ -1176,45 +1180,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     setViewOverrides(prev => ({ ...prev, ...updated }))
     setShowVersionHistory(false)
     load()
-  }
-
-  // ── AI Explanation (Copilot integration) ─────────────────────────────────
-  //
-  // api.post() never rejects on an HTTP error status (only a genuine
-  // network failure - fetch itself only rejects for that, not for a 4xx/
-  // 5xx response), so a try/catch alone would never actually surface a
-  // 400/500 here; the response still "resolves" with an error-shaped
-  // body ({statusCode, message}) that has no analysis field. Checking for
-  // that explicitly, same reasoning as the Roadmap "needs config" 400
-  // case handled the same way earlier this session.
-  const runAiAction = async (action: 'explain' | 'risks' | 'gaps' | 'duplicates') => {
-    setAiLoading(true)
-    setAiError('')
-    setAiAnalysis('')
-    try {
-      const result = await api.post(`/ea-views/${view.id}/ai-explain`, { action })
-      if (result?.statusCode >= 400 || !result?.analysis) { setAiError(result?.message || 'The AI assistant could not analyze this view. Please try again.'); return }
-      setAiAnalysis(result.analysis)
-    } catch (e: any) {
-      setAiError('Something went wrong asking the AI about this view. Please try again.')
-    } finally {
-      setAiLoading(false)
-    }
-  }
-  const askAiQuestion = async () => {
-    if (!aiQuestion.trim()) return
-    setAiLoading(true)
-    setAiError('')
-    setAiAnalysis('')
-    try {
-      const result = await api.post(`/ea-views/${view.id}/ai-explain`, { question: aiQuestion.trim() })
-      if (result?.statusCode >= 400 || !result?.analysis) { setAiError(result?.message || 'The AI assistant could not analyze this view. Please try again.'); return }
-      setAiAnalysis(result.analysis)
-    } catch (e: any) {
-      setAiError('Something went wrong asking the AI about this view. Please try again.')
-    } finally {
-      setAiLoading(false)
-    }
   }
 
   // ── Approval Workflow ─────────────────────────────────────────────────
@@ -2397,6 +2362,14 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     const objectById = new Map<string, any>((dataset?.objects ?? []).map((o: any) => [o.id, o]))
     const renderClaims = (explanation: any) => (
       <div>
+        {(explanation.facts ?? []).length > 0 && (
+          <div data-testid="ask-facts" style={{ ...S.card, padding: 10, marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>{t('eaviews.ask_facts')}<HelpTip text={t('eaviews.ask_facts_help')} /></div>
+            <ul style={{ margin: 0, paddingInlineStart: 18, fontSize: 12 }}>
+              {explanation.facts.map((f: any) => <li key={f.key}>{isAR ? f.textAr : f.text}</li>)}
+            </ul>
+          </div>
+        )}
         {explanation.domainPerspective && (
           <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10, fontStyle: 'italic' }}>Perspective: {explanation.domainPerspective.note}</div>
         )}
@@ -2436,7 +2409,11 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
               {tab === 'explain' ? 'Explain' : tab === 'risks' ? 'Risks' : tab === 'gaps' ? 'Gaps' : tab === 'question' ? 'Ask' : 'Propose Changes'}
             </button>
           ))}
-          <button style={{ ...S.btn(), marginLeft: 'auto' }} onClick={() => setAiAssistMode(false)}>✕ Exit AI Assist</button>
+          <a data-testid="continue-in-copilot" style={{ ...S.btn(), marginLeft: 'auto', textDecoration: 'none' }}
+            href={`/copilot?ask=${encodeURIComponent(`${view.name}${activeScenarioObj?.name ? ` (${activeScenarioObj.name})` : ''}: ${aiTab === 'question' && aiAssistQuestion.trim() ? aiAssistQuestion.trim() : 'explain what this view shows'}`)}`}>
+            {t('eaviews.ask_continue')}
+          </a>
+          <button style={S.btn()} aria-label={t('eaviews.ask_close')} onClick={() => setAiAssistMode(false)}>✕</button>
         </div>
 
         {/* Self-contained highlight display - the graph renderer's own
@@ -2794,14 +2771,22 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         </div>
         <div style={{ marginLeft:'auto', display:'flex', gap:8 }}>
           {!isRoadmap && !isDashboard && (<>
-            <button style={comparisonMode ? S.btn('primary') : S.btn()} onClick={() => { setComparisonMode(m => !m); setAuthoringMode(false); setAiAssistMode(false) }} title="Compare two architecture scenarios">⇄ Compare</button>
-            <button style={authoringMode ? S.btn('primary') : S.btn()} onClick={() => { setAuthoringMode(m => !m); setComparisonMode(false); setAiAssistMode(false) }} title="Author changes to this Architecture Scenario">✎ Author</button>
-            <button style={aiAssistMode ? S.btn('primary') : S.btn()} onClick={() => { setAiAssistMode(m => !m); setComparisonMode(false); setAuthoringMode(false) }} title="Ask the AI assistant about this architecture">🤖 AI Assist</button>
+            <button style={comparisonMode ? S.btn('primary') : S.btn()} onClick={() => { setComparisonMode(m => !m); setAuthoringMode(false); setAiAssistMode(false) }}>{t('eaviews.tb_compare')}</button>
+            <button style={aiAssistMode ? S.btn('primary') : S.btn()} onClick={() => { setAiAssistMode(m => !m); setComparisonMode(false); setAuthoringMode(false) }}>{t('eaviews.tb_ask')}</button>
+            {/* Editing a state is for people who author change. */}
+            {canAuthorState && (
+              <button style={authoringMode ? S.btn('primary') : S.btn()} onClick={() => { setAuthoringMode(m => !m); setComparisonMode(false); setAiAssistMode(false) }}>{t('eaviews.tb_edit_state')}</button>
+            )}
           </>)}
-          <button style={{ ...S.btn(), fontSize:12 }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>↻ Refresh</button>
-          <button style={{ ...S.btn(), fontSize:12 }} onClick={takeSnapshot}>📸 Snapshot</button>
-          <button style={{ ...S.btn(), fontSize:12 }} onClick={openVersionHistory}>🕐 History</button>
-          <button style={{ ...S.btn(), fontSize:12 }} onClick={() => { setShowAiPanel(v => !v); setAiAnalysis(''); setAiError(''); setAiQuestion('') }}>🤖 Ask AI</button>
+          <HelpTip text={t('eaviews.tb_help')} />
+          <details style={{ position:'relative' }}>
+            <summary style={{ ...S.btn(), fontSize:12, listStyle:'none' }}>{t('eaviews.tb_more')}</summary>
+            <div style={{ position:'absolute', top:'100%', insetInlineEnd:0, marginTop:4, background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:8, zIndex:20, minWidth:150, padding:4, display:'flex', flexDirection:'column' as const, gap:2 }}>
+              <button style={{ ...S.btn(), fontSize:12, textAlign:'start' as const }} onClick={isRoadmap ? loadRoadmap : isDashboard ? loadDashboard : load}>{t('eaviews.tb_refresh')}</button>
+              {canSnapshot && <button style={{ ...S.btn(), fontSize:12, textAlign:'start' as const }} onClick={takeSnapshot}>{t('eaviews.tb_snapshot')}</button>}
+              <button style={{ ...S.btn(), fontSize:12, textAlign:'start' as const }} onClick={openVersionHistory}>{t('eaviews.tb_history')}</button>
+            </div>
+          </details>
           <div style={{ position:'relative' }}>
             <button style={{ ...S.btn(), fontSize:12 }} disabled={!!exportingFormat} onClick={() => setShowExportMenu(v => !v)}>{exportingFormat ? `⏳ Exporting ${exportingFormat.toUpperCase()}...` : '⬇ Export'}</button>
             {showExportMenu && (() => {
@@ -2878,31 +2863,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                 ))}
               </div>
             )}
-        </div>
-      )}
-
-      {showAiPanel && (
-        <div style={{ ...S.card, marginBottom:16, borderColor:'var(--accent)' }}>
-          <div style={{ display:'flex', alignItems:'center', marginBottom:12 }}>
-            <div style={{ fontWeight:600 }}>🤖 Ask AI About This View</div>
-            <button style={{ ...S.btn(), fontSize:11, marginLeft:'auto' }} onClick={() => setShowAiPanel(false)}>Close</button>
-          </div>
-          <div style={{ display:'flex', gap:8, flexWrap:'wrap' as const, marginBottom:12 }}>
-            <button style={{ ...S.btn(), fontSize:12 }} disabled={aiLoading} onClick={() => runAiAction('explain')}>Explain this View</button>
-            <button style={{ ...S.btn(), fontSize:12 }} disabled={aiLoading} onClick={() => runAiAction('risks')}>Identify Risks</button>
-            <button style={{ ...S.btn(), fontSize:12 }} disabled={aiLoading} onClick={() => runAiAction('gaps')}>Identify Gaps</button>
-            <button style={{ ...S.btn(), fontSize:12 }} disabled={aiLoading} onClick={() => runAiAction('duplicates')}>Find Duplicates</button>
-          </div>
-          <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-            <input style={{ ...S.input, flex:1 }} value={aiQuestion} onChange={e => setAiQuestion(e.target.value)} placeholder="Or ask your own question, e.g. What stands out here?"
-              onKeyDown={e => { if (e.key === 'Enter') askAiQuestion() }} />
-            <button style={{ ...S.btn('primary'), fontSize:12 }} disabled={aiLoading || !aiQuestion.trim()} onClick={askAiQuestion}>Ask</button>
-          </div>
-          {aiLoading && <div style={{ color:'var(--text-dim)', textAlign:'center', padding:20 }}>Thinking...</div>}
-          {aiError && <div style={{ color:'#e74c3c', fontSize:13, padding:'8px 0' }}>⚠ {aiError}</div>}
-          {aiAnalysis && !aiLoading && (
-            <div style={{ background:'var(--navy-mid)', borderRadius:8, padding:14, fontSize:13, lineHeight:1.6, whiteSpace:'pre-wrap' as const }}>{aiAnalysis}</div>
-          )}
         </div>
       )}
 
