@@ -2300,3 +2300,46 @@ describe('compatGapText()', () => {
       .toBe('No data for: APPLICATION · No related data for: ORG_UNIT · No APP_IS_CONSUMER_OF_INTERFACE between APPLICATION and Interface')
   })
 })
+
+describe('EaViewsPage - architecture states and evolution (P2)', () => {
+  const VIEW = { id: 'view-p2', name: 'Portfolio P2', visualization: 'TABLE', architectureState: 'CURRENT', status: 'PUBLISHED', rootObjectTypes: ['APPLICATION'] }
+  const st = (scenarioId: string, label: string, name: string, transitionNumber?: number) => ({ scenarioId, name, label, transitionNumber, status: 'APPROVED', horizonDate: null })
+  const STATES = { anchorScenarioId: null, lines: [
+    { id: 'geo', programme: 'Geo Address', states: [st('cur', 'CURRENT', 'Current'), st('geo', 'TARGET', 'Geo Address')] },
+    { id: 'tgt', programme: '1HRDF', states: [st('cur', 'CURRENT', 'Current'), st('t1', 'TRANSITION', 'Jadarat T1', 1), st('tgt', 'TARGET', 'Jadarat Target')] },
+  ] }
+  const DATASET = { dataset: { context: { scenario: { id: 'cur' } }, objects: [], relationships: [], paths: [], hierarchies: [], metrics: [], warnings: [], provenance: {} }, eligibility: { eligible: [{ visualization: 'TABLE' }], ineligible: [] } }
+  const COMPARISON = { context: {}, objects: { added: [], removed: [], modified: [], unchanged: [] }, relationships: { added: [], removed: [], unchanged: [] }, metrics: { objectCounts: { added: 0, removed: 0, modified: 0, unchanged: 0 }, relationshipCounts: { added: 0, removed: 0, unchanged: 0 } }, warnings: [] }
+  const EVOLUTION = { from: st('cur', 'CURRENT', 'Current'), to: st('tgt', 'TARGET', 'Jadarat Target'), programme: '1HRDF', summary: { introduced: 3, retired: 1, restored: 0, modified: 2, unchanged: 10, relationshipsAdded: 4, relationshipsRemoved: 1 }, items: [] }
+
+  function setup() {
+    mockSearchParams = new URLSearchParams('viewId=view-p2')
+    mockFetch({ '/ea-views/view-p2': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [{ id: 'cur', name: 'Current', type: 'CURRENT' }, { id: 'geo', name: 'Geo Address', type: 'TARGET' }, { id: 't1', name: 'Jadarat T1', type: 'TRANSITION' }, { id: 'tgt', name: 'Jadarat Target', type: 'TARGET' }],
+      '/ea-views/view-p2/dataset': DATASET, '/ea-views/view-p2/states': STATES, '/ea-views/view-p2/compare': COMPARISON, '/ea-views/view-p2/evolution': EVOLUTION })
+    render(<EaViewsPage />)
+  }
+
+  it('compare only offers later states on the same line as the chosen starting state, and shows what changes', async () => {
+    setup()
+    await screen.findByText('Portfolio P2')
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some(([u]) => u.includes('/ea-views/view-p2/states'))).toBe(true))
+    fireEvent.click(screen.getByText('⇄ Compare'))
+    const from = await screen.findByLabelText('eaviews.compare_from')
+    fireEvent.change(from, { target: { value: 't1' } })
+    const toOptions = Array.from((screen.getByLabelText('eaviews.compare_to') as HTMLSelectElement).options).map(o => o.value)
+    expect(toOptions).toEqual(['', 'tgt']) // Geo Address (another programme) is never offered
+    fireEvent.change(from, { target: { value: 'cur' } })
+    fireEvent.change(screen.getByLabelText('eaviews.compare_to'), { target: { value: 'tgt' } })
+    fireEvent.click(screen.getByText(/^Compare/))
+    const evo = await screen.findByTestId('evolution')
+    expect(evo).toHaveTextContent('3')
+    const evoCall = (global.fetch as jest.Mock).mock.calls.find(([u]) => u.includes('/evolution'))
+    expect(evoCall[0]).toContain('from=cur&to=tgt')
+  })
+
+  it('the state picker lists architecture states by programme instead of raw scenarios', async () => {
+    setup()
+    expect(await screen.findByTestId('state-menu')).toHaveTextContent('1HRDF')
+    expect(screen.getByTestId('state-menu')).toHaveTextContent('Jadarat Target')
+  })
+})
