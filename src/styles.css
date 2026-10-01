@@ -243,3 +243,15 @@ tr:hover td { background:rgba(3,105,161,0.03) }
 .landscape-item { font-size:12px; padding:4px 8px; border-radius:6px; border:1px solid var(--border); background:var(--navy-mid); color:var(--text); cursor:pointer; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .landscape-item:hover, .landscape-item:focus-visible { border-color:var(--accent) }
 @media (max-width: 640px) { .landscape-grid { grid-template-columns:1fr } }
+
+/* EA Views insights: facts tiles (design-system tokens only) */
+.insight-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:10px }
+.insight-tile { text-align:start; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:var(--navy-light); color:var(--text); font:inherit; min-width:0 }
+button.insight-tile { cursor:pointer }
+button.insight-tile:hover, button.insight-tile:focus-visible { border-color:var(--accent) }
+.insight-attention { border-inline-start:3px solid var(--accent) }
+.insight-active { background:var(--navy-mid); border-color:var(--accent) }
+.insight-value { font-size:20px; font-weight:700; line-height:1.2 }
+.insight-total { font-size:13px; font-weight:400; color:var(--text-dim) }
+.insight-text { font-size:12px; color:var(--text-dim); margin-top:4px; line-height:1.4 }
+@media (max-width: 640px) { .insight-grid { grid-template-columns:1fr 1fr } }

@@ -2343,3 +2343,30 @@ describe('EaViewsPage - architecture states and evolution (P2)', () => {
     expect(screen.getByTestId('state-menu')).toHaveTextContent('Jadarat Target')
   })
 })
+
+describe('EaViewsPage - facts and focus (P3)', () => {
+  const VIEW = { id: 'view-p3', name: 'Portfolio P3', visualization: 'TABLE', architectureState: 'CURRENT', status: 'PUBLISHED', rootObjectTypes: ['APPLICATION'] }
+  const node = (id: string, name: string) => ({ id, name, assetType: 'Application', domain: 'APPLICATION', status: 'ACTIVE', tags: [], metadata: {} })
+  const PAYLOAD = {
+    dataset: { context: { scenario: { id: 'cur' } }, objects: [], relationships: [], paths: [], hierarchies: [], metrics: [], warnings: [], provenance: {} },
+    legacy: { nodes: [node('a1', 'Payroll'), node('a2', 'HR Portal'), node('a3', 'Orphan App')], edges: [] },
+    eligibility: { eligible: [{ visualization: 'TABLE' }], ineligible: [] },
+    insights: [
+      { key: 'count', type: 'COUNT', severity: 'INFO', value: 3, text: '3 applications in this view.', textAr: 'عدد العناصر في هذا المشهد: 3' },
+      { key: 'data-quality:owner', type: 'DATA_QUALITY', severity: 'ATTENTION', value: 1, total: 3, text: '1 of 3 applications have no owner recorded.', textAr: 'دون مالك مسجّل: 1 من 3', objectIds: ['a3'] },
+    ],
+  }
+  it('shows the facts and narrows the view to the objects behind a selected fact', async () => {
+    mockSearchParams = new URLSearchParams('viewId=view-p3')
+    mockFetch({ '/ea-views/view-p3': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [], '/ea-views/view-p3/dataset': PAYLOAD, '/ea-views/view-p3/states': { lines: [] } })
+    render(<EaViewsPage />)
+    expect(await screen.findByTestId('insights')).toHaveTextContent('عدد العناصر في هذا المشهد: 3')
+    await screen.findByText('HR Portal')
+    fireEvent.click(screen.getByRole('button', { pressed: false, name: /دون مالك/ }))
+    expect(await screen.findByTestId('focus-chip')).toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('HR Portal')).not.toBeInTheDocument())
+    expect(screen.getByText('Orphan App')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('eaviews.focus_clear'))
+    expect(await screen.findByText('HR Portal')).toBeInTheDocument()
+  })
+})

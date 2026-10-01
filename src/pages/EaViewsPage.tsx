@@ -11,6 +11,7 @@ import { useSearchParams } from 'react-router-dom'
 import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { LandscapeView } from './eaviews/LandscapeView'
 import { StateMenu, EvolutionSummary, allStates, comparableWith, stateTitle, StateLine } from './eaviews/ArchitectureStates'
+import { InsightsStrip, ViewInsight } from './eaviews/InsightsStrip'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
 import { determineTableMode, buildRelationshipTable, buildMatrix, cellInteraction } from './eaviews/tableMatrixUtils'
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
@@ -422,6 +423,10 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // result means. null for a custom view (no contract).
   const [contract, setContract] = useState<any>(null)
   const [presentation, setPresentation] = useState<any>(null)
+  const [insights, setInsights] = useState<ViewInsight[]>([])
+  // A fact the user selected: the view narrows to the objects behind it.
+  const [focusInsight, setFocusInsight] = useState<ViewInsight | null>(null)
+  const [stateChange, setStateChange] = useState<any>(null)
   const [eligibility, setEligibility] = useState<any>(null)
   // Phase 5A: scenario selector state. The "saved/default" scenario
   // lives on `view.scenarioId` itself (already in scope, via
@@ -684,6 +689,8 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       setEligibility(d?.eligibility ?? null)
       setContract(d?.contract ?? null)
       setPresentation(d?.presentation ?? null)
+      setInsights(Array.isArray(d?.insights) ? d.insights : [])
+      setFocusInsight(null)
       if (d?.presentation?.primary && !(d.presentation.available || []).includes(vizModeRef.current)) setVizMode(d.presentation.primary)
       setCommittedScenarioId(d?.dataset?.context?.scenario?.id ?? null)
       // Phase 4B: initialize the selected heatmap metric from
@@ -741,6 +748,8 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       setEligibility(d.eligibility ?? null)
       setContract(d.contract ?? null)
       setPresentation(d.presentation ?? null)
+      setInsights(Array.isArray(d.insights) ? d.insights : [])
+      setFocusInsight(null)
       setCommittedScenarioId(d.dataset?.context?.scenario?.id ?? scenarioId)
       setPendingScenarioId(null)
       // Phase 5A Section 10: URL reflects the committed scenario only -
@@ -812,6 +821,18 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     }).catch(() => { if (!cancelled) setStateLines(null) })
     return () => { cancelled = true }
   }, [api, view.id, view.scenarioId])
+
+  useEffect(() => {
+    setStateChange(null)
+    if (!stateLines || !committedScenarioId) return
+    const currentId = stateLines[0]?.states[0]?.scenarioId
+    if (!currentId || currentId === committedScenarioId) return
+    if (!comparableWith(stateLines, currentId).some(x => x.scenarioId === committedScenarioId)) return
+    let cancelled = false
+    Promise.resolve(api.get(`/ea-views/${view.id}/evolution?from=${encodeURIComponent(currentId)}&to=${encodeURIComponent(committedScenarioId)}`))
+      .then((d: any) => { if (!cancelled && d?.summary) setStateChange(d.summary) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [api, view.id, stateLines, committedScenarioId])
 
   const runComparison = (leftId: string, rightId: string) => {
     const myToken = ++comparisonRequestTokenRef.current
@@ -1239,7 +1260,19 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // already resolves semanticType) - falls back to the raw domain only
   // for a node whose type has no meta-model match at all, so nothing
   // becomes unfilterable.
+  // A selected fact keeps its objects and their direct neighbours, so the
+  // relationships behind the fact stay visible.
+  const focusIds = useMemo(() => {
+    if (!focusInsight?.objectIds?.length) return null
+    const ids = new Set<string>(focusInsight.objectIds)
+    for (const e of (data?.edges || [])) {
+      if (focusInsight.objectIds.includes(e.sourceId)) ids.add(e.targetId)
+      if (focusInsight.objectIds.includes(e.targetId)) ids.add(e.sourceId)
+    }
+    return ids
+  }, [focusInsight, data])
   const filteredNodes = (data?.nodes || []).filter((n: any) =>
+    (!focusIds || focusIds.has(n.id)) &&
     (!filterDomain || (n.operatingDomain || n.domain) === filterDomain) &&
     (!filterType || n.assetType === filterType) &&
     (!filterStatus || n.status === filterStatus) &&
@@ -2898,6 +2931,14 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           </button>
         ))}
       </div>
+
+      <InsightsStrip insights={insights} stateChange={stateChange} focusKey={focusInsight?.key ?? null} onFocus={setFocusInsight} />
+      {focusInsight && (
+        <div role="status" data-testid="focus-chip" style={{ display:'flex', alignItems:'center', gap:8, fontSize:12, marginBottom:12 }}>
+          <span>{t('eaviews.focus_active')}: {isAR ? focusInsight.textAr : focusInsight.text}</span>
+          <button style={{ ...S.btn(), fontSize:11 }} onClick={() => setFocusInsight(null)}>{t('eaviews.focus_clear')}</button>
+        </div>
+      )}
 
       {resultState?.state === 'NO_RELATIONSHIPS' && (
         <div role="status" data-testid="result-state-note" style={{ fontSize:12, color:'var(--text-dim)', marginBottom:12 }}>
