@@ -17,6 +17,15 @@ export interface StrategyRefresh {
   responseProgress?: { total: number; published: number; pending: number }
 }
 
+export interface PublicationOptions {
+  revision: number; actions: string[]
+  objectTypes: Array<{ id: string; code: string; name: string; operatingDomain: string; canCreate: boolean; canUpdate: boolean }>
+  relationships: Array<{ id: string; code: string; forwardLabel: string }>
+  assets: Array<{ id: string; name: string; assetType: string; domain: string; editable?: boolean }>
+  plans: Array<{ id: string; name: string }>; cycles: Array<{ id: string; name: string }>
+  views: Array<{ id: string; name: string; scenarioId: string; scenarioType: string }>
+}
+
 async function request<T>(path: string, body?: object | FormData): Promise<T> {
   const token = getToken()
   const isUpload = body instanceof FormData
@@ -37,5 +46,8 @@ export const strategyRefreshApi = {
   analyze: (id: string) => request<StrategyRefresh>(`/${encodeURIComponent(id)}/analyze`, {}),
   decide: (id: string, finding: RefreshFinding, action: 'APPROVE' | 'REJECT' | 'AMEND', reason: string, amendment?: { title: string; description: string }) => request(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(finding.id)}/decisions`, { action, revision: finding.revision, reason, ...amendment }),
   activate: (id: string) => request(`/${encodeURIComponent(id)}/activate`, {}),
+  publicationOptions: (id: string, findingId: string) => request<PublicationOptions>(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(findingId)}/publication-options`),
+  publish: (id: string, finding: RefreshFinding, contract: Record<string, unknown>) => request(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(finding.id)}/publication`, { ...contract, revision: finding.revision }),
+  cancelPublication: (id: string, findingId: string) => request(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(findingId)}/publication/cancel`, {}),
   source: (id: string, sourceId: string) => request<{ url: string }>(`/${encodeURIComponent(id)}/documents/${encodeURIComponent(sourceId)}/url`),
 }
