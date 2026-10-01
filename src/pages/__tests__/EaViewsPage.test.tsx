@@ -2199,3 +2199,51 @@ describe('EaViewsPage - ViewBuilder Dynamic Filter Builder wiring', () => {
     });
   });
 });
+
+describe('EaViewsPage - ViewViewer result notices and snapshot state (P0)', () => {
+  const VIEW = { id: 'view-p0', name: 'Portfolio P0', visualization: 'TABLE', architectureState: 'CURRENT', status: 'PUBLISHED', rootObjectTypes: ['APPLICATION'] };
+  function datasetWith(warnings: any[]) {
+    return { dataset: { context: { scenario: { id: 'scn-target', name: 'Target' } }, objects: [], relationships: [], paths: [], hierarchies: [], metrics: [], warnings, provenance: {} }, eligibility: { eligible: ['TABLE'], defaultVisualization: 'TABLE', reasons: {} } };
+  }
+
+  it('shows truncation and scope-exclusion facts instead of hiding them', async () => {
+    mockSearchParams = new URLSearchParams('viewId=view-p0');
+    mockFetch({
+      '/ea-views/view-p0': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [],
+      '/ea-views/view-p0/dataset': datasetWith([
+        { code: 'TRUNCATED', message: 'This result reached a size limit - 4200 objects match.' },
+        { code: 'SCOPE_EXCLUSION', message: "32 National Platform object(s) are outside this view's scope and not shown." },
+        { code: 'MISSING_HIERARCHY_PARENT', message: 'internal detail' },
+      ]),
+    });
+    render(<EaViewsPage />);
+    const notices = await screen.findByTestId('result-notices');
+    expect(notices).toHaveTextContent('4200 objects match');
+    expect(notices).toHaveTextContent('32 National Platform');
+    expect(notices).not.toHaveTextContent('internal detail');
+  });
+
+  it('shows no notice bar when the result is complete and unscoped', async () => {
+    mockSearchParams = new URLSearchParams('viewId=view-p0');
+    mockFetch({ '/ea-views/view-p0': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [], '/ea-views/view-p0/dataset': datasetWith([]) });
+    render(<EaViewsPage />);
+    expect(await screen.findByText('Portfolio P0')).toBeInTheDocument();
+    expect(screen.queryByTestId('result-notices')).not.toBeInTheDocument();
+  });
+
+  it('a snapshot captures the architecture state being viewed', async () => {
+    mockSearchParams = new URLSearchParams('viewId=view-p0');
+    jest.spyOn(window, 'prompt').mockReturnValue('Snap 1');
+    jest.spyOn(window, 'alert').mockImplementation(() => {});
+    mockFetch({ '/ea-views/view-p0': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [], '/ea-views/view-p0/dataset': datasetWith([]), '/ea-views/view-p0/snapshots': { id: 'snap-1' } });
+    render(<EaViewsPage />);
+    await screen.findByText('Portfolio P0');
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some(([url]) => url.includes('/dataset'))).toBe(true));
+    fireEvent.click(await screen.findByText('📸 Snapshot'));
+    await waitFor(() => {
+      const post = (global.fetch as jest.Mock).mock.calls.find(([url, o]) => url.endsWith('/ea-views/view-p0/snapshots') && o?.method === 'POST');
+      expect(post).toBeDefined();
+      expect(JSON.parse(post[1].body)).toEqual({ name: 'Snap 1', scenarioId: 'scn-target' });
+    });
+  });
+});
