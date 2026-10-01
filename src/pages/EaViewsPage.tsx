@@ -10,7 +10,7 @@ import DynamicFilterBuilder from '../components/filterBuilder/DynamicFilterBuild
 import { useSearchParams } from 'react-router-dom'
 import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
-import { determineTableMode, buildRelationshipTable, buildMatrix } from './eaviews/tableMatrixUtils'
+import { determineTableMode, buildRelationshipTable, buildMatrix, cellInteraction } from './eaviews/tableMatrixUtils'
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
 import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters, ExpandDirection } from './eaviews/graphDisclosureUtils'
 import { buildScenarioLineageTree, getScenarioLineagePath, chooseVisualizationAfterScenarioSwitch } from './eaviews/scenarioSelectorUtils'
@@ -1604,6 +1604,12 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
             )}
           </div>
         )}
+        {result.relationMode === 'DIRECT' && [...(result.cells?.values() ?? [])].some(c => cellInteraction(c)) && (
+          <div className="flex items-center gap-2" style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
+            <span>Cells show the recorded interaction: C = create, R = read, U = update, D = delete.</span>
+            <HelpTip text="Each cell shows what the application does with that data entity, as recorded on the relationship itself (for example CRUD, RU or R). A dot means the relationship exists but no interaction has been recorded for it." />
+          </div>
+        )}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ borderCollapse: 'collapse', minWidth: '100%' }}>
             <thead>
@@ -1628,7 +1634,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                       <td key={c.id}
                         onClick={() => populated && setMatrixDrilldown({ rowObj: r, colObj: c, relationMode: result.relationMode, items: populated.items })}
                         style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', cursor: populated ? 'pointer' : 'default', background: populated ? 'rgba(3,105,161,0.12)' : 'transparent' }}>
-                        {populated && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>{populated.count > 1 ? `${populated.count} ${result.relationMode === 'PATH' ? 'paths' : ''}`.trim() : (result.relationMode === 'PATH' ? '1 path' : '●')}</span>}
+                        {populated && <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--accent)' }}>{(result.relationMode === 'DIRECT' && cellInteraction(populated)) || (populated.count > 1 ? `${populated.count} ${result.relationMode === 'PATH' ? 'paths' : ''}`.trim() : (result.relationMode === 'PATH' ? '1 path' : '●'))}</span>}
                       </td>
                     )
                   })}

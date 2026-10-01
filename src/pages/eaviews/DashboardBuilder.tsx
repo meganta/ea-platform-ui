@@ -267,6 +267,9 @@ function WidgetContent({ widget, result }: { widget: DashboardWidget; result: an
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--accent)' }}>{result.label}</div>
+        {typeof result.total === 'number' && result.total !== result.value && (
+          <div data-testid="kpi-total" style={{ fontSize: 12, color: 'var(--text-dim)' }}>of {result.total}</div>
+        )}
       </div>
     )
   }

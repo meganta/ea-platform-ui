@@ -175,3 +175,14 @@ export function buildMatrix(dataset: any, eligibility: any): MatrixResult {
 
   return { eligible: false, reason: 'Matrix is not available for this view.' }
 }
+
+// The interaction a DIRECT matrix cell records (e.g. 'CRUD', 'RU', 'R'),
+// read from the backing relationships' own `interaction` attribute - never
+// inferred. Several relationships with different values are listed, e.g.
+// 'R / RU'. Null when no backing relationship records one (the cell then
+// shows plain presence, as before).
+export function cellInteraction(cell: MatrixCell | undefined): string | null {
+  if (!cell) return null
+  const values = [...new Set(cell.items.map((i: any) => i?.attributes?.interaction).filter((v: any) => typeof v === 'string' && v.trim()))]
+  return values.length ? values.join(' / ') : null
+}
