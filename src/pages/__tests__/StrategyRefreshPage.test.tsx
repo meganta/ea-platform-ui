@@ -12,6 +12,17 @@ const finding: any = { id: 'fact-a', category: 'STRATEGY_STRUCTURE', title: 'Inc
 const ready: any = { id: 'refresh-a', title: 'Strategy 2027', strategyId: 'strategy-a', analysisStatus: 'READY', strategyStatus: 'DRAFT', findings: [finding], sources: [{ id: 'doc-a', filename: 'Strategy.pdf' }], context: { limitations: ['Repository evidence is incomplete'], evidence: [] }, summary: [{ category: 'STRATEGY_STRUCTURE', count: 1, findingIds: ['fact-a'] }], responseProgress: { total: 1, published: 0, pending: 1 } }
 beforeEach(() => { mockIsAR = false; jest.clearAllMocks(); api.list.mockResolvedValue([ready]); api.get.mockResolvedValue(ready) })
 
+it('shows the recorded shared ViewDataset picture without applying or re-querying architecture', async () => {
+  api.get.mockResolvedValue({ ...ready, context: { limitations: [], evidence: [{ id: 'view-a:target-a', module: 'EA_VIEW_DATASET', authority: 'TENANT_FACT', data: { viewId: 'view-a', viewName: 'Strategic Target', scenarioType: 'TARGET', dataset: { objects: [{ id: 'asset-a' }], relationships: [] }, image: { svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Asset A</text></svg>', shownNodes: 1, shownEdges: 0 } } }] } });
+  render(<StrategyRefreshPage />);
+  fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.map' }));
+  expect(screen.getByRole('img', { name: 'Strategic Target' })).toHaveAttribute('src', expect.stringContaining('data:image/svg+xml'));
+  expect(screen.getByText('strategy.refresh.view_snapshot_note')).toBeInTheDocument();
+  expect(api.decide).not.toHaveBeenCalled();
+  expect(api.activate).not.toHaveBeenCalled();
+});
+
 it('makes refresh the primary action and drills summary facts into their evidence', async () => {
   render(<StrategyRefreshPage />)
   expect(screen.getByRole('button', { name: 'strategy.refresh.start' })).toBeInTheDocument()
