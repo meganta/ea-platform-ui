@@ -10,6 +10,7 @@ import DynamicFilterBuilder from '../components/filterBuilder/DynamicFilterBuild
 import { useSearchParams } from 'react-router-dom'
 import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { LandscapeView } from './eaviews/LandscapeView'
+import { StateMenu, EvolutionSummary, allStates, comparableWith, stateTitle, StateLine } from './eaviews/ArchitectureStates'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
 import { determineTableMode, buildRelationshipTable, buildMatrix, cellInteraction } from './eaviews/tableMatrixUtils'
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
@@ -434,6 +435,10 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // committed scenario; `scenarioSwitchError` surfaces a failed switch
   // without ever touching the still-valid committed state.
   const [scenarios, setScenarios] = useState<any[]>([])
+  // The view's lines of change (Current -> Transition -> Target per
+  // programme). null until loaded; the old scenario tree is the fallback.
+  const [stateLines, setStateLines] = useState<StateLine[] | null>(null)
+  const [evolution, setEvolution] = useState<any>(null)
   const [committedScenarioId, setCommittedScenarioId] = useState<string | null>(null)
   const [pendingScenarioId, setPendingScenarioId] = useState<string | null>(null)
   const [scenarioSwitchError, setScenarioSwitchError] = useState<string | null>(null)
@@ -800,8 +805,24 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // request time only commits if it's still the latest issued when the
   // response arrives, so rapidly changing the left/right pair can never
   // let an earlier, slower request overwrite a later, faster one.
+  useEffect(() => {
+    let cancelled = false
+    Promise.resolve(api.get(`/ea-views/${view.id}/states`)).then((d: any) => {
+      if (!cancelled) setStateLines(Array.isArray(d?.lines) ? d.lines : null)
+    }).catch(() => { if (!cancelled) setStateLines(null) })
+    return () => { cancelled = true }
+  }, [api, view.id, view.scenarioId])
+
   const runComparison = (leftId: string, rightId: string) => {
     const myToken = ++comparisonRequestTokenRef.current
+    setEvolution(null)
+    // Forward along a line of change: also show what changes, in
+    // architecture terms (introduced / retired / restored / changed).
+    if (stateLines && comparableWith(stateLines, leftId).some(x => x.scenarioId === rightId)) {
+      Promise.resolve(api.get(`/ea-views/${view.id}/evolution?from=${encodeURIComponent(leftId)}&to=${encodeURIComponent(rightId)}`)).then((d: any) => {
+        if (myToken === comparisonRequestTokenRef.current && d?.summary) setEvolution(d)
+      }).catch(() => {})
+    }
     setComparisonLoading(true)
     setComparisonError(null)
     api.post(`/ea-views/${view.id}/compare`, { leftScenarioId: leftId, rightScenarioId: rightId }).then((d: any) => {
@@ -1908,16 +1929,20 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     return (
       <div>
         <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' as const }}>
-          <label style={S.label}>Left</label>
-          <select style={{ ...S.input, maxWidth: 200 }} value={comparisonLeftId ?? ''} onChange={e => setComparisonLeftId(e.target.value || null)}>
+          <label style={S.label} htmlFor="compare-from">{stateLines ? t('eaviews.compare_from') : 'Left'}</label>
+          <select id="compare-from" style={{ ...S.input, maxWidth: 240 }} value={comparisonLeftId ?? ''} onChange={e => { setComparisonLeftId(e.target.value || null); if (stateLines) setComparisonRightId(null) }}>
             <option value="">Select…</option>
-            {scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {stateLines
+              ? allStates(stateLines).map(s => <option key={s.scenarioId} value={s.scenarioId}>{stateTitle(s, t)}{s.label !== 'CURRENT' ? ` · ${s.name}` : ''}</option>)
+              : scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <span style={{ color: 'var(--text-dim)' }}>vs</span>
-          <label style={S.label}>Right</label>
-          <select style={{ ...S.input, maxWidth: 200 }} value={comparisonRightId ?? ''} onChange={e => setComparisonRightId(e.target.value || null)}>
+          <span style={{ color: 'var(--text-dim)' }}>→</span>
+          <label style={S.label} htmlFor="compare-to">{stateLines ? t('eaviews.compare_to') : 'Right'}</label>
+          <select id="compare-to" style={{ ...S.input, maxWidth: 240 }} value={comparisonRightId ?? ''} onChange={e => setComparisonRightId(e.target.value || null)}>
             <option value="">Select…</option>
-            {scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            {stateLines
+              ? (comparisonLeftId ? comparableWith(stateLines, comparisonLeftId) : []).map(s => <option key={s.scenarioId} value={s.scenarioId}>{stateTitle(s, t)}{s.label !== 'CURRENT' ? ` · ${s.name}` : ''}</option>)
+              : scenarios.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           <button style={S.btn('primary')} disabled={!comparisonLeftId || !comparisonRightId} onClick={() => comparisonLeftId && comparisonRightId && runComparison(comparisonLeftId, comparisonRightId)}>
             Compare{comparisonLoading ? ' ⏳' : ''}
@@ -1925,6 +1950,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           <button style={{ ...S.btn(), marginLeft: 'auto' }} onClick={() => { setComparisonMode(false); setComparisonData(null) }}>✕ Exit Comparison</button>
         </div>
         {comparisonError && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 12 }}>⚠ {comparisonError}</div>}
+        {evolution && <EvolutionSummary evolution={evolution} />}
         {!comparisonData ? (
           <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Choose two scenarios and click Compare to see what changed architecturally between them.</div>
         ) : (() => {
@@ -2689,7 +2715,9 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                 <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>▾</span>
               </summary>
               <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 4, background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, padding: 10, zIndex: 30, minWidth: 280, maxHeight: 360, overflowY: 'auto' as const }}>
-                {(() => {
+                {stateLines && stateLines.length > 0 ? (
+                  <StateMenu lines={stateLines} activeId={committedScenarioId} onPick={(id) => { if (id !== committedScenarioId) switchScenario(id) }} />
+                ) : (() => {
                   const tree = buildScenarioLineageTree(scenarios)
                   const renderScenarioOption = (id: string, depth: number): React.ReactNode => {
                     const s = scenarios.find(x => x.id === id)
