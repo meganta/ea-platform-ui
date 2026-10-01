@@ -1763,3 +1763,145 @@ describe('StudyCostEstimate', () => {
     expect(screen.getByText('رأسمالية (لمرة واحدة)')).toBeInTheDocument();
   });
 });
+
+const IMPACT_CONTENT = {
+  scope: 'CURRENT_ARCHITECTURE', analyzedAt: '2026-10-01T00:00:00.000Z',
+  totals: { repositoryObjects: 5, assessedObjects: 5, impactedObjects: 2, impactedDomains: 1 },
+  domains: [
+    { domain: 'BUSINESS_ARCHITECTURE', domainName: 'Business Architecture', status: 'ASSESSED', objectCount: 2, assessedCount: 2, impactLevel: 'NONE', summary: 'Capabilities are unchanged.', impactedObjects: [] },
+    { domain: 'APPLICATION_INTEGRATION', domainName: 'Applications & Integration', status: 'ASSESSED', objectCount: 3, assessedCount: 3, impactLevel: 'HIGH', summary: 'The portal must embed the chatbot.', impactedObjects: [
+      { assetId: 'app-1', name: 'Citizen Portal', assetType: 'APPLICATION', typeLabel: 'Application', impactType: 'MODIFY', nature: 'DIRECT', impactLevel: 'HIGH', description: 'Embeds the chat widget.' },
+      { assetId: 'app-2', name: 'Identity Service', assetType: 'APPLICATION', typeLabel: 'Application', impactType: 'INTEGRATE', nature: 'INDIRECT', impactLevel: 'LOW', description: 'Single sign-on for the chatbot.' },
+    ] },
+    { domain: 'DATA_ARCHITECTURE', domainName: 'Data Architecture', status: 'NO_OBJECTS', objectCount: 0, assessedCount: 0, impactLevel: 'NONE', summary: '', impactedObjects: [] },
+    { domain: 'SECURITY_ARCHITECTURE', domainName: 'Security Architecture', status: 'FAILED', objectCount: 4, assessedCount: 0, impactLevel: 'NONE', summary: '', impactedObjects: [] },
+  ],
+};
+
+describe('InnovationPage - Studies: optional EA impact analysis', () => {
+  it('the create form offers the impact analysis as an opt-in (labelled checkbox) and sends it', async () => {
+    mockFetch({
+      '/innovation/radar': [], '/innovation/studies': (opts: any) => opts?.method === 'POST' ? { id: 'new-study-1' } : [],
+      '/innovation/studies/new-study-1': STUDY,
+    });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('innov.new_study'));
+    const checkbox = screen.getByLabelText('Include EA impact analysis') as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    fireEvent.click(checkbox);
+    const textboxes = screen.getAllByRole('textbox');
+    fireEvent.change(textboxes[0], { target: { value: 'Chatbot' } });
+    fireEvent.change(textboxes[2], { target: { value: 'Adopt it?' } });
+    fireEvent.click(screen.getByText('innov.create_study'));
+    await waitFor(() => {
+      const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].endsWith('/innovation/studies'));
+      expect(JSON.parse(postCall[1].body).includeImpactAnalysis).toBe(true);
+    });
+  });
+
+  it('switching it on from the study calls the toggle endpoint', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [STUDY], '/innovation/studies/study-1': STUDY, '/innovation/studies/study-1/impact-analysis': {} });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findByText('innov.not_generated_yet');
+    fireEvent.click(screen.getByLabelText('Include EA impact analysis'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].endsWith('/innovation/studies/study-1/impact-analysis'));
+      expect(call[1].method).toBe('PUT');
+      expect(JSON.parse(call[1].body)).toEqual({ enabled: true });
+    });
+  });
+
+  it('renders impacted domains with their objects, and the other domains in one line each, after the architecture fit', async () => {
+    const study = { ...GENERATED_STUDY, includeImpactAnalysis: true, sections: [
+      ...GENERATED_STUDY.sections,
+      { id: 'sec-f', sectionKey: 'ARCHITECTURE_FIT', title: 'Architecture Fit', orderIndex: 5, content: 'Fits.', status: 'AI_DRAFT' },
+      { id: 'sec-i', sectionKey: 'EA_IMPACT_ANALYSIS', title: 'EA Impact Analysis', orderIndex: 6, content: IMPACT_CONTENT, status: 'AI_DRAFT' },
+    ] };
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [study], '/innovation/studies/study-1': study });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    expect(await screen.findByTestId('study-ea-impact')).toBeInTheDocument();
+    const text = document.body.textContent || '';
+    expect(text.indexOf('Architecture Fit Assessment')).toBeLessThan(text.indexOf('EA Impact Analysis'));
+    expect(screen.getByTestId('ea-impact-total-objects')).toHaveTextContent('2');
+    expect(screen.getByText('Citizen Portal')).toBeInTheDocument();
+    expect(screen.getByText('Embeds the chat widget.')).toBeInTheDocument();
+    expect(screen.getByText('Indirect (possible)')).toBeInTheDocument();
+    expect(screen.getByTestId('ea-impact-domain-DATA_ARCHITECTURE')).toHaveTextContent('No objects recorded in this domain.');
+    expect(screen.getByTestId('ea-impact-domain-SECURITY_ARCHITECTURE')).toHaveTextContent('Not assessed');
+    expect(screen.getByTestId('ea-impact-domain-BUSINESS_ARCHITECTURE')).toHaveTextContent('Capabilities are unchanged.');
+    // A generated study with the analysis enabled can re-run it on its own.
+    fireEvent.click(screen.getByText('Re-run impact analysis'));
+    await waitFor(() => {
+      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].endsWith('/impact-analysis/run'));
+      expect(call[1].method).toBe('POST');
+    });
+  });
+
+  it('StudyEaImpact renders in Arabic', () => {
+    const { StudyEaImpact } = require('../InnovationPage');
+    render(<StudyEaImpact content={IMPACT_CONTENT} isAR />);
+    expect(screen.getByText('التطبيقات والتكامل')).toBeInTheDocument();
+    expect(screen.getByText('تعديل')).toBeInTheDocument();
+    expect(screen.getByText('غير مباشر (محتمل)')).toBeInTheDocument();
+    expect(screen.getByText('لا توجد عناصر مسجلة في هذا المجال.')).toBeInTheDocument();
+  });
+
+  it('StudyEaImpact says so when nothing is impacted', () => {
+    const { StudyEaImpact } = require('../InnovationPage');
+    render(<StudyEaImpact content={{ ...IMPACT_CONTENT, totals: { ...IMPACT_CONTENT.totals, impactedObjects: 0, impactedDomains: 0 }, domains: [IMPACT_CONTENT.domains[0]] }} isAR={false} />);
+    expect(screen.getByText('No Repository object was identified as impacted.')).toBeInTheDocument();
+  });
+});
+
+describe('InnovationPage - Studies: EA View pictures in the impact analysis', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text>Citizen Portal</text></svg>';
+  const withView = { ...IMPACT_CONTENT, domains: IMPACT_CONTENT.domains.map((d: any) => d.domain === 'APPLICATION_INTEGRATION'
+    ? { ...d, view: { source: 'SAVED_VIEW', viewId: 'v1', viewpointId: null, title: 'Application Landscape', visualization: 'GRAPH', architectureState: 'CURRENT', reason: 'Shows the portal with its integrations.', objects: 8, impactedShown: 2, generatedAt: '', image: { mimeType: 'image/svg+xml', svg, width: 10, height: 10 } } }
+    : d) };
+
+  it('shows the chosen view under its domain as an image, with why it was chosen and how many impacted objects it highlights', () => {
+    const { StudyEaImpact } = require('../InnovationPage');
+    render(<StudyEaImpact content={withView} isAR={false} />);
+    const figure = screen.getByTestId('study-impact-view');
+    expect(screen.getByTestId('ea-impact-domain-APPLICATION_INTEGRATION')).toContainElement(figure);
+    const img = screen.getByAltText('EA View: Application Landscape') as HTMLImageElement;
+    expect(img.src.startsWith('data:image/svg+xml')).toBe(true);
+    expect(figure).toHaveTextContent('Saved view · GRAPH');
+    expect(figure).toHaveTextContent('Shows the portal with its integrations. 2 impacted object(s) highlighted.');
+  });
+
+  it('in Arabic', () => {
+    const { StudyEaImpact } = require('../InnovationPage');
+    render(<StudyEaImpact content={withView} isAR />);
+    expect(screen.getByAltText('عرض البنية المؤسسية: Application Landscape')).toBeInTheDocument();
+    expect(screen.getByTestId('study-impact-view')).toHaveTextContent('تم تمييز 2 من العناصر المتأثرة.');
+  });
+
+  it('no view, no figure', () => {
+    const { StudyEaImpact } = require('../InnovationPage');
+    render(<StudyEaImpact content={IMPACT_CONTENT} isAR={false} />);
+    expect(screen.queryByTestId('study-impact-view')).not.toBeInTheDocument();
+  });
+
+  it('editing the section never sends the picture data back', async () => {
+    const study = { ...GENERATED_STUDY, includeImpactAnalysis: true, sections: [{ id: 'sec-i', sectionKey: 'EA_IMPACT_ANALYSIS', title: 'EA Impact Analysis', orderIndex: 6, content: withView, status: 'AI_DRAFT' }] };
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [study], '/innovation/studies/study-1': study, '/impact-preview/': { potentiallyStaleSections: [] }, '/innovation/study-sections/sec-i/content': {} });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findByTestId('study-impact-view');
+    fireEvent.click(screen.getByText(/Edit/));
+    fireEvent.click(await screen.findByText('Save'));
+    await waitFor(() => {
+      const put = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].endsWith('/study-sections/sec-i/content'));
+      const body = JSON.parse(put[1].body);
+      const app = body.content.domains.find((d: any) => d.domain === 'APPLICATION_INTEGRATION');
+      expect(app.view).toEqual({ title: 'Application Landscape', source: 'SAVED_VIEW' });
+    });
+  });
+});
