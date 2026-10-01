@@ -19,6 +19,19 @@ export type Locale = 'AR' | 'EN'
 // ── Static translation table ─────────────────────────────────────────────────
 // Keys map to both locales. NEVER use English as fallback for Arabic.
 const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
+  'strategy.refresh.previous_evidence': { EN: 'Approved previous strategy evidence', AR: 'أدلة الاستراتيجية السابقة المعتمدة' },
+  'strategy.refresh.open_baseline': { EN: 'Open approved baseline version', AR: 'فتح الإصدار المرجعي المعتمد' },
+  'strategy.refresh.label.BASELINE_NOT_AVAILABLE': { EN: 'No approved comparison baseline', AR: 'لا يوجد إصدار مرجعي معتمد للمقارنة' },
+  'strategy.refresh.label.IDENTITY_AMBIGUOUS': { EN: 'Identity requires review', AR: 'الهوية تتطلب مراجعة' },
+  'strategy.refresh.label.NEW_CANDIDATE': { EN: 'Potential new fact', AR: 'حقيقة جديدة محتملة' },
+  'strategy.refresh.label.RETAINED': { EN: 'Retained declared content', AR: 'محتوى معلن مستمر' },
+  'strategy.refresh.label.MODIFIED': { EN: 'Modified declared content', AR: 'محتوى معلن معدل' },
+  'strategy.refresh.label.NOT_REPRESENTED_CANDIDATE': { EN: 'No exact match — review required', AR: 'لا توجد مطابقة دقيقة — تتطلب مراجعة' },
+  'strategy.refresh.label.EQUIVALENT_CANDIDATE': { EN: 'Potential semantic equivalence', AR: 'تكافؤ دلالي محتمل' },
+  'strategy.refresh.label.MERGED_CANDIDATE': { EN: 'Potential merge', AR: 'دمج محتمل' },
+  'strategy.refresh.label.SPLIT_CANDIDATE': { EN: 'Potential split', AR: 'تقسيم محتمل' },
+  'strategy.refresh.label.REPLACED_CANDIDATE': { EN: 'Potential replacement', AR: 'استبدال محتمل' },
+  'strategy.refresh.label.REMOVED_CANDIDATE': { EN: 'Potential removal — not an authorized deletion', AR: 'إزالة محتملة — ليست تفويضاً للحذف' },
   'strategy.refresh.label.DOCUMENT_DECLARED_FACT': { EN: 'Document-declared fact', AR: 'حقيقة معلنة في الوثيقة' },
   'strategy.refresh.label.TENANT_FACT': { EN: 'Tenant fact', AR: 'حقيقة مسجلة للجهة' },
   'strategy.refresh.label.DETERMINISTIC_DERIVATION': { EN: 'Deterministic derivation', AR: 'اشتقاق حتمي' },

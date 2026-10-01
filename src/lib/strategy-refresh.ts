@@ -8,12 +8,12 @@ export interface RefreshFinding {
   evidence: any
 }
 export interface StrategyRefresh {
-  id: string; title: string; strategyId: string; analysisStatus: string; strategyStatus: string; failureCode?: string
+  id: string; title: string; strategyId: string; analysisStatus: string; strategyStatus: string; failureCode?: string; baseRefreshId?: string | null; warnings?: string[]
   strategy?: { name: string; strategyType: string }
   sources?: Array<{ id: string; filename: string; extractionStatus: string }>
   findings?: RefreshFinding[]
   summary?: Array<{ category: string; count: number; findingIds: string[] }>
-  context?: { limitations: string[]; evidence: Array<{ id: string; module: string; authority: string; data: any }> }
+  context?: { limitations: string[]; evidence: Array<{ id: string; module: string; authority: string; data: any }>; previous?: Array<{ id: string; title: string; payload: any; evidence: any }> }
   responseProgress?: { total: number; published: number; pending: number }
 }
 
