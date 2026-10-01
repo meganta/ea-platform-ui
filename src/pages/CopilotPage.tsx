@@ -797,7 +797,8 @@ export default function CopilotPage() {
   const [messages, setMessages] = useState<Msg[]>([])
   const [conversations, setConversations] = useState<any[]>([])
   const [activeConvId, setActiveConvId] = useState<string | null>(null)
-  const [input, setInput] = useState('')
+  // "Continue in Copilot" from EA Views (/copilot?ask=...) prefills the question; nothing is sent automatically.
+  const [input, setInput] = useState(() => { try { return new URLSearchParams(window.location.search).get('ask') || '' } catch { return '' } })
   const [loading, setLoading] = useState(false)
   const [includeChief, setIncludeChief] = useState(true)
   const [sidebarTab, setSidebarTab] = useState<'architects' | 'history' | 'meetings' | 'playbooks' | 'actiondrafts'>('architects')

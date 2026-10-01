@@ -1,8 +1,9 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EaViewsPage from '../EaViewsPage';
 
+let mockHasPermission: (code: string) => boolean = () => true;
 jest.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ token: 'fake-token' }),
+  useAuth: () => ({ token: 'fake-token', hasPermission: (code: string) => mockHasPermission(code) }),
 }));
 
 // EaViewsPage now uses useSearchParams (Object Context View entry point) -
@@ -39,6 +40,7 @@ import * as exportUtils from '../eaviews/exportUtils';
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockHasPermission = () => true;
   mockSearchParams = new URLSearchParams();
   // ViewLibrary now guards its seed call with a sessionStorage flag (see
   // EaViewsPage.tsx) so it only reseeds once per browser session -
@@ -504,20 +506,20 @@ describe('EaViewsPage - Version History', () => {
 
   it('clicking History fetches and shows the version list', async () => {
     await openView({ '/ea-views/v1/versions': [{ id: 'ver-2', versionNumber: 2, changeReason: 'Published', status: 'PUBLISHED', createdAt: '2026-02-01T00:00:00Z' }, { id: 'ver-1', versionNumber: 1, changeReason: 'Initial creation', status: 'DRAFT', createdAt: '2026-01-01T00:00:00Z' }] });
-    fireEvent.click(screen.getByText('🕐 History'));
+    fireEvent.click(screen.getByText('eaviews.tb_history'));
     expect(await screen.findByText('Published')).toBeInTheDocument();
     expect(screen.getByText('Initial creation')).toBeInTheDocument();
   });
 
   it('shows an empty-history message when there is none yet', async () => {
     await openView({ '/ea-views/v1/versions': [] });
-    fireEvent.click(screen.getByText('🕐 History'));
+    fireEvent.click(screen.getByText('eaviews.tb_history'));
     expect(await screen.findByText(/No version history yet/)).toBeInTheDocument();
   });
 
   it('does not show a Restore button for the currently active version', async () => {
     await openView({ '/ea-views/v1/versions': [{ id: 'ver-2', versionNumber: 2, changeReason: 'Current', status: 'PUBLISHED', createdAt: '2026-02-01T00:00:00Z' }] });
-    fireEvent.click(screen.getByText('🕐 History'));
+    fireEvent.click(screen.getByText('eaviews.tb_history'));
     await screen.findByText('Current');
     expect(screen.queryByText('Restore')).not.toBeInTheDocument();
   });
@@ -525,7 +527,7 @@ describe('EaViewsPage - Version History', () => {
   it('shows a Restore button for a non-current version, and confirms before restoring', async () => {
     const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(true);
     await openView({ '/ea-views/v1/versions': [{ id: 'ver-1', versionNumber: 1, changeReason: 'Old version', status: 'DRAFT', createdAt: '2026-01-01T00:00:00Z' }] });
-    fireEvent.click(screen.getByText('🕐 History'));
+    fireEvent.click(screen.getByText('eaviews.tb_history'));
     await screen.findByText('Old version');
     fireEvent.click(screen.getByText('Restore'));
     await waitFor(() => {
@@ -539,7 +541,7 @@ describe('EaViewsPage - Version History', () => {
   it('does not restore when the confirmation is cancelled', async () => {
     const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
     await openView({ '/ea-views/v1/versions': [{ id: 'ver-1', versionNumber: 1, changeReason: 'Old version', status: 'DRAFT', createdAt: '2026-01-01T00:00:00Z' }] });
-    fireEvent.click(screen.getByText('🕐 History'));
+    fireEvent.click(screen.getByText('eaviews.tb_history'));
     await screen.findByText('Old version');
     fireEvent.click(screen.getByText('Restore'));
     const restoreCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/restore'));
@@ -617,93 +619,6 @@ describe('EaViewsPage - Approval Workflow', () => {
     const rejectCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/v1/reject'));
     expect(rejectCall).toBeUndefined();
     promptSpy.mockRestore();
-  });
-});
-
-describe('EaViewsPage - AI Explanation (Copilot integration)', () => {
-  async function openView(extraRoutes: Record<string, any> = {}) {
-    mockFetch({
-      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH' }],
-      '/ea-views/v1/dataset': { legacy: { nodes: [], edges: [], metadata: {} } },
-      '/ea-views/saved-filters': [],
-      ...extraRoutes,
-    });
-    render(<EaViewsPage />);
-    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
-    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
-    fireEvent.click(await screen.findByText('App Landscape'));
-    await screen.findByText(/objects/);
-  }
-
-  it('clicking Ask AI opens the panel with the four preset actions and a free-text question box', async () => {
-    await openView();
-    fireEvent.click(screen.getByText('🤖 Ask AI'));
-    expect(screen.getByText('Explain this View')).toBeInTheDocument();
-    expect(screen.getByText('Identify Risks')).toBeInTheDocument();
-    expect(screen.getByText('Identify Gaps')).toBeInTheDocument();
-    expect(screen.getByText('Find Duplicates')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Or ask your own question/)).toBeInTheDocument();
-  });
-
-  it('clicking a preset action posts the right action and renders the returned analysis', async () => {
-    await openView({ '/ea-views/v1/ai-explain': { analysis: 'This view shows 5 applications with one deprecated system.' } });
-    fireEvent.click(screen.getByText('🤖 Ask AI'));
-    fireEvent.click(screen.getByText('Identify Risks'));
-    await waitFor(() => {
-      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ai-explain'));
-      expect(call).toBeDefined();
-      expect(JSON.parse(call[1].body)).toEqual({ action: 'risks' });
-    });
-    expect(await screen.findByText('This view shows 5 applications with one deprecated system.')).toBeInTheDocument();
-  });
-
-  it('shows a "Thinking..." indicator while the request is in flight, and disables the preset buttons', async () => {
-    let resolveFn: (v: any) => void = () => {};
-    const api = { '/ea-views/v1/ai-explain': () => new Promise(res => { resolveFn = res; }) };
-    await openView(api);
-    fireEvent.click(screen.getByText('🤖 Ask AI'));
-    fireEvent.click(screen.getByText('Explain this View'));
-    expect(await screen.findByText('Thinking...')).toBeInTheDocument();
-    expect(screen.getByText('Explain this View')).toBeDisabled();
-    resolveFn({ analysis: 'Done.' });
-    await waitFor(() => expect(screen.queryByText('Thinking...')).not.toBeInTheDocument());
-  });
-
-  it('typing a custom question and pressing Enter asks it instead of a preset action', async () => {
-    await openView({ '/ea-views/v1/ai-explain': { analysis: 'Two applications are past end of life.' } });
-    fireEvent.click(screen.getByText('🤖 Ask AI'));
-    fireEvent.change(screen.getByPlaceholderText(/Or ask your own question/), { target: { value: 'Which apps are near end of life?' } });
-    fireEvent.keyDown(screen.getByPlaceholderText(/Or ask your own question/), { key: 'Enter' });
-    await waitFor(() => {
-      const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ai-explain'));
-      expect(JSON.parse(call[1].body)).toEqual({ question: 'Which apps are near end of life?' });
-    });
-    expect(await screen.findByText('Two applications are past end of life.')).toBeInTheDocument();
-  });
-
-  it('the Ask button is disabled until a question is typed', async () => {
-    await openView();
-    fireEvent.click(screen.getByText('🤖 Ask AI'));
-    expect(screen.getByText('Ask')).toBeDisabled();
-    fireEvent.change(screen.getByPlaceholderText(/Or ask your own question/), { target: { value: 'x' } });
-    expect(screen.getByText('Ask')).not.toBeDisabled();
-  });
-
-  it('shows an error message (not a blank panel) when the backend returns an error-shaped response, since api.post never rejects on an HTTP error status', async () => {
-    await openView({ '/ea-views/v1/ai-explain': { __fail: true, status: 400, message: 'Unknown action' } });
-    fireEvent.click(screen.getByText('🤖 Ask AI'));
-    fireEvent.click(screen.getByText('Explain this View'));
-    expect(await screen.findByText(/Unknown action/)).toBeInTheDocument();
-  });
-
-  it('closing and reopening the panel does not carry over a previous analysis or error', async () => {
-    await openView({ '/ea-views/v1/ai-explain': { analysis: 'First answer.' } });
-    fireEvent.click(screen.getByText('🤖 Ask AI'));
-    fireEvent.click(screen.getByText('Explain this View'));
-    await screen.findByText('First answer.');
-    fireEvent.click(screen.getByText('Close'));
-    fireEvent.click(screen.getByText('🤖 Ask AI'));
-    expect(screen.queryByText('First answer.')).not.toBeInTheDocument();
   });
 });
 
@@ -1419,7 +1334,7 @@ describe('EaViewsPage - Comparison mode (Phase 5B)', () => {
     fireEvent.click(screen.getAllByText('📋 My Views')[0]);
     fireEvent.click(await screen.findByText('Comparable View'));
     await screen.findByText('Current Architecture');
-    fireEvent.click(screen.getByText(/⇄ Compare/));
+    fireEvent.click(screen.getByText('eaviews.tb_compare'));
   }
 
   it('opens the existing comparison engine directly from an ADM same-viewpoint comparison link', async () => {
@@ -1615,7 +1530,7 @@ describe('EaViewsPage - Scenario Authoring (Phase 5C)', () => {
     fireEvent.click(screen.getAllByText('📋 My Views')[0]);
     fireEvent.click(await screen.findByText('Authorable View'));
     await screen.findByText('App X');
-    fireEvent.click(screen.getByText(/✎ Author/));
+    fireEvent.click(screen.getByText('eaviews.tb_edit_state'));
   }
 
   it('shows the scenario name/type/status and Object provenance badges (Inherited vs Overridden)', async () => {
@@ -1758,7 +1673,7 @@ describe('EaViewsPage - AI Assist (Phase 5D)', () => {
     fireEvent.click(screen.getAllByText('📋 My Views')[0]);
     fireEvent.click(await screen.findByText('AI View'));
     await screen.findByText('App X');
-    fireEvent.click(screen.getByText(/🤖 AI Assist/));
+    fireEvent.click(screen.getByText('eaviews.tb_ask'));
   }
 
   // ── Acceptance 1: claims are never visually identical across classifications ──
@@ -1837,7 +1752,7 @@ describe('EaViewsPage - AI Assist (Phase 5D)', () => {
     fireEvent.click(screen.getAllByText('📋 My Views')[0]);
     fireEvent.click(await screen.findByText('AI View'));
     await screen.findByText('App X');
-    fireEvent.click(screen.getByText(/🤖 AI Assist/));
+    fireEvent.click(screen.getByText('eaviews.tb_ask'));
     fireEvent.click(screen.getByText('Generate Explanation'));
     await screen.findByText('Old view claim');
 
@@ -1967,8 +1882,8 @@ describe('EaViewsPage - AI Assist (Phase 5D)', () => {
 
   it('exiting AI Assist mode returns to the normal single-scenario view', async () => {
     await openAiAssist();
-    fireEvent.click(screen.getByText(/✕ Exit AI Assist/));
-    expect(screen.queryByText(/✕ Exit AI Assist/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText('eaviews.ask_close'));
+    expect(screen.queryByLabelText('eaviews.ask_close')).not.toBeInTheDocument();
   });
 });
 
@@ -2239,7 +2154,7 @@ describe('EaViewsPage - ViewViewer result notices and snapshot state (P0)', () =
     render(<EaViewsPage />);
     await screen.findByText('Portfolio P0');
     await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some(([url]) => url.includes('/dataset'))).toBe(true));
-    fireEvent.click(await screen.findByText('📸 Snapshot'));
+    fireEvent.click(await screen.findByText('eaviews.tb_snapshot'));
     await waitFor(() => {
       const post = (global.fetch as jest.Mock).mock.calls.find(([url, o]) => url.endsWith('/ea-views/view-p0/snapshots') && o?.method === 'POST');
       expect(post).toBeDefined();
@@ -2323,7 +2238,7 @@ describe('EaViewsPage - architecture states and evolution (P2)', () => {
     setup()
     await screen.findByText('Portfolio P2')
     await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some(([u]) => u.includes('/ea-views/view-p2/states'))).toBe(true))
-    fireEvent.click(screen.getByText('⇄ Compare'))
+    fireEvent.click(screen.getByText('eaviews.tb_compare'))
     const from = await screen.findByLabelText('eaviews.compare_from')
     fireEvent.change(from, { target: { value: 't1' } })
     const toOptions = Array.from((screen.getByLabelText('eaviews.compare_to') as HTMLSelectElement).options).map(o => o.value)
@@ -2368,5 +2283,47 @@ describe('EaViewsPage - facts and focus (P3)', () => {
     expect(screen.getByText('Orphan App')).toBeInTheDocument()
     fireEvent.click(screen.getByText('eaviews.focus_clear'))
     expect(await screen.findByText('HR Portal')).toBeInTheDocument()
+  })
+})
+
+describe('EaViewsPage - toolbar and Ask ArchMind (P4)', () => {
+  const VIEW = { id: 'view-p4', name: 'Portfolio P4', visualization: 'TABLE', architectureState: 'CURRENT', status: 'PUBLISHED', rootObjectTypes: ['APPLICATION'] }
+  const DATASET = { dataset: { context: { scenario: { id: 'tgt' } }, objects: [], relationships: [], paths: [], hierarchies: [], metrics: [], warnings: [], provenance: {} }, legacy: { nodes: [], edges: [] }, eligibility: { eligible: [{ visualization: 'TABLE' }], ineligible: [] } }
+  const EXPLAIN = { claims: [{ text: 'Most applications support workforce capabilities.', classification: 'INFERENCE', evidenceRefs: [] }], facts: [{ key: 'count', text: '67 applications in this view.', textAr: 'عدد العناصر في هذا المشهد: 67' }] }
+  function setup() {
+    mockSearchParams = new URLSearchParams('viewId=view-p4')
+    mockFetch({ '/ea-views/view-p4': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [{ id: 'tgt', name: 'Jadarat Target', type: 'TARGET' }],
+      '/ea-views/view-p4/dataset': DATASET, '/ea-views/view-p4/states': { lines: [] }, '/ea-views/view-p4/ai/explain': EXPLAIN })
+    render(<EaViewsPage />)
+  }
+
+  it('offers one grounded AI entry (Ask ArchMind) - the old ungrounded "Ask AI" is gone', async () => {
+    setup()
+    await screen.findByText('Portfolio P4')
+    expect(screen.getByText('eaviews.tb_ask')).toBeInTheDocument()
+    expect(screen.queryByText('🤖 Ask AI')).not.toBeInTheDocument()
+    expect(screen.queryByText(/AI Assist/)).not.toBeInTheDocument()
+  })
+
+  it('Ask ArchMind explains the state on screen, shows the facts it used, and can continue in Copilot', async () => {
+    setup()
+    await screen.findByText('Portfolio P4')
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some(([u]) => u.includes('/dataset'))).toBe(true))
+    fireEvent.click(screen.getByText('eaviews.tb_ask'))
+    fireEvent.click(await screen.findByText(/Generate Explanation/))
+    expect(await screen.findByTestId('ask-facts')).toHaveTextContent('عدد العناصر في هذا المشهد: 67')
+    const call = (global.fetch as jest.Mock).mock.calls.find(([u, o]) => u.includes('/ai/explain') && o?.method === 'POST')
+    expect(JSON.parse(call[1].body)).toEqual(expect.objectContaining({ action: 'explain', scenarioId: 'tgt' }))
+    const link = screen.getByTestId('continue-in-copilot') as HTMLAnchorElement
+    expect(decodeURIComponent(link.getAttribute('href')!)).toContain('/copilot?ask=Portfolio P4 (Jadarat Target)')
+  })
+
+  it('editing a state and taking snapshots only appear for people allowed to do them', async () => {
+    mockHasPermission = (code) => !['Scenario.Author', 'Views.CreateSnapshot'].includes(code)
+    setup()
+    await screen.findByText('Portfolio P4')
+    expect(screen.queryByText('eaviews.tb_edit_state')).not.toBeInTheDocument()
+    expect(screen.queryByText('eaviews.tb_snapshot')).not.toBeInTheDocument()
+    expect(screen.getByText('eaviews.tb_history')).toBeInTheDocument()
   })
 })
