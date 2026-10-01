@@ -1167,7 +1167,8 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const takeSnapshot = async () => {
     const name = window.prompt('Snapshot name:', `${view.name} - ${new Date().toLocaleDateString()}`)
     if (!name) return
-    await api.post(`/ea-views/${view.id}/snapshots`, { name })
+    // Captures the architecture state being viewed, not the view's default.
+    await api.post(`/ea-views/${view.id}/snapshots`, committedScenarioId ? { name, scenarioId: committedScenarioId } : { name })
     alert('Snapshot saved!')
   }
 
@@ -2719,6 +2720,24 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           {view.status === 'DRAFT' && <button style={{ ...S.btn('primary'), fontSize:12 }} onClick={publish}>🚀 Publish</button>}
         </div>
       </div>
+
+      {(() => {
+        // Facts about the result itself: a size limit was reached, or the
+        // view's scope leaves some objects out. Never hidden.
+        const notices = (dataset?.warnings ?? []).filter((w: any) => w.code === 'TRUNCATED' || w.code === 'SCOPE_EXCLUSION')
+        if (notices.length === 0) return null
+        return (
+          <div role="status" data-testid="result-notices" style={{ ...S.card, marginBottom:16, padding:'10px 14px', display:'flex', flexDirection:'column' as const, gap:4 }}>
+            <div style={{ fontSize:12, fontWeight:600, display:'flex', alignItems:'center', gap:6 }}>
+              {t('eaviews.result_notes')}
+              <HelpTip text={t('eaviews.result_notes_help')} />
+            </div>
+            {notices.map((w: any, i: number) => (
+              <div key={`${w.code}-${i}`} style={{ fontSize:12, color:'var(--text-dim)' }}>{w.message}</div>
+            ))}
+          </div>
+        )
+      })()}
 
       {showVersionHistory && (
         <div style={{ ...S.card, marginBottom:16, borderColor:'var(--accent)' }}>

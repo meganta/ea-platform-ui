@@ -913,6 +913,8 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'eaviews.my_views': { EN: 'My Views', AR: 'مشاهدي' },
   'eaviews.rel_changes': { EN: 'Relationship Changes', AR: 'تغييرات العلاقات' },
   'eaviews.title': { EN: 'EA Views', AR: 'مشاهد هندسة المؤسسات' },
+  'eaviews.result_notes': { EN: 'About this result', AR: 'حول هذه النتيجة' },
+  'eaviews.result_notes_help': { EN: 'Facts about what this view includes: whether a size limit was reached, and which objects the view\'s scope leaves out.', AR: 'معلومات عمّا يتضمنه هذا المشهد: هل بلغت النتيجة حدّ الحجم، وما العناصر التي يستبعدها نطاق المشهد.' },
   'copilot.new_meeting': { EN: 'New Meeting', AR: 'اجتماع جديد' },
   'copilot.meeting_title': { EN: 'Meeting Title *', AR: 'عنوان الاجتماع *' },
   'copilot.meeting_date': { EN: 'Meeting Date', AR: 'تاريخ الاجتماع' },
