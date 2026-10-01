@@ -1,4 +1,4 @@
-import { determineTableMode, buildRelationshipTable, buildMatrix } from '../tableMatrixUtils'
+import { determineTableMode, buildRelationshipTable, buildMatrix, cellInteraction } from '../tableMatrixUtils'
 
 describe('tableMatrixUtils', () => {
   // The exact Phase 4A acceptance example:
@@ -196,5 +196,18 @@ describe('tableMatrixUtils', () => {
     expect(result.reason).toContain('No two-axis relationship found')
     expect(result.rows).toBeUndefined()
     expect(result.columns).toBeUndefined()
+  })
+})
+
+describe('cellInteraction', () => {
+  it('returns the interaction recorded on the backing relationship', () => {
+    expect(cellInteraction({ count: 1, items: [{ attributes: { interaction: 'CRUD' } }] })).toBe('CRUD')
+  })
+  it('lists distinct values when several relationships back one cell', () => {
+    expect(cellInteraction({ count: 3, items: [{ attributes: { interaction: 'R' } }, { attributes: { interaction: 'RU' } }, { attributes: { interaction: 'R' } }] })).toBe('R / RU')
+  })
+  it('is null when nothing is recorded - never inferred', () => {
+    expect(cellInteraction({ count: 1, items: [{}] })).toBeNull()
+    expect(cellInteraction(undefined)).toBeNull()
   })
 })
