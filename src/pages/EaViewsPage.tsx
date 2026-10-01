@@ -12,8 +12,9 @@ import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { LandscapeView } from './eaviews/LandscapeView'
 import { StateMenu, EvolutionSummary, allStates, comparableWith, stateTitle, StateLine } from './eaviews/ArchitectureStates'
 import { InsightsStrip, ViewInsight } from './eaviews/InsightsStrip'
+import { layoutByQuestion, layoutByDomain } from './eaviews/canvasLayout'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
-import { determineTableMode, buildRelationshipTable, buildMatrix, cellInteraction } from './eaviews/tableMatrixUtils'
+import { determineTableMode, buildRelationshipTable, buildMatrix, cellInteraction, arrangeMatrix, MatrixOrder } from './eaviews/tableMatrixUtils'
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
 import { buildGraphIndexes, chooseFocusObject, computeInitialVisibleSet, expandNeighbors, expandAllNextPathHops, collapseBranch, pruneDanglingRelationships, computePathHighlight, applyGraphFilters, ExpandDirection } from './eaviews/graphDisclosureUtils'
 import { buildScenarioLineageTree, getScenarioLineagePath, chooseVisualizationAfterScenarioSwitch } from './eaviews/scenarioSelectorUtils'
@@ -155,8 +156,21 @@ export function compatGapText(compat: any): string {
   return parts.join(' · ')
 }
 
-function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }) {
-  const { isAR } = useLang()
+function ViewLibrary({ api, onCreate, onOpen }: { api: any, onCreate: (v: any) => void, onOpen?: (view: any) => void }) {
+  const { t, isAR } = useLang()
+  const auth = useAuth() as any
+  const canCustomize = typeof auth?.hasPermission === 'function' ? auth.hasPermission('Views.Create') : true
+  const [search, setSearch] = useState('')
+  const [leadershipOnly, setLeadershipOnly] = useState(false)
+  const [opening, setOpening] = useState<string | null>(null)
+  // Direct open: straight to the view, in a private workspace - no builder.
+  const openDirect = (vp: any) => {
+    if (!onOpen) { onCreate(vp); return }
+    setOpening(vp.id)
+    Promise.resolve(api.post(`/ea-views/open-viewpoint/${vp.id}`)).then((view: any) => {
+      if (view?.id) onOpen(view)
+    }).finally(() => setOpening(null))
+  }
   const [viewpoints, setViewpoints] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -203,7 +217,12 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
 
   const categories = Array.from(new Set(viewpoints.map(v => v.category)))
   const allStakeholders = Array.from(new Set(viewpoints.flatMap(v => v.stakeholders || []))).sort()
-  const filtered = viewpoints.filter(v => (!filterCat || v.category === filterCat) && (!filterStakeholder || (v.stakeholders || []).includes(filterStakeholder)))
+  const q = search.trim().toLowerCase()
+  const filtered = viewpoints.filter(v =>
+    (!filterCat || v.category === filterCat) &&
+    (!filterStakeholder || (v.stakeholders || []).includes(filterStakeholder)) &&
+    (!leadershipOnly || (v.contract?.audience || []).includes('EXECUTIVE')) &&
+    (!q || [v.name, v.nameAr, v.description, v.contract?.question, v.contract?.questionAr].some((x: any) => String(x || '').toLowerCase().includes(q))))
 
   const COMPAT_BADGE: Record<string, { label: string; color: string }> = {
     COMPATIBLE: { label: '✓ Compatible', color: '#2ecc71' },
@@ -221,6 +240,11 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
       <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' as const, alignItems: 'center' }}>
         <button style={{ ...S.btn(), background: !filterCat ? 'var(--accent)' : undefined, color: !filterCat ? 'var(--navy)' : undefined }} onClick={() => setFilterCat('')}>All</button>
         {categories.map(c => <button key={c} style={{ ...S.btn(), background: filterCat === c ? CATEGORY_COLOR[c] : undefined, color: filterCat === c ? '#fff' : undefined }} onClick={() => setFilterCat(c)}>{c}</button>)}
+        <label htmlFor="library-search" style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>{t('eaviews.lib_search')}</label>
+        <input id="library-search" style={{ ...S.input, maxWidth: 260 }} placeholder={t('eaviews.lib_search')} value={search} onChange={e => setSearch(e.target.value)} />
+        <input id="library-leadership" type="checkbox" checked={leadershipOnly} onChange={e => setLeadershipOnly(e.target.checked)} />
+        <label htmlFor="library-leadership" style={{ fontSize: 12 }}>{t('eaviews.lib_leadership')}</label>
+        <HelpTip text={t('eaviews.lib_help')} />
         {allStakeholders.length > 0 && (
           <select style={{ ...S.input, maxWidth: 180, marginLeft: 'auto' }} value={filterStakeholder} onChange={e => setFilterStakeholder(e.target.value)}>
             <option value="">All Stakeholders</option>
@@ -264,7 +288,10 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
                   {vp.concerns?.length > 0 && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' as const }}>{vp.concerns.map((c: string) => <span key={c} style={{ ...S.badge('#9b59b6'), fontSize: 10 }}>{c}</span>)}</div>}
                 </div>
               )}
-              <button style={{ ...S.btn('primary'), width: '100%', fontSize: 12 }} onClick={() => onCreate(vp)}>▶ Activate View</button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button style={{ ...S.btn('primary'), flex: 1, fontSize: 12 }} disabled={opening === vp.id} onClick={() => openDirect(vp)}>{opening === vp.id ? '⏳' : t('eaviews.lib_open')}</button>
+                {canCustomize && <button style={{ ...S.btn(), fontSize: 12 }} onClick={() => onCreate(vp)}>{t('eaviews.lib_customize')}</button>}
+              </div>
             </div>
             )
           })}
@@ -474,6 +501,10 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // (matrix rows and columns are two different axes, each pageable on
   // its own).
   const [matrixRowPage, setMatrixRowPage] = useState(1)
+  // P5 matrix reading aids and canvas layout choice.
+  const [matrixOrder, setMatrixOrder] = useState<MatrixOrder>('LINKED')
+  const [matrixHideEmptyCols, setMatrixHideEmptyCols] = useState(false)
+  const [canvasLayout, setCanvasLayout] = useState<'QUESTION' | 'DOMAIN'>('QUESTION')
   const [matrixColPage, setMatrixColPage] = useState(1)
   // ── Comparison mode (Phase 5B) ────────────────────────────────────────
   //
@@ -701,17 +732,10 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       if (heatmapRecommendedMetric) setHeatmapField(heatmapRecommendedMetric)
       const legacyNodes = d?.legacy?.nodes
       if (legacyNodes) {
-        // Auto-layout by domain in columns
-        const domGroups: Record<string,any[]> = {}
-        for (const n of legacyNodes) { const dk = n.domain||'Other'; if(!domGroups[dk])domGroups[dk]=[]; domGroups[dk].push(n) }
-        const pos: Record<string,{x:number,y:number}> = {}
-        let colX = 60
-        for (const [,ns] of Object.entries(domGroups)) {
-          const x = colX
-          ns.forEach((n,i) => { pos[n.id] = {x, y:60+i*80} })
-          colX += 220
-        }
-        setPositions(pos)
+        // Canvas reads left to right as the view's question does: primary
+        // objects, then each related group / path hop (see canvasLayout).
+        setPositions(d?.dataset?.objects?.length ? layoutByQuestion(legacyNodes, d.dataset.objects, d.dataset.paths || []) : layoutByDomain(legacyNodes))
+        setCanvasLayout('QUESTION')
       }
       setLoading(false)
     }
@@ -901,6 +925,15 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // its explicit confirmation step).
   const canAuthorState = can('Scenario.Author')
   const canSnapshot = can('Views.CreateSnapshot')
+  // A viewpoint opened directly is a private workspace until kept.
+  const isWorkspace = !!(view as any).isWorkspace
+  const [refineOpen, setRefineOpen] = useState(!isWorkspace)
+  const keepView = async () => {
+    const name = window.prompt(t('eaviews.keep_prompt'), view.name)
+    if (name === null) return
+    const kept = await api.post(`/ea-views/${view.id}/keep`, { name })
+    if (kept?.id) setViewOverrides(prev => ({ ...prev, ...kept }))
+  }
 
   const runAuthoringAction = async (action: () => Promise<any>) => {
     if (requiresCurrentEditConfirmation(activeScenarioObj) && !authoringConfirmedCurrent) {
@@ -1615,8 +1648,9 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         <div>{result.reason}</div>
       </div>
     }
-    const allRows = result.rows ?? []
-    const allCols = result.columns ?? []
+    const arranged = arrangeMatrix(result.rows ?? [], result.columns ?? [], result.cells, { order: matrixOrder, hideEmptyColumns: matrixHideEmptyCols })
+    const allRows = arranged.rows
+    const allCols = arranged.columns
     const totalRowPages = Math.max(1, Math.ceil(allRows.length / MATRIX_ROW_LIMIT))
     const totalColPages = Math.max(1, Math.ceil(allCols.length / MATRIX_COL_LIMIT))
     const clampedRowPage = Math.min(matrixRowPage, totalRowPages)
@@ -1632,6 +1666,19 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
             Path-based Matrix ({result.pathSteps.length} hops) — Derived through: {[result.pathSteps[0].from, ...result.pathSteps.map(s => s.to)].join(' → ')}
           </div>
         )}
+        <div data-testid="matrix-controls" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' as const, fontSize: 12, marginBottom: 10 }}>
+          <label htmlFor="matrix-order" style={{ color: 'var(--text-dim)' }}>{t('eaviews.matrix_order')}</label>
+          <select id="matrix-order" style={{ ...S.input, width: 'auto', padding: '3px 6px', fontSize: 12 }} value={matrixOrder} onChange={e => { setMatrixOrder(e.target.value as MatrixOrder); setMatrixRowPage(1) }}>
+            <option value="LINKED">{t('eaviews.matrix_order_linked')}</option>
+            <option value="GAPS">{t('eaviews.matrix_order_gaps')}</option>
+            <option value="NAME">{t('eaviews.matrix_order_name')}</option>
+          </select>
+          <input id="matrix-hide-empty" type="checkbox" checked={matrixHideEmptyCols} onChange={e => { setMatrixHideEmptyCols(e.target.checked); setMatrixColPage(1) }} />
+          <label htmlFor="matrix-hide-empty">{t('eaviews.matrix_hide_empty')}</label>
+          <HelpTip text={t('eaviews.matrix_help')} />
+          {arranged.emptyRows > 0 && <span data-testid="matrix-gaps" style={{ color: 'var(--text-dim)' }}>{t('eaviews.matrix_gaps')}: {arranged.emptyRows}</span>}
+          {arranged.hiddenColumns > 0 && <span style={{ color: 'var(--text-dim)' }}>{t('eaviews.matrix_hidden')}: {arranged.hiddenColumns}</span>}
+        </div>
         {(allRows.length > MATRIX_ROW_LIMIT || allCols.length > MATRIX_COL_LIMIT) && (
           <div className="flex items-center gap-3 flex-wrap" style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>
             <span>Showing {rows.length} of {allRows.length} {result.rowType} × {cols.length} of {allCols.length} {result.columnType}</span>
@@ -1667,13 +1714,15 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                 {cols.map((c: any) => (
                   <th key={c.id} style={{ padding: '6px 10px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: TYPE_COLOR[c.assetType]||'var(--text)', whiteSpace: 'nowrap', minWidth: 100, maxWidth: 140 }}>
                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div>
+                    <div style={{ fontSize: 10, fontWeight: 400, color: 'var(--text-dim)' }}>{arranged.columnTotals.get(c.id)}</div>
                   </th>
                 ))}
+                <th title={t('eaviews.matrix_total')} style={{ padding: '6px 10px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', fontSize: 11, color: 'var(--text-dim)' }}>Σ</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r: any, ri: number) => (
-                <tr key={r.id} style={{ background: ri % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>
+                <tr key={r.id} className={arranged.rowTotals.get(r.id) === 0 ? 'matrix-gap-row' : undefined} style={{ background: ri % 2 === 0 ? 'var(--navy-light)' : 'transparent' }}>
                   <td style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 12, fontWeight: 600, position: 'sticky', left: 0, background: ri % 2 === 0 ? 'var(--navy-light)' : 'var(--navy)', maxWidth: 140 }}>
                     <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: TYPE_COLOR[r.assetType]||'var(--text)' }}>{r.name}</div>
                   </td>
@@ -1687,6 +1736,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                       </td>
                     )
                   })}
+                  <td data-testid={`row-total-${r.id}`} style={{ padding: '6px 8px', borderBottom: '1px solid var(--border)', borderLeft: '1px solid var(--border)', textAlign: 'center', fontSize: 11, color: 'var(--text-dim)' }}>{arranged.rowTotals.get(r.id)}</td>
                 </tr>
               ))}
             </tbody>
@@ -2537,6 +2587,17 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => setZoom(z=>Math.max(0.25,z-0.15))}>−</button>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={() => { setZoom(1); setPan({x:0,y:0}) }}>⊡ Fit</button>
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} disabled={layoutRunning} onClick={runAutoLayout}>{layoutRunning ? '⏳ Laying out...' : '🧭 Auto-Layout'}</button>
+          <label htmlFor="canvas-layout" style={{ fontSize: 12, color: 'var(--text-dim)', padding: '3px 2px' }}>{t('eaviews.canvas_layout')}</label>
+          <select id="canvas-layout" style={{ ...S.input, width: 'auto', padding: '3px 6px', fontSize: 12 }} value={canvasLayout}
+            onChange={e => {
+              const mode = e.target.value as 'QUESTION' | 'DOMAIN'
+              setCanvasLayout(mode)
+              setPositions(mode === 'QUESTION' ? layoutByQuestion(filteredNodes, dataset?.objects || [], dataset?.paths || []) : layoutByDomain(filteredNodes))
+            }}>
+            <option value="QUESTION">{t('eaviews.canvas_by_question')}</option>
+            <option value="DOMAIN">{t('eaviews.canvas_by_domain')}</option>
+          </select>
+          <HelpTip text={t('eaviews.canvas_help')} />
           <button style={{ ...S.btn(), padding: '3px 10px', fontSize: 12 }} onClick={toggleFullscreen}>{isFullscreen ? '⤢ Exit Fullscreen' : '⛶ Fullscreen'}</button>
           {/* Section 12/13: visible-vs-total, distinct from dataset truncation */}
           <span style={{ fontSize: 11, color: 'var(--text-dim)', padding: '3px 6px' }} title="Objects currently shown vs. total in this dataset - expand relationships to explore more.">
@@ -2701,7 +2762,9 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
           )}
           <div style={{ display:'flex', gap:6, marginTop:2 }}>
             <span style={S.badge(CATEGORY_COLOR[view.category]||'#3498db')}>{view.category}</span>
-            <span style={S.badge(STATUS_COLOR[view.status])}>{view.status}</span>
+            {isWorkspace
+              ? <span data-testid="workspace-badge" style={S.badge('#7f8c8d')} title={t('eaviews.workspace_help')}>{t('eaviews.workspace')}</span>
+              : <span style={S.badge(STATUS_COLOR[view.status])}>{view.status}</span>}
             {view.approvalStatus && view.approvalStatus !== 'NOT_REQUIRED' && (
               <span style={S.badge(view.approvalStatus === 'APPROVED' ? '#2ecc71' : view.approvalStatus === 'REJECTED' ? '#e74c3c' : '#f39c12')}>
                 {view.approvalStatus === 'PENDING' ? '⏳ Pending Approval' : view.approvalStatus === 'APPROVED' ? '✓ Approved' : '✕ Rejected'}
@@ -2778,6 +2841,9 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
               <button style={authoringMode ? S.btn('primary') : S.btn()} onClick={() => { setAuthoringMode(m => !m); setComparisonMode(false); setAiAssistMode(false) }}>{t('eaviews.tb_edit_state')}</button>
             )}
           </>)}
+          {isWorkspace && can('Views.Create') && (
+            <button style={{ ...S.btn('primary'), fontSize:12 }} onClick={keepView}>{t('eaviews.keep')}</button>
+          )}
           <HelpTip text={t('eaviews.tb_help')} />
           <details style={{ position:'relative' }}>
             <summary style={{ ...S.btn(), fontSize:12, listStyle:'none' }}>{t('eaviews.tb_more')}</summary>
@@ -2906,8 +2972,12 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         </div>
       )}
 
-      {/* Filters */}
-      <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' as const }}>
+      {/* Filters - progressive disclosure: a directly opened viewpoint leads
+          with its facts; refining is one click away. */}
+      {!refineOpen && (
+        <button style={{ ...S.btn(), fontSize:12, marginBottom:16 }} aria-expanded={false} onClick={() => setRefineOpen(true)}>{t('eaviews.refine_show')}</button>
+      )}
+      {refineOpen && <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' as const }}>
         <input style={{ ...S.input, maxWidth:200 }} placeholder="🔍 Search..." value={search} onChange={e=>setSearch(e.target.value)} />
         <select style={{ ...S.input, maxWidth:150 }} value={filterDomain} onChange={e=>setFilterDomain(e.target.value)}>
           <option value="">All Domains</option>
@@ -2929,7 +2999,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         )}
         <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setShowSaveFilterBox(v => !v)}>💾 Save Filters</button>
         <div style={{ marginLeft:'auto', fontSize:13, color:'var(--text-dim)', display:'flex', alignItems:'center' }}>{filteredNodes.length} / {data?.nodes?.length||0} objects</div>
-      </div>
+      </div>}
 
       {showSaveFilterBox && (
         <div style={{ ...S.card, marginBottom:16, padding:12, display:'flex', gap:8, alignItems:'center' }}>
@@ -3670,7 +3740,7 @@ export default function EaViewsPage() {
 
       <div style={S.content}>
         {tab === 'dashboard' && <ViewsDashboard api={api} stats={stats} onTab={setTab} onOpenView={openView} />}
-        {tab === 'library' && <ViewLibrary api={api} onCreate={handleLibraryCreate} />}
+        {tab === 'library' && <ViewLibrary api={api} onCreate={handleLibraryCreate} onOpen={openView} />}
         {tab === 'my-views' && <MyViews api={api} onOpen={openView} initialArchitectureState={initialArchState} />}
         {tab === 'packs' && <CollectionsPanel api={api} onOpenView={openView} />}
         {tab === 'snapshots' && <SnapshotsPanel api={api} />}
