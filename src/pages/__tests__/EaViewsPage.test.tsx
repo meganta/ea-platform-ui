@@ -2247,3 +2247,56 @@ describe('EaViewsPage - ViewViewer result notices and snapshot state (P0)', () =
     });
   });
 });
+
+describe('EaViewsPage - Viewpoint Contract presentation (P1)', () => {
+  const VIEW = { id: 'view-p1', name: 'Portfolio P1', visualization: 'LANDSCAPE', architectureState: 'CURRENT', status: 'PUBLISHED', viewpointId: 'vp-1', rootObjectTypes: ['APPLICATION'] }
+  const contract = { version: 1, question: 'What applications do we own and run?', questionAr: 'ما التطبيقات التي نملكها؟', primaryVisualization: 'LANDSCAPE', allowedAlternates: ['TABLE', 'CARDS'] }
+  function payload(objects: any[], presentation: any) {
+    return {
+      dataset: { context: { scenario: { id: 'cur' } }, objects, relationships: [], paths: [], hierarchies: [], metrics: [], warnings: [], provenance: {} },
+      legacy: { nodes: objects.map(o => ({ id: o.id, name: o.name, assetType: 'Application', domain: 'APPLICATION', status: 'ACTIVE', tags: [], metadata: {} })), edges: [] },
+      eligibility: { eligible: [{ visualization: 'TABLE' }, { visualization: 'CARDS' }], ineligible: [] },
+      contract, presentation,
+    }
+  }
+
+  it('shows the question and offers only the contract visualizations the result supports', async () => {
+    mockSearchParams = new URLSearchParams('viewId=view-p1')
+    mockFetch({ '/ea-views/view-p1': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [],
+      '/ea-views/view-p1/dataset': payload([{ id: 'a1', name: 'Payroll', role: 'PRIMARY' }], { primary: 'LANDSCAPE', available: ['LANDSCAPE', 'TABLE', 'CARDS'], resultState: { state: 'OK' } }) })
+    render(<EaViewsPage />)
+    expect(await screen.findByTestId('view-question')).toHaveTextContent('ما التطبيقات التي نملكها؟') // default locale is AR
+    expect(await screen.findByText(/LANDSCAPE/)).toBeInTheDocument()
+    expect(screen.queryByText(/🕸 GRAPH/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/🔥 HEATMAP/)).not.toBeInTheDocument()
+    expect(await screen.findByTestId('landscape')).toHaveTextContent('Payroll')
+  })
+
+  it("shows the contract's empty-state meaning instead of an empty renderer", async () => {
+    mockSearchParams = new URLSearchParams('viewId=view-p1')
+    mockFetch({ '/ea-views/view-p1': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [],
+      '/ea-views/view-p1/dataset': payload([], { primary: 'LANDSCAPE', available: ['LANDSCAPE'], resultState: { state: 'NO_DATA', message: 'There are no applications in this architecture state.' } }) })
+    render(<EaViewsPage />)
+    const state = await screen.findByTestId('result-state')
+    expect(state).toHaveTextContent('eaviews.result_no_data')
+    expect(state).toHaveTextContent('There are no applications in this architecture state.')
+    expect(screen.queryByTestId('landscape')).not.toBeInTheDocument()
+  })
+
+  it('a custom view without a contract keeps the full visualization strip and shows no question', async () => {
+    mockSearchParams = new URLSearchParams('viewId=view-p1')
+    mockFetch({ '/ea-views/view-p1': { ...VIEW, viewpointId: null, visualization: 'TABLE' }, '/ea-views/stats': {}, '/ea-views/scenarios': [],
+      '/ea-views/view-p1/dataset': { ...payload([{ id: 'a1', name: 'Payroll', role: 'PRIMARY' }], null), contract: null } })
+    render(<EaViewsPage />)
+    expect(await screen.findByText(/🕸 GRAPH/)).toBeInTheDocument()
+    expect(screen.queryByTestId('view-question')).not.toBeInTheDocument()
+  })
+})
+
+describe('compatGapText()', () => {
+  it('names every missing type and relationship', () => {
+    const { compatGapText } = require('../EaViewsPage')
+    expect(compatGapText({ missingRootTypes: ['APPLICATION'], missingRelatedTypes: ['ORG_UNIT'], missingRelationships: [{ from: 'APPLICATION', to: 'Interface', via: 'APP_IS_CONSUMER_OF_INTERFACE' }] }))
+      .toBe('No data for: APPLICATION · No related data for: ORG_UNIT · No APP_IS_CONSUMER_OF_INTERFACE between APPLICATION and Interface')
+  })
+})
