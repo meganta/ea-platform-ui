@@ -1910,13 +1910,15 @@ const RECOMMENDATION_LABEL: Record<string, { en: string; ar: string }> = {
 }
 // Mirrors apps/api/src/innovation/study.service.ts's STUDY_SECTION_DEFS (story order: summary, why, what it enables,
 // how, cost and value, risks, recommendation) - keep in sync if that list changes.
-const STUDY_SECTIONS: { key: string; en: string; ar: string; shape: 'text' | 'list' | 'recommendation' }[] = [
+const STUDY_SECTIONS: { key: string; en: string; ar: string; shape: 'text' | 'list' | 'recommendation' | 'impact' }[] = [
   { key: 'EXECUTIVE_SUMMARY', en: 'Executive Summary', ar: 'الملخص التنفيذي', shape: 'text' },
   { key: 'BUSINESS_PROBLEM', en: 'Business Problem / Opportunity', ar: 'المشكلة/الفرصة التجارية', shape: 'text' },
   { key: 'STRATEGIC_ALIGNMENT', en: 'Strategic Alignment', ar: 'التوافق الاستراتيجي', shape: 'text' },
   { key: 'CAPABILITY_IMPACT', en: 'Business Capability Impact', ar: 'أثر القدرات المؤسسية', shape: 'list' },
   { key: 'USE_CASES', en: 'Potential Use Cases', ar: 'حالات الاستخدام المحتملة', shape: 'list' },
   { key: 'ARCHITECTURE_FIT', en: 'Architecture Fit Assessment', ar: 'تقييم توافق البنية', shape: 'text' },
+  // Optional - only on studies that opted in to the EA impact analysis.
+  { key: 'EA_IMPACT_ANALYSIS', en: 'EA Impact Analysis', ar: 'تحليل الأثر على البنية المؤسسية', shape: 'impact' },
   { key: 'TECHNOLOGY_OPTIONS', en: 'Recommended Technology Options', ar: 'خيارات التقنية الموصى بها', shape: 'list' },
   { key: 'BENCHMARK', en: 'Product Benchmark', ar: 'المقارنة المعيارية للمنتجات', shape: 'list' },
   { key: 'COST_ESTIMATE', en: 'Cost Estimate (CAPEX / OPEX)', ar: 'تقدير التكاليف (الرأسمالية / التشغيلية)', shape: 'list' },
@@ -1995,6 +1997,116 @@ export function StudyCostEstimate({ lines, isAR }: { lines: any[]; isAR: boolean
         </div>
       )}
       <StudyRegisterTable rows={rows} isAR={isAR} numeric={['low', 'high']} />
+    </div>
+  )
+}
+
+const EA_IMPACT_HELP = {
+  en: 'Optional. The AI also assesses the study against every domain of your EA Repository (Current architecture) and lists, per domain, only the objects that are or might be impacted, with a description of the impact. It takes longer and uses more AI credits. You can switch it on or off later from the study.',
+  ar: 'اختياري. يقيّم الذكاء الاصطناعي الدراسة أيضًا مقابل كل مجال في مستودع البنية المؤسسية (البنية الحالية)، ويسرد لكل مجال العناصر المتأثرة أو المحتمل تأثرها فقط مع وصف الأثر. يستغرق وقتًا أطول ويستهلك أرصدة ذكاء اصطناعي إضافية. يمكنك تفعيله أو إيقافه لاحقًا من الدراسة.',
+}
+// Mirrors apps/api/src/innovation/study-ea-impact.ts (domains, impact types) - keep in sync if that list changes.
+const EA_IMPACT_DOMAIN_LABEL: Record<string, { en: string; ar: string }> = {
+  BUSINESS_ARCHITECTURE: { en: 'Business Architecture', ar: 'معمارية الأعمال' },
+  BENEFICIARY_EXPERIENCE: { en: 'Beneficiary Experience', ar: 'تجربة المستفيد' },
+  APPLICATION_INTEGRATION: { en: 'Applications & Integration', ar: 'التطبيقات والتكامل' },
+  DATA_ARCHITECTURE: { en: 'Data Architecture', ar: 'معمارية البيانات' },
+  INFRASTRUCTURE: { en: 'Infrastructure & Technology', ar: 'البنية التحتية والتقنية' },
+  SECURITY_ARCHITECTURE: { en: 'Security Architecture', ar: 'معمارية الأمن' },
+  STRATEGY_LAYER: { en: 'Strategy Layer', ar: 'الطبقة الاستراتيجية' },
+  UNCLASSIFIED: { en: 'Other / Unclassified', ar: 'أخرى / غير مصنفة' },
+}
+const EA_IMPACT_TYPE_LABEL: Record<string, { en: string; ar: string }> = {
+  ENHANCE: { en: 'Enhance', ar: 'تعزيز' }, MODIFY: { en: 'Modify', ar: 'تعديل' }, INTEGRATE: { en: 'Integrate', ar: 'تكامل' },
+  REPLACE: { en: 'Replace', ar: 'استبدال' }, RETIRE: { en: 'Retire', ar: 'إيقاف' }, DEPENDENCY: { en: 'Dependency', ar: 'اعتمادية' },
+}
+const EA_IMPACT_LEVEL_COLOR: Record<string, string> = { HIGH: RATING_COLOR.bad, MEDIUM: RATING_COLOR.mid, LOW: '#3498db', NONE: '#64748B' }
+
+/** EA impact analysis: headline counts, then every domain - impacted ones with their objects, the rest in one line each. */
+export function StudyEaImpact({ content, isAR }: { content: any; isAR: boolean }) {
+  const L = (en: string, ar: string) => (isAR ? ar : en)
+  const domains: any[] = Array.isArray(content?.domains) ? content.domains : []
+  const totals = content?.totals || {}
+  const domainName = (d: any) => EA_IMPACT_DOMAIN_LABEL[d.domain]?.[isAR ? 'ar' : 'en'] || d.domainName || d.domain
+  const levelBadge = (level: string) => {
+    const label = level === 'NONE' ? L('No impact', 'لا أثر') : STUDY_VALUE_LABELS[level]?.[isAR ? 'ar' : 'en'] || level
+    return <span data-rating={level} style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700, color: EA_IMPACT_LEVEL_COLOR[level] || '#64748B', background: `${EA_IMPACT_LEVEL_COLOR[level] || '#64748B'}22`, whiteSpace: 'nowrap' as const }}>{label}</span>
+  }
+  const impacted = domains.filter(d => d.status === 'ASSESSED' && (d.impactedObjects || []).length > 0)
+  const quiet = domains.filter(d => !impacted.includes(d))
+  const th = { textAlign: isAR ? 'right' as const : 'left' as const, padding: '8px 10px', background: 'var(--navy)', color: 'var(--text-dim)', fontWeight: 700, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' as const }
+  const td = { padding: '8px 10px', verticalAlign: 'top' as const, lineHeight: 1.5 }
+  const tiles = [
+    { key: 'objects', label: L('Impacted objects', 'العناصر المتأثرة'), value: totals.impactedObjects ?? 0, color: RATING_COLOR.bad },
+    { key: 'domains', label: L('Impacted domains', 'المجالات المتأثرة'), value: `${totals.impactedDomains ?? 0} / ${domains.filter(d => d.status !== 'NO_OBJECTS').length}`, color: RATING_COLOR.mid },
+    { key: 'repository', label: L('Objects assessed (Current architecture)', 'العناصر المقيَّمة (البنية الحالية)'), value: totals.assessedObjects ?? 0, color: '#3498db' },
+  ]
+  return (
+    <div data-testid="study-ea-impact">
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 12 }}>
+        {tiles.map(tile => (
+          <div key={tile.key} data-testid={`ea-impact-total-${tile.key}`} style={{ background: 'var(--navy)', border: '1px solid var(--border)', borderTop: `3px solid ${tile.color}`, borderRadius: 8, padding: 10 }}>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}>{tile.label}</div>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{tile.value}</div>
+          </div>
+        ))}
+      </div>
+      {impacted.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>{L('No Repository object was identified as impacted.', 'لم يُحدَّد أي عنصر متأثر في المستودع.')}</div>}
+      {impacted.map(d => (
+        <div key={d.domain} data-testid={`ea-impact-domain-${d.domain}`} style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const, marginBottom: 6 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, flex: 1 }}>{domainName(d)}</div>
+            {levelBadge(d.impactLevel)}
+            <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? `${d.impactedObjects.length} من ${d.objectCount} عنصر متأثر` : `${d.impactedObjects.length} of ${d.objectCount} objects impacted`}</span>
+          </div>
+          {d.summary && <div style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 8 }}>{d.summary}</div>}
+          {d.assessedCount < d.objectCount && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' as const, marginBottom: 8 }}>{isAR ? `قُيّم ${d.assessedCount} من ${d.objectCount} عنصرًا (الأكثر صلة أولًا).` : `${d.assessedCount} of ${d.objectCount} objects assessed (most relevant first).`}</div>}
+          <div style={{ overflowX: 'auto' as const, WebkitOverflowScrolling: 'touch' as any }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 12, minWidth: 640 }}>
+              <thead><tr>
+                <th scope="col" style={th}>{L('Object', 'العنصر')}</th>
+                <th scope="col" style={th}>{L('Type', 'النوع')}</th>
+                <th scope="col" style={th}>{L('Impact Type', 'نوع الأثر')}</th>
+                <th scope="col" style={th}>{L('Level', 'المستوى')}</th>
+                <th scope="col" style={th}>{L('Impact Description', 'وصف الأثر')}</th>
+              </tr></thead>
+              <tbody>
+                {d.impactedObjects.map((o: any) => (
+                  <tr key={o.assetId} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ ...td, fontWeight: 600 }}>{o.name}</td>
+                    <td style={td}>{o.typeLabel || o.assetType}</td>
+                    <td style={td}>
+                      {EA_IMPACT_TYPE_LABEL[o.impactType]?.[isAR ? 'ar' : 'en'] || o.impactType}
+                      {o.nature === 'INDIRECT' && <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{L('Indirect (possible)', 'غير مباشر (محتمل)')}</div>}
+                    </td>
+                    <td style={td}>{levelBadge(o.impactLevel)}</td>
+                    <td style={td}>{o.description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+      {quiet.length > 0 && (
+        <div style={{ border: '1px solid var(--border)', borderRadius: 8, padding: 12 }}>
+          <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6 }}>{L('Other domains', 'المجالات الأخرى')}</div>
+          {quiet.map(d => (
+            <div key={d.domain} data-testid={`ea-impact-domain-${d.domain}`} style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' as const, fontSize: 12, padding: '4px 0' }}>
+              <span style={{ fontWeight: 600, minWidth: 180 }}>{domainName(d)}</span>
+              <span style={{ color: d.status === 'FAILED' ? RATING_COLOR.bad : 'var(--text-dim)', flex: 1, minWidth: 200 }}>
+                {d.status === 'NO_OBJECTS' ? L('No objects recorded in this domain.', 'لا توجد عناصر مسجلة في هذا المجال.')
+                  : d.status === 'FAILED' ? L('Not assessed — run the analysis again.', 'لم يُقيَّم — أعد تشغيل التحليل.')
+                  : (d.summary || L('No impact identified.', 'لم يُحدَّد أثر.'))}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div data-testid="study-source-note" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8, fontStyle: 'italic' as const }}>
+        {L('Assessed by AI against your EA Repository (Current architecture). Only objects that are or might be impacted are listed; every object is a real Repository object. Review before relying on it.',
+          'تقييم آلي مقابل مستودع البنية المؤسسية (البنية الحالية). تُدرج فقط العناصر المتأثرة أو المحتمل تأثرها، وجميعها عناصر حقيقية في المستودع. يُرجى المراجعة قبل الاعتماد عليه.')}
+      </div>
     </div>
   )
 }
@@ -2339,7 +2451,7 @@ function StudiesTab({ api, isAR, t }: any) {
 }
 
 function StudyCreateForm({ api, isAR, t, onDone, onCancel }: any) {
-  const [form, setForm] = useState({ title: '', titleAr: '', objective: '', originType: 'MANUAL', originRadarItemId: '', originIdeaId: '', originDescription: '', scope: 'STANDARD' })
+  const [form, setForm] = useState({ title: '', titleAr: '', objective: '', originType: 'MANUAL', originRadarItemId: '', originIdeaId: '', originDescription: '', scope: 'STANDARD', includeImpactAnalysis: false })
   const [radarItems, setRadarItems] = useState<any[]>([])
   const [ideas, setIdeas] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
@@ -2358,6 +2470,7 @@ function StudyCreateForm({ api, isAR, t, onDone, onCancel }: any) {
     try {
       const created = await api.post('/innovation/studies', {
         title: form.title, titleAr: form.titleAr || undefined, objective: form.objective, originType: form.originType, scope: form.scope,
+        includeImpactAnalysis: form.includeImpactAnalysis,
         originRadarItemId: form.originType === 'RADAR_ITEM' ? form.originRadarItemId : undefined,
         originIdeaId: form.originType === 'IDEA' ? form.originIdeaId : undefined,
         originDescription: form.originType !== 'RADAR_ITEM' && form.originType !== 'IDEA' ? form.originDescription : undefined,
@@ -2413,6 +2526,11 @@ function StudyCreateForm({ api, isAR, t, onDone, onCancel }: any) {
         <><div style={S.label}>{t('innov.origin_description')}</div>
         <textarea style={{ ...S.input, minHeight: 60, resize: 'vertical' as const, fontFamily: 'inherit' }} value={form.originDescription} onChange={e => setForm(f => ({ ...f, originDescription: e.target.value }))} /></>
       )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 12px', flexWrap: 'wrap' as const }}>
+        <input id="study-include-impact" type="checkbox" checked={form.includeImpactAnalysis} onChange={e => setForm(f => ({ ...f, includeImpactAnalysis: e.target.checked }))} />
+        <label htmlFor="study-include-impact" style={{ fontSize: 13, cursor: 'pointer' }}>{isAR ? 'تضمين تحليل الأثر على البنية المؤسسية' : 'Include EA impact analysis'}</label>
+        <HelpTip text={EA_IMPACT_HELP[isAR ? 'ar' : 'en']} />
+      </div>
       <div style={S.row}>
         <button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? t('innov.saving') : t('innov.create_study')}</button>
         <button style={S.btn()} onClick={onCancel}>{t('innov.cancel')}</button>
@@ -2456,7 +2574,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
   const startEdit = async () => {
     setActionError('')
     await loadImpactPreview()
-    setEditDraft(def?.shape === 'recommendation' ? { ...content } : def?.shape === 'list' ? JSON.stringify(content, null, 2) : (content || ''))
+    setEditDraft(def?.shape === 'recommendation' ? { ...content } : def?.shape === 'list' || def?.shape === 'impact' ? JSON.stringify(content, null, 2) : (content || ''))
     setEditing(true)
   }
 
@@ -2464,7 +2582,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
     setSaving(true); setActionError('')
     try {
       let payload = editDraft
-      if (def?.shape === 'list') {
+      if (def?.shape === 'list' || def?.shape === 'impact') {
         try { payload = JSON.parse(editDraft) } catch { setActionError(isAR ? 'صيغة JSON غير صالحة' : 'Invalid JSON — check the structure before saving.'); setSaving(false); return }
       }
       await api.put(`/innovation/study-sections/${section.id}/content`, { content: payload })
@@ -2520,6 +2638,9 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
           {section.sectionKey === 'COST_ESTIMATE' && <HelpTip text={isAR
             ? 'تكاليف تنفيذ الخيار الأنسب: الرأسمالية لمرة واحدة والتشغيلية سنوياً، لكل بند نطاق وطريقة حساب ومبررات. أضف افتراضات الدراسة (مثل عدد المستخدمين) قبل التوليد لتحسين الدقة. الإجماليات وتكلفة الملكية لثلاث سنوات تُحسب تلقائياً من البنود.'
             : 'Cost of implementing the best-fit option: one-time CAPEX and yearly OPEX, each line with a range, its calculation and rationale. Add study assumptions (e.g. user numbers) before generating for sharper figures. Totals and the 3-year cost of ownership are computed from the lines.'} />}
+          {section.sectionKey === 'EA_IMPACT_ANALYSIS' && <HelpTip text={isAR
+            ? 'أثر الدراسة على كل مجال في مستودع البنية المؤسسية: العناصر المتأثرة أو المحتمل تأثرها فقط، مع نوع الأثر ومستواه ووصفه. «غير مباشر» يعني أن العنصر قد يتأثر عبر علاقاته. التعديل اليدوي لا يمكنه إضافة عنصر غير موجود في المستودع، و«إعادة النظر بالذكاء الاصطناعي» تعيد التحليل مقابل المستودع وفق توجيهك.'
+            : 'The study’s impact on each domain of your EA Repository: only objects that are or might be impacted, with the impact type, level and description. “Indirect” means the object might be affected through its relationships. Manual edits cannot add an object that is not in the Repository; Revisit with AI re-runs the analysis against the Repository with your guidance.'} />}
           {section.sectionKey === 'BENCHMARK' && <HelpTip text={isAR
             ? 'يقارن المنتجات المسماة في خيارات التقنية على خمسة معايير. يُعد الصف مستندًا إلى أدلة فقط عندما يستشهد بدليل موثق في رادار التقنية للتقنية محل الدراسة؛ وإلا فهو تقييم نوعي وليس قياسًا. التعديل اليدوي لا يمكنه إضافة دليل.'
             : 'Compares the products named in the technology options on five criteria. A row counts as evidence-backed only when it cites recorded Tech Radar evidence for the study’s technology; otherwise it is a qualitative assessment, not a measurement. Manual edits cannot add evidence.'} />}
@@ -2574,7 +2695,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
               <div style={S.label}>{isAR ? 'المبررات' : 'Rationale'}</div>
               <textarea style={{ ...S.input, minHeight: 100, resize: 'vertical' as const, fontFamily: 'inherit' }} value={editDraft?.rationale || ''} onChange={e => setEditDraft((d: any) => ({ ...d, rationale: e.target.value }))} />
             </div>
-          ) : def?.shape === 'list' ? (
+          ) : def?.shape === 'list' || def?.shape === 'impact' ? (
             <textarea style={{ ...S.input, minHeight: 160, resize: 'vertical' as const, fontFamily: 'monospace', fontSize: 12 }} value={editDraft || ''} onChange={e => setEditDraft(e.target.value)} />
           ) : (
             <textarea style={{ ...S.input, minHeight: 120, resize: 'vertical' as const, fontFamily: 'inherit' }} value={editDraft || ''} onChange={e => setEditDraft(e.target.value)} />
@@ -2588,6 +2709,8 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
         <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{isAR ? 'لم يتم إنشاء هذا القسم بعد' : 'Not yet generated'}</div>
       ) : def?.shape === 'text' ? (
         <div style={{ fontSize: 13, lineHeight: 1.7, whiteSpace: 'pre-wrap' as const }}>{content}</div>
+      ) : def?.shape === 'impact' ? (
+        <StudyEaImpact content={content} isAR={isAR} />
       ) : def?.shape === 'recommendation' ? (
         <div>
           <span style={S.badge('#2ecc71')}>{isAR ? RECOMMENDATION_LABEL[content.recommendation]?.ar : RECOMMENDATION_LABEL[content.recommendation]?.en}</span>
@@ -2650,6 +2773,8 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
   const [converting, setConverting] = useState(false)
   const [addingAssumption, setAddingAssumption] = useState(false)
   const [assumptionForm, setAssumptionForm] = useState({ label: '', value: '' })
+  const [impactBusy, setImpactBusy] = useState<'' | 'toggle' | 'run'>('')
+  const [impactError, setImpactError] = useState('')
 
   const load = useCallback(() => { api.get(`/innovation/studies/${studyId}`).then(setStudy) }, [api, studyId])
   useEffect(() => { load() }, [load])
@@ -2659,6 +2784,19 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
     try { await api.post(`/innovation/studies/${studyId}/generate`); await load() }
     catch (e: any) { setGenError(e.message); await load() }
     finally { setGenerating(false) }
+  }
+
+  const toggleImpactAnalysis = async (enabled: boolean) => {
+    setImpactBusy('toggle'); setImpactError('')
+    try { await api.put(`/innovation/studies/${studyId}/impact-analysis`, { enabled }); await load() }
+    catch (e: any) { setImpactError(e.message || String(e)) }
+    finally { setImpactBusy('') }
+  }
+  const runImpactAnalysis = async () => {
+    setImpactBusy('run'); setImpactError('')
+    try { await api.post(`/innovation/studies/${studyId}/impact-analysis/run`); await load() }
+    catch (e: any) { setImpactError(e.message || String(e)) }
+    finally { setImpactBusy('') }
   }
 
   const moveTo = async (status: string) => { await api.put(`/innovation/studies/${studyId}/status`, { status }); await load() }
@@ -2715,6 +2853,7 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
   // Study order comes from the section definitions: a section added later (the benchmark) must not tie with older sections' stored orderIndex.
   const sectionRank = (sec: any) => { const i = STUDY_SECTIONS.findIndex(d => d.key === sec.sectionKey); return i < 0 ? 1000 + (sec.orderIndex ?? 0) : i }
   const sortedSections = [...(study.sections || [])].sort((a: any, b: any) => sectionRank(a) - sectionRank(b))
+  const impactSection = (study.sections || []).find((s: any) => s.sectionKey === 'EA_IMPACT_ANALYSIS')
 
   return (
     <div>
@@ -2743,6 +2882,19 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
           </button>
         </div>
         {genError && <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 10 }}>{t('innov.generation_failed')}: {genError}</div>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+          <input id="study-impact-toggle" type="checkbox" checked={!!study.includeImpactAnalysis} disabled={!!impactBusy || study.status === 'AI_RESEARCH'} onChange={e => toggleImpactAnalysis(e.target.checked)} />
+          <label htmlFor="study-impact-toggle" style={{ fontSize: 13, cursor: 'pointer' }}>{isAR ? 'تضمين تحليل الأثر على البنية المؤسسية' : 'Include EA impact analysis'}</label>
+          <HelpTip text={EA_IMPACT_HELP[isAR ? 'ar' : 'en']} />
+          <div style={{ flex: 1 }} />
+          {study.includeImpactAnalysis && hasGeneratedContent && (
+            <button style={S.btn()} onClick={runImpactAnalysis} disabled={!!impactBusy || generating || study.status === 'AI_RESEARCH'}>
+              {impactBusy === 'run' ? (isAR ? 'جارٍ تحليل الأثر…' : 'Analyzing impact…') : impactSection?.content != null ? (isAR ? 'إعادة تشغيل تحليل الأثر' : 'Re-run impact analysis') : (isAR ? 'تشغيل تحليل الأثر' : 'Run impact analysis')}
+            </button>
+          )}
+        </div>
+        {study.includeImpactAnalysis && !hasGeneratedContent && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>{isAR ? 'سيُنفَّذ تحليل الأثر ضمن توليد الدراسة.' : 'The impact analysis runs as part of generating the study.'}</div>}
+        {impactError && <div style={{ fontSize: 12, color: '#e74c3c', marginTop: 8 }}>{impactError}</div>}
       </div>
 
       {!hasGeneratedContent && !generating && study.status !== 'AI_RESEARCH' && (
