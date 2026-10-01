@@ -32,6 +32,28 @@ export default function StrategyRefreshPage() {
   const [amendTitle, setAmendTitle] = useState('')
   const [amendDescription, setAmendDescription] = useState('')
   const selection = useRef<string | null>(null)
+  const root = useRef<HTMLElement>(null)
+  const modalOpen = createOpen || !!review || !!evidence
+  useEffect(() => {
+    if (!modalOpen) return
+    const dialog = root.current?.querySelector<HTMLElement>('[role="dialog"]')
+    if (!dialog) return
+    const previous = document.activeElement as HTMLElement | null
+    const focusable = () => Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]'))
+    dialog.tabIndex = -1
+    ;(focusable()[0] || dialog).focus()
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !busy) { event.preventDefault(); setCreateOpen(false); setReview(null); setEvidence(null) }
+      if (event.key !== 'Tab') return
+      const controls = focusable()
+      const first = controls[0] || dialog
+      const last = controls[controls.length - 1] || dialog
+      if (event.shiftKey && (document.activeElement === first || document.activeElement === dialog)) { event.preventDefault(); last.focus() }
+      else if (!event.shiftKey && (document.activeElement === last || document.activeElement === dialog)) { event.preventDefault(); first.focus() }
+    }
+    dialog.addEventListener('keydown', onKey)
+    return () => { dialog.removeEventListener('keydown', onKey); if (previous?.isConnected) previous.focus() }
+  }, [modalOpen, busy, evidence?.id, review?.finding.id])
   const loadList = useCallback(() => strategyRefreshApi.list().then(setList), [])
   useEffect(() => { loadList().catch(e => setError(e.message)) }, [loadList])
   useEffect(() => {
@@ -102,7 +124,7 @@ export default function StrategyRefreshPage() {
   const linkedFacts = findings.filter(f => evidence?.evidence?.factIds?.includes(f.id))
   const linkedTenant = refresh?.context?.evidence.filter(e => evidence?.evidence?.tenantEvidenceIds?.includes(e.id)) || []
 
-  return <main className="strategy-refresh" dir={isAR ? 'rtl' : 'ltr'}>
+  return <main ref={root} className="strategy-refresh" dir={isAR ? 'rtl' : 'ltr'}>
     <header><div><h1>{t('strategy.refresh.heading')}</h1><p>{t('strategy.refresh.intro')}</p></div>{hasPermission('Strategy.Refresh') && <button className="primary" disabled={busy} onClick={() => setCreateOpen(true)}>{t('strategy.refresh.start')}</button>}</header>
     {error && <div role="alert" className="error">{error}</div>}
     {!refresh ? <section className="refresh-list"><h2>{t('strategy.refresh.history')}</h2>{list.length ? list.map(item => <button className="refresh-card" key={item.id} onClick={() => open(item.id)}><strong>{item.title}</strong><span>{displayLabel(item.analysisStatus)} · {displayLabel(item.strategyStatus)}</span></button>) : <p>{t('strategy.refresh.empty')}</p>}</section> : <>
