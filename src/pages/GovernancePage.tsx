@@ -6,6 +6,7 @@ import HelpTip from '../components/HelpTip'
 import { AttachedViewsPanel } from '../components/AttachedViewsPanel'
 import { exportFileName } from '../lib/exportFileName'
 import PrincipleCompliancePanel from '../components/PrincipleCompliancePanel'
+import PipelineStepList, { PipelineStep, stepsRatio } from '../components/PipelineStepList'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -489,23 +490,13 @@ function IntelligenceAdvisor({ reviewType, onReady }: { reviewType: string; onRe
 
 function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any, f: any[], rpt: any) => void }) {
   const api = useApi()
+  const { isAR } = useLang()
   const [stage, setStage] = useState<'gaps' | 'reviewing' | 'done'>('gaps')
   const [progress, setProgress] = useState(0)
   const [statusMsg, setStatusMsg] = useState('Analyzing input documents...')
-  const [engines, setEngines] = useState([
-    { label: 'Business Architecture', done: false },
-    { label: 'Beneficiary Experience', done: false },
-    { label: 'Application & Integration', done: false },
-    { label: 'Data Architecture', done: false },
-    { label: 'Infrastructure', done: false },
-    { label: 'Security Architecture', done: false },
-    { label: 'Compliance Matrix', done: false },
-    { label: 'Strategic Alignment', done: false },
-    { label: 'Risk Assessment', done: false },
-    { label: 'Financial Optimization', done: false },
-  ])
+  // The steps that apply to this review type, as the backend reports them (no simulated ticking).
+  const [steps, setSteps] = useState<PipelineStep[] | null>(null)
   const pollRef = useRef<any>(null)
-  const engineTimerRef = useRef<any>(null)
   const startedRef = useRef(false)
 
   useEffect(() => {
@@ -514,7 +505,6 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
     runFlow()
     return () => {
       clearInterval(pollRef.current)
-      clearInterval(engineTimerRef.current)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -565,19 +555,9 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
 
     setStatusMsg('AI review pipeline running...')
 
-    // Animate engines progressively — use ref so closure stays fresh
-    const engineIdxRef = { current: 0 }
-    const totalEngines = 10
-    const tickEngine = () => {
-      const idx = engineIdxRef.current
-      if (idx < totalEngines) {
-        setEngines(prev => prev.map((e, i) => i <= idx ? { ...e, done: true } : e))
-        engineIdxRef.current = idx + 1
-        setProgress(30 + Math.round(((idx + 1) / totalEngines) * 50))
-      }
-    }
-    tickEngine()
-    engineTimerRef.current = setInterval(tickEngine, 7000)
+    // Progress comes from the pipeline itself: the steps it plans for this
+    // review type and the ones it has finished.
+    setSteps(null)
 
     // Poll for completion — also detect DRAFT (pipeline crashed after start)
     // Confirmed real bug, traced directly: this only ever checked for
@@ -595,10 +575,16 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
     let staleDraftCount = 0
     pollRef.current = setInterval(async () => {
       const r = await api.get('/governance/reviews/' + review.id).catch(() => null)
+      const reported: PipelineStep[] | undefined = r?.pipelineProgress?.steps
+      if (Array.isArray(reported) && reported.length > 0) {
+        setSteps(reported)
+        setProgress(30 + Math.round(stepsRatio(reported) * 65))
+        const running = reported.filter(s => s.state === 'pending').length
+        setStatusMsg(running > 0 ? `${reported.length - running} of ${reported.length} steps complete…` : 'Finalizing report...')
+      }
       if (r?.status === 'COMPLETED' || r?.status === 'READY_FOR_REVIEW') {
         clearInterval(pollRef.current)
-        clearInterval(engineTimerRef.current)
-        setEngines(prev => prev.map(e => ({ ...e, done: true })))
+        setSteps(prev => prev ? prev.map(st => st.state === 'pending' ? { ...st, state: 'done' } : st) : prev)
         setProgress(95)
         setStatusMsg('Generating report...')
         await sleep(1500)
@@ -623,7 +609,6 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
         staleDraftCount++
         if (staleDraftCount >= 3) {
           clearInterval(pollRef.current)
-          clearInterval(engineTimerRef.current)
           setPipelineError('Pipeline crashed during execution. Check Cloud Run logs for details. You can retry below.')
         }
       }
@@ -633,7 +618,7 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
   const handleManualRetry = async () => {
     setRetrying(true)
     setPipelineError(null)
-    setEngines(prev => prev.map(e => ({ ...e, done: false })))
+    setSteps(null)
     setProgress(30)
     startedRef.current = false
     await runFlow()
@@ -656,13 +641,12 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
 
       {/* Engine status */}
       {stage === 'reviewing' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {engines.map((e, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', borderRadius: 8, background: e.done ? '#2ecc7111' : 'var(--navy-dark)', border: '1px solid ' + (e.done ? '#2ecc7133' : 'var(--navy-light)') }}>
-              <span style={{ fontSize: 14 }}>{e.done ? '✅' : '⏳'}</span>
-              <span style={{ fontSize: 12, color: e.done ? '#2ecc71' : 'var(--text-muted)' }}>{e.label}</span>
-            </div>
-          ))}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{isAR ? 'خطوات هذه المراجعة' : 'Steps for this review'}</span>
+            <HelpTip text={isAR ? 'تظهر هنا الخطوات التي تنطبق على نوع هذه المراجعة فقط، وتُعلَّم كل خطوة عند اكتمالها فعلياً. الخطوة غير المنطبقة على الوثيقة تظهر كذلك.' : 'Only the steps that apply to this review type are shown, and each is marked when it actually finishes. A step that does not apply to this document is shown as not applicable.'} />
+          </div>
+          <PipelineStepList steps={steps} />
         </div>
       )}
 
