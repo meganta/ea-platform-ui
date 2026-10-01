@@ -157,12 +157,12 @@ describe('EaViewsPage - ViewLibrary', () => {
     expect(screen.queryByText('App View')).not.toBeInTheDocument();
   });
 
-  it('navigates to the builder with the selected viewpoint when Activate View is clicked', async () => {
+  it('navigates to the builder with the selected viewpoint when Customize is clicked', async () => {
     mockFetch({ '/ea-views/stats': {}, '/ea-views/viewpoints': [SAMPLE_VIEWPOINT] });
     render(<EaViewsPage />);
     fireEvent.click(await screen.findByText('📚 View Library'));
     await screen.findByText('Application Landscape');
-    fireEvent.click(screen.getByText('▶ Activate View'));
+    fireEvent.click(screen.getByText('eaviews.lib_customize'));
     // Builder view hides the tab strip
     await waitFor(() => expect(screen.queryByText('🏠 Dashboard')).not.toBeInTheDocument());
   });
@@ -2325,5 +2325,62 @@ describe('EaViewsPage - toolbar and Ask ArchMind (P4)', () => {
     expect(screen.queryByText('eaviews.tb_edit_state')).not.toBeInTheDocument()
     expect(screen.queryByText('eaviews.tb_snapshot')).not.toBeInTheDocument()
     expect(screen.getByText('eaviews.tb_history')).toBeInTheDocument()
+  })
+})
+
+describe('EaViewsPage - library and direct open (P6)', () => {
+  const VP = (id: string, name: string, extra: any = {}) => ({ id, code: id, name, category: 'Application', defaultVisualization: 'TABLE', rootObjectTypes: ['APPLICATION'], relatedObjectTypes: [], stakeholders: [], concerns: [], ...extra })
+  const LIB = [
+    VP('vp-1', 'Application Portfolio', { contract: { question: 'What applications do we own and run?', audience: ['EXECUTIVE', 'ARCHITECT'] } }),
+    VP('vp-2', 'API Data Matrix', { contract: { question: 'Which APIs expose which data?', audience: ['ARCHITECT'] } }),
+  ]
+  const WS = { id: 'ws-1', name: 'Application Portfolio', visualization: 'TABLE', status: 'DRAFT', isWorkspace: true, viewpointId: 'vp-1', rootObjectTypes: ['APPLICATION'] }
+  const DATASET = { dataset: { context: { scenario: { id: 'cur' } }, objects: [], relationships: [], paths: [], hierarchies: [], metrics: [], warnings: [], provenance: {} }, legacy: { nodes: [], edges: [] }, eligibility: { eligible: [{ visualization: 'TABLE' }], ineligible: [] } }
+
+  function setup(extra: Record<string, any> = {}) {
+    mockFetch({ '/ea-views/stats': {}, '/ea-views/viewpoints': LIB, '/ea-views/open-viewpoint/vp-1': WS, '/ea-views/ws-1/dataset': DATASET, '/ea-views/ws-1/states': { lines: [] }, '/ea-views/scenarios': [], ...extra })
+    render(<EaViewsPage />)
+  }
+
+  it('searches by question and filters to leadership viewpoints', async () => {
+    setup()
+    fireEvent.click(await screen.findByText('📚 View Library'))
+    await screen.findByText('API Data Matrix')
+    fireEvent.change(screen.getByLabelText('eaviews.lib_search'), { target: { value: 'expose' } })
+    expect(screen.queryByText('Application Portfolio')).not.toBeInTheDocument()
+    expect(screen.getByText('API Data Matrix')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('eaviews.lib_search'), { target: { value: '' } })
+    fireEvent.click(screen.getByLabelText('eaviews.lib_leadership'))
+    expect(screen.getByText('Application Portfolio')).toBeInTheDocument()
+    expect(screen.queryByText('API Data Matrix')).not.toBeInTheDocument()
+  })
+
+  it('Open goes straight to the view in a private workspace, facts first with refine controls one click away, and can be kept', async () => {
+    jest.spyOn(window, 'prompt').mockReturnValue('My portfolio')
+    setup({ '/ea-views/ws-1/keep': { ...WS, isWorkspace: false, name: 'My portfolio' } })
+    fireEvent.click(await screen.findByText('📚 View Library'))
+    await screen.findByText('Application Portfolio')
+    fireEvent.click(screen.getAllByText('eaviews.lib_open')[0])
+    expect(await screen.findByTestId('workspace-badge')).toBeInTheDocument()
+    const openCall = (global.fetch as jest.Mock).mock.calls.find(([u, o]) => u.includes('/open-viewpoint/vp-1') && o?.method === 'POST')
+    expect(openCall).toBeDefined()
+    expect(screen.queryByPlaceholderText('🔍 Search...')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('eaviews.refine_show'))
+    expect(screen.getByPlaceholderText('🔍 Search...')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('eaviews.keep'))
+    await waitFor(() => expect(screen.queryByTestId('workspace-badge')).not.toBeInTheDocument())
+    const keepCall = (global.fetch as jest.Mock).mock.calls.find(([u]) => u.includes('/ws-1/keep'))
+    expect(JSON.parse(keepCall[1].body)).toEqual({ name: 'My portfolio' })
+  })
+
+  it('people who cannot create views can open a viewpoint but not customize or keep it', async () => {
+    mockHasPermission = (code) => code !== 'Views.Create'
+    setup()
+    fireEvent.click(await screen.findByText('📚 View Library'))
+    await screen.findByText('Application Portfolio')
+    expect(screen.queryByText('eaviews.lib_customize')).not.toBeInTheDocument()
+    fireEvent.click(screen.getAllByText('eaviews.lib_open')[0])
+    await screen.findByTestId('workspace-badge')
+    expect(screen.queryByText('eaviews.keep')).not.toBeInTheDocument()
   })
 })

@@ -211,3 +211,26 @@ describe('cellInteraction', () => {
     expect(cellInteraction(undefined)).toBeNull()
   })
 })
+
+describe('arrangeMatrix() (P5)', () => {
+  const { arrangeMatrix } = require('../tableMatrixUtils')
+  const rows = [{ id: 'r1', name: 'Bravo' }, { id: 'r2', name: 'Alpha' }, { id: 'r3', name: 'Charlie' }]
+  const cols = [{ id: 'c1', name: 'X' }, { id: 'c2', name: 'Y' }, { id: 'c3', name: 'Z' }]
+  const cells = new Map([['r1::c1', {}], ['r1::c2', {}], ['r3::c2', {}]]) as any
+  it('counts linked cells per row and column, and orders most linked first', () => {
+    const a = arrangeMatrix(rows, cols, cells, { order: 'LINKED', hideEmptyColumns: false })
+    expect(a.rows.map((r: any) => r.id)).toEqual(['r1', 'r3', 'r2'])
+    expect(a.columns.map((c: any) => c.id)).toEqual(['c2', 'c1', 'c3'])
+    expect(a.rowTotals.get('r1')).toBe(2)
+    expect(a.emptyRows).toBe(1)
+  })
+  it('gaps first brings uncovered rows to the top; rows are never hidden', () => {
+    const a = arrangeMatrix(rows, cols, cells, { order: 'GAPS', hideEmptyColumns: true })
+    expect(a.rows.map((r: any) => r.id)).toEqual(['r2', 'r3', 'r1'])
+    expect(a.columns.map((c: any) => c.id)).toEqual(['c2', 'c1'])
+    expect(a.hiddenColumns).toBe(1)
+  })
+  it('A-Z orders by name', () => {
+    expect(arrangeMatrix(rows, cols, cells, { order: 'NAME', hideEmptyColumns: false }).rows.map((r: any) => r.name)).toEqual(['Alpha', 'Bravo', 'Charlie'])
+  })
+})

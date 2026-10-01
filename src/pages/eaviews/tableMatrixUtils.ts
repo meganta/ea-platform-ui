@@ -186,3 +186,48 @@ export function cellInteraction(cell: MatrixCell | undefined): string | null {
   const values = [...new Set(cell.items.map((i: any) => i?.attributes?.interaction).filter((v: any) => typeof v === 'string' && v.trim()))]
   return values.length ? values.join(' / ') : null
 }
+
+// ── Matrix arrangement (P5) ──────────────────────────────────────────────
+//
+// Reading aids over an already-built matrix, never a change to what it
+// contains: how many cells each row/column fills, ordering (most linked
+// first, A-Z, or gaps first so uncovered rows lead), and hiding columns
+// that nothing links to. Rows are never hidden - an empty row is a gap the
+// view exists to show.
+export type MatrixOrder = 'LINKED' | 'NAME' | 'GAPS'
+
+export interface ArrangedMatrix {
+  rows: any[]
+  columns: any[]
+  rowTotals: Map<string, number>
+  columnTotals: Map<string, number>
+  emptyRows: number
+  hiddenColumns: number
+}
+
+export function arrangeMatrix(rows: any[], columns: any[], cells: Map<string, MatrixCell> | undefined, opts: { order: MatrixOrder; hideEmptyColumns: boolean }): ArrangedMatrix {
+  const rowTotals = new Map<string, number>()
+  const columnTotals = new Map<string, number>()
+  for (const r of rows) rowTotals.set(r.id, 0)
+  for (const c of columns) columnTotals.set(c.id, 0)
+  for (const key of (cells ? Array.from(cells.keys()) : [])) {
+    const [rowId, colId] = key.split('::')
+    if (rowTotals.has(rowId) && columnTotals.has(colId)) {
+      rowTotals.set(rowId, rowTotals.get(rowId)! + 1)
+      columnTotals.set(colId, columnTotals.get(colId)! + 1)
+    }
+  }
+  const byName = (a: any, b: any) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true })
+  const rowCmp = opts.order === 'NAME' ? byName
+    : opts.order === 'GAPS' ? (a: any, b: any) => rowTotals.get(a.id)! - rowTotals.get(b.id)! || byName(a, b)
+    : (a: any, b: any) => rowTotals.get(b.id)! - rowTotals.get(a.id)! || byName(a, b)
+  const colCmp = opts.order === 'NAME' ? byName : (a: any, b: any) => columnTotals.get(b.id)! - columnTotals.get(a.id)! || byName(a, b)
+  const visibleCols = opts.hideEmptyColumns ? columns.filter(c => columnTotals.get(c.id)! > 0) : columns
+  return {
+    rows: [...rows].sort(rowCmp),
+    columns: [...visibleCols].sort(colCmp),
+    rowTotals, columnTotals,
+    emptyRows: rows.filter(r => rowTotals.get(r.id) === 0).length,
+    hiddenColumns: columns.length - visibleCols.length,
+  }
+}
