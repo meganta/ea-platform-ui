@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { AttachedViewsPanel } from '../components/AttachedViewsPanel'
+import { exportFileName } from '../lib/exportFileName'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -823,7 +824,7 @@ export default function GovernancePage() {
       const objUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objUrl
-      a.download = format === 'powerpoint' ? 'EA_Governance_Review_' + (langParam === 'ar' ? 'AR' : 'EN') + '.pptx' : (review?.title || 'governance-review') + (langParam === 'ar' ? '_AR' : '_EN') + '.docx'
+      a.download = exportFileName(review?.title, 'Governance_Review', langParam === 'ar' ? 'ar' : 'en', format === 'powerpoint' ? 'pptx' : 'docx')
       document.body.appendChild(a)
       a.click()
       setTimeout(() => { URL.revokeObjectURL(objUrl); document.body.removeChild(a) }, 2000)

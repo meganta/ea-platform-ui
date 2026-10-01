@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
+import { exportFileName } from '../lib/exportFileName'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -2682,7 +2683,7 @@ function StudyDetail({ api, studyId, isAR, t, onBack }: any) {
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = url; a.download = `Innovation_Study_${language.toUpperCase()}.${format === 'word' ? 'docx' : 'pptx'}`
+      a.href = url; a.download = exportFileName(language === 'ar' && study?.titleAr ? study.titleAr : study?.title, 'Innovation_Study', language, format === 'word' ? 'docx' : 'pptx')
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
     } catch (e: any) {
