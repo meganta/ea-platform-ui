@@ -2289,7 +2289,7 @@ describe('EaViewsPage - facts and focus (P3)', () => {
 describe('EaViewsPage - toolbar and Ask ArchMind (P4)', () => {
   const VIEW = { id: 'view-p4', name: 'Portfolio P4', visualization: 'TABLE', architectureState: 'CURRENT', status: 'PUBLISHED', rootObjectTypes: ['APPLICATION'] }
   const DATASET = { dataset: { context: { scenario: { id: 'tgt' } }, objects: [], relationships: [], paths: [], hierarchies: [], metrics: [], warnings: [], provenance: {} }, legacy: { nodes: [], edges: [] }, eligibility: { eligible: [{ visualization: 'TABLE' }], ineligible: [] } }
-  const EXPLAIN = { claims: [{ text: 'Most applications support workforce capabilities.', classification: 'INFERENCE', evidenceRefs: [] }], facts: [{ key: 'count', text: '67 applications in this view.', textAr: 'عدد العناصر في هذا المشهد: 67' }] }
+  const EXPLAIN = { claims: [{ text: 'Most applications support workforce capabilities.', classification: 'INFERENCE', evidenceRefs: [] }, { text: 'There are 67 applications.', classification: 'FACT', evidenceRefs: [{ kind: 'INSIGHT', id: 'count' }] }], facts: [{ key: 'count', text: '67 applications in this view.', textAr: 'عدد العناصر في هذا المشهد: 67' }] }
   function setup() {
     mockSearchParams = new URLSearchParams('viewId=view-p4')
     mockFetch({ '/ea-views/view-p4': VIEW, '/ea-views/stats': {}, '/ea-views/scenarios': [{ id: 'tgt', name: 'Jadarat Target', type: 'TARGET' }],
@@ -2314,6 +2314,7 @@ describe('EaViewsPage - toolbar and Ask ArchMind (P4)', () => {
     expect(await screen.findByTestId('ask-facts')).toHaveTextContent('عدد العناصر في هذا المشهد: 67')
     const call = (global.fetch as jest.Mock).mock.calls.find(([u, o]) => u.includes('/ai/explain') && o?.method === 'POST')
     expect(JSON.parse(call[1].body)).toEqual(expect.objectContaining({ action: 'explain', scenarioId: 'tgt' }))
+    expect(screen.getByTestId('cited-fact')).toHaveTextContent('عدد العناصر في هذا المشهد: 67') // a cited fact shows as the fact
     const link = screen.getByTestId('continue-in-copilot') as HTMLAnchorElement
     expect(decodeURIComponent(link.getAttribute('href')!)).toContain('/copilot?ask=Portfolio P4 (Jadarat Target)')
   })

@@ -2432,6 +2432,11 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
             {(c.evidenceRefs ?? []).length > 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
                 {c.evidenceRefs.map((ref: any, ri: number) => {
+                  // A cited counted fact shows as the fact itself.
+                  if (ref.kind === 'INSIGHT') {
+                    const fact = (explanation.facts ?? []).find((f: any) => f.key === ref.id)
+                    return <span key={ri} data-testid="cited-fact" style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, border: '1px solid var(--border)', color: 'var(--text-dim)' }}>{fact ? (isAR ? fact.textAr : fact.text) : ref.id}</span>
+                  }
                   const resolved = resolveEvidenceRef(ref, dataset)
                   return (
                     <span
