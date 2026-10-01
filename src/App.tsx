@@ -27,7 +27,7 @@ import SharedViewPage from './pages/SharedViewPage'
 import AccessGovernancePage from './pages/AccessGovernancePage'
 import SetupAssistantPage from './pages/SetupAssistantPage'
 import UsersPage from './pages/UsersPage'
-import StrategyPage from './pages/StrategyPage'
+import StrategyPage from './pages/StrategyRefreshPage'
 import BusinessCapabilitiesPage from './pages/BusinessCapabilitiesPage'
 import MySurveysPage from './pages/MySurveysPage'
 import InnovationPage from './pages/InnovationPage'
@@ -97,7 +97,7 @@ export default function App() {
               <Route path="getting-started" element={<ProtectedRoute superadminOnly><SetupAssistantPage /></ProtectedRoute>} />
               <Route path="my-surveys" element={<ProtectedRoute permission="Surveys.Respond"><MySurveysPage /></ProtectedRoute>} />
               <Route path="business-capabilities" element={<ProtectedRoute permission="BusinessCapability.View"><BusinessCapabilitiesPage /></ProtectedRoute>} />
-              <Route path="strategy" element={<ProtectedRoute permission="Repository.View" superadminOnly><StrategyPage /></ProtectedRoute>} />
+              <Route path="strategy" element={<ProtectedRoute permission="Strategy.View"><StrategyPage /></ProtectedRoute>} />
               <Route path="innovation" element={<ProtectedRoute permission="Repository.View"><InnovationPage /></ProtectedRoute>} />
               <Route path="notifications" element={<NotificationsPage />} />
               <Route path="billing" element={<ProtectedRoute permission="Users.View" superadminOnly><BillingPage /></ProtectedRoute>} />

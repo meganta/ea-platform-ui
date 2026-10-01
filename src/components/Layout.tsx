@@ -70,7 +70,7 @@ export default function Layout() {
     { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'Reviews.View', superadminOnly: true },
     { to: '/my-surveys', label: '📝 ' + (locale === 'AR' ? 'استبياناتي' : 'My Surveys'), icon: '', permission: 'Surveys.Respond' },
     { to: '/business-capabilities', label: '🧱 ' + (locale === 'AR' ? 'قدرات الأعمال' : 'Business Capabilities'), icon: '', permission: 'BusinessCapability.View' },
-    { to: '/strategy', label: '🎯 Strategy', icon: '', permission: 'Repository.View', superadminOnly: true },
+    { to: '/strategy', label: '🎯 ' + t('strategy.refresh.heading'), icon: '', permission: 'Strategy.View' },
     { to: '/ea-planning', label: '🗓 EA Planning', icon: '', permission: 'Repository.View' },
     { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Repository.View' },
     { to: '/notifications', label: '🔔 ' + t('nav.notifications'), icon: '', permission: null },
