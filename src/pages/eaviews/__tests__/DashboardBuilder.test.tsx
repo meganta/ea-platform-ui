@@ -129,6 +129,19 @@ describe('DashboardGrid', () => {
     expect(screen.getByText('42')).toBeInTheDocument();
   });
 
+  it('shows "of M" under a scoped KPI whose value is a subset of its scope total', () => {
+    const widgets = [{ id: 'w1', type: 'kpi' as const, title: 'Approved Apps', x: 0, y: 0, w: 1, h: 1, config: {} }];
+    render(<DashboardGrid widgets={widgets} results={{ w1: { value: 20, label: '20', total: 24 } }} />);
+    expect(screen.getByText('20')).toBeInTheDocument();
+    expect(screen.getByTestId('kpi-total')).toHaveTextContent('of 24');
+  });
+
+  it('shows no "of M" when the KPI is the whole scope or unscoped', () => {
+    const widgets = [{ id: 'w1', type: 'kpi' as const, title: 'Apps', x: 0, y: 0, w: 1, h: 1, config: {} }];
+    render(<DashboardGrid widgets={widgets} results={{ w1: { value: 24, label: '24', total: 24 } }} />);
+    expect(screen.queryByTestId('kpi-total')).toBeNull();
+  });
+
   it('renders a table widget\'s rows with status badges', () => {
     const widgets = [{ id: 'w1', type: 'table' as const, title: 'Apps', x: 0, y: 0, w: 2, h: 1, config: {} }];
     render(<DashboardGrid widgets={widgets} results={{ w1: { nodes: [{ id: 'a1', name: 'HR System', status: 'APPROVED' }] } }} />);
