@@ -5,8 +5,7 @@ import HelpTip from '../components/HelpTip'
 import { RoadmapConfigPanel, RoadmapTimeline } from './eaviews/RoadmapView'
 import { DashboardBuilder, DashboardGrid, DashboardWidget } from './eaviews/DashboardBuilder'
 
-import { PathBuilder, RelationshipHop } from './eaviews/PathBuilder'
-import DynamicFilterBuilder from '../components/filterBuilder/DynamicFilterBuilder'
+import SemanticViewBuilder from './eaviews/SemanticViewBuilder'
 import { useSearchParams } from 'react-router-dom'
 import { CollectionsPanel } from './eaviews/CollectionsPanel'
 import { LandscapeView } from './eaviews/LandscapeView'
@@ -455,6 +454,8 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [contract, setContract] = useState<any>(null)
   const [presentation, setPresentation] = useState<any>(null)
   const [insights, setInsights] = useState<ViewInsight[]>([])
+  // Meta Model change impact for this view (backend semanticReview).
+  const [semanticReview, setSemanticReview] = useState<any>(null)
   // A fact the user selected: the view narrows to the objects behind it.
   const [focusInsight, setFocusInsight] = useState<ViewInsight | null>(null)
   const [stateChange, setStateChange] = useState<any>(null)
@@ -720,6 +721,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       setContract(d?.contract ?? null)
       setPresentation(d?.presentation ?? null)
       setInsights(Array.isArray(d?.insights) ? d.insights : [])
+      setSemanticReview(d?.semanticReview ?? null)
       setFocusInsight(null)
       if (d?.presentation?.primary && !(d.presentation.available || []).includes(vizModeRef.current)) setVizMode(d.presentation.primary)
       setCommittedScenarioId(d?.dataset?.context?.scenario?.id ?? null)
@@ -772,6 +774,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       setContract(d.contract ?? null)
       setPresentation(d.presentation ?? null)
       setInsights(Array.isArray(d.insights) ? d.insights : [])
+      setSemanticReview(d.semanticReview ?? null)
       setFocusInsight(null)
       setCommittedScenarioId(d.dataset?.context?.scenario?.id ?? scenarioId)
       setPendingScenarioId(null)
@@ -1903,8 +1906,8 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // Empty results carry their meaning from the viewpoint contract: no data
   // in this state, nothing matching the scope, or objects not linked yet.
   const resultState = presentation?.resultState
-  const resultEmpty = !!resultState && (resultState.state === 'NO_DATA' || resultState.state === 'FILTERED_OUT')
-  const RESULT_STATE_TITLE: Record<string, string> = { NO_DATA: 'eaviews.result_no_data', FILTERED_OUT: 'eaviews.result_filtered_out', NO_RELATIONSHIPS: 'eaviews.result_no_relationships' }
+  const resultEmpty = !!resultState && (resultState.state === 'NO_DATA' || resultState.state === 'FILTERED_OUT' || resultState.state === 'REVIEW_REQUIRED')
+  const RESULT_STATE_TITLE: Record<string, string> = { NO_DATA: 'eaviews.result_no_data', FILTERED_OUT: 'eaviews.result_filtered_out', NO_RELATIONSHIPS: 'eaviews.result_no_relationships', REVIEW_REQUIRED: 'eaviews.review_required' }
   const renderResultState = () => (
     <div role="status" data-testid="result-state" style={{ ...S.card, textAlign: 'center', padding: 40 }}>
       <div style={{ fontWeight: 600, marginBottom: 6 }}>{t(RESULT_STATE_TITLE[resultState.state])}</div>
@@ -2895,7 +2898,13 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       {(() => {
         // Facts about the result itself: a size limit was reached, or the
         // view's scope leaves some objects out. Never hidden.
-        const notices = (dataset?.warnings ?? []).filter((w: any) => w.code === 'TRUNCATED' || w.code === 'SCOPE_EXCLUSION')
+        const notices = [
+          ...(dataset?.warnings ?? []).filter((w: any) => w.code === 'TRUNCATED' || w.code === 'SCOPE_EXCLUSION'),
+          // Non-blocking Meta Model changes are shown here; blocking ones
+          // replace the result (see renderResultState).
+          ...(semanticReview?.status === 'REVIEW_REQUIRED' && !semanticReview.blocking
+            ? (semanticReview.issues || []).map((i: any) => ({ code: 'REVIEW', message: `${t('eaviews.review_required')}: ${i.message}` })) : []),
+        ]
         if (notices.length === 0) return null
         return (
           <div role="status" data-testid="result-notices" style={{ ...S.card, marginBottom:16, padding:'10px 14px', display:'flex', flexDirection:'column' as const, gap:4 }}>
@@ -3060,190 +3069,10 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
 }
 
 // ── View Builder ──────────────────────────────────────────────────────────────
+// The view builder is a guided interface over the tenant's published Meta
+// Model (see eaviews/SemanticViewBuilder).
 function ViewBuilder({ api, viewpoint, onCreated, onCancel }: { api: any, viewpoint: any, onCreated: (v: any) => void, onCancel: () => void }) {
-  const ASSET_TYPES = ['CAPABILITY','APPLICATION','DATA_ENTITY','TECH_COMPONENT','SECURITY_CONTROL','EA_PRINCIPLE','INTEGRATION','PROCESS','ORG_UNIT','RISK']
-  const DOMAINS = ['BUSINESS','APPLICATION','DATA','TECHNOLOGY','SECURITY','STRATEGIC','BENEFICIARY_EXPERIENCE','CROSS_CUTTING']
-  const VIZS = ['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE','ROADMAP','DASHBOARD','LANDSCAPE']
-  // Phase 5A: the old Architecture State selector (STATES: CURRENT/
-  // TARGET/TRANSITION/BASELINE/PLANNED) is retired from view creation -
-  // architectureState is still sent in the create payload for backend
-  // compatibility (defaulted to 'CURRENT', never shown to the user), but
-  // architecture scenario selection is now a viewing-time concern via
-  // the ScenarioSelector, not a per-View fixed choice at creation.
-  const CATS = ['Business','Application','Data','Technology','Security','Cross-Domain','Strategic','Governance','Custom']
-
-  const [form, setForm] = useState<{
-    name: string
-    description: string
-    category: string
-    visualization: string
-    architectureState: string
-    rootObjectTypes: string[]
-    relatedObjectTypes: string[]
-    domains: string[]
-    viewpointId: string | undefined
-    relationshipPath: RelationshipHop[]
-    structuredQuery: any
-  }>({
-    name: viewpoint?.name || '',
-    description: viewpoint?.description || '',
-    category: viewpoint?.category || 'Custom',
-    visualization: viewpoint?.defaultVisualization || 'GRAPH',
-    architectureState: 'CURRENT',
-    rootObjectTypes: viewpoint?.rootObjectTypes || [],
-    relatedObjectTypes: viewpoint?.relatedObjectTypes || [],
-    domains: viewpoint?.requiredDomains || [],
-    viewpointId: viewpoint?.id || undefined,
-    relationshipPath: [],
-    structuredQuery: null,
-  })
-  const [saving, setSaving] = useState(false)
-
-  const toggleArr = (arr: string[], val: string) => arr.includes(val) ? arr.filter(v=>v!==val) : [...arr, val]
-
-  // The filter builder's conditions are specific to the root object type
-  // they were built for - changing it (or picking multiple root types)
-  // invalidates a structured query built for a single one, so it's
-  // cleared rather than silently carried over (task section 4: "remove/
-  // reset incompatible structured conditions").
-  const setRootObjectTypes = (rootObjectTypes: string[]) => setForm(f => ({ ...f, rootObjectTypes, structuredQuery: null }))
-
-  const save = async () => {
-    if (!form.name) return
-    setSaving(true)
-    // structuredQuery persists inside filterConfig (task section 7 - no
-    // new field/model, reuses existing View persistence) - the backend's
-    // resolveExecutionContext extracts it back out into its own
-    // ViewQueryConfig.structuredQuery field at execution time (see
-    // tenant-view.service.ts).
-    const { structuredQuery, ...rest } = form
-    const payload = { ...rest, filterConfig: structuredQuery ? { structuredQuery } : {} }
-    const result = await api.post('/ea-views', payload)
-    setSaving(false)
-    if (result?.id) onCreated(result)
-  }
-
-  return (
-    <div>
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
-        <button style={{ ...S.btn(), padding:'6px 12px' }} onClick={onCancel}>← Back</button>
-        <div style={{ fontSize:18, fontWeight:700 }}>{viewpoint ? `Configure: ${viewpoint.name}` : 'New Custom View'}</div>
-      </div>
-
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 320px', gap:20 }}>
-        <div style={{ display:'flex', flexDirection:'column' as const, gap:16 }}>
-          <div style={S.card}>
-            <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Identity</div>
-            <div style={S.grid2}>
-              <div style={{ gridColumn:'1/-1' }}><label style={S.label}>View Name *</label><input style={S.input} value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} placeholder="e.g. Q4 2026 Application Portfolio" /></div>
-              <div><label style={S.label}>Category</label>
-                <select style={S.input} value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
-                  {CATS.map(c=><option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div style={{ gridColumn:'1/-1' }}><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
-            </div>
-          </div>
-
-          <div style={S.card}>
-            <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Visualization</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
-              {VIZS.map(v=>(
-                <div key={v} onClick={()=>setForm(f=>({...f,visualization:v}))} style={{ padding:'10px 12px', borderRadius:8, border:`2px solid ${form.visualization===v?'var(--accent)':'var(--border)'}`, cursor:'pointer', textAlign:'center', background:form.visualization===v?'rgba(3,105,161,0.08)':'transparent' }}>
-                  <div style={{ fontSize:20 }}>{VIZ_ICONS[v]}</div>
-                  <div style={{ fontSize:11, fontWeight:500, marginTop:4 }}>{v.replace(/_/g,' ')}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div style={S.card}>
-            <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Object Types</div>
-            <div style={{ marginBottom:12 }}><label style={S.label}>Primary Object Types (root)</label>
-              <div style={{ display:'flex', gap:6, flexWrap:'wrap' as const }}>
-                {ASSET_TYPES.map(t=><span key={t} onClick={()=>setRootObjectTypes(toggleArr(form.rootObjectTypes,t))} style={{ ...S.badge(form.rootObjectTypes.includes(t)?TYPE_COLOR[t]||'var(--accent)':'#7f8c8d'), cursor:'pointer', opacity:form.rootObjectTypes.includes(t)?1:0.5 }}>{t.replace(/_/g,' ')}</span>)}
-              </div>
-            </div>
-            {/* Progressive disclosure: hidden until at least one root type
-                is picked. Before that, the exclusion filter below has
-                nothing to exclude yet, so every type would render
-                identically (same unselected styling) in both this section
-                and Primary Object Types above - confusingly duplicated and
-                genuinely ambiguous to click, caught by a test asserting on
-                a single "CAPABILITY" badge finding two matches instead of
-                one. */}
-            {form.rootObjectTypes.length > 0 && (
-              <div><label style={S.label}>Related Object Types</label>
-                <div style={{ display:'flex', gap:6, flexWrap:'wrap' as const }}>
-                  {ASSET_TYPES.filter(t=>!form.rootObjectTypes.includes(t)).map(t=><span key={t} onClick={()=>setForm(f=>({...f,relatedObjectTypes:toggleArr(f.relatedObjectTypes,t)}))} style={{ ...S.badge(form.relatedObjectTypes.includes(t)?'#f39c12':'#7f8c8d'), cursor:'pointer', opacity:form.relatedObjectTypes.includes(t)?1:0.5 }}>{t.replace(/_/g,' ')}</span>)}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Meta Model-driven Dynamic Filter Builder (task section 3/4) -
-              shown once exactly one root type is picked, since a
-              structured query targets a single root object type
-              (ArchitectureQuery.rootObjectType); with multiple root types
-              selected, which type's filters would apply is ambiguous, so
-              the builder stays hidden rather than guessing. Wired
-              directly into ViewQueryConfig.structuredQuery via the
-              existing backend contract - same shared component, same
-              structured-query shape as EA Repository, no fork. */}
-          {form.rootObjectTypes.length === 1 && (
-            <div style={S.card}>
-              <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Filters</div>
-              <DynamicFilterBuilder
-                objectType={form.rootObjectTypes[0]}
-                api={api}
-                value={form.structuredQuery}
-                onChange={structuredQuery => setForm(f => ({ ...f, structuredQuery }))}
-                onApply={() => {}}
-                onClear={() => setForm(f => ({ ...f, structuredQuery: null }))}
-              />
-            </div>
-          )}
-
-          {/* Progressive disclosure: the Path Builder only appears once a
-              root type is picked - a single-level view (the pre-existing,
-              simpler flow) doesn't need it at all. */}
-          {form.rootObjectTypes.length > 0 && (
-            <div style={S.card}>
-              <div style={{ fontSize:14, fontWeight:600, marginBottom:6 }}>Relationship Path <span style={{ fontWeight:400, fontSize:12, color:'var(--text-dim)' }}>(optional - walk multiple hops instead of a single-level view)</span></div>
-              <PathBuilder api={api} rootType={form.rootObjectTypes[0]} initialPath={form.relationshipPath} onChange={(path) => setForm(f => ({ ...f, relationshipPath: path }))} />
-            </div>
-          )}
-
-          <div style={S.card}>
-            <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Domains</div>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' as const }}>
-              {DOMAINS.map(d=><span key={d} onClick={()=>setForm(f=>({...f,domains:toggleArr(f.domains,d)}))} style={{ ...S.badge(form.domains.includes(d)?DOMAIN_COLOR[d]||'var(--accent)':'#7f8c8d'), cursor:'pointer', opacity:form.domains.includes(d)?1:0.5 }}>{d.replace(/_/g,' ')}</span>)}
-            </div>
-            <div style={{ fontSize:12, color:'var(--text-dim)', marginTop:8 }}>Leave empty to include all domains</div>
-          </div>
-        </div>
-
-        {/* Preview panel */}
-        <div style={{ display:'flex', flexDirection:'column' as const, gap:12 }}>
-          <div style={{ ...S.card, position:'sticky', top:0 }}>
-            <div style={{ fontSize:14, fontWeight:600, marginBottom:14 }}>Summary</div>
-            <div style={{ display:'flex', flexDirection:'column' as const, gap:8 }}>
-              <div><div style={S.label}>View Name</div><div style={{ fontSize:13, fontWeight:500 }}>{form.name || '—'}</div></div>
-              <div><div style={S.label}>Visualization</div><div style={{ fontSize:13 }}>{VIZ_ICONS[form.visualization]} {form.visualization.replace(/_/g,' ')}</div></div>
-              <div><div style={S.label}>Primary Types</div><div style={{ display:'flex', gap:4, flexWrap:'wrap' as const }}>
-                {form.rootObjectTypes.length ? form.rootObjectTypes.map((t: string)=><span key={t} style={{ ...S.badge(TYPE_COLOR[t]||'#3498db'), fontSize:10 }}>{t.replace(/_/g,' ')}</span>) : <span style={{ fontSize:12, color:'var(--text-dim)' }}>None selected</span>}
-              </div></div>
-              <div><div style={S.label}>Domains</div><div style={{ display:'flex', gap:4, flexWrap:'wrap' as const }}>
-                {form.domains.length ? form.domains.map((d: string)=><span key={d} style={{ ...S.badge(DOMAIN_COLOR[d]||'#3498db'), fontSize:10 }}>{d}</span>) : <span style={{ fontSize:12, color:'var(--text-dim)' }}>All domains</span>}
-              </div></div>
-            </div>
-            <button style={{ ...S.btn('primary'), width:'100%', marginTop:16 }} onClick={save} disabled={!form.name||saving}>{saving?'Creating...':'✅ Create View'}</button>
-            <button style={{ ...S.btn(), width:'100%', marginTop:8 }} onClick={onCancel}>Cancel</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  return <SemanticViewBuilder api={api} viewpoint={viewpoint} onCreated={onCreated} onCancel={onCancel} />
 }
 
 // ── Snapshots ─────────────────────────────────────────────────────────────────
