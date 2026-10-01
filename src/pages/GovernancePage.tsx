@@ -6,6 +6,7 @@ import HelpTip from '../components/HelpTip'
 import { AttachedViewsPanel } from '../components/AttachedViewsPanel'
 import { exportFileName } from '../lib/exportFileName'
 import PrincipleCompliancePanel from '../components/PrincipleCompliancePanel'
+import StrategyAlignmentPanel, { usesStrategyAlignment } from '../components/StrategyAlignmentPanel'
 import PipelineStepList, { PipelineStep, stepsRatio } from '../components/PipelineStepList'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
@@ -102,13 +103,14 @@ const DECISION_COLOR: Record<string, string> = {
 }
 
 // ── Score circle ──────────────────────────────────────────
-function ScoreCircle({ score, label, size = 72, help }: { score: number, label: string, size?: number, help?: string }) {
-  const color = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
+function ScoreCircle({ score, label, size = 72, help }: { score: number | null, label: string, size?: number, help?: string }) {
+  // A null score is a dimension not assessed for this review (e.g. strategic alignment with no strategy objective).
+  const color = score === null ? '#64748B' : score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{ width: 72, height: 72, borderRadius: '50%', border: `3px solid ${color}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px' }}>
-        <div style={{ fontSize: 22, fontWeight: 700, color }}>{score}</div>
-        <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
+        <div style={{ fontSize: score === null ? 15 : 22, fontWeight: 700, color }}>{score === null ? 'N/A' : score}</div>
+        {score !== null && <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>}
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}{help && <HelpTip text={help} />}</div>
     </div>
@@ -1753,6 +1755,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   )
   React.useEffect(() => { setLocalRisks((report.riskRegister as any)?.risks || []) }, [report])
   const [localObjectives, setLocalObjectives] = React.useState<any[]>(report.strategicAlignment?.objectives || [])
+  // Reviews assessed against the business/digital strategy objectives (StrategyAlignmentPanel) vs the older free-form objectives.
+  const strategyAssessed = usesStrategyAlignment(report)
   React.useEffect(() => { setLocalObjectives(report.strategicAlignment?.objectives || []) }, [report])
   const updateObjective = async (idx: number, data: any) => {
     const newObjs = localObjectives.map((o, i) => i === idx ? { ...o, ...data } : o)
@@ -1874,6 +1878,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         <ScoreCircle score={uScores.overall} label='Overall' help="This is the big-picture health score for this review, combining everything below into one number. Green (75+) means things look solid; orange (60-74) means there are some things to fix; red (below 60) means significant issues need addressing before this can move forward." />
         {dimensionVisible('strategic') && (
         <ScoreCircle score={(() => {
+            // Assessed against the strategy objectives: the backend's score, null when not considered.
+            if (strategyAssessed) { const v = rescoreResult && 'strategicScore' in rescoreResult ? rescoreResult.strategicScore : report.strategicScore; return typeof v === 'number' ? Math.round(v) : null }
             // Strategic = weighted alignment % from tenant objectives
             const STRAT_W: Record<string,number> = { BUSINESS_STRATEGY:0.40, DT_STRATEGY:0.35, EA_STRATEGY:0.25 }
             const NATIONAL_T = ['VISION_2030', 'NDP', 'NATIONAL', 'OTHER']
@@ -1912,7 +1918,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
       {/* Score formula explainer — shows actual computed values. It weights all six dimensions, so it is
           shown only for review types that display all six (the others score with their own weights). */}
-      {['strategic', 'compliance', 'risk', 'futureState', 'financial', 'domainQuality'].every(dimensionVisible) && (() => {
+      {['strategic', 'compliance', 'risk', 'futureState', 'financial', 'domainQuality'].every(dimensionVisible) && !strategyAssessed && (() => {
         // Use uScores — single source of truth for all score displays
         const critCount = uScores.critCount
         const penalty = uScores.penalty
@@ -2391,7 +2397,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       )}
 
       {/* Strategic Tab */}
-      {tab === 'strategic' && (() => {
+      {tab === 'strategic' && strategyAssessed && (
+        <StrategyAlignmentPanel section={report.strategicAlignment?.alignment} score={rescoreResult && 'strategicScore' in rescoreResult ? rescoreResult.strategicScore : report.strategicScore} />
+      )}
+      {tab === 'strategic' && !strategyAssessed && (() => {
         const objectives = localObjectives
 
         // Strategy type weights and colors — declared FIRST (used in sort below)
