@@ -9,6 +9,7 @@ import { PathBuilder, RelationshipHop } from './eaviews/PathBuilder'
 import DynamicFilterBuilder from '../components/filterBuilder/DynamicFilterBuilder'
 import { useSearchParams } from 'react-router-dom'
 import { CollectionsPanel } from './eaviews/CollectionsPanel'
+import { LandscapeView } from './eaviews/LandscapeView'
 import { exportAsJSON, exportNodesAsCSV, exportMatrixAsCSV, exportRoadmapAsCSV, exportGraphAsSVG, exportGraphAsPNG, exportGraphAsPDF, exportNodesAsPDF, exportMatrixAsPDF, exportRoadmapAsPDF, exportGraphAsPPTX, exportNodesAsPPTX, exportMatrixAsPPTX, exportRoadmapAsPPTX } from './eaviews/exportUtils'
 import { determineTableMode, buildRelationshipTable, buildMatrix, cellInteraction } from './eaviews/tableMatrixUtils'
 import { buildCapabilityMapDisplay, computeCapabilityOverlayCount, buildCapabilityDrilldown, buildHeatmapDisplay, buildTreeDisplay, buildCardContext } from './eaviews/capabilityHeatmapTreeCardsUtils'
@@ -65,6 +66,11 @@ const S = {
 }
 
 const VIZ_ICONS: Record<string,string> = { GRAPH:'🕸', MATRIX:'⊞', HEATMAP:'🔥', CAPABILITY_MAP:'⬛', TABLE:'≡', ROADMAP:'🗺', LANDSCAPE:'🗾', DASHBOARD:'📊' }
+// Renderers this viewer has. With a viewpoint contract the strip offers only
+// the contract's visualizations the result supports; custom views keep the
+// full strip.
+const RENDERABLE_MODES = ['LANDSCAPE','GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE']
+const LEGACY_MODES = ['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE']
 const CATEGORY_COLOR: Record<string,string> = { Business:'#3498db', Application:'#e67e22', Data:'#1abc9c', Technology:'#e74c3c', Security:'#9b59b6', 'Cross-Domain':'#f39c12', Strategic:'#2ecc71', Governance:'#7f8c8d', Custom:'#64748B' }
 const STATE_COLOR: Record<string,string> = { CURRENT:'#2ecc71', TARGET:'#3498db', TRANSITION:'#f39c12', BASELINE:'#7f8c8d', PLANNED:'#9b59b6' }
 const STATUS_COLOR: Record<string,string> = { DRAFT:'#f39c12', PUBLISHED:'#2ecc71', ARCHIVED:'#7f8c8d' }
@@ -138,7 +144,17 @@ function computeForceLayout(nodes: any[], edges: any[], existingPositions: Recor
 // for no benefit once a session has already done it once.
 const VIEWPOINTS_SEEDED_KEY = 'ea_viewpoints_seeded_session'
 
+// Every gap the compatibility check found, in plain words.
+export function compatGapText(compat: any): string {
+  const parts: string[] = []
+  if (compat?.missingRootTypes?.length) parts.push(`No data for: ${compat.missingRootTypes.join(', ')}`)
+  if (compat?.missingRelatedTypes?.length) parts.push(`No related data for: ${compat.missingRelatedTypes.join(', ')}`)
+  for (const r of compat?.missingRelationships || []) parts.push(`No ${r.via || 'relationships'} between ${r.from} and ${r.to}`)
+  return parts.join(' · ')
+}
+
 function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }) {
+  const { isAR } = useLang()
   const [viewpoints, setViewpoints] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(false)
@@ -233,10 +249,11 @@ function ViewLibrary({ api, onCreate }: { api: any, onCreate: (v: any) => void }
                   <div style={{ display: 'flex', gap: 6, marginTop: 4, flexWrap: 'wrap' as const }}>
                     <span style={S.badge(CATEGORY_COLOR[vp.category] || '#3498db')}>{vp.category}</span>
                     <span style={S.badge('#7f8c8d')}>{(vp.defaultVisualization||'').replace(/_/g,' ')}</span>
-                    {badge && <span style={S.badge(badge.color)} title={compat.status === 'PARTIAL' || compat.status === 'NOT_COMPATIBLE' ? `Missing data for: ${compat.missingRootTypes.join(', ')}` : undefined}>{badge.label}</span>}
+                    {badge && <span style={S.badge(badge.color)} title={compat.status === 'PARTIAL' || compat.status === 'NOT_COMPATIBLE' ? compatGapText(compat) : undefined}>{badge.label}</span>}
                   </div>
                 </div>
               </div>
+              {vp.contract?.question && <div data-testid="viewpoint-question" style={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5, marginBottom: 6 }}>{isAR && vp.contract.questionAr ? vp.contract.questionAr : vp.contract.question}</div>}
               <div style={{ fontSize: 12, color: 'var(--text-dim)', lineHeight: 1.6, marginBottom: 12 }}>{vp.description}</div>
               {vp.purpose && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic', marginBottom: 12 }}>Purpose: {vp.purpose}</div>}
               {(vp.stakeholders?.length > 0 || vp.concerns?.length > 0) && (
@@ -370,7 +387,7 @@ function MyViews({ api, onOpen, initialArchitectureState }: { api: any, onOpen: 
 
 // ── View Viewer (graph + matrix + heatmap + capability map) ───────────────────
 function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view: any, onBack: () => void, onRefresh: () => void }) {
-  const { t } = useLang()
+  const { t, isAR } = useLang()
   // publish()/approveView()/rejectView()/requestApproval() all return the
   // updated view from the backend, but the parent's onRefresh only
   // refreshes dashboard stats, not this specific view object it passed
@@ -399,6 +416,11 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // renderer (Graph/CapabilityMap/Heatmap/Tree/Cards) continues reading
   // `data` exactly as before, completely unaware this exists.
   const [dataset, setDataset] = useState<any>(null)
+  // Viewpoint Contract presentation from /dataset: the question, the
+  // visualizations worth offering for this result, and what an empty
+  // result means. null for a custom view (no contract).
+  const [contract, setContract] = useState<any>(null)
+  const [presentation, setPresentation] = useState<any>(null)
   const [eligibility, setEligibility] = useState<any>(null)
   // Phase 5A: scenario selector state. The "saved/default" scenario
   // lives on `view.scenarioId` itself (already in scope, via
@@ -514,6 +536,8 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [aiComparisonExplanation, setAiComparisonExplanation] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [vizMode, setVizMode] = useState<string>(view.visualization || 'GRAPH')
+  const vizModeRef = React.useRef(vizMode)
+  vizModeRef.current = vizMode
   const [filterDomain, setFilterDomain] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -653,6 +677,9 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       setData(d?.legacy ?? d)
       setDataset(d?.dataset ?? null)
       setEligibility(d?.eligibility ?? null)
+      setContract(d?.contract ?? null)
+      setPresentation(d?.presentation ?? null)
+      if (d?.presentation?.primary && !(d.presentation.available || []).includes(vizModeRef.current)) setVizMode(d.presentation.primary)
       setCommittedScenarioId(d?.dataset?.context?.scenario?.id ?? null)
       // Phase 4B: initialize the selected heatmap metric from
       // VisualizationEligibility's own recommendation rather than a fixed
@@ -707,6 +734,8 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       setData(d.legacy ?? d)
       setDataset(d.dataset)
       setEligibility(d.eligibility ?? null)
+      setContract(d.contract ?? null)
+      setPresentation(d.presentation ?? null)
       setCommittedScenarioId(d.dataset?.context?.scenario?.id ?? scenarioId)
       setPendingScenarioId(null)
       // Phase 5A Section 10: URL reflects the committed scenario only -
@@ -1802,6 +1831,25 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   // no per-card fetch. A density warning (reusing the existing filter
   // bar, not new pagination infrastructure) appears above a threshold.
   const CARDS_WARN_THRESHOLD = 100
+  // Empty results carry their meaning from the viewpoint contract: no data
+  // in this state, nothing matching the scope, or objects not linked yet.
+  const resultState = presentation?.resultState
+  const resultEmpty = !!resultState && (resultState.state === 'NO_DATA' || resultState.state === 'FILTERED_OUT')
+  const RESULT_STATE_TITLE: Record<string, string> = { NO_DATA: 'eaviews.result_no_data', FILTERED_OUT: 'eaviews.result_filtered_out', NO_RELATIONSHIPS: 'eaviews.result_no_relationships' }
+  const renderResultState = () => (
+    <div role="status" data-testid="result-state" style={{ ...S.card, textAlign: 'center', padding: 40 }}>
+      <div style={{ fontWeight: 600, marginBottom: 6 }}>{t(RESULT_STATE_TITLE[resultState.state])}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{resultState.message}</div>
+    </div>
+  )
+
+  const renderLandscape = () => {
+    const primaryIds = new Set<string>((dataset?.objects || []).filter((o: any) => o.role === 'PRIMARY').map((o: any) => o.id))
+    const visibleIds = new Set(filteredNodes.map((n: any) => n.id))
+    const edges = (data?.edges || []).filter((e: any) => visibleIds.has(e.sourceId) && visibleIds.has(e.targetId))
+    return <LandscapeView nodes={filteredNodes} edges={edges} primaryIds={primaryIds.size > 0 ? primaryIds : new Set(filteredNodes.map((n: any) => n.id))} onSelect={(n) => setSelected(n)} />
+  }
+
   const renderCards = () => (
     <div>
       {filteredNodes.length > CARDS_WARN_THRESHOLD && (
@@ -2609,6 +2657,12 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         <button style={{ ...S.btn(), padding:'6px 12px' }} onClick={onBack}>← Back</button>
         <div>
           <div style={{ fontSize:18, fontWeight:700 }}>{view.name}</div>
+          {contract?.question && (
+            <div data-testid="view-question" style={{ fontSize:13, color:'var(--text-dim)', marginTop:2, display:'flex', alignItems:'center', gap:6 }}>
+              {isAR && contract.questionAr ? contract.questionAr : contract.question}
+              <HelpTip text={t('eaviews.question_help')} />
+            </div>
+          )}
           <div style={{ display:'flex', gap:6, marginTop:2 }}>
             <span style={S.badge(CATEGORY_COLOR[view.category]||'#3498db')}>{view.category}</span>
             <span style={S.badge(STATUS_COLOR[view.status])}>{view.status}</span>
@@ -2810,12 +2864,18 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       {!comparisonMode && !authoringMode && !aiAssistMode && (<>
       {/* Viz mode selector */}
       <div style={{ display:'flex', gap:2, background:'var(--navy-light)', borderRadius:8, padding:3, marginBottom:16, width:'fit-content' }}>
-        {['GRAPH','CAPABILITY_MAP','HEATMAP','MATRIX','TREE','CARDS','TABLE'].map(m => (
+        {(presentation?.available?.length ? presentation.available.filter((m: string) => RENDERABLE_MODES.includes(m)) : LEGACY_MODES).map((m: string) => (
           <button key={m} style={{ ...S.btn(), padding:'5px 12px', fontSize:12, background:vizMode===m?'var(--accent)':'none', color:vizMode===m?'var(--navy)':'var(--text-dim)' }} onClick={()=>setVizMode(m)}>
             {VIZ_ICONS[m]} {m.replace(/_/g,' ')}
           </button>
         ))}
       </div>
+
+      {resultState?.state === 'NO_RELATIONSHIPS' && (
+        <div role="status" data-testid="result-state-note" style={{ fontSize:12, color:'var(--text-dim)', marginBottom:12 }}>
+          <strong>{t('eaviews.result_no_relationships')}:</strong> {resultState.message}
+        </div>
+      )}
 
       {/* Filters */}
       <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' as const }}>
@@ -2880,12 +2940,14 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         : comparisonMode ? renderComparison()
         : authoringMode ? renderAuthoring()
         : aiAssistMode ? renderAiAssist()
+        : resultEmpty ? renderResultState()
         : vizMode === 'GRAPH' ? renderGraph()
         : vizMode === 'CAPABILITY_MAP' ? renderCapabilityMap()
         : vizMode === 'HEATMAP' ? renderHeatmap()
         : vizMode === 'MATRIX' ? renderMatrix()
         : vizMode === 'TREE' ? renderTree()
         : vizMode === 'CARDS' ? renderCards()
+        : vizMode === 'LANDSCAPE' ? renderLandscape()
         : renderTable()}
       </>
       )}

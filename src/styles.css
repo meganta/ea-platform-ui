@@ -233,3 +233,13 @@ tr:hover td { background:rgba(3,105,161,0.03) }
 @media (max-width: 700px) {
   .design-picker-grid, .design-preview-grid { grid-template-columns:1fr }
 }
+
+/* EA Views landscape: grouped portfolio layout (design-system tokens only) */
+.landscape-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:12px }
+.landscape-group { background:var(--navy-light); border:1px solid var(--border); border-radius:8px; padding:10px; min-width:0 }
+.landscape-group-title { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; font-weight:600; margin-bottom:8px }
+.landscape-count { font-size:11px; color:var(--text-dim) }
+.landscape-items { display:flex; flex-wrap:wrap; gap:6px }
+.landscape-item { font-size:12px; padding:4px 8px; border-radius:6px; border:1px solid var(--border); background:var(--navy-mid); color:var(--text); cursor:pointer; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.landscape-item:hover, .landscape-item:focus-visible { border-color:var(--accent) }
+@media (max-width: 640px) { .landscape-grid { grid-template-columns:1fr } }
