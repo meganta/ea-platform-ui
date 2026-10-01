@@ -2002,8 +2002,8 @@ export function StudyCostEstimate({ lines, isAR }: { lines: any[]; isAR: boolean
 }
 
 const EA_IMPACT_HELP = {
-  en: 'Optional. The AI also assesses the study against every domain of your EA Repository (Current architecture) and lists, per domain, only the objects that are or might be impacted, with a description of the impact. It takes longer and uses more AI credits. You can switch it on or off later from the study.',
-  ar: 'اختياري. يقيّم الذكاء الاصطناعي الدراسة أيضًا مقابل كل مجال في مستودع البنية المؤسسية (البنية الحالية)، ويسرد لكل مجال العناصر المتأثرة أو المحتمل تأثرها فقط مع وصف الأثر. يستغرق وقتًا أطول ويستهلك أرصدة ذكاء اصطناعي إضافية. يمكنك تفعيله أو إيقافه لاحقًا من الدراسة.',
+  en: 'Optional. The AI also assesses the study against every domain of your EA Repository (Current architecture) and lists, per domain, only the objects that are or might be impacted, with a description of the impact. Where one of your EA Views (saved or from the View Library) illustrates a domain’s impact, the AI chooses it and embeds its picture with the impacted objects highlighted. It takes longer and uses more AI credits. You can switch it on or off later from the study.',
+  ar: 'اختياري. يقيّم الذكاء الاصطناعي الدراسة أيضًا مقابل كل مجال في مستودع البنية المؤسسية (البنية الحالية)، ويسرد لكل مجال العناصر المتأثرة أو المحتمل تأثرها فقط مع وصف الأثر. وإذا وُجد عرض للبنية المؤسسية (محفوظ أو من مكتبة العروض) يوضح أثر المجال، يختاره الذكاء الاصطناعي ويضمّن صورته مع تمييز العناصر المتأثرة. يستغرق وقتًا أطول ويستهلك أرصدة ذكاء اصطناعي إضافية. يمكنك تفعيله أو إيقافه لاحقًا من الدراسة.',
 }
 // Mirrors apps/api/src/innovation/study-ea-impact.ts (domains, impact types) - keep in sync if that list changes.
 const EA_IMPACT_DOMAIN_LABEL: Record<string, { en: string; ar: string }> = {
@@ -2021,6 +2021,27 @@ const EA_IMPACT_TYPE_LABEL: Record<string, { en: string; ar: string }> = {
   REPLACE: { en: 'Replace', ar: 'استبدال' }, RETIRE: { en: 'Retire', ar: 'إيقاف' }, DEPENDENCY: { en: 'Dependency', ar: 'اعتمادية' },
 }
 const EA_IMPACT_LEVEL_COLOR: Record<string, string> = { HIGH: RATING_COLOR.bad, MEDIUM: RATING_COLOR.mid, LOW: '#3498db', NONE: '#64748B' }
+
+/** One domain's EA View picture, chosen by the AI to illustrate the impact; impacted objects are highlighted in it. */
+function StudyImpactViewFigure({ view, isAR }: { view: any; isAR: boolean }) {
+  // An <img> never runs markup from the picture; the SVG is generated server-side with every name escaped.
+  const src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(view.image.svg)}`
+  const source = view.source === 'VIEW_LIBRARY' ? (isAR ? 'مكتبة العروض' : 'View Library') : (isAR ? 'عرض محفوظ' : 'Saved view')
+  return (
+    <figure data-testid="study-impact-view" style={{ margin: '0 0 10px', border: '1px solid var(--border)', borderRadius: 8, padding: 10, background: 'var(--navy)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const, marginBottom: 8, fontSize: 12 }}>
+        <span style={{ fontWeight: 700 }}>🗺 {view.title}</span>
+        <span style={{ color: 'var(--text-dim)' }}>{source} · {view.visualization}</span>
+      </div>
+      <div style={{ overflowX: 'auto' as const, background: '#ffffff', borderRadius: 6 }}>
+        <img src={src} alt={isAR ? `عرض البنية المؤسسية: ${view.title}` : `EA View: ${view.title}`} style={{ display: 'block', maxWidth: '100%', height: 'auto' }} />
+      </div>
+      <figcaption style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6, lineHeight: 1.5 }}>
+        {view.reason ? `${view.reason} ` : ''}{isAR ? `تم تمييز ${view.impactedShown} من العناصر المتأثرة.` : `${view.impactedShown} impacted object(s) highlighted.`}
+      </figcaption>
+    </figure>
+  )
+}
 
 /** EA impact analysis: headline counts, then every domain - impacted ones with their objects, the rest in one line each. */
 export function StudyEaImpact({ content, isAR }: { content: any; isAR: boolean }) {
@@ -2060,6 +2081,7 @@ export function StudyEaImpact({ content, isAR }: { content: any; isAR: boolean }
             <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? `${d.impactedObjects.length} من ${d.objectCount} عنصر متأثر` : `${d.impactedObjects.length} of ${d.objectCount} objects impacted`}</span>
           </div>
           {d.summary && <div style={{ fontSize: 12, lineHeight: 1.6, marginBottom: 8 }}>{d.summary}</div>}
+          {d.view?.image?.svg && <StudyImpactViewFigure view={d.view} isAR={isAR} />}
           {d.assessedCount < d.objectCount && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' as const, marginBottom: 8 }}>{isAR ? `قُيّم ${d.assessedCount} من ${d.objectCount} عنصرًا (الأكثر صلة أولًا).` : `${d.assessedCount} of ${d.objectCount} objects assessed (most relevant first).`}</div>}
           <div style={{ overflowX: 'auto' as const, WebkitOverflowScrolling: 'touch' as any }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 12, minWidth: 640 }}>
@@ -2574,7 +2596,11 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
   const startEdit = async () => {
     setActionError('')
     await loadImpactPreview()
-    setEditDraft(def?.shape === 'recommendation' ? { ...content } : def?.shape === 'list' || def?.shape === 'impact' ? JSON.stringify(content, null, 2) : (content || ''))
+    // The impact analysis' view pictures are generated and kept by the server; the editor shows which view, not the image data.
+    const editable = def?.shape === 'impact' && Array.isArray(content?.domains)
+      ? { ...content, domains: content.domains.map((d: any) => d.view ? { ...d, view: { title: d.view.title, source: d.view.source } } : d) }
+      : content
+    setEditDraft(def?.shape === 'recommendation' ? { ...content } : def?.shape === 'list' || def?.shape === 'impact' ? JSON.stringify(editable, null, 2) : (content || ''))
     setEditing(true)
   }
 

@@ -1857,3 +1857,51 @@ describe('InnovationPage - Studies: optional EA impact analysis', () => {
     expect(screen.getByText('No Repository object was identified as impacted.')).toBeInTheDocument();
   });
 });
+
+describe('InnovationPage - Studies: EA View pictures in the impact analysis', () => {
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><text>Citizen Portal</text></svg>';
+  const withView = { ...IMPACT_CONTENT, domains: IMPACT_CONTENT.domains.map((d: any) => d.domain === 'APPLICATION_INTEGRATION'
+    ? { ...d, view: { source: 'SAVED_VIEW', viewId: 'v1', viewpointId: null, title: 'Application Landscape', visualization: 'GRAPH', architectureState: 'CURRENT', reason: 'Shows the portal with its integrations.', objects: 8, impactedShown: 2, generatedAt: '', image: { mimeType: 'image/svg+xml', svg, width: 10, height: 10 } } }
+    : d) };
+
+  it('shows the chosen view under its domain as an image, with why it was chosen and how many impacted objects it highlights', () => {
+    const { StudyEaImpact } = require('../InnovationPage');
+    render(<StudyEaImpact content={withView} isAR={false} />);
+    const figure = screen.getByTestId('study-impact-view');
+    expect(screen.getByTestId('ea-impact-domain-APPLICATION_INTEGRATION')).toContainElement(figure);
+    const img = screen.getByAltText('EA View: Application Landscape') as HTMLImageElement;
+    expect(img.src.startsWith('data:image/svg+xml')).toBe(true);
+    expect(figure).toHaveTextContent('Saved view · GRAPH');
+    expect(figure).toHaveTextContent('Shows the portal with its integrations. 2 impacted object(s) highlighted.');
+  });
+
+  it('in Arabic', () => {
+    const { StudyEaImpact } = require('../InnovationPage');
+    render(<StudyEaImpact content={withView} isAR />);
+    expect(screen.getByAltText('عرض البنية المؤسسية: Application Landscape')).toBeInTheDocument();
+    expect(screen.getByTestId('study-impact-view')).toHaveTextContent('تم تمييز 2 من العناصر المتأثرة.');
+  });
+
+  it('no view, no figure', () => {
+    const { StudyEaImpact } = require('../InnovationPage');
+    render(<StudyEaImpact content={IMPACT_CONTENT} isAR={false} />);
+    expect(screen.queryByTestId('study-impact-view')).not.toBeInTheDocument();
+  });
+
+  it('editing the section never sends the picture data back', async () => {
+    const study = { ...GENERATED_STUDY, includeImpactAnalysis: true, sections: [{ id: 'sec-i', sectionKey: 'EA_IMPACT_ANALYSIS', title: 'EA Impact Analysis', orderIndex: 6, content: withView, status: 'AI_DRAFT' }] };
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [study], '/innovation/studies/study-1': study, '/impact-preview/': { potentiallyStaleSections: [] }, '/innovation/study-sections/sec-i/content': {} });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findByTestId('study-impact-view');
+    fireEvent.click(screen.getByText(/Edit/));
+    fireEvent.click(await screen.findByText('Save'));
+    await waitFor(() => {
+      const put = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].endsWith('/study-sections/sec-i/content'));
+      const body = JSON.parse(put[1].body);
+      const app = body.content.domains.find((d: any) => d.domain === 'APPLICATION_INTEGRATION');
+      expect(app.view).toEqual({ title: 'Application Landscape', source: 'SAVED_VIEW' });
+    });
+  });
+});
