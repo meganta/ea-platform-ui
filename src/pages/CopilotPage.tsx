@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import ReactMarkdown from 'react-markdown'
 import CopilotProvenance, { ProvenanceTrace } from '../components/CopilotProvenance'
 import EaQuestionExplorer from '../components/EaQuestionExplorer'
+import CopilotViewAttachments from '../components/CopilotViewAttachments'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -41,7 +42,7 @@ interface EvidenceItem {
   score: number
   targetRef: { type: string; id: string }
 }
-interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[]; trace?: ProvenanceTrace | null; remainingSpeech?: string | null; failed?: boolean }
+interface Msg { id: string; role: 'user' | 'architect' | 'system'; content: string; architectCode?: string; architectName?: string; architectAvatar?: string; timestamp: Date; evidence?: EvidenceItem[]; trace?: ProvenanceTrace | null; remainingSpeech?: string | null; failed?: boolean; attachments?: unknown[] }
 interface Architect { id: string; code: string; name: string; role: string; domain?: string; avatar: string; description?: string; isChief: boolean; aiModel: string; isActive: boolean }
 
 // Phase 1: authority-level color coding, matching the same caveat
@@ -839,6 +840,7 @@ export default function CopilotPage() {
         architectAvatar: m.architectCode ? (archMap[m.architectCode]?.avatar || '🤖') : undefined,
         timestamp: new Date(m.createdAt),
         evidence: Array.isArray(m.evidenceRefs) ? m.evidenceRefs : undefined,
+        attachments: Array.isArray(m.attachments) ? m.attachments : undefined,
       })))
       setActiveConvId(convId)
     }
@@ -1002,7 +1004,7 @@ export default function CopilotPage() {
         await streamSse('/copilot/chat', { message: msg, architectCode: selectedArchitect.code, conversationId: activeConvId }, (d) => {
           if (d.type === 'meta') setActiveConvId(d.conversationId)
           if (d.type === 'text') setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, content: msg2.content + d.content } : msg2))
-          if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations(); setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, evidence: d.evidence, trace: d.trace ?? null } : msg2)) }
+          if (d.type === 'done') { setActiveConvId(d.conversationId); refreshConversations(); setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, evidence: d.evidence, trace: d.trace ?? null, attachments: Array.isArray(d.attachments) ? d.attachments : undefined } : msg2)) }
           if (d.type === 'error') setMessages(m => m.map(msg2 => msg2.id === streamingId ? { ...msg2, content: d.error || 'Copilot could not complete this request. Please try again.', failed: true } : msg2))
         })
       } else {
@@ -1013,7 +1015,7 @@ export default function CopilotPage() {
         if (d.type === 'meta') setActiveConvId(d.conversationId)
         if (d.type === 'architect_response') {
           const arch = architects.find(a => a.code === d.architectCode)
-          setMessages(m => [...m, { id: Date.now() + d.architectCode, role: 'architect', content: d.content, architectCode: d.architectCode, architectName: d.architectName || arch?.name, architectAvatar: arch?.avatar || '🤖', timestamp: new Date(), evidence: d.evidence, failed: !!d.failed }])
+          setMessages(m => [...m, { id: Date.now() + d.architectCode, role: 'architect', content: d.content, architectCode: d.architectCode, architectName: d.architectName || arch?.name, architectAvatar: arch?.avatar || '🤖', timestamp: new Date(), evidence: d.evidence, attachments: Array.isArray(d.attachments) ? d.attachments : undefined, failed: !!d.failed }])
         }
         if (d.type === 'chief_start') {
           const chief = architects.find(a => a.isChief)
@@ -1170,7 +1172,7 @@ export default function CopilotPage() {
             </div>
           )}
 
-          {messages.map(m => (
+          {messages.map((m, mi) => (
             <div key={m.id} style={{ marginBottom: 16, display: 'flex', gap: 12, alignItems: 'flex-start', flexDirection: m.role === 'user' ? 'row-reverse' : 'row' }}>
               {/* Avatar */}
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: m.role === 'user' ? 'var(--accent)33' : archColor(m.architectCode) + '33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
@@ -1195,6 +1197,7 @@ export default function CopilotPage() {
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>
                   {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
+                {m.role === 'architect' && <CopilotViewAttachments attachments={m.attachments} question={messages.slice(0, mi).reverse().find(p => p.role === 'user')?.content} />}
                 {m.role === 'architect' && <CopilotProvenance evidence={m.evidence} trace={m.trace} />}
                 {m.role === 'architect' && <EvidenceDrawer evidence={m.evidence} />}
                 {m.role === 'architect' && m.remainingSpeech && (
