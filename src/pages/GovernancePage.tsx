@@ -5,6 +5,7 @@ import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { AttachedViewsPanel } from '../components/AttachedViewsPanel'
 import { exportFileName } from '../lib/exportFileName'
+import PrincipleCompliancePanel from '../components/PrincipleCompliancePanel'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -2704,7 +2705,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const cats = ['TENANT_PRINCIPLE','TENANT_STANDARD','NCA_STANDARD','NDMO_STANDARD','SDAIA_STANDARD','DGA_STANDARD']
         // Use localCompliance for optimistic updates — fall back to report items
         const allItemsSource = localCompliance.length > 0 ? localCompliance : items
+        // EA principles are assessed one by one in their own section when the review has it.
+        const principleSection = report.complianceMatrix?.principleCompliance
         const displayItems = allItemsSource.filter((i:any) => {
+          if (principleSection && i.category === 'TENANT_PRINCIPLE') return false
           if (nationalCats.includes(i.category)) return i.complianceStatus !== 'NOT_APPLICABLE'
           return true
         })
@@ -2715,6 +2719,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
         return (
           <div>
+            <PrincipleCompliancePanel section={principleSection} />
             {/* Visual status breakdown */}
             {total > 0 && (
               <div style={{ marginBottom: 20 }}>
