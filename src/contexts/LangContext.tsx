@@ -20,6 +20,17 @@ export type Locale = 'AR' | 'EN'
 // Keys map to both locales. NEVER use English as fallback for Arabic.
 const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   // Copilot — answer provenance ("Based on")
+  'copilot.view.help': { EN: 'Copilot checked your saved EA Views and the View Library for a view that shows what you asked, ran it, and attached the result. The picture is a snapshot taken when the answer was written. Download it as a PNG image or as a PowerPoint deck (picture plus the objects and relationships behind it), or open the saved view in EA Views to explore it live.', AR: 'بحث المساعد في مشاهد البنية المؤسسية المحفوظة لديك وفي مكتبة المشاهد عن مشهد يوضّح ما سألت عنه، ثم شغّله وأرفق نتيجته. الصورة لقطة أُخذت وقت كتابة الإجابة. يمكنك تنزيلها كصورة PNG أو كعرض تقديمي PowerPoint (الصورة مع العناصر والعلاقات التي تستند إليها)، أو فتح المشهد المحفوظ في وحدة المشاهد لاستكشافه مباشرةً.' },
+  'copilot.view.objects': { EN: 'objects', AR: 'عنصر' },
+  'copilot.view.relationships': { EN: 'relationships', AR: 'علاقة' },
+  'copilot.view.from_library': { EN: 'View Library', AR: 'مكتبة المشاهد' },
+  'copilot.view.from_saved': { EN: 'Saved view', AR: 'مشهد محفوظ' },
+  'copilot.view.truncated': { EN: 'This view returned more objects than fit in one picture; the most relevant are shown and the deck lists the rest.', AR: 'أعاد هذا المشهد عناصر أكثر مما تتسع له صورة واحدة؛ تُعرض الأكثر صلة، ويسرد العرض التقديمي البقية.' },
+  'copilot.view.download_png': { EN: 'Image (PNG)', AR: 'صورة (PNG)' },
+  'copilot.view.download_deck': { EN: 'Deck (PowerPoint)', AR: 'عرض تقديمي (PowerPoint)' },
+  'copilot.view.open': { EN: 'Open in EA Views', AR: 'فتح في المشاهد' },
+  'copilot.view.preparing': { EN: 'Preparing…', AR: 'جارٍ التجهيز…' },
+  'copilot.view.export_failed': { EN: 'The file could not be created. Please try again.', AR: 'تعذّر إنشاء الملف. يرجى المحاولة مرة أخرى.' },
   'copilot.prov.based_on': { EN: 'Based on', AR: 'استناداً إلى' },
   'copilot.prov.help': { EN: 'Shows which ArchMind records this answer used, grouped by module. Recorded facts come directly from system records; derived items are joins or paths built from stored links; documents are supporting knowledge from the Knowledge Base. "How this was answered" shows the question type, time reference and modules consulted - it never shows the AI\'s hidden reasoning.', AR: 'يعرض سجلات ArchMind التي استندت إليها هذه الإجابة مجمّعةً حسب الوحدة. الحقائق المسجّلة مأخوذة مباشرةً من سجلات النظام، والعناصر المستنتجة هي روابط أو مسارات مبنية على علاقات مخزّنة، والوثائق معرفة داعمة من قاعدة المعرفة. ويعرض قسم "كيف تمت الإجابة" نوع السؤال والمرجع الزمني والوحدات التي تم الرجوع إليها، ولا يعرض أبداً الاستدلال الداخلي للذكاء الاصطناعي.' },
   'copilot.prov.how_answered': { EN: 'How this was answered', AR: 'كيف تمت الإجابة' },
