@@ -3,7 +3,7 @@ import StrategyRefreshPage from '../StrategyRefreshPage'
 import { strategyRefreshApi } from '../../lib/strategy-refresh'
 let mockIsAR = false
 
-jest.mock('../../lib/strategy-refresh', () => ({ strategyRefreshApi: { list: jest.fn(), get: jest.fn(), create: jest.fn(), upload: jest.fn(), analyze: jest.fn(), decide: jest.fn(), activate: jest.fn(), source: jest.fn() } }))
+jest.mock('../../lib/strategy-refresh', () => ({ strategyRefreshApi: { list: jest.fn(), get: jest.fn(), create: jest.fn(), upload: jest.fn(), analyze: jest.fn(), decide: jest.fn(), activate: jest.fn(), source: jest.fn(), publicationOptions: jest.fn(), publish: jest.fn(), cancelPublication: jest.fn() } }))
 jest.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => true }) }))
 jest.mock('../../contexts/LangContext', () => ({ useLang: () => ({ isAR: mockIsAR, t: (key: string) => key }) }))
 
@@ -11,6 +11,19 @@ const api = strategyRefreshApi as jest.Mocked<typeof strategyRefreshApi>
 const finding: any = { id: 'fact-a', category: 'STRATEGY_STRUCTURE', title: 'Increase service access', authority: 'DOCUMENT_DECLARED_FACT', decision: 'PENDING', revision: 1, confidence: 0.9, destination: 'REPOSITORY', publishedAt: null, payload: { semanticType: 'Objective', description: 'Declared objective' }, evidence: [{ sourceId: 'doc-a', quote: 'Increase service access', section: 'Objectives', page: null }] }
 const ready: any = { id: 'refresh-a', title: 'Strategy 2027', strategyId: 'strategy-a', analysisStatus: 'READY', strategyStatus: 'DRAFT', findings: [finding], sources: [{ id: 'doc-a', filename: 'Strategy.pdf' }], context: { limitations: ['Repository evidence is incomplete'], evidence: [] }, summary: [{ category: 'STRATEGY_STRUCTURE', count: 1, findingIds: ['fact-a'] }], responseProgress: { total: 1, published: 0, pending: 1 } }
 beforeEach(() => { mockIsAR = false; jest.clearAllMocks(); api.list.mockResolvedValue([ready]); api.get.mockResolvedValue(ready) })
+
+it('offers publication on the reviewed finding card without duplicating it or silently writing', async () => {
+  api.get.mockResolvedValue({ ...ready, strategyStatus: 'ACTIVE', findings: [{ ...finding, decision: 'APPROVED' }] });
+  api.publicationOptions.mockResolvedValue({ revision: 1, actions: [], objectTypes: [], relationships: [], assets: [], plans: [], cycles: [], views: [] });
+  render(<StrategyRefreshPage />);
+  fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.review' }));
+  expect(screen.getAllByRole('heading', { name: finding.title })).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.publish' }));
+  expect(await screen.findByText('strategy.refresh.publication.no_destination')).toBeInTheDocument();
+  expect(api.publish).not.toHaveBeenCalled();
+  expect(api.activate).not.toHaveBeenCalled();
+});
 
 it('shows the recorded shared ViewDataset picture without applying or re-querying architecture', async () => {
   api.get.mockResolvedValue({ ...ready, context: { limitations: [], evidence: [{ id: 'view-a:target-a', module: 'EA_VIEW_DATASET', authority: 'TENANT_FACT', data: { viewId: 'view-a', viewName: 'Strategic Target', scenarioType: 'TARGET', dataset: { objects: [{ id: 'asset-a' }], relationships: [] }, image: { svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Asset A</text></svg>', shownNodes: 1, shownEdges: 0 } } }] } });
