@@ -1908,7 +1908,8 @@ const RECOMMENDATION_LABEL: Record<string, { en: string; ar: string }> = {
   POC_FIRST: { en: 'PoC First', ar: 'إثبات مفهوم أولاً' }, PILOT: { en: 'Pilot', ar: 'تجريب' },
   DEFER: { en: 'Defer', ar: 'تأجيل' }, WATCH: { en: 'Watch', ar: 'متابعة' }, REJECT: { en: 'Reject', ar: 'رفض' },
 }
-// Mirrors apps/api/src/innovation/study.service.ts's STUDY_SECTION_DEFS - keep in sync if that list changes.
+// Mirrors apps/api/src/innovation/study.service.ts's STUDY_SECTION_DEFS (story order: summary, why, what it enables,
+// how, cost and value, risks, recommendation) - keep in sync if that list changes.
 const STUDY_SECTIONS: { key: string; en: string; ar: string; shape: 'text' | 'list' | 'recommendation' }[] = [
   { key: 'EXECUTIVE_SUMMARY', en: 'Executive Summary', ar: 'الملخص التنفيذي', shape: 'text' },
   { key: 'BUSINESS_PROBLEM', en: 'Business Problem / Opportunity', ar: 'المشكلة/الفرصة التجارية', shape: 'text' },
@@ -1918,9 +1919,9 @@ const STUDY_SECTIONS: { key: string; en: string; ar: string; shape: 'text' | 'li
   { key: 'ARCHITECTURE_FIT', en: 'Architecture Fit Assessment', ar: 'تقييم توافق البنية', shape: 'text' },
   { key: 'TECHNOLOGY_OPTIONS', en: 'Recommended Technology Options', ar: 'خيارات التقنية الموصى بها', shape: 'list' },
   { key: 'BENCHMARK', en: 'Product Benchmark', ar: 'المقارنة المعيارية للمنتجات', shape: 'list' },
-  { key: 'RISKS_MITIGATION', en: 'Risks & Mitigation', ar: 'المخاطر والتخفيف', shape: 'list' },
   { key: 'COST_ESTIMATE', en: 'Cost Estimate (CAPEX / OPEX)', ar: 'تقدير التكاليف (الرأسمالية / التشغيلية)', shape: 'list' },
   { key: 'FINANCIAL_ASSESSMENT', en: 'Financial Assessment', ar: 'التقييم المالي', shape: 'text' },
+  { key: 'RISKS_MITIGATION', en: 'Risks & Mitigation', ar: 'المخاطر والتخفيف', shape: 'list' },
   { key: 'RECOMMENDATION', en: 'Recommendation', ar: 'التوصية', shape: 'recommendation' },
 ]
 
