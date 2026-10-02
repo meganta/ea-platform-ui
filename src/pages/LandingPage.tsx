@@ -188,7 +188,7 @@ export default function LandingPage() {
       <a className="lp-skip" href="#main">{L(c('Skip to content', 'انتقل إلى المحتوى'))}</a>
       <header className="lp-header">
         <nav className="lp-nav am-container wide" aria-label={L(c('Primary navigation', 'التنقل الرئيسي'))}>
-          <BrandLogo href="#top" tone="reverse" size={21} label="ArchMind home" />
+          <BrandLogo href="#top" tone="reverse" size={21} label={L(c('ArchMind home', 'الصفحة الرئيسية لـ ArchMind'))} />
           <button className="lp-menu-button" aria-label={L(c('Open navigation', 'فتح قائمة التنقل'))} aria-expanded={menuOpen} aria-controls="lp-nav-panel" onClick={() => setMenuOpen(!menuOpen)}><Icon name={menuOpen ? 'close' : 'menu'} /></button>
           <div id="lp-nav-panel" className={`lp-nav-panel${menuOpen ? ' open' : ''}`}>
             <div className="lp-nav-links">
@@ -296,7 +296,7 @@ export default function LandingPage() {
               <p className="am-caption lp-framework-note">{L(c('Framework configuration supports NORA 2.0, TOGAF-oriented, and custom meta-model structures. No certification claim is implied.', 'تدعم تهيئة الأطر هياكل NORA 2.0 والهياكل الموجهة بمنهجية TOGAF والنماذج الوصفية المخصصة، دون الإشارة إلى أي اعتماد رسمي.'))}</p>
             </div>
             <div className="lp-framework-visual">
-              <div className="lp-framework-row"><span>NORA 2.0</span><span>TOGAF</span><span>{L(c('CUSTOM', 'مخصص'))}</span></div>
+              <div className="lp-framework-row"><span>{L(c('NORA 2.0', 'نورة 2.0'))}</span><span>TOGAF</span><span>{L(c('CUSTOM', 'مخصص'))}</span></div>
               <div className="lp-framework-base">{L(c('Configurable architecture language', 'لغة معمارية قابلة للتهيئة'))}</div>
             </div>
           </div>
@@ -333,7 +333,7 @@ export default function LandingPage() {
       <footer className="lp-footer am-on-dark">
         <div className="am-container lp-footer-grid">
           <div className="lp-footer-brand">
-            <BrandLogo href="#top" tone="reverse" size={22} label="ArchMind home" />
+            <BrandLogo href="#top" tone="reverse" size={22} label={L(c('ArchMind home', 'الصفحة الرئيسية لـ ArchMind'))} />
             <p className="am-body-sm">{L(c('Enterprise architecture, operated with intent.', 'تشغيل البنية المؤسسية بوضوح وفاعلية.'))}</p>
           </div>
           <nav className="lp-footer-col" aria-label={L(c('Product', 'المنتج'))}>
@@ -381,7 +381,7 @@ function ProductComposition({ locale }: { locale: 'EN' | 'AR' }) {
       <aside><b /><b /><b className="active" /><b /><b /></aside>
       <div className="lp-product-canvas">
         <div className="lp-canvas-head"><div><small>{L(c('ARCHITECTURE OVERVIEW', 'نظرة عامة على البنية'))}</small><strong>{L(c('Operational architecture workspace', 'مساحة العمل المعمارية'))}</strong></div><span>{L(c('Current state', 'الحالة الحالية'))}</span></div>
-        <div className="lp-metrics"><div><small>{L(c('Repository', 'المستودع'))}</small><strong>248</strong><em>+12</em></div><div><small>{L(c('Views', 'المشاهد'))}</small><strong>36</strong><em>Live</em></div><div><small>{L(c('Reviews', 'المراجعات'))}</small><strong>08</strong><em>Active</em></div></div>
+        <div className="lp-metrics"><div><small>{L(c('Repository', 'المستودع'))}</small><strong>248</strong><em>+12</em></div><div><small>{L(c('Views', 'المشاهد'))}</small><strong>36</strong><em>{L(c('Live', 'مباشر'))}</em></div><div><small>{L(c('Reviews', 'المراجعات'))}</small><strong>08</strong><em>{L(c('Active', 'نشطة'))}</em></div></div>
         <div className="lp-canvas-lower">
           <div className="lp-map"><div className="lp-card-label">{L(c('EA VIEW · DEPENDENCY MAP', 'مشهد الاعتماديات'))}</div><div className="lp-node n1">B</div><div className="lp-node n2">A</div><div className="lp-node n3">D</div><div className="lp-node n4">T</div><svg viewBox="0 0 300 150"><path d="M52 38 C100 30 115 70 155 74 M155 74 C200 75 210 35 255 43 M155 74 C180 105 205 118 252 116" /></svg></div>
           <div className="lp-ai"><div className="lp-ai-head"><span>AI</span><div><small>{L(c('CHIEF ARCHITECT', 'المعماري الرئيسي'))}</small><strong>{L(c('Architecture insight', 'رؤية معمارية'))}</strong></div></div><p>{L(c('Three applications support overlapping capabilities. Review consolidation options before the target-state transition.', 'تدعم ثلاثة تطبيقات قدرات متداخلة. راجع خيارات التوحيد قبل الانتقال إلى الحالة المستهدفة.'))}</p><div className="lp-ai-source">{L(c('Grounded in 14 architecture records', 'مستند إلى 14 سجلاً معمارياً'))}</div></div>
@@ -417,9 +417,9 @@ function DemoForm({ locale, errors, requestDraft, copied, submitting, submitted,
   if (submitted) return <div className="lp-form lp-form-done" role="status"><span className="lp-done-mark"><Icon name="check" size={26} /></span><h3 className="am-h3">{L(c('Thank you', 'شكراً لك'))}</h3><p>{L(c('Your request has been received. An ArchMind representative will be in touch shortly.', 'تم استلام طلبك. سيتواصل معك أحد ممثلي ArchMind قريباً.'))}</p></div>
   if (requestDraft) return <div className="lp-form lp-form-done" role="status"><span className="lp-done-mark"><Icon name="check" size={26} /></span><h3 className="am-h3">{L(c('Your request is ready', 'طلبك جاهز'))}</h3><p>{L(c("We couldn't submit this automatically. Copy the prepared details and share them with your ArchMind representative.", 'تعذّر إرسال الطلب تلقائياً. انسخ تفاصيل الطلب وشاركها مع ممثل ArchMind.'))}</p><button className="am-btn am-btn-primary" type="button" onClick={onCopy}>{copied ? L(c('Copied', 'تم النسخ')) : L(c('Copy request details', 'نسخ تفاصيل الطلب'))}</button></div>
   return <form className="lp-form" noValidate onSubmit={onSubmit}>
-    <div className="lp-form-grid">{field('fullName', c('Full Name', 'الاسم الكامل'), 'text', false, 'name')}{field('organization', c('Organization', 'الجهة'), 'text', false, 'organization')}{field('jobTitle', c('Job Title', 'المسمى الوظيفي'), 'text', false, 'organization-title')}{field('email', c('Work Email', 'البريد الإلكتروني للعمل'), 'email', false, 'email')}{field('phone', c('Phone', 'رقم الهاتف'), 'tel', true, 'tel')}<label className="am-field"><span>{L(c('Country', 'الدولة'))}</span><select className="am-input" name="country" defaultValue="Saudi Arabia" aria-invalid={!!errors.country}><option>Saudi Arabia</option><option>United Arab Emirates</option><option>Bahrain</option><option>Kuwait</option><option>Oman</option><option>Qatar</option><option>{L(c('Other', 'أخرى'))}</option></select>{errors.country && <em className="am-field-error">{errors.country}</em>}</label></div>
+    <div className="lp-form-grid">{field('fullName', c('Full Name', 'الاسم الكامل'), 'text', false, 'name')}{field('organization', c('Organization', 'الجهة'), 'text', false, 'organization')}{field('jobTitle', c('Job Title', 'المسمى الوظيفي'), 'text', false, 'organization-title')}{field('email', c('Work Email', 'البريد الإلكتروني للعمل'), 'email', false, 'email')}{field('phone', c('Phone', 'رقم الهاتف'), 'tel', true, 'tel')}<label className="am-field"><span>{L(c('Country', 'الدولة'))}</span><select className="am-input" name="country" defaultValue="Saudi Arabia" aria-invalid={!!errors.country}>{([['Saudi Arabia', 'المملكة العربية السعودية'], ['United Arab Emirates', 'الإمارات العربية المتحدة'], ['Bahrain', 'البحرين'], ['Kuwait', 'الكويت'], ['Oman', 'عُمان'], ['Qatar', 'قطر']] as const).map(([en, ar]) => <option key={en} value={en}>{L(c(en, ar))}</option>)}<option>{L(c('Other', 'أخرى'))}</option></select>{errors.country && <em className="am-field-error">{errors.country}</em>}</label></div>
     <label className="am-field"><span>{L(c('Message', 'الرسالة'))}</span><textarea className="am-input" name="message" rows={4} aria-invalid={!!errors.message} aria-describedby={errors.message ? 'message-error' : undefined} placeholder={L(c('Tell us about your architecture priorities…', 'حدثنا عن أولويات البنية المؤسسية لديكم…'))} />{errors.message && <em className="am-field-error" id="message-error">{errors.message}</em>}</label>
-    <fieldset className="lp-fieldset"><legend className="am-field-label">{L(c('Preferred Language', 'اللغة المفضلة'))}</legend><label className="lp-radio"><input type="radio" name="preferredLanguage" value="English" defaultChecked={locale === 'EN'} /> English</label><label className="lp-radio"><input type="radio" name="preferredLanguage" value="Arabic" defaultChecked={locale === 'AR'} /> العربية</label>{errors.preferredLanguage && <em className="am-field-error">{errors.preferredLanguage}</em>}</fieldset>
+    <fieldset className="lp-fieldset"><legend className="am-field-label">{L(c('Preferred Language', 'اللغة المفضلة'))}</legend><label className="lp-radio"><input type="radio" name="preferredLanguage" value="English" defaultChecked={locale === 'EN'} /> {L(c('English', 'الإنجليزية'))}</label><label className="lp-radio"><input type="radio" name="preferredLanguage" value="Arabic" defaultChecked={locale === 'AR'} /> {L(c('Arabic', 'العربية'))}</label>{errors.preferredLanguage && <em className="am-field-error">{errors.preferredLanguage}</em>}</fieldset>
     <button className="am-btn am-btn-primary block" type="submit" disabled={submitting} aria-busy={submitting}>{submitting ? L(c('Sending…', 'جارٍ الإرسال…')) : <>{L(labels.requestDemo)} <Arrow /></>}</button>
   </form>
 }

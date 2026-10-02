@@ -38,7 +38,7 @@ export default function EaQuestionExplorer({ onSelect }: { onSelect: (text: stri
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 500 }}>
       {!open && FEATURED_EA_QUESTIONS.map(question => (
-        <QuestionButton key={question.id} text={question.text} onSelect={choose} />
+        <QuestionButton key={question.id} text={isAR ? question.textAr : question.text} onSelect={choose} />
       ))}
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
@@ -61,15 +61,15 @@ export default function EaQuestionExplorer({ onSelect }: { onSelect: (text: stri
                     background: active ? 'var(--accent)' : 'var(--navy-light)', color: active ? 'var(--navy)' : 'var(--text-dim)',
                     border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
                   }}>
-                  {c.label} <span style={{ opacity: 0.75 }}>({c.questions.length})</span>
+                  {isAR ? c.labelAr : c.label} <span style={{ opacity: 0.75 }}>({c.questions.length})</span>
                 </button>
               )
             })}
           </div>
-          <div role="list" aria-label={`${category.label} questions`} style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 280, overflowY: 'auto', paddingRight: 2 }}>
+          <div role="list" aria-label={isAR ? `أسئلة ${category.labelAr}` : `${category.label} questions`} style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 280, overflowY: 'auto', paddingRight: 2 }}>
             {category.questions.map(question => (
               <div role="listitem" key={question.id}>
-                <QuestionButton text={question.text} onSelect={choose} />
+                <QuestionButton text={isAR ? question.textAr : question.text} onSelect={choose} />
               </div>
             ))}
           </div>

@@ -404,7 +404,7 @@ describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
     fireEvent.change(input, { target: { value: 'Does anything already cover this?' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
-    const citation = await screen.findByTitle('Source: Payment Gateway');
+    const citation = await screen.findByTitle('↗ Payment Gateway');
     expect(citation).toHaveTextContent('Payment Gateway');
     fireEvent.click(citation);
     expect(openSpy).toHaveBeenCalledWith('/repository?assetId=asset-1', '_blank');
@@ -426,7 +426,7 @@ describe('CopilotPage - evidence drawer (Copilot Phase 1)', () => {
     fireEvent.keyDown(input, { key: 'Enter' });
 
     await screen.findByText('A generic recommendation with no specific asset named.');
-    expect(screen.queryByTitle('Source: Payment Gateway')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('↗ Payment Gateway')).not.toBeInTheDocument();
   });
 
   // Direct regression check for the actual reported bug: the AI's real
@@ -534,8 +534,8 @@ describe('CopilotPage - Task Playbooks (Copilot Phase 2)', () => {
     expect(await screen.findByText('Architecture Impact Analysis')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Architecture Impact Analysis'));
 
-    expect(await screen.findByText(/subject \*/)).toBeInTheDocument();
-    expect(screen.getByText(/scopeRefId \(optional\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/Subject \*/)).toBeInTheDocument();
+    expect(screen.getByText(/Scope reference \(ID\) \(optional\)/)).toBeInTheDocument();
   });
 
   it('previews the resolved architects and evidence before running, without spending an AI call', async () => {
@@ -645,7 +645,7 @@ describe('CopilotPage - Action Draft review (Copilot Phase 3)', () => {
     await screen.findByText('Business Architect');
     fireEvent.click(screen.getByText('📝 Drafts'));
     expect(await screen.findByText('EA_REPOSITORY · EA_ASSET · CREATE')).toBeInTheDocument();
-    expect(screen.getByText('PENDING APPROVAL')).toBeInTheDocument();
+    expect(screen.getByText('Pending Approval')).toBeInTheDocument();
     expect(screen.getByText(/Proposed by APPLICATION/)).toBeInTheDocument();
     expect(screen.getByText(/Proposed Service/)).toBeInTheDocument();
   });
@@ -667,7 +667,7 @@ describe('CopilotPage - Action Draft review (Copilot Phase 3)', () => {
       const approveCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].includes('/approve'));
       expect(approveCall).toBeDefined();
     });
-    expect(await screen.findByText('APPROVED')).toBeInTheDocument();
+    expect(await screen.findByText('Approved')).toBeInTheDocument();
   });
 
   it('rejecting prompts for a reason and includes it in the request body', async () => {
@@ -781,5 +781,17 @@ describe('CopilotPage - handoff from EA Views (Continue in Copilot)', () => {
     const input = screen.getByPlaceholderText(/Enter to send/) as HTMLTextAreaElement;
     expect(input.value).toBe('Portfolio (Target): explain what this view shows');
     expect((global.fetch as jest.Mock).mock.calls.some(([u, o]) => o?.method === 'POST')).toBe(false);
+  });
+});
+
+describe('CopilotPage - one language at a time', () => {
+  it('the Arabic Copilot shell shows no English UI text', async () => {
+    mockIsAR = true;
+    (global.fetch as jest.Mock) = jest.fn().mockImplementation(() => Promise.resolve({ ok: true, json: () => Promise.resolve([]) }));
+    const { container } = render(<CopilotPage />);
+    await screen.findByText('🤖 المساعد الذكي للبنية المؤسسية');
+    const { findLanguageLeaks, SHARED_TERMS } = require('../../testUtils/languageLeaks');
+    expect(findLanguageLeaks(container, 'ar', [...SHARED_TERMS, /copilot\.[a-z_.]+/, /common\.[a-z_]+/, 'Haiku', 'Sonnet', 'Whisper', 'TTS-1', 'Enter', 'Shift'])).toEqual([]);
+    mockIsAR = false;
   });
 });

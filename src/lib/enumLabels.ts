@@ -54,6 +54,12 @@ export const COMMON_ENUM_LABELS: Record<string, BiLabel> = {
   RECOMMENDED: { en: 'Recommended', ar: 'موصى به' },
   EXCEPTION: { en: 'Exception', ar: 'استثناء' },
   EXCEPTION_REQUESTED: { en: 'Exception Requested', ar: 'طُلب استثناء' },
+  PENDING_APPROVAL: { en: 'Pending Approval', ar: 'بانتظار الاعتماد' },
+  EXECUTED: { en: 'Executed', ar: 'منفَّذ' },
+  GOVERNANCE_REVIEW: { en: 'Governance Review', ar: 'مراجعة الحوكمة' },
+  DECISION_EVALUATION: { en: 'Decision & Evaluation', ar: 'القرار والتقييم' },
+  INNOVATION: { en: 'Innovation', ar: 'الابتكار' },
+  ADM: { en: 'ADM', ar: 'ADM' },
   // Governance decisions
   APPROVED_WITH_CONDITIONS: { en: 'Approved with Conditions', ar: 'معتمد بشروط' },
   REQUIRES_CHANGES: { en: 'Requires Changes', ar: 'يتطلب تعديلات' },

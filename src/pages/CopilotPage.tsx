@@ -1,3 +1,5 @@
+import { useLang } from '../contexts/LangContext'
+import { enumLabel } from '../lib/enumLabels'
 import { useState, useRef, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import ReactMarkdown from 'react-markdown'
@@ -50,11 +52,11 @@ interface Architect { id: string; code: string; name: string; role: string; doma
 // produces server-side (an item with no bracketed caveat is
 // AUTHORITATIVE) — colors are purely a visual echo of that same
 // classification, not a separate judgment made in the frontend.
-const AUTHORITY_STYLE: Record<EvidenceItem['sourceAuthorityLevel'], { bg: string; fg: string; label: string }> = {
-  AUTHORITATIVE: { bg: 'rgba(34,197,94,0.15)', fg: '#22c55e', label: 'Authoritative' },
-  ADVISORY: { bg: 'rgba(234,179,8,0.15)', fg: '#eab308', label: 'Advisory / Draft' },
-  HISTORICAL: { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8', label: 'Historical' },
-  UNVALIDATED: { bg: 'rgba(249,115,22,0.15)', fg: '#f97316', label: 'Validity Unknown' },
+const AUTHORITY_STYLE: Record<EvidenceItem['sourceAuthorityLevel'], { bg: string; fg: string; label: string; labelAr: string }> = {
+  AUTHORITATIVE: { bg: 'rgba(34,197,94,0.15)', fg: '#22c55e', label: 'Authoritative', labelAr: 'معتمد' },
+  ADVISORY: { bg: 'rgba(234,179,8,0.15)', fg: '#eab308', label: 'Advisory / Draft', labelAr: 'استشاري / مسودة' },
+  HISTORICAL: { bg: 'rgba(148,163,184,0.15)', fg: '#94a3b8', label: 'Historical', labelAr: 'تاريخي' },
+  UNVALIDATED: { bg: 'rgba(249,115,22,0.15)', fg: '#f97316', label: 'Validity Unknown', labelAr: 'السريان غير معروف' },
 }
 
 function evidenceSourceUrl(item: EvidenceItem): string | null {
@@ -143,7 +145,7 @@ function highlightCitationsInNode(node: ReactNode, pattern: RegExp, candidates: 
         <span
           key={i}
           onClick={() => openEvidenceSource(matched)}
-          title={`Source: ${matched.title}`}
+          title={`↗ ${matched.title}`}
           style={{ textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 2, cursor: 'pointer', color: 'inherit', fontWeight: 500 }}
         >
           {part}
@@ -199,12 +201,14 @@ function renderContentWithCitations(content: string, evidence?: EvidenceItem[]):
 
 /** Expandable "N sources" panel shown under an architect message that has evidence — the Phase 1 evidence-grounded Copilot's one visible surface so far (inline citation markers in the response text itself are a further follow-up). */
 function EvidenceDrawer({ evidence }: { evidence?: EvidenceItem[] }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [open, setOpen] = useState(false)
   if (!evidence || evidence.length === 0) return null
   return (
     <div style={{ marginTop: 6 }}>
       <button onClick={() => setOpen(o => !o)} style={{ fontSize: 11, color: 'var(--text-dim)', background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '3px 9px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
-        🔍 {evidence.length} source{evidence.length === 1 ? '' : 's'} {open ? '▲' : '▼'}
+        🔍 {evidence.length} {evidence.length === 1 ? L('source', 'مصدر') : L('sources', 'مصادر')} {open ? '▲' : '▼'}
       </button>
       {open && (
         <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 480 }}>
@@ -214,12 +218,12 @@ function EvidenceDrawer({ evidence }: { evidence?: EvidenceItem[] }) {
               <div key={item.sourceId + i} style={{ padding: '8px 10px', borderRadius: 8, background: 'var(--navy-light)', border: '1px solid var(--border)', fontSize: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</span>
-                  <span style={{ flexShrink: 0, fontSize: 10, padding: '2px 7px', borderRadius: 999, background: style.bg, color: style.fg }}>{style.label}</span>
+                  <span style={{ flexShrink: 0, fontSize: 10, padding: '2px 7px', borderRadius: 999, background: style.bg, color: style.fg }}>{isAR ? style.labelAr : style.label}</span>
                 </div>
                 <div style={{ color: 'var(--text-dim)', marginTop: 3, fontSize: 11.5, lineHeight: 1.5 }}>{item.excerpt}</div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 5 }}>
                   <span style={{ fontSize: 10, color: 'var(--text-dim)', opacity: 0.7 }}>{evidenceTypeLabel(item)}</span>
-                  {evidenceSourceUrl(item) && <button onClick={() => openEvidenceSource(item)} style={{ fontSize: 10.5, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View source →</button>}
+                  {evidenceSourceUrl(item) && <button onClick={() => openEvidenceSource(item)} style={{ fontSize: 10.5, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>{L('View source →', 'عرض المصدر ←')}</button>}
                 </div>
               </div>
             )
@@ -231,10 +235,47 @@ function EvidenceDrawer({ evidence }: { evidence?: EvidenceItem[] }) {
 }
 
 const MODEL_LABEL: Record<string, string> = { haiku: '⚡ Fast', sonnet: '🧠 Smart' }
+const MODEL_LABEL_AR: Record<string, string> = { haiku: '⚡ سريع', sonnet: '🧠 متقدم' }
+
+// The default architects' names and roles arrive in English only (backend
+// architect-registry DEFAULT_ARCHITECTS); the Arabic UI shows them by code.
+// A tenant-defined architect keeps the name it was given.
+const ARCHITECT_AR: Record<string, { name: string; role: string }> = {
+  CHIEF: { name: 'المعماري الرئيسي', role: 'كبير معماريي المؤسسة' },
+  BUSINESS: { name: 'معماري الأعمال', role: 'معماري الأعمال' },
+  APPLICATION: { name: 'معماري التطبيقات', role: 'معماري التطبيقات' },
+  INTEGRATION: { name: 'معماري التكامل', role: 'معماري التكامل' },
+  DATA: { name: 'معماري البيانات', role: 'معماري بيانات المؤسسة' },
+  TECHNOLOGY: { name: 'معماري التقنية', role: 'معماري التقنية والبنية التحتية' },
+  SECURITY: { name: 'معماري الأمن', role: 'معماري الأمن السيبراني' },
+  BENEFICIARY: { name: 'معماري تجربة المستفيد', role: 'معماري تجربة المستفيد' },
+}
+// Playbook names/descriptions arrive in English only (backend copilot-playbooks.ts); Arabic by playbook id.
+const PLAYBOOK_AR: Record<string, { name: string; description: string }> = {
+  ARCHITECTURE_IMPACT_ANALYSIS: { name: 'تحليل الأثر المعماري', description: 'تقييم كيفية امتداد أثر تغيير مقترح عبر مجالات الأعمال والتطبيقات والبيانات والتقنية والأمن.' },
+  GAP_ASSESSMENT: { name: 'تقييم الفجوة بين الحالة الحالية والمستهدفة', description: 'مقارنة حالة البنية الحالية بحالة مستهدفة موصوفة وتحديد الفجوات.' },
+  DUPLICATION_REUSE_ANALYSIS: { name: 'تحليل تكرار التطبيقات والتقنيات وإعادة استخدامها', description: 'تحديد القدرات المتداخلة في محفظة التطبيقات والتقنيات ومواضع إمكانية إعادة الاستخدام.' },
+  STANDARDS_ALIGNMENT: { name: 'المواءمة مع معايير ومبادئ البنية', description: 'فحص مقترح أو أصل قائم مقابل مبادئ ومعايير البنية المؤسسية للجهة.' },
+  ROADMAP_ALIGNMENT: { name: 'المواءمة مع خارطة الطريق والمبادرات', description: 'التحقق من مواءمة المقترح مع مبادرات خارطة الطريق القائمة والتوجه الاستراتيجي.' },
+  DEPENDENCY_BLAST_RADIUS: { name: 'تحليل الاعتماديات ونطاق الأثر', description: 'تتبع ما يعتمد على أصل معين وتقدير أثر تغييره أو إيقافه.' },
+  DECISION_PREPARATION: { name: 'التحضير لقرار معماري', description: 'إعداد التحليل الذي يحتاجه سجل قرار معماري رسمي — دون اتخاذ القرار نفسه.' },
+  OPTIONS_EVALUATION_PREP: { name: 'التحضير لتقييم الخيارات التقنية', description: 'إعداد مقارنة منظمة للخيارات المرشحة قبل تقييم رسمي في القرار والتقييم.' },
+  GOVERNANCE_REVIEW_PREP: { name: 'التحضير لمراجعة الحوكمة', description: 'تقييم مسبق لمقترح عبر جميع المجالات قبل تقديمه لمراجعة حوكمة رسمية.' },
+  MEETING_FOLLOWUP: { name: 'متابعة الاجتماع للبنية المؤسسية', description: 'تحويل اجتماع سبق تحليله إلى إجراءات متابعة محددة للبنية المؤسسية. يتطلب أن يكون الاجتماع قد حُلّل أولاً في مساعد الاجتماعات — يجمع هذا الدليل تلك المخرجات ولا يعيد تحليل النص.' },
+}
+const PLAYBOOK_INPUT_LABEL: Record<string, { en: string; ar: string }> = {
+  subject: { en: 'Subject', ar: 'الموضوع' },
+  scopeRefId: { en: 'Scope reference (ID)', ar: 'مرجع النطاق (المعرّف)' },
+  meetingId: { en: 'Meeting ID', ar: 'معرّف الاجتماع' },
+}
+const architectName = (code: string | undefined, name: string | undefined, isAR: boolean) => (isAR && code && ARCHITECT_AR[code]?.name) || name || ''
+const architectRole = (code: string | undefined, role: string | undefined, isAR: boolean) => (isAR && code && ARCHITECT_AR[code]?.role) || role || ''
 const DOMAIN_COLOR: Record<string, string> = { CHIEF: '#f39c12', BUSINESS: '#3498db', BENEFICIARY: '#2980b9', APPLICATION: '#e67e22', INTEGRATION: '#16a085', DATA: '#1abc9c', TECHNOLOGY: '#e74c3c', SECURITY: '#9b59b6' }
 
 // ── Meeting Assistant ─────────────────────────────────────────────────────────
 function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [meetings, setMeetings] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<any>(null)
@@ -318,35 +359,35 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
     return (
       <div>
         <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
-          <button style={{ padding:'6px 12px', borderRadius:8, background:'var(--navy-mid)', border:'none', color:'var(--text)', cursor:'pointer', fontSize:13 }} onClick={()=>{ setView('list'); setSelected(null) }}>← Back</button>
+          <button style={{ padding:'6px 12px', borderRadius:8, background:'var(--navy-mid)', border:'none', color:'var(--text)', cursor:'pointer', fontSize:13 }} onClick={()=>{ setView('list'); setSelected(null) }}>{L('← Back', '→ رجوع')}</button>
           <div style={{ flex:1 }}>
             <div style={{ fontSize:18, fontWeight:700 }}>{selected.title}</div>
             <div style={{ display:'flex', gap:8, marginTop:3 }}>
               <span style={{ padding:'2px 10px', borderRadius:10, fontSize:11, fontWeight:600, background:(STATUS_COLOR[selected.status]||'#7f8c8d')+'22', color:STATUS_COLOR[selected.status]||'#7f8c8d' }}>{selected.status}</span>
-              {selected.scheduledAt && <span style={{ fontSize:11, color:'var(--text-dim)' }}>{new Date(selected.scheduledAt).toLocaleDateString()}</span>}
+              {selected.scheduledAt && <span style={{ fontSize:11, color:'var(--text-dim)' }}>{new Date(selected.scheduledAt).toLocaleDateString(isAR ? 'ar' : 'en-US')}</span>}
             </div>
           </div>
           {hasTranscript && !hasAnalyses && (
             <button onClick={startAnalysis} disabled={analyzing} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'var(--navy)', border:'none', cursor:analyzing?'default':'pointer', fontSize:13, fontWeight:600 }}>
-              {analyzing ? '⏳ Analyzing...' : '▶ Analyze with Architects'}
+              {analyzing ? L('⏳ Analyzing...', '⏳ جارٍ التحليل...') : L('▶ Analyze with Architects', '▶ التحليل مع المعماريين')}
             </button>
           )}
           {hasAnalyses && (
             <button onClick={startAnalysis} disabled={analyzing} style={{ padding:'8px 16px', borderRadius:8, background:'var(--navy-mid)', border:'none', color:'var(--text)', cursor:analyzing?'default':'pointer', fontSize:13 }}>
-              {analyzing ? '⏳ Re-analyzing...' : '↻ Re-analyze'}
+              {analyzing ? L('⏳ Re-analyzing...', '⏳ جارٍ إعادة التحليل...') : L('↻ Re-analyze', '↻ إعادة التحليل')}
             </button>
           )}
         </div>
 
         {/* Transcript section */}
         <div style={{ background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, padding:20, marginBottom:16 }}>
-          <div style={{ fontSize:14, fontWeight:600, marginBottom:12 }}>📝 Transcript</div>
+          <div style={{ fontSize:14, fontWeight:600, marginBottom:12 }}>{L('📝 Transcript', '📝 النص المكتوب')}</div>
           {hasTranscript ? (
             <div>
               <div style={{ display:'flex', gap:8, marginBottom:10, fontSize:12, color:'var(--text-dim)' }}>
-                <span>📄 {transcript.wordCount?.toLocaleString()} words</span>
+                <span>📄 {transcript.wordCount?.toLocaleString(isAR ? 'ar' : 'en-US')} {L('words', 'كلمة')}</span>
                 <span>🌐 {transcript.language}</span>
-                <span>📅 {new Date(transcript.createdAt).toLocaleString()}</span>
+                <span>📅 {new Date(transcript.createdAt).toLocaleString(isAR ? 'ar' : 'en-US')}</span>
               </div>
               <div style={{ background:'var(--navy)', borderRadius:8, padding:12, maxHeight:200, overflowY:'auto', fontSize:12, lineHeight:1.7, color:'var(--text-dim)', fontFamily:'monospace' }}>
                 {transcript.content.slice(0, 1000)}{transcript.content.length > 1000 ? '...' : ''}
@@ -355,23 +396,23 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
           ) : (
             <div>
               <div style={{ display:'flex', gap:8, marginBottom:12 }}>
-                <button onClick={()=>setUploadMode('text')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='text'?'var(--accent)':'var(--border)'}`, background:uploadMode==='text'?'rgba(3,105,161,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>📝 Paste Text</button>
-                <button onClick={()=>setUploadMode('audio')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='audio'?'var(--accent)':'var(--border)'}`, background:uploadMode==='audio'?'rgba(3,105,161,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>🎵 Upload Audio</button>
+                <button onClick={()=>setUploadMode('text')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='text'?'var(--accent)':'var(--border)'}`, background:uploadMode==='text'?'rgba(3,105,161,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>{L('📝 Paste Text', '📝 لصق نص')}</button>
+                <button onClick={()=>setUploadMode('audio')} style={{ flex:1, padding:'8px 0', borderRadius:8, border:`2px solid ${uploadMode==='audio'?'var(--accent)':'var(--border)'}`, background:uploadMode==='audio'?'rgba(3,105,161,0.08)':'transparent', color:'var(--text)', cursor:'pointer', fontSize:13 }}>{L('🎵 Upload Audio', '🎵 رفع تسجيل صوتي')}</button>
               </div>
               <div style={{ marginBottom:10, display:'flex', gap:8, alignItems:'center' }}>
-                <label style={{ fontSize:12, color:'var(--text-dim)' }}>Language:</label>
+                <label style={{ fontSize:12, color:'var(--text-dim)' }}>{L('Language:', 'اللغة:')}</label>
                 <select value={transcriptLang} onChange={e=>setTranscriptLang(e.target.value)} style={{ padding:'4px 8px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:6, color:'var(--text)', fontSize:12 }}>
-                  <option value="en">English</option>
-                  <option value="ar">Arabic</option>
+                  <option value="en">{L('English', 'الإنجليزية')}</option>
+                  <option value="ar">{L('Arabic', 'العربية')}</option>
                 </select>
               </div>
               {uploadMode === 'text' ? (
                 <div>
                   <textarea value={transcriptText} onChange={e=>setTranscriptText(e.target.value)}
                     style={{ width:'100%', minHeight:140, padding:'10px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:12, resize:'vertical', fontFamily:'monospace', lineHeight:1.6 }}
-                    placeholder="Paste meeting transcript here...&#10;&#10;You can include speaker names like:&#10;John: Let's discuss the API architecture...&#10;Sarah: I have concerns about the data model..." />
+                    placeholder={L('Paste meeting transcript here...\n\nYou can include speaker names like:\nJohn: Let\'s discuss the API architecture...\nSarah: I have concerns about the data model...', 'الصق نص الاجتماع هنا...\n\nيمكنك تضمين أسماء المتحدثين مثل:\nمحمد: لنناقش معمارية واجهات البرمجة...\nسارة: لدي ملاحظات على نموذج البيانات...')} />
                   <button onClick={ingestText} disabled={!transcriptText.trim()} style={{ marginTop:8, padding:'8px 16px', borderRadius:8, background:transcriptText.trim()?'var(--accent)':'var(--navy-mid)', color:transcriptText.trim()?'var(--navy)':'var(--text-dim)', border:'none', cursor:transcriptText.trim()?'pointer':'default', fontSize:13, fontWeight:600 }}>
-                    Upload Transcript
+                    {L('Upload Transcript', 'رفع النص')}
                   </button>
                 </div>
               ) : (
@@ -381,8 +422,8 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
                     onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--accent)')}
                     onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}>
                     <div style={{ fontSize:30, marginBottom:8 }}>{analyzing?'⏳':'🎵'}</div>
-                    <div style={{ fontSize:13, fontWeight:500 }}>{analyzing?'Transcribing with Whisper...':'Click to upload audio recording'}</div>
-                    <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:4 }}>MP3, WAV, MP4, WebM — Whisper AI transcribes automatically</div>
+                    <div style={{ fontSize:13, fontWeight:500 }}>{analyzing?L('Transcribing with Whisper...', 'جارٍ التفريغ النصي عبر Whisper...'):L('Click to upload audio recording', 'انقر لرفع تسجيل صوتي')}</div>
+                    <div style={{ fontSize:11, color:'var(--text-dim)', marginTop:4 }}>{L('MP3, WAV, MP4, WebM — Whisper AI transcribes automatically', 'MP3 وWAV وMP4 وWebM — يفرّغها Whisper نصياً تلقائياً')}</div>
                   </div>
                 </div>
               )}
@@ -393,7 +434,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
         {/* Analyses section */}
         {hasAnalyses && (
           <div>
-            <div style={{ fontSize:15, fontWeight:600, marginBottom:12 }}>🏛 Architect Analyses</div>
+            <div style={{ fontSize:15, fontWeight:600, marginBottom:12 }}>{L('🏛 Architect Analyses', '🏛 تحليلات المعماريين')}</div>
             <div style={{ display:'flex', flexDirection:'column' as const, gap:12 }}>
               {selected.analyses.map((analysis: any) => {
                 const code = analysis.architectCode
@@ -408,10 +449,10 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
                         {architects.find(a=>a.code===code)?.avatar || '🏛'}
                       </div>
                       <div style={{ flex:1 }}>
-                        <div style={{ fontWeight:600, color }}>{analysis.architectName}</div>
-                        <div style={{ fontSize:11, color:'var(--text-dim)' }}>{findings.length} findings · {risks.length} risks · {actions.length} actions</div>
+                        <div style={{ fontWeight:600, color }}>{architectName(analysis.architectCode, analysis.architectName, isAR)}</div>
+                        <div style={{ fontSize:11, color:'var(--text-dim)' }}>{findings.length} {L('findings ·', 'ملاحظة ·')} {risks.length} {L('risks ·', 'خطر ·')} {actions.length} {L('actions', 'إجراء')}</div>
                       </div>
-                      <div style={{ fontSize:11, color:'var(--text-dim)' }}>{new Date(analysis.createdAt).toLocaleTimeString()}</div>
+                      <div style={{ fontSize:11, color:'var(--text-dim)' }}>{new Date(analysis.createdAt).toLocaleTimeString(isAR ? 'ar' : 'en-US')}</div>
                     </summary>
                     <div style={{ padding:'0 16px 16px', borderTop:`1px solid ${color}22` }}>
                       {/* Quick stats */}
@@ -436,7 +477,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
 
         {!hasTranscript && !hasAnalyses && (
           <div style={{ background:'rgba(3,105,161,0.05)', border:'1px solid var(--border)', borderRadius:10, padding:24, textAlign:'center', color:'var(--text-dim)', fontSize:13 }}>
-            Upload a transcript above, then click "Analyze with Architects"
+            {L('Upload a transcript above, then click "Analyze with Architects"', 'ارفع نص الاجتماع أعلاه، ثم انقر "التحليل مع المعماريين"')}
           </div>
         )}
       </div>
@@ -447,25 +488,25 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
   const renderCreate = () => (
     <div style={{ maxWidth:560 }}>
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
-        <button style={{ padding:'6px 12px', borderRadius:8, background:'var(--navy-mid)', border:'none', color:'var(--text)', cursor:'pointer', fontSize:13 }} onClick={()=>setView('list')}>← Back</button>
-        <div style={{ fontSize:18, fontWeight:700 }}>New Meeting</div>
+        <button style={{ padding:'6px 12px', borderRadius:8, background:'var(--navy-mid)', border:'none', color:'var(--text)', cursor:'pointer', fontSize:13 }} onClick={()=>setView('list')}>{L('← Back', '→ رجوع')}</button>
+        <div style={{ fontSize:18, fontWeight:700 }}>{L('New Meeting', 'اجتماع جديد')}</div>
       </div>
       <div style={{ background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, padding:20, display:'flex', flexDirection:'column' as const, gap:14 }}>
-        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>Meeting Title *</label><input style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder="e.g. Solution Design Review — HR System" /></div>
-        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>Description</label><input style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
-        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>Meeting Date</label><input type="datetime-local" style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.scheduledAt} onChange={e=>setForm(f=>({...f,scheduledAt:e.target.value}))} /></div>
+        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>{L('Meeting Title *', 'عنوان الاجتماع *')}</label><input style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.title} onChange={e=>setForm(f=>({...f,title:e.target.value}))} placeholder={L('e.g. Solution Design Review — HR System', 'مثال: مراجعة تصميم الحل — نظام الموارد البشرية')} /></div>
+        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>{L('Description', 'الوصف')}</label><input style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} /></div>
+        <div><label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:4 }}>{L('Meeting Date', 'تاريخ الاجتماع')}</label><input type="datetime-local" style={{ width:'100%', padding:'8px 12px', background:'var(--navy)', border:'1px solid var(--border)', borderRadius:8, color:'var(--text)', fontSize:13 }} value={form.scheduledAt} onChange={e=>setForm(f=>({...f,scheduledAt:e.target.value}))} /></div>
         <div>
-          <label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:8 }}>Architects to Analyze ({form.architectCodes.length} selected)</label>
+          <label style={{ fontSize:11, color:'var(--text-dim)', fontWeight:600, display:'block', marginBottom:8 }}>{L('Architects to Analyze (', 'المعماريون المحللون (')}{form.architectCodes.length} {L('selected)', 'محدد)')}</label>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' as const }}>
             {architects.map(a => {
               const sel = form.architectCodes.includes(a.code)
               const color = DOMAIN_COLOR[a.code]||'#7f8c8d'
-              return <span key={a.code} onClick={()=>toggleArchitect(a.code)} style={{ padding:'6px 12px', borderRadius:20, fontSize:12, fontWeight:600, background:sel?color+'22':'transparent', border:`1px solid ${sel?color:' var(--border)'}`, color:sel?color:'var(--text-dim)', cursor:'pointer' }}>{a.avatar} {a.name}</span>
+              return <span key={a.code} onClick={()=>toggleArchitect(a.code)} style={{ padding:'6px 12px', borderRadius:20, fontSize:12, fontWeight:600, background:sel?color+'22':'transparent', border:`1px solid ${sel?color:' var(--border)'}`, color:sel?color:'var(--text-dim)', cursor:'pointer' }}>{a.avatar} {architectName(a.code, a.name, isAR)}</span>
             })}
           </div>
         </div>
         <button onClick={createMeeting} disabled={!form.title} style={{ padding:'10px 0', borderRadius:8, background:form.title?'var(--accent)':'var(--navy-mid)', color:form.title?'var(--navy)':'var(--text-dim)', border:'none', cursor:form.title?'pointer':'default', fontSize:13, fontWeight:600 }}>
-          Create Meeting
+          {L('Create Meeting', 'إنشاء الاجتماع')}
         </button>
       </div>
     </div>
@@ -478,18 +519,18 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
         <div>
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20 }}>
             <div>
-              <div style={{ fontSize:18, fontWeight:700 }}>📋 Meeting Assistant</div>
-              <div style={{ fontSize:13, color:'var(--text-dim)' }}>Upload meeting transcripts and get domain-specific architect analyses</div>
+              <div style={{ fontSize:18, fontWeight:700 }}>{L('📋 Meeting Assistant', '📋 مساعد الاجتماعات')}</div>
+              <div style={{ fontSize:13, color:'var(--text-dim)' }}>{L('Upload meeting transcripts and get domain-specific architect analyses', 'ارفع نصوص الاجتماعات واحصل على تحليلات المعماريين حسب المجال')}</div>
             </div>
-            <button onClick={()=>setView('create')} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'var(--navy)', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>+ New Meeting</button>
+            <button onClick={()=>setView('create')} style={{ padding:'8px 16px', borderRadius:8, background:'var(--accent)', color:'var(--navy)', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>{L('+ New Meeting', '+ اجتماع جديد')}</button>
           </div>
 
-          {loading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:40 }}>Loading...</div> : meetings.length === 0 ? (
+          {loading ? <div style={{ color:'var(--text-dim)', textAlign:'center', padding:40 }}>{L('Loading...', 'جارٍ التحميل...')}</div> : meetings.length === 0 ? (
             <div style={{ background:'var(--navy-light)', border:'1px solid var(--border)', borderRadius:10, padding:60, textAlign:'center' }}>
               <div style={{ fontSize:40, marginBottom:12 }}>📋</div>
-              <div style={{ fontSize:15, fontWeight:600, marginBottom:8 }}>No meetings yet</div>
-              <div style={{ fontSize:13, color:'var(--text-dim)', marginBottom:16 }}>Create a meeting, upload its transcript, and get analysis from multiple EA architects</div>
-              <button onClick={()=>setView('create')} style={{ padding:'8px 20px', borderRadius:8, background:'var(--accent)', color:'var(--navy)', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>Create First Meeting</button>
+              <div style={{ fontSize:15, fontWeight:600, marginBottom:8 }}>{L('No meetings yet', 'لا توجد اجتماعات بعد')}</div>
+              <div style={{ fontSize:13, color:'var(--text-dim)', marginBottom:16 }}>{L('Create a meeting, upload its transcript, and get analysis from multiple EA architects', 'أنشئ اجتماعاً وارفع نصه واحصل على تحليل من عدة معماريين')}</div>
+              <button onClick={()=>setView('create')} style={{ padding:'8px 20px', borderRadius:8, background:'var(--accent)', color:'var(--navy)', border:'none', cursor:'pointer', fontSize:13, fontWeight:600 }}>{L('Create First Meeting', 'إنشاء أول اجتماع')}</button>
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column' as const, gap:8 }}>
@@ -502,9 +543,9 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
                   <div style={{ flex:1, minWidth:0 }}>
                     <div style={{ fontWeight:600 }}>{m.title}</div>
                     <div style={{ fontSize:12, color:'var(--text-dim)', display:'flex', gap:8, marginTop:2 }}>
-                      <span>{new Date(m.createdAt).toLocaleDateString()}</span>
-                      <span>{m._count?.transcripts||0} transcript</span>
-                      <span>{m._count?.analyses||0} analyses</span>
+                      <span>{new Date(m.createdAt).toLocaleDateString(isAR ? 'ar' : 'en-US')}</span>
+                      <span>{m._count?.transcripts||0} {L('transcript', 'نص')}</span>
+                      <span>{m._count?.analyses||0} {L('analyses', 'تحليل')}</span>
                     </div>
                   </div>
                   <span style={{ padding:'2px 10px', borderRadius:10, fontSize:11, fontWeight:600, background:(STATUS_COLOR[m.status]||'#7f8c8d')+'22', color:STATUS_COLOR[m.status]||'#7f8c8d' }}>{m.status}</span>
@@ -522,6 +563,8 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
 
 /** Phase 2: Task-mode UI — playbook picker, input form, a read-only preview step (spec requires reviewing the auto-selected architects/sources before execution), and structured run results. Mirrors MeetingAssistant's pattern (a self-contained sidebar-tab view, not folded into the Single/Consult chat toggle, since a playbook run is form-driven rather than a chat turn). */
 function PlaybookRunner({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [playbooks, setPlaybooks] = useState<any[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [inputs, setInputs] = useState<Record<string, string>>({})
@@ -572,27 +615,27 @@ function PlaybookRunner({ api }: { api: any }) {
 
   return (
     <div style={{ padding: 20, maxWidth: 720, display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ fontWeight: 700, fontSize: 16 }}>🧭 Task Playbooks</div>
+      <div style={{ fontWeight: 700, fontSize: 16 }}>{L('🧭 Task Playbooks', '🧭 أدلة المهام')}</div>
 
       {!selected ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {playbooks.map(p => (
             <div key={p.id} onClick={() => selectPlaybook(p)} style={{ padding: '10px 14px', borderRadius: 8, border: '1px solid var(--border)', cursor: 'pointer', background: 'var(--navy-light)' }}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{p.name}</div>
-              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2 }}>{p.description}</div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{(isAR && PLAYBOOK_AR[p.id]?.name) || p.name}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text-dim)', marginTop: 2 }}>{(isAR && PLAYBOOK_AR[p.id]?.description) || p.description}</div>
             </div>
           ))}
         </div>
       ) : (
         <>
-          <button onClick={() => setSelectedId(null)} style={{ alignSelf: 'flex-start', fontSize: 11, background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0 }}>← Back to playbooks</button>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{selected.name}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{selected.description}</div>
+          <button onClick={() => setSelectedId(null)} style={{ alignSelf: 'flex-start', fontSize: 11, background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0 }}>{L('← Back to playbooks', '→ العودة إلى أدلة المهام')}</button>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{(isAR && PLAYBOOK_AR[selected.id]?.name) || selected.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{(isAR && PLAYBOOK_AR[selected.id]?.description) || selected.description}</div>
 
           {allFields.map(key => (
             <div key={key}>
               <label style={{ fontSize: 11, color: 'var(--text-dim)', display: 'block', marginBottom: 3 }}>
-                {key}{selected.requiredInputs.includes(key) ? ' *' : ' (optional)'}
+                {PLAYBOOK_INPUT_LABEL[key] ? (isAR ? PLAYBOOK_INPUT_LABEL[key].ar : PLAYBOOK_INPUT_LABEL[key].en) : key}{selected.requiredInputs.includes(key) ? ' *' : L(' (optional)', ' (اختياري)')}
               </label>
               <textarea
                 value={inputs[key] || ''}
@@ -604,36 +647,36 @@ function PlaybookRunner({ api }: { api: any }) {
           ))}
 
           <button onClick={runPreview} disabled={previewLoading} style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: previewLoading ? 'default' : 'pointer' }}>
-            {previewLoading ? 'Loading preview...' : 'Preview'}
+            {previewLoading ? L('Loading preview...', 'جارٍ تحميل المعاينة...') : L('Preview', 'معاينة')}
           </button>
 
           {preview && (
             <div style={{ padding: 12, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
               {preview.missingInputs.length > 0 && (
-                <div style={{ fontSize: 12, color: '#f97316' }}>Missing required input(s): {preview.missingInputs.join(', ')}</div>
+                <div style={{ fontSize: 12, color: '#f97316' }}>{L('Missing required input(s):', 'مدخلات مطلوبة ناقصة:')} {preview.missingInputs.map((k: string) => PLAYBOOK_INPUT_LABEL[k] ? (isAR ? PLAYBOOK_INPUT_LABEL[k].ar : PLAYBOOK_INPUT_LABEL[k].en) : k).join(isAR ? '، ' : ', ')}</div>
               )}
               <div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 5 }}>Architects that will run — click to include/exclude:</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 5 }}>{L('Architects that will run — click to include/exclude:', 'المعماريون الذين سيعملون — انقر للتضمين أو الاستبعاد:')}</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {preview.resolvedArchitects.map((a: any) => {
                     const on = (architectOverride ?? []).includes(a.code)
                     return (
                       <span key={a.code} onClick={() => toggleOverride(a.code)} style={{ padding: '4px 10px', borderRadius: 999, fontSize: 11, cursor: 'pointer', background: on ? 'var(--accent)' : 'var(--navy-light)', color: on ? 'var(--navy)' : 'var(--text-dim)', border: '1px solid var(--border)' }}>
-                        {a.avatar} {a.name}
+                        {a.avatar} {architectName(a.code, a.name, isAR)}
                       </span>
                     )
                   })}
                 </div>
                 {preview.missingArchitects.length > 0 && (
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>Not available for this tenant: {preview.missingArchitects.join(', ')}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>{L('Not available for this tenant:', 'غير متاح لهذه الجهة:')} {preview.missingArchitects.join(', ')}</div>
                 )}
-                {preview.willRunChiefSynthesis && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>🏛 Chief Architect will synthesize these responses</div>}
+                {preview.willRunChiefSynthesis && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 5 }}>{L('🏛 Chief Architect will synthesize these responses', '🏛 سيجمع المعماري الرئيسي هذه الردود')}</div>}
               </div>
               {preview.evidencePreview && preview.evidencePreview.items.length > 0 && (
                 <EvidenceDrawer evidence={preview.evidencePreview.items} />
               )}
               <button onClick={runPlaybook} disabled={running || preview.missingInputs.length > 0} style={{ padding: '8px 16px', borderRadius: 8, fontWeight: 700, fontSize: 12, cursor: (running || preview.missingInputs.length > 0) ? 'default' : 'pointer', opacity: (running || preview.missingInputs.length > 0) ? 0.6 : 1 }}>
-                {running ? 'Running...' : 'Run Playbook'}
+                {running ? L('Running...', 'جارٍ التشغيل...') : L('Run Playbook', 'تشغيل الدليل')}
               </button>
             </div>
           )}
@@ -643,10 +686,10 @@ function PlaybookRunner({ api }: { api: any }) {
               {result.domainResponses.map((r: any) => (
                 <div key={r.architectCode} style={{ padding: 12, borderRadius: 8, border: r.failed ? '1px solid #f97316' : '1px solid var(--border)' }}>
                   <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {r.architectName}
+                    {architectName(r.architectCode, r.architectName, isAR)}
                     {r.failed && (
                       <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
-                        ⚠️ did not complete
+                        {L('⚠️ did not complete', '⚠️ لم يكتمل')}
                       </span>
                     )}
                   </div>
@@ -657,10 +700,10 @@ function PlaybookRunner({ api }: { api: any }) {
               {result.chiefResponse && (
                 <div style={{ padding: 12, borderRadius: 8, border: result.chiefResponse.failed ? '1px solid #f97316' : '1px solid var(--accent)' }}>
                   <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    🏛 {result.chiefResponse.architectName} — Synthesis
+                    🏛 {architectName('CHIEF', result.chiefResponse.architectName, isAR)} {L('— Synthesis', '— الخلاصة')}
                     {result.chiefResponse.failed && (
                       <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
-                        ⚠️ did not complete
+                        {L('⚠️ did not complete', '⚠️ لم يكتمل')}
                       </span>
                     )}
                   </div>
@@ -669,7 +712,7 @@ function PlaybookRunner({ api }: { api: any }) {
               )}
               {result.targetModule && (
                 <div style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>
-                  Suggested next step: take this to {result.targetModule.replace(/_/g, ' ').toLowerCase()} for a formal assessment. This is a preparatory analysis only — nothing has been submitted or decided automatically.
+                  {L('Suggested next step: take this to', 'الخطوة التالية المقترحة: انقل هذا إلى')} {enumLabel(result.targetModule, isAR)} {L('for a formal assessment. This is a preparatory analysis only — nothing has been submitted or decided automatically.', 'لتقييم رسمي. هذا تحليل تمهيدي فقط — لم يُقدَّم أو يُقرَّر أي شيء تلقائياً.')}
                 </div>
               )}
             </div>
@@ -691,6 +734,8 @@ const ACTION_DRAFT_STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
 
 /** Phase 3: review/approval UI for Copilot Action Drafts — the human side of the create(DRAFT)->submit(PENDING_APPROVAL)->approve(APPROVED)->execute(EXECUTED) lifecycle the backend already enforces. No draft can move forward without an explicit click here; this component never auto-advances anything. */
 function ActionDraftReview({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [drafts, setDrafts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -721,12 +766,12 @@ function ActionDraftReview({ api }: { api: any }) {
 
   return (
     <div style={{ padding: 20, maxWidth: 720 }}>
-      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>📝 Action Drafts</div>
+      <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 14 }}>{L('📝 Action Drafts', '📝 مسودات الإجراءات')}</div>
 
       {loading ? (
-        <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>Loading...</div>
+        <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{L('Loading...', 'جارٍ التحميل...')}</div>
       ) : drafts.length === 0 ? (
-        <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>No action drafts yet. An architect can propose one while helping with a task.</div>
+        <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{L('No action drafts yet. An architect can propose one while helping with a task.', 'لا توجد مسودات إجراءات بعد. يمكن للمعماري اقتراح واحدة أثناء المساعدة في مهمة.')}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {drafts.map(d => {
@@ -736,49 +781,49 @@ function ActionDraftReview({ api }: { api: any }) {
               <div key={d.id} style={{ padding: 14, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--navy-light)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontWeight: 600, fontSize: 13 }}>{d.targetModule} · {d.targetEntityType} · {d.proposedActionType}</div>
-                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 9px', borderRadius: 999, background: style.bg, color: style.fg, whiteSpace: 'nowrap' }}>{d.status.replace(/_/g, ' ')}</span>
+                  <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 9px', borderRadius: 999, background: style.bg, color: style.fg, whiteSpace: 'nowrap' }}>{enumLabel(d.status, isAR)}</span>
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                  Proposed by {d.proposingArchitectCode}{d.confidence != null && ` · confidence ${Math.round(d.confidence * 100)}%`}
+                  {L('Proposed by', 'اقترحها')} {d.proposingArchitectCode}{d.confidence != null && L(` · confidence ${Math.round(d.confidence * 100)}%`, `· الثقة ${Math.round(d.confidence * 100)}%`)}
                 </div>
                 <pre style={{ fontSize: 11.5, background: 'var(--navy)', padding: 8, borderRadius: 6, marginTop: 8, overflow: 'auto', maxHeight: 160 }}>{JSON.stringify(d.payload, null, 2)}</pre>
-                {d.assumptions?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>Assumptions: {d.assumptions.join('; ')}</div>}
-                {d.missingInformation?.length > 0 && <div style={{ fontSize: 11, color: '#eab308', marginTop: 4 }}>Missing information: {d.missingInformation.join('; ')}</div>}
+                {d.assumptions?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>{L('Assumptions:', 'الافتراضات:')} {d.assumptions.join('; ')}</div>}
+                {d.missingInformation?.length > 0 && <div style={{ fontSize: 11, color: '#eab308', marginTop: 4 }}>{L('Missing information:', 'المعلومات الناقصة:')} {d.missingInformation.join('; ')}</div>}
 
                 <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {d.status === 'DRAFT' && (
                     <button onClick={() => act(d.id, 'submit')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 600, fontSize: 12, cursor: busy ? 'default' : 'pointer' }}>
-                      Submit for Approval
+                      {L('Submit for Approval', 'إرسال للاعتماد')}
                     </button>
                   )}
                   {d.status === 'PENDING_APPROVAL' && (
                     <>
                       <button onClick={() => act(d.id, 'approve')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, background: 'var(--accent)', color: 'var(--navy)', border: 'none', cursor: busy ? 'default' : 'pointer' }}>
-                        Approve
+                        {L('Approve', 'اعتماد')}
                       </button>
                       <button onClick={() => setRejectingId(d.id)} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 600, fontSize: 12, background: 'none', border: '1px solid #ef4444', color: '#ef4444', cursor: busy ? 'default' : 'pointer' }}>
-                        Reject
+                        {L('Reject', 'رفض')}
                       </button>
                     </>
                   )}
                   {d.status === 'APPROVED' && (
                     <button onClick={() => act(d.id, 'execute')} disabled={busy} style={{ padding: '6px 14px', borderRadius: 8, fontWeight: 700, fontSize: 12, background: '#3b82f6', color: 'white', border: 'none', cursor: busy ? 'default' : 'pointer' }}>
-                      {busy ? 'Executing...' : 'Execute'}
+                      {busy ? L('Executing...', 'جارٍ التنفيذ...') : L('Execute', 'تنفيذ')}
                     </button>
                   )}
                   {d.status === 'EXECUTED' && (
-                    <div style={{ fontSize: 12, color: '#22c55e' }}>✅ Executed{d.executionResult?.entityId ? ` — created ${d.executionResult.entityId}` : ''}</div>
+                    <div style={{ fontSize: 12, color: '#22c55e' }}>{L('✅ Executed', '✅ نُفّذ')}{d.executionResult?.entityId ? L(` — created ${d.executionResult.entityId}`, `— أُنشئ ${d.executionResult.entityId}`) : ''}</div>
                   )}
                   {d.status === 'REJECTED' && (
-                    <div style={{ fontSize: 12, color: '#ef4444' }}>❌ Rejected{d.rejectionReason ? `: ${d.rejectionReason}` : ''}</div>
+                    <div style={{ fontSize: 12, color: '#ef4444' }}>{L('❌ Rejected', '❌ مرفوض')}{d.rejectionReason ? `: ${d.rejectionReason}` : ''}</div>
                   )}
                 </div>
 
                 {rejectingId === d.id && (
                   <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-                    <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Reason (optional)" style={{ flex: 1, padding: '6px 10px', borderRadius: 6, fontSize: 12 }} />
-                    <button onClick={() => confirmReject(d.id)} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer' }}>Confirm Reject</button>
-                    <button onClick={() => { setRejectingId(null); setRejectReason('') }} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, background: 'none', border: '1px solid var(--border)', cursor: 'pointer' }}>Cancel</button>
+                    <input value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder={L('Reason (optional)', 'السبب (اختياري)')} style={{ flex: 1, padding: '6px 10px', borderRadius: 6, fontSize: 12 }} />
+                    <button onClick={() => confirmReject(d.id)} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, background: '#ef4444', color: 'white', border: 'none', cursor: 'pointer' }}>{L('Confirm Reject', 'تأكيد الرفض')}</button>
+                    <button onClick={() => { setRejectingId(null); setRejectReason('') }} style={{ padding: '6px 12px', borderRadius: 6, fontSize: 12, background: 'none', border: '1px solid var(--border)', cursor: 'pointer' }}>{L('Cancel', 'إلغاء')}</button>
                   </div>
                 )}
               </div>
@@ -791,6 +836,8 @@ function ActionDraftReview({ api }: { api: any }) {
 }
 
 export default function CopilotPage() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const api = useApi()
   const [architects, setArchitects] = useState<Architect[]>([])
   const [selectedArchitect, setSelectedArchitect] = useState<Architect | null>(null)
@@ -861,7 +908,7 @@ export default function CopilotPage() {
       headers: { Authorization: `Bearer ${api.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    if (!res.ok || !res.body) throw new Error(`Copilot request failed (${res.status})`)
+    if (!res.ok || !res.body) throw new Error(L(`Copilot request failed (${res.status})`, `فشل طلب المساعد الذكي (${res.status})`))
     const reader = res.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
@@ -896,7 +943,7 @@ export default function CopilotPage() {
       mediaRecorderRef.current = mr
       setRecording(true)
     } catch (e: any) {
-      alert('Microphone access denied. Please allow microphone access to use voice mode.')
+      alert(L('Microphone access denied. Please allow microphone access to use voice mode.', 'تم رفض الوصول إلى الميكروفون. يرجى السماح بالوصول لاستخدام الوضع الصوتي.'))
     }
   }
 
@@ -1055,15 +1102,15 @@ export default function CopilotPage() {
       <div className="side-panel-260" style={{ background: 'var(--navy-light)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
         {/* Header */}
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>🤖 EA Copilot</div>
-          <button onClick={newConversation} style={{ width: '100%', padding: '7px 0', borderRadius: 8, background: 'var(--accent)', color: 'var(--navy)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>+ New Conversation</button>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>{L('🤖 EA Copilot', '🤖 المساعد الذكي للبنية المؤسسية')}</div>
+          <button onClick={newConversation} style={{ width: '100%', padding: '7px 0', borderRadius: 8, background: 'var(--accent)', color: 'var(--navy)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>{L('+ New Conversation', '+ محادثة جديدة')}</button>
         </div>
 
         {/* Sidebar tabs */}
         <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
           {(['architects', 'history', 'meetings', 'playbooks', 'actiondrafts'] as const).map(t => (
             <button key={t} style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSidebarTab(t)}>
-              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : t === 'meetings' ? '📋 Meetings' : t === 'playbooks' ? '🧭 Playbooks' : '📝 Drafts'}
+              {t === 'architects' ? L('👥 Architects', '👥 المعماريون') : t === 'history' ? L('🕐 History', '🕐 السجل') : t === 'meetings' ? L('📋 Meetings', '📋 الاجتماعات') : t === 'playbooks' ? L('🧭 Playbooks', '🧭 الأدلة') : L('📝 Drafts', '📝 المسودات')}
             </button>
           ))}
         </div>
@@ -1073,8 +1120,8 @@ export default function CopilotPage() {
             <>
               {/* Mode selector */}
               <div style={{ display: 'flex', gap: 4, marginBottom: 10, background: 'var(--navy)', borderRadius: 8, padding: 3 }}>
-                <button onClick={() => setMode('single')} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: mode === 'single' ? 600 : 400, background: mode === 'single' ? 'var(--accent)' : 'none', color: mode === 'single' ? 'var(--navy)' : 'var(--text-dim)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Single</button>
-                <button onClick={() => setMode('consult')} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: mode === 'consult' ? 600 : 400, background: mode === 'consult' ? 'var(--accent)' : 'none', color: mode === 'consult' ? 'var(--navy)' : 'var(--text-dim)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Consult</button>
+                <button onClick={() => setMode('single')} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: mode === 'single' ? 600 : 400, background: mode === 'single' ? 'var(--accent)' : 'none', color: mode === 'single' ? 'var(--navy)' : 'var(--text-dim)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>{L('Single', 'فردي')}</button>
+                <button onClick={() => setMode('consult')} style={{ flex: 1, padding: '4px 0', fontSize: 11, fontWeight: mode === 'consult' ? 600 : 400, background: mode === 'consult' ? 'var(--accent)' : 'none', color: mode === 'consult' ? 'var(--navy)' : 'var(--text-dim)', border: 'none', borderRadius: 6, cursor: 'pointer' }}>{L('Consult', 'استشارة')}</button>
               </div>
 
               {/* Architect list */}
@@ -1089,10 +1136,10 @@ export default function CopilotPage() {
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', background: isSelected ? color + '22' : 'none', border: `1px solid ${isSelected ? color + '55' : 'transparent'}`, transition: 'all 0.15s' }}>
                     <div style={{ width: 32, height: 32, borderRadius: '50%', background: color + '33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{a.avatar}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? color : 'var(--text)' }}>{a.name}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.role}</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: isSelected ? color : 'var(--text)' }}>{architectName(a.code, a.name, isAR)}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-dim)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{architectRole(a.code, a.role, isAR)}</div>
                     </div>
-                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{MODEL_LABEL[a.aiModel]}</div>
+                    <div style={{ fontSize: 9, color: 'var(--text-dim)' }}>{(isAR ? MODEL_LABEL_AR : MODEL_LABEL)[a.aiModel]}</div>
                   </div>
                 )
               })}
@@ -1102,22 +1149,22 @@ export default function CopilotPage() {
                 <div style={{ marginTop: 10, padding: '8px 10px', background: 'var(--navy)', borderRadius: 8, fontSize: 11, color: 'var(--text-dim)' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
                     <input type="checkbox" checked={includeChief} onChange={e => setIncludeChief(e.target.checked)} />
-                    Chief Architect synthesis
+                    {L('Chief Architect synthesis', 'خلاصة المعماري الرئيسي')}
                   </label>
-                  <div style={{ marginTop: 6 }}>{consultArchitects.length === 0 ? 'All domain architects' : `${consultArchitects.length} selected (max 4)`}</div>
+                  <div style={{ marginTop: 6 }}>{consultArchitects.length === 0 ? L('All domain architects', 'جميع معماريي المجالات') : L(`${consultArchitects.length} selected (max 4)`, `تم اختيار ${consultArchitects.length} (بحد أقصى 4)`)}</div>
                 </div>
               )}
             </>
           ) : (
             // History
             <>
-              {conversations.length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: 12, textAlign: 'center', padding: 20 }}>No conversations yet</div>}
+              {conversations.length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: 12, textAlign: 'center', padding: 20 }}>{L('No conversations yet', 'لا توجد محادثات بعد')}</div>}
               {conversations.map(c => (
                 <div key={c.id} onClick={() => loadConversation(c.id)} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', background: activeConvId === c.id ? 'rgba(3,105,161,0.1)' : 'none', border: `1px solid ${activeConvId === c.id ? 'var(--accent)44' : 'transparent'}` }}
                   onMouseEnter={e => { if (activeConvId !== c.id) e.currentTarget.style.background = 'rgba(15,23,42,0.04)' }}
                   onMouseLeave={e => { if (activeConvId !== c.id) e.currentTarget.style.background = 'none' }}>
-                  <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Untitled'}</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{c.messageCount} messages · {new Date(c.updatedAt).toLocaleDateString()}</div>
+                  <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || L('Untitled', 'بلا عنوان')}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>{c.messageCount} {L('messages ·', 'رسالة ·')} {new Date(c.updatedAt).toLocaleDateString(isAR ? 'ar' : 'en-US')}</div>
                 </div>
               ))}
             </>
@@ -1146,16 +1193,16 @@ export default function CopilotPage() {
             <>
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: archColor(selectedArchitect.code) + '33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{selectedArchitect.avatar}</div>
               <div>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{selectedArchitect.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{selectedArchitect.role} · {MODEL_LABEL[selectedArchitect.aiModel]}</div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{architectName(selectedArchitect.code, selectedArchitect.name, isAR)}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{architectRole(selectedArchitect.code, selectedArchitect.role, isAR)} · {(isAR ? MODEL_LABEL_AR : MODEL_LABEL)[selectedArchitect.aiModel]}</div>
               </div>
             </>
           ) : (
             <div>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>Multi-Architect Consultation</div>
+              <div style={{ fontWeight: 700, fontSize: 14 }}>{L('Multi-Architect Consultation', 'استشارة متعددة المعماريين')}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
-                {consultArchitects.length === 0 ? 'All domain architects' : consultArchitects.map(c => architects.find(a => a.code === c)?.name).join(', ')}
-                {includeChief ? ' + Chief Synthesis' : ''}
+                {consultArchitects.length === 0 ? L('All domain architects', 'جميع معماريي المجالات') : consultArchitects.map(c => architectName(c, architects.find(a => a.code === c)?.name, isAR)).join(', ')}
+                {includeChief ? L(' + Chief Synthesis', '+ خلاصة المعماري الرئيسي') : ''}
               </div>
             </div>
           )}
@@ -1166,9 +1213,9 @@ export default function CopilotPage() {
           {messages.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100%', gap: 20 }}>
               <div style={{ fontSize: 56 }}>{selectedArchitect?.avatar || '🤖'}</div>
-              <div style={{ fontSize: 20, fontWeight: 700 }}>{mode === 'single' ? (selectedArchitect?.name || 'EA Copilot') : 'Multi-Architect Consultation'}</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{mode === 'single' ? (architectName(selectedArchitect?.code, selectedArchitect?.name, isAR) || L('EA Copilot', 'المساعد الذكي للبنية المؤسسية')) : L('Multi-Architect Consultation', 'استشارة متعددة المعماريين')}</div>
               <div style={{ fontSize: 14, color: 'var(--text-dim)', maxWidth: 400, textAlign: 'center' }}>
-                {mode === 'single' ? (selectedArchitect?.description || 'Ask me anything about enterprise architecture') : 'Multiple domain architects will analyze your question from different perspectives'}
+                {mode === 'single' ? (selectedArchitect?.description || L('Ask me anything about enterprise architecture', 'اسألني أي شيء عن البنية المؤسسية')) : L('Multiple domain architects will analyze your question from different perspectives', 'سيحلل عدة معماريين سؤالك من زوايا مختلفة')}
               </div>
               {/* Suggested EA questions: choosing one fills the composer, exactly as if typed. */}
               <EaQuestionExplorer onSelect={q => { setInput(q); inputRef.current?.focus() }} />
@@ -1186,10 +1233,10 @@ export default function CopilotPage() {
               <div style={{ maxWidth: '75%' }}>
                 {m.role !== 'user' && m.architectName && (
                   <div style={{ fontSize: 11, fontWeight: 600, color: archColor(m.architectCode), marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {m.architectName}
+                    {architectName(m.architectCode, m.architectName, isAR)}
                     {m.failed && (
                       <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 7px', borderRadius: 999, background: 'rgba(249,115,22,0.15)', color: '#f97316' }}>
-                        ⚠️ did not complete
+                        {L('⚠️ did not complete', '⚠️ لم يكتمل')}
                       </span>
                     )}
                   </div>
@@ -1198,14 +1245,14 @@ export default function CopilotPage() {
                   {m.content ? (m.role === 'architect' ? renderContentWithCitations(m.content, m.evidence) : m.content) : <span style={{ opacity: 0.5 }}><span className="typing-dot" style={{ animation: 'blink 1s infinite' }}>•</span><span style={{ animationDelay: '0.2s', animation: 'blink 1s infinite' }}> •</span><span style={{ animationDelay: '0.4s', animation: 'blink 1s infinite' }}> •</span></span>}
                 </div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>
-                  {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  {m.timestamp.toLocaleTimeString(isAR ? 'ar' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                 </div>
                 {m.role === 'architect' && <CopilotViewAttachments attachments={m.attachments} question={messages.slice(0, mi).reverse().find(p => p.role === 'user')?.content} />}
                 {m.role === 'architect' && <CopilotProvenance evidence={m.evidence} trace={m.trace} />}
                 {m.role === 'architect' && <EvidenceDrawer evidence={m.evidence} />}
                 {m.role === 'architect' && m.remainingSpeech && (
                   <button onClick={() => speakMore(m)} style={{ marginTop: 6, fontSize: 11, color: 'var(--text-dim)', background: 'none', border: '1px solid var(--border)', borderRadius: 8, padding: '3px 9px', cursor: 'pointer' }}>
-                    🔊 Speak more
+                    {L('🔊 Speak more', '🔊 تحدث أكثر')}
                   </button>
                 )}
               </div>
@@ -1216,7 +1263,7 @@ export default function CopilotPage() {
             <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(3,105,161,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🤖</div>
               <div style={{ padding: '10px 14px', borderRadius: '4px 12px 12px 12px', background: 'var(--navy-light)', border: '1px solid var(--border)', fontSize: 13 }}>
-                <span style={{ color: 'var(--text-dim)' }}>Thinking...</span>
+                <span style={{ color: 'var(--text-dim)' }}>{L('Thinking...', 'جارٍ التفكير...')}</span>
               </div>
             </div>
           )}
@@ -1228,15 +1275,15 @@ export default function CopilotPage() {
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
             <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
-              placeholder={mode === 'single' ? `Ask ${selectedArchitect?.name || 'the architect'}... (Enter to send, Shift+Enter for newline)` : 'Ask all selected architects...'}
+              placeholder={mode === 'single' ? L(`Ask ${selectedArchitect?.name || 'the architect'}... (Enter to send, Shift+Enter for newline)`, `اسأل ${architectName(selectedArchitect?.code, selectedArchitect?.name, true) || 'المعماري'}... (Enter للإرسال، Shift+Enter لسطر جديد)`) : L('Ask all selected architects...', 'اسأل جميع المعماريين المحددين...')}
               rows={2} style={{ flex: 1, padding: '10px 14px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5 }} />
-            <button onClick={() => setVoiceMode(v => !v)} title="Toggle voice mode"
+            <button onClick={() => setVoiceMode(v => !v)} title={L('Toggle voice mode', 'تبديل الوضع الصوتي')}
             style={{ padding: '10px 14px', borderRadius: 10, background: voiceMode ? '#e74c3c22' : 'var(--navy-mid)', color: voiceMode ? '#e74c3c' : 'var(--text-dim)', border: `1px solid ${voiceMode ? '#e74c3c44' : 'var(--border)'}`, cursor: 'pointer', fontSize: 18 }}>
             🎤
           </button>
           <button onClick={send} disabled={loading || !input.trim()}
               style={{ padding: '10px 20px', borderRadius: 10, background: loading || !input.trim() ? 'var(--navy-mid)' : 'var(--accent)', color: loading || !input.trim() ? 'var(--text-dim)' : 'var(--navy)', border: 'none', cursor: loading || !input.trim() ? 'default' : 'pointer', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>
-              {loading ? '...' : 'Send ↵'}
+              {loading ? '...' : L('Send ↵', 'إرسال ↵')}
             </button>
           </div>
           {/* Hidden audio player for TTS */}
@@ -1256,31 +1303,31 @@ export default function CopilotPage() {
             </button>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: recording ? '#e74c3c' : voiceLoading ? 'var(--text-dim)' : 'var(--text)' }}>
-                {voiceLoading ? 'Processing...' : recording ? 'Recording — release to send' : 'Hold 🎤 to record'}
+                {voiceLoading ? L('Processing...', 'جارٍ المعالجة...') : recording ? L('Recording — release to send', 'جارٍ التسجيل — أفلت للإرسال') : L('Hold 🎤 to record', 'اضغط مطولاً على 🎤 للتسجيل')}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>
-                Speaking to: {selectedArchitect?.avatar} {selectedArchitect?.name || 'Chief Architect'}
+                {L('Speaking to:', 'التحدث إلى:')} {selectedArchitect?.avatar} {architectName(selectedArchitect?.code, selectedArchitect?.name, isAR) || L('Chief Architect', 'المعماري الرئيسي')}
               </div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6, alignItems: 'flex-end' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--text-dim)', cursor: 'pointer' }}>
                 <input type="checkbox" checked={ttsEnabled} onChange={e => setTtsEnabled(e.target.checked)} style={{ width: 12, height: 12 }} />
-                Voice reply
+                {L('Voice reply', 'الرد الصوتي')}
               </label>
               <select value={voiceLanguage} onChange={e => setVoiceLanguage(e.target.value as any)} style={{ fontSize: 11, padding: '2px 6px', background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text)' }}>
-                <option value="">Auto detect</option>
-                <option value="en">English</option>
-                <option value="ar">Arabic</option>
+                <option value="">{L('Auto detect', 'اكتشاف تلقائي')}</option>
+                <option value="en">{L('English', 'الإنجليزية')}</option>
+                <option value="ar">{L('Arabic', 'العربية')}</option>
               </select>
             </div>
           </div>
         )}
 
         <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, display: 'flex', gap: 16 }}>
-            <span>Domain architects use ⚡ Haiku (low cost)</span>
-            <span>Chief Architect uses 🧠 Sonnet (synthesis only)</span>
-            <span>Context cached 5 min</span>
-            {voiceMode && <span>🎤 Whisper STT + TTS-1 (low cost)</span>}
+            <span>{L('Domain architects use ⚡ Haiku (low cost)', 'يستخدم معماريو المجالات ⚡ Haiku (تكلفة منخفضة)')}</span>
+            <span>{L('Chief Architect uses 🧠 Sonnet (synthesis only)', 'يستخدم المعماري الرئيسي 🧠 Sonnet (للخلاصة فقط)')}</span>
+            <span>{L('Context cached 5 min', 'السياق مخزّن مؤقتاً 5 دقائق')}</span>
+            {voiceMode && <span>{L('🎤 Whisper STT + TTS-1 (low cost)', '🎤 Whisper لتحويل الكلام إلى نص + TTS-1 (تكلفة منخفضة)')}</span>}
           </div>
         </div>
       </div>
