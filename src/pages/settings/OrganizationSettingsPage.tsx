@@ -55,6 +55,7 @@ function DomainChip({ code, active, onClick }: { code: string; active: boolean; 
 
 export default function OrganizationSettingsPage() {
   const { isAR, setLocale } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [repoConfig, setRepoConfig] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -122,7 +123,7 @@ export default function OrganizationSettingsPage() {
       if ((r1.id || r1.tenantId) && r2) setMsg({ type: 'success', text: isAR ? '✓ تم الحفظ بنجاح' : '✓ Saved successfully' })
       else setMsg({ type: 'error', text: isAR ? 'حدث خطأ أثناء الحفظ' : 'Something went wrong while saving' })
     } catch (e: any) {
-      setMsg({ type: 'error', text: e.message || 'Failed to save' })
+      setMsg({ type: 'error', text: e.message || L('Failed to save', 'تعذّر الحفظ') })
     } finally {
       setSaving(false)
     }
@@ -185,6 +186,7 @@ export default function OrganizationSettingsPage() {
             <div className="form-group">
               <label className="form-label">{isAR ? 'لغة المنصة' : 'Platform Language'}</label>
               <select className="form-input" value={form.language} onChange={e => { const lang = e.target.value as 'AR' | 'EN'; setForm(f => ({ ...f, language: lang })); setLocale(lang) }}>
+                {/* The language switch itself: each language is named in its own script. */}
                 <option value="AR">العربية</option>
                 <option value="EN">English</option>
               </select>
@@ -280,7 +282,8 @@ export default function OrganizationSettingsPage() {
   )
 }
 function OrgBrandingSection() {
-  const { t } = useLang()
+  const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const { previewAccentColor, reload: reloadGlobalBranding } = useBranding()
   const [form, setForm] = useState({ organizationNameEn: '', organizationNameAr: '', primaryColor: '#00b4d8', secondaryColor: '#1a2332', accentColor: '#f39c12', fontFamily: '' })
   const [saving, setSaving] = useState(false)
@@ -315,9 +318,9 @@ function OrgBrandingSection() {
     try {
       const updated = await authFetch('/branding', { method: 'PUT', body: JSON.stringify(form) })
       if (updated?.id) {
-        setMsg({ type: 'success', text: 'Branding saved' })
+        setMsg({ type: 'success', text: L('Branding saved', 'تم حفظ الهوية البصرية') })
         reloadGlobalBranding() // pulls the now-persisted color as the new baseline
-      } else setMsg({ type: 'error', text: 'Failed to save' })
+      } else setMsg({ type: 'error', text: L('Failed to save', 'تعذّر الحفظ') })
     } finally { setSaving(false) }
   }
 
@@ -334,21 +337,21 @@ function OrgBrandingSection() {
       })
       const data = await res.json()
       if (res.ok) {
-        setMsg({ type: 'success', text: `${kind === 'logo' ? 'Logo' : 'Favicon'} uploaded` })
+        setMsg({ type: 'success', text: `${kind === 'logo' ? L('Logo', 'الشعار') : L('Favicon', 'أيقونة الموقع')} uploaded` })
         if (kind === 'logo') { setHasLogo(true); setLogoCacheBust(Date.now()) }
         else { setHasFavicon(true); setFaviconCacheBust(Date.now()) }
       } else {
-        setMsg({ type: 'error', text: data?.message || `Failed to upload ${kind}` })
+        setMsg({ type: 'error', text: data?.message || L(`Failed to upload ${kind}`, `تعذّر رفع ${kind}`) })
       }
     } catch (e) {
-      setMsg({ type: 'error', text: `Upload failed: ${(e as Error).message}` })
+      setMsg({ type: 'error', text: L(`Upload failed: ${(e as Error).message}`, `فشل الرفع: ${(e as Error).message}`) })
     } finally { setUploading(false) }
   }
 
   return (
     <div>
-      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>🎨 Branding</div>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Customize the platform appearance for your organization</div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>{L('🎨 Branding', '🎨 الهوية البصرية')}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>{L('Customize the platform appearance for your organization', 'خصّص مظهر المنصة لجهتك')}</div>
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -363,26 +366,26 @@ function OrgBrandingSection() {
         {/* Logo & Favicon upload */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 11, marginBottom: 3 }}>Logo</div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Logo', 'الشعار')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
               {hasLogo
                 ? <img src={`${API_URL}/branding/logo?t=${logoCacheBust}`} alt={t("settings.logo")} style={{ maxHeight: 40, maxWidth: 100, objectFit: 'contain' }} />
-                : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No logo uploaded</div>}
+                : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('No logo uploaded', 'لم يُرفع شعار')}</div>}
               <label className="btn btn-secondary" style={{ fontSize: 11, cursor: 'pointer', marginLeft: 'auto' }}>
-                {uploadingLogo ? 'Uploading…' : 'Upload'}
+                {uploadingLogo ? L('Uploading…', 'جارٍ الرفع…') : L('Upload', 'رفع')}
                 <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" style={{ display: 'none' }} disabled={uploadingLogo}
                   onChange={e => { const f = e.target.files?.[0]; if (f) uploadAsset('logo', f); e.target.value = '' }} />
               </label>
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, marginBottom: 3 }}>Favicon</div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Favicon', 'أيقونة الموقع')}</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 10, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
               {hasFavicon
                 ? <img src={`${API_URL}/branding/favicon?t=${faviconCacheBust}`} alt={t("settings.favicon")} style={{ maxHeight: 24, maxWidth: 24, objectFit: 'contain' }} />
-                : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>No favicon uploaded</div>}
+                : <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('No favicon uploaded', 'لم تُرفع أيقونة موقع')}</div>}
               <label className="btn btn-secondary" style={{ fontSize: 11, cursor: 'pointer', marginLeft: 'auto' }}>
-                {uploadingFavicon ? 'Uploading…' : 'Upload'}
+                {uploadingFavicon ? L('Uploading…', 'جارٍ الرفع…') : L('Upload', 'رفع')}
                 <input type="file" accept="image/png,image/x-icon,image/svg+xml" style={{ display: 'none' }} disabled={uploadingFavicon}
                   onChange={e => { const f = e.target.files?.[0]; if (f) uploadAsset('favicon', f); e.target.value = '' }} />
               </label>
@@ -403,11 +406,11 @@ function OrgBrandingSection() {
         </div>
 
         <div>
-          <div style={{ fontSize: 11, marginBottom: 3 }}>Font Family (optional — CSS font-family value)</div>
-          <input className="form-input" placeholder="e.g. 'Inter', 'IBM Plex Sans Arabic', sans-serif" value={form.fontFamily || ''} onChange={e => setForm(f => ({ ...f, fontFamily: e.target.value }))} style={{ width: '100%', fontSize: 11 }} />
+          <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Font Family (optional — CSS font-family value)', 'عائلة الخط (اختياري — قيمة font-family في CSS)')}</div>
+          <input className="form-input" placeholder={L('e.g. \'Inter\', \'IBM Plex Sans Arabic\', sans-serif', 'مثال: \'Inter\', \'IBM Plex Sans Arabic\', sans-serif')} value={form.fontFamily || ''} onChange={e => setForm(f => ({ ...f, fontFamily: e.target.value }))} style={{ width: '100%', fontSize: 11 }} />
         </div>
 
-        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Branding'}</button>
+        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? L('Saving...', 'جارٍ الحفظ...') : L('💾 Save Branding', '💾 حفظ الهوية البصرية')}</button>
       </div>
     </div>
   )
@@ -420,6 +423,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 function OrgTerminologySection() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [terms, setTerms] = useState<any[]>([])
   const [categories, setCategories] = useState<string[]>([])
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL')
@@ -459,15 +464,15 @@ function OrgTerminologySection() {
     setSaving(true); setMsg(null)
     try {
       const res = await authFetch('/localization/terms/override', { method: 'POST', body: JSON.stringify(overrideForm) })
-      if (res.id) { setMsg({ type: 'success', text: 'Override saved' }); setShowOverrideForm(false); load() }
-      else setMsg({ type: 'error', text: res.message || 'Failed to save' })
+      if (res.id) { setMsg({ type: 'success', text: L('Override saved', 'تم حفظ التخصيص') }); setShowOverrideForm(false); load() }
+      else setMsg({ type: 'error', text: res.message || L('Failed to save', 'تعذّر الحفظ') })
     } finally { setSaving(false) }
   }
 
   const disableTerm = async (termKey: string, category: string) => {
-    if (!window.confirm(`Disable "${termKey}" for this tenant?`)) return
+    if (!window.confirm(L(`Disable "${termKey}" for this tenant?`, `تعطيل "${termKey}" لهذه الجهة؟`))) return
     await authFetch(`/localization/terms/${termKey}/${category}/disable`, { method: 'PUT' })
-    setMsg({ type: 'success', text: 'Term disabled for this tenant' }); load()
+    setMsg({ type: 'success', text: L('Term disabled for this tenant', 'تم تعطيل المصطلح لهذه الجهة') }); load()
   }
 
   const startOverride = (term: any) => {
@@ -477,29 +482,29 @@ function OrgTerminologySection() {
 
   return (
     <div>
-      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>🌐 EA Terminology Management</div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>{L('🌐 EA Terminology Management', '🌐 إدارة مصطلحات البنية المؤسسية')}</div>
       <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
-        Manage NORA/DGA standard terminology. Global terms are platform defaults. Create tenant-specific overrides to customize Arabic terminology for your organization.
+        {L('Manage NORA/DGA standard terminology. Global terms are platform defaults. Create tenant-specific overrides to customize Arabic terminology for your organization.', 'إدارة المصطلحات المعيارية لنورة وهيئة الحكومة الرقمية. المصطلحات العامة هي الإعدادات الافتراضية للمنصة، ويمكنك إنشاء تخصيصات خاصة بالجهة لتكييف المصطلحات العربية لجهتك.')}
       </div>
 
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
 
       {/* Controls */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <input className="form-input" placeholder="Search terms..." value={search} onChange={e => setSearch(e.target.value)}
+        <input className="form-input" placeholder={L('Search terms...', 'ابحث في المصطلحات...')} value={search} onChange={e => setSearch(e.target.value)}
           style={{ width: 200, fontSize: 11 }} />
         <select className="form-input" value={selectedCategory} onChange={e => setSelectedCategory(e.target.value)} style={{ fontSize: 11 }}>
-          <option value="ALL">All Categories</option>
+          <option value="ALL">{L('All Categories', 'كل الفئات')}</option>
           {categories.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
         </select>
         <label style={{ fontSize: 11, display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
           <input type="checkbox" checked={showGlobalOnly} onChange={e => setShowGlobalOnly(e.target.checked)} />
-          Global only
+          {L('Global only', 'العامة فقط')}
         </label>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-          <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={load}>↻ Refresh</button>
+          <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={load}>{L('↻ Refresh', '↻ تحديث')}</button>
           <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} onClick={() => { setEditingTerm(null); setOverrideForm({ termKey: '', category: '', arabic: '', arabicNormalized: '', aiPreferred: true, uiPreferred: true, notes: '' }); setShowOverrideForm(true) }}>
-            + Add Override
+            {L('+ Add Override', '+ إضافة تخصيص')}
           </button>
         </div>
       </div>
@@ -507,56 +512,56 @@ function OrgTerminologySection() {
       {/* Override form */}
       {showOverrideForm && (
         <div style={{ marginBottom: 16, padding: 16, background: 'var(--navy)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{editingTerm ? `Override: ${editingTerm.english}` : 'New Terminology Override'}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{editingTerm ? L(`Override: ${editingTerm.english}`, `تخصيص: ${editingTerm.english}`) : L('New Terminology Override', 'تخصيص مصطلح جديد')}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
             {!editingTerm && <>
               <div>
-                <div style={{ fontSize: 11, marginBottom: 3 }}>Term Key</div>
+                <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Term Key', 'مفتاح المصطلح')}</div>
                 <input className="form-input" value={overrideForm.termKey} onChange={e => setOverrideForm(f => ({ ...f, termKey: e.target.value }))} placeholder="e.g. enterprise_architecture" style={{ fontSize: 11, width: '100%' }} />
               </div>
               <div>
-                <div style={{ fontSize: 11, marginBottom: 3 }}>Category</div>
+                <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Category', 'الفئة')}</div>
                 <select className="form-input" value={overrideForm.category} onChange={e => setOverrideForm(f => ({ ...f, category: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
-                  <option value="">Select...</option>
+                  <option value="">{L('Select...', 'اختر...')}</option>
                   {categories.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
                 </select>
               </div>
             </>}
             <div>
-              <div style={{ fontSize: 11, marginBottom: 3 }}>Arabic Term</div>
-              <input className="form-input" value={overrideForm.arabic} onChange={e => setOverrideForm(f => ({ ...f, arabic: e.target.value }))} placeholder="Arabic translation" style={{ fontSize: 11, width: '100%', direction: 'rtl' }} />
+              <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Arabic Term', 'المصطلح بالعربية')}</div>
+              <input className="form-input" value={overrideForm.arabic} onChange={e => setOverrideForm(f => ({ ...f, arabic: e.target.value }))} placeholder={L('Arabic translation', 'الترجمة العربية')} style={{ fontSize: 11, width: '100%', direction: 'rtl' }} />
             </div>
             <div>
-              <div style={{ fontSize: 11, marginBottom: 3 }}>Normalized Form (used in AI)</div>
-              <input className="form-input" value={overrideForm.arabicNormalized} onChange={e => setOverrideForm(f => ({ ...f, arabicNormalized: e.target.value }))} placeholder="Preferred AI form" style={{ fontSize: 11, width: '100%', direction: 'rtl' }} />
+              <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Normalized Form (used in AI)', 'الصيغة الموحدة (تُستخدم في الذكاء الاصطناعي)')}</div>
+              <input className="form-input" value={overrideForm.arabicNormalized} onChange={e => setOverrideForm(f => ({ ...f, arabicNormalized: e.target.value }))} placeholder={L('Preferred AI form', 'الصيغة المفضلة للذكاء الاصطناعي')} style={{ fontSize: 11, width: '100%', direction: 'rtl' }} />
             </div>
             <div>
-              <div style={{ fontSize: 11, marginBottom: 3 }}>Notes</div>
-              <input className="form-input" value={overrideForm.notes} onChange={e => setOverrideForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes" style={{ fontSize: 11, width: '100%' }} />
+              <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Notes', 'ملاحظات')}</div>
+              <input className="form-input" value={overrideForm.notes} onChange={e => setOverrideForm(f => ({ ...f, notes: e.target.value }))} placeholder={L('Optional notes', 'ملاحظات اختيارية')} style={{ fontSize: 11, width: '100%' }} />
             </div>
             <div style={{ display: 'flex', gap: 12, alignItems: 'center', paddingTop: 18 }}>
               <label style={{ fontSize: 11, display: 'flex', gap: 4, cursor: 'pointer' }}>
-                <input type="checkbox" checked={overrideForm.aiPreferred} onChange={e => setOverrideForm(f => ({ ...f, aiPreferred: e.target.checked }))} /> AI preferred
+                <input type="checkbox" checked={overrideForm.aiPreferred} onChange={e => setOverrideForm(f => ({ ...f, aiPreferred: e.target.checked }))} /> {L('AI preferred', 'مفضّل للذكاء الاصطناعي')}
               </label>
               <label style={{ fontSize: 11, display: 'flex', gap: 4, cursor: 'pointer' }}>
-                <input type="checkbox" checked={overrideForm.uiPreferred} onChange={e => setOverrideForm(f => ({ ...f, uiPreferred: e.target.checked }))} /> UI preferred
+                <input type="checkbox" checked={overrideForm.uiPreferred} onChange={e => setOverrideForm(f => ({ ...f, uiPreferred: e.target.checked }))} /> {L('UI preferred', 'مفضّل للواجهة')}
               </label>
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} disabled={saving} onClick={saveOverride}>{saving ? 'Saving...' : '💾 Save Override'}</button>
-            <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setShowOverrideForm(false)}>Cancel</button>
+            <button className="btn btn-primary btn-sm" style={{ fontSize: 11 }} disabled={saving} onClick={saveOverride}>{saving ? L('Saving...', 'جارٍ الحفظ...') : L('💾 Save Override', '💾 حفظ التخصيص')}</button>
+            <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => setShowOverrideForm(false)}>{L('Cancel', 'إلغاء')}</button>
           </div>
         </div>
       )}
 
       {/* Terms table */}
-      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Loading terminology...</div> : (
+      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('Loading terminology...', 'جارٍ تحميل المصطلحات...')}</div> : (
         <div>
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{filteredTerms.length} terms</div>
+          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{filteredTerms.length} {L('terms', 'مصطلح')}</div>
           <div style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr 1.2fr 0.8fr 80px 80px', background: 'var(--navy-mid)', padding: '8px 12px', fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', gap: 8 }}>
-              <div>ENGLISH</div><div>ARABIC</div><div>NORMALIZED (AI)</div><div>CATEGORY</div><div>FLAGS</div><div>ACTIONS</div>
+              <div>{L('ENGLISH', 'الإنجليزية')}</div><div>{L('ARABIC', 'العربية')}</div><div>{L('NORMALIZED (AI)', 'الصيغة الموحدة (الذكاء الاصطناعي)')}</div><div>{L('CATEGORY', 'الفئة')}</div><div>{L('FLAGS', 'العلامات')}</div><div>{L('ACTIONS', 'الإجراءات')}</div>
             </div>
             {filteredTerms.slice(0, 100).map(term => (
               <div key={`${term.termKey}-${term.category}-${term.tenantId || 'global'}`}
@@ -569,13 +574,13 @@ function OrgTerminologySection() {
                 <div style={{ direction: 'rtl', textAlign: 'right', color: term.arabicNormalized !== term.arabic ? 'var(--accent)' : 'var(--text)' }}>{term.arabicNormalized}</div>
                 <div>
                   <span style={{ fontSize: 9, padding: '2px 5px', borderRadius: 2, background: 'var(--navy-mid)', fontFamily: 'var(--font-mono)' }}>{CATEGORY_LABELS[term.category]?.replace(/^[^ ]+ /, '') || term.category}</span>
-                  {term.tenantId && <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>● tenant override</div>}
-                  {term.isGlobal && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>◉ global</div>}
+                  {term.tenantId && <div style={{ fontSize: 9, color: 'var(--accent)', marginTop: 2 }}>{L('● tenant override', '● تخصيص الجهة')}</div>}
+                  {term.isGlobal && <div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 2 }}>{L('◉ global', '◉ عام')}</div>}
                 </div>
                 <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                  {term.aiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(3,105,161,0.15)', color: 'var(--accent)' }}>AI</span>}
-                  {term.uiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(100,200,100,0.15)', color: '#4caf50' }}>UI</span>}
-                  {term.isActive === false && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(255,0,0,0.1)', color: '#f44' }}>OFF</span>}
+                  {term.aiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(3,105,161,0.15)', color: 'var(--accent)' }}>{L('AI', 'ذكاء اصطناعي')}</span>}
+                  {term.uiPreferred && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(100,200,100,0.15)', color: '#4caf50' }}>{L('UI', 'الواجهة')}</span>}
+                  {term.isActive === false && <span style={{ fontSize: 8, padding: '1px 4px', borderRadius: 2, background: 'rgba(255,0,0,0.1)', color: '#f44' }}>{L('OFF', 'معطّل')}</span>}
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   <button onClick={() => startOverride(term)} style={{ fontSize: 9, padding: '2px 6px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', color: 'var(--text)' }}>✏</button>
@@ -584,14 +589,14 @@ function OrgTerminologySection() {
               </div>
             ))}
           </div>
-          {filteredTerms.length > 100 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>Showing first 100 — use search or category filter to narrow results</div>}
+          {filteredTerms.length > 100 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>{L('Showing first 100 — use search or category filter to narrow results', 'يُعرض أول 100 — استخدم البحث أو تصفية الفئة لتضييق النتائج')}</div>}
         </div>
       )}
 
       {/* Resolution info */}
       <div style={{ marginTop: 16, padding: 12, background: 'rgba(3,105,161,0.05)', border: '1px solid rgba(3,105,161,0.15)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)' }}>
-        <strong style={{ color: 'var(--text)' }}>Resolution order:</strong> Tenant override → Global NORA/DGA baseline → Raw key<br />
-        <span style={{ color: 'var(--accent)' }}>● Tenant overrides</span> are shown with a blue indicator. They take precedence over global terms in AI generation and UI display.
+        <strong style={{ color: 'var(--text)' }}>{L('Resolution order:', 'ترتيب الاعتماد:')}</strong> {L('Tenant override → Global NORA/DGA baseline → Raw key', 'تخصيص الجهة ← الأساس العام لنورة/هيئة الحكومة الرقمية ← المفتاح الخام')}<br />
+        <span style={{ color: 'var(--accent)' }}>{L('● Tenant overrides', '● تخصيصات الجهة')}</span> {L('are shown with a blue indicator. They take precedence over global terms in AI generation and UI display.', 'تظهر بمؤشر أزرق، ولها الأولوية على المصطلحات العامة في توليد الذكاء الاصطناعي وعرض الواجهة.')}
       </div>
     </div>
   )

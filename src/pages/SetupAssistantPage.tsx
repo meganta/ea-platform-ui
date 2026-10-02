@@ -19,11 +19,11 @@ const STEPS = [
 
 // KB-related foundation docs
 const KB_FOUNDATION_DOCS = [
-  { key: 'nora_methodology', titleAr: 'منهجية نورا 2.0', category: 'METHODOLOGY', required: true, whyItMatters: 'الإطار الوطني الأساسي لتطوير البنية المؤسسية' },
-  { key: 'dga_standards', titleAr: 'معايير هيئة الحكومة الرقمية', category: 'REGULATION', required: true, whyItMatters: 'معايير التحول الرقمي الحكومي الإلزامية' },
-  { key: 'nca_requirements', titleAr: 'متطلبات الأمن السيبراني (هيئة الأمن السيبراني)', category: 'REGULATION', required: true, whyItMatters: 'متطلبات الأمن السيبراني الإلزامية' },
-  { key: 'sdaia_documents', titleAr: 'وثائق هيئة البيانات والذكاء الاصطناعي', category: 'REGULATION', required: false, whyItMatters: 'حوكمة البيانات والذكاء الاصطناعي' },
-  { key: 'internal_ea_policy', titleAr: 'سياسة البنية المؤسسية الداخلية', category: 'POLICY', required: false, whyItMatters: 'السياسات الداخلية المعتمدة' },
+  { key: 'nora_methodology', titleAr: 'منهجية نورا 2.0', titleEn: 'NORA 2.0 Methodology', category: 'METHODOLOGY', required: true, whyItMatters: 'الإطار الوطني الأساسي لتطوير البنية المؤسسية', whyItMattersEn: 'The core national framework for developing enterprise architecture' },
+  { key: 'dga_standards', titleAr: 'معايير هيئة الحكومة الرقمية', titleEn: 'DGA Standards', category: 'REGULATION', required: true, whyItMatters: 'معايير التحول الرقمي الحكومي الإلزامية', whyItMattersEn: 'Mandatory government digital transformation standards' },
+  { key: 'nca_requirements', titleAr: 'متطلبات الأمن السيبراني (هيئة الأمن السيبراني)', titleEn: 'NCA Cybersecurity Requirements', category: 'REGULATION', required: true, whyItMatters: 'متطلبات الأمن السيبراني الإلزامية', whyItMattersEn: 'Mandatory cybersecurity requirements' },
+  { key: 'sdaia_documents', titleAr: 'وثائق هيئة البيانات والذكاء الاصطناعي', titleEn: 'SDAIA Documents', category: 'REGULATION', required: false, whyItMatters: 'حوكمة البيانات والذكاء الاصطناعي', whyItMattersEn: 'Data and AI governance' },
+  { key: 'internal_ea_policy', titleAr: 'سياسة البنية المؤسسية الداخلية', titleEn: 'Internal EA Policy', category: 'POLICY', required: false, whyItMatters: 'السياسات الداخلية المعتمدة', whyItMattersEn: 'Approved internal policies' },
 ]
 
 // Repo-related foundation docs
@@ -35,17 +35,17 @@ const KB_FOUNDATION_DOCS = [
 // known follow-up; not fixed in this pass since it's a distinct scope
 // from the settings/navigation restructuring this pass addresses.
 const REPO_FOUNDATION_DOCS = [
-  { key: 'ea_principles', titleAr: 'مبادئ البنية المؤسسية', assetType: 'EA_PRINCIPLE', domain: 'CROSS_CUTTING', importance: 'CRITICAL', whyItMatters: 'القواعد الحاكمة لجميع قرارات البنية المعمارية' },
-  { key: 'ea_standards', titleAr: 'معايير البنية المؤسسية', assetType: 'EA_STANDARD', domain: 'CROSS_CUTTING', importance: 'CRITICAL', whyItMatters: 'ضمان الاتساق والامتثال في جميع المجالات' },
-  { key: 'ea_governance_model', titleAr: 'نموذج حوكمة البنية المؤسسية', assetType: 'GOVERNANCE_MODEL', domain: 'CROSS_CUTTING', importance: 'CRITICAL', whyItMatters: 'تحديد آليات اتخاذ قرارات البنية المعمارية' },
-  { key: 'ea_charter', titleAr: 'ميثاق البنية المؤسسية', assetType: 'EA_CHARTER', domain: 'CROSS_CUTTING', importance: 'CRITICAL', whyItMatters: 'التفويض الرسمي لوظيفة البنية المؤسسية' },
-  { key: 'ea_operating_model', titleAr: 'النموذج التشغيلي للبنية المؤسسية', assetType: 'OPERATING_MODEL', domain: 'CROSS_CUTTING', importance: 'HIGH', whyItMatters: 'تحديد كيفية عمل وظيفة البنية المؤسسية' },
-  { key: 'architecture_review_procedure', titleAr: 'إجراءات مراجعة الهندسة المعمارية', assetType: 'PROCEDURE', domain: 'CROSS_CUTTING', importance: 'HIGH', whyItMatters: 'توحيد عملية مراجعة واعتماد المنتجات المعمارية' },
-  { key: 'technology_standards_catalog', titleAr: 'فهرس المعايير التقنية', assetType: 'STANDARDS_CATALOG', domain: 'TECHNOLOGY', importance: 'HIGH', whyItMatters: 'التقنيات والمنصات المعتمدة في المنظمة' },
-  { key: 'integration_standards', titleAr: 'معايير التكامل', assetType: 'INTEGRATION_STANDARD', domain: 'APPLICATIONS', importance: 'HIGH', whyItMatters: 'أنماط التكامل الآمنة والموحدة' },
-  { key: 'data_governance_principles', titleAr: 'مبادئ حوكمة البيانات', assetType: 'DATA_PRINCIPLE', domain: 'DATA', importance: 'HIGH', whyItMatters: 'حوكمة ملكية البيانات وجودتها ودورة حياتها' },
-  { key: 'security_architecture_principles', titleAr: 'مبادئ هندسة الأمن', assetType: 'SECURITY_PRINCIPLE', domain: 'SECURITY', importance: 'HIGH', whyItMatters: 'متطلبات الأمن بالتصميم المتوافقة مع معايير هيئة الأمن السيبراني' },
-  { key: 'architecture_compliance_policy', titleAr: 'سياسة الامتثال المعماري', assetType: 'POLICY', domain: 'CROSS_CUTTING', importance: 'HIGH', whyItMatters: 'إلزام المشاريع بمعايير البنية المؤسسية المعتمدة' },
+  { key: 'ea_principles', titleAr: 'مبادئ البنية المؤسسية', titleEn: 'EA Principles', assetType: 'EA_PRINCIPLE', domain: 'CROSS_CUTTING', importance: 'CRITICAL', whyItMatters: 'القواعد الحاكمة لجميع قرارات البنية المعمارية', whyItMattersEn: 'The rules that govern every architecture decision' },
+  { key: 'ea_standards', titleAr: 'معايير البنية المؤسسية', titleEn: 'EA Standards', assetType: 'EA_STANDARD', domain: 'CROSS_CUTTING', importance: 'CRITICAL', whyItMatters: 'ضمان الاتساق والامتثال في جميع المجالات', whyItMattersEn: 'Consistency and compliance across all domains' },
+  { key: 'ea_governance_model', titleAr: 'نموذج حوكمة البنية المؤسسية', titleEn: 'EA Governance Model', assetType: 'GOVERNANCE_MODEL', domain: 'CROSS_CUTTING', importance: 'CRITICAL', whyItMatters: 'تحديد آليات اتخاذ قرارات البنية المعمارية', whyItMattersEn: 'How architecture decisions are made' },
+  { key: 'ea_charter', titleAr: 'ميثاق البنية المؤسسية', titleEn: 'EA Charter', assetType: 'EA_CHARTER', domain: 'CROSS_CUTTING', importance: 'CRITICAL', whyItMatters: 'التفويض الرسمي لوظيفة البنية المؤسسية', whyItMattersEn: 'The formal mandate of the EA function' },
+  { key: 'ea_operating_model', titleAr: 'النموذج التشغيلي للبنية المؤسسية', titleEn: 'EA Operating Model', assetType: 'OPERATING_MODEL', domain: 'CROSS_CUTTING', importance: 'HIGH', whyItMatters: 'تحديد كيفية عمل وظيفة البنية المؤسسية', whyItMattersEn: 'How the EA function operates' },
+  { key: 'architecture_review_procedure', titleAr: 'إجراءات مراجعة الهندسة المعمارية', titleEn: 'Architecture Review Procedure', assetType: 'PROCEDURE', domain: 'CROSS_CUTTING', importance: 'HIGH', whyItMatters: 'توحيد عملية مراجعة واعتماد المنتجات المعمارية', whyItMattersEn: 'A single process to review and approve architecture work products' },
+  { key: 'technology_standards_catalog', titleAr: 'فهرس المعايير التقنية', titleEn: 'Technology Standards Catalog', assetType: 'STANDARDS_CATALOG', domain: 'TECHNOLOGY', importance: 'HIGH', whyItMatters: 'التقنيات والمنصات المعتمدة في المنظمة', whyItMattersEn: 'The organization\'s approved technologies and platforms' },
+  { key: 'integration_standards', titleAr: 'معايير التكامل', titleEn: 'Integration Standards', assetType: 'INTEGRATION_STANDARD', domain: 'APPLICATIONS', importance: 'HIGH', whyItMatters: 'أنماط التكامل الآمنة والموحدة', whyItMattersEn: 'Secure, consistent integration patterns' },
+  { key: 'data_governance_principles', titleAr: 'مبادئ حوكمة البيانات', titleEn: 'Data Governance Principles', assetType: 'DATA_PRINCIPLE', domain: 'DATA', importance: 'HIGH', whyItMatters: 'حوكمة ملكية البيانات وجودتها ودورة حياتها', whyItMattersEn: 'Data ownership, quality and lifecycle governance' },
+  { key: 'security_architecture_principles', titleAr: 'مبادئ هندسة الأمن', titleEn: 'Security Architecture Principles', assetType: 'SECURITY_PRINCIPLE', domain: 'SECURITY', importance: 'HIGH', whyItMatters: 'متطلبات الأمن بالتصميم المتوافقة مع معايير هيئة الأمن السيبراني', whyItMattersEn: 'Security-by-design requirements aligned with NCA standards' },
+  { key: 'architecture_compliance_policy', titleAr: 'سياسة الامتثال المعماري', titleEn: 'Architecture Compliance Policy', assetType: 'POLICY', domain: 'CROSS_CUTTING', importance: 'HIGH', whyItMatters: 'إلزام المشاريع بمعايير البنية المؤسسية المعتمدة', whyItMattersEn: 'Requires projects to follow the approved EA standards' },
 ]
 
 const SCORE_COLOR = (s: number) => s >= 80 ? 'var(--success)' : s >= 60 ? 'var(--accent)' : s >= 40 ? 'var(--warning)' : 'var(--danger)'
@@ -66,6 +66,7 @@ function ScoreRing({ score, label }: { score: number; label: string }) {
 
 function Step1KB({ onNext }: any) {
   const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [kbDocs, setKbDocs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   useEffect(() => {
@@ -85,10 +86,10 @@ function Step1KB({ onNext }: any) {
   return (
     <div>
       <div style={{ padding: 10, background: 'rgba(3,105,161,0.07)', border: '1px solid rgba(3,105,161,0.2)', borderRadius: 4, marginBottom: 14, fontSize: 12, color: 'var(--border)' }}>
-        <strong style={{ color: 'var(--accent)' }}>📚 قاعدة المعرفة:</strong> وثائق مرجعية مشتركة — منهجيات وطنية، معايير، لوائح تنظيمية. <span style={{ color: 'var(--warning)' }}>ليست أصولاً خاصة بمنظمتك.</span>
+        <strong style={{ color: 'var(--accent)' }}>📚 {L('Knowledge Base:', 'قاعدة المعرفة:')}</strong> {L('Shared reference documents — national methodologies, standards, regulations.', 'وثائق مرجعية مشتركة — منهجيات وطنية، معايير، لوائح تنظيمية.')} <span style={{ color: 'var(--warning)' }}>{L("They are not your organization's own assets.", 'ليست أصولاً خاصة بمنظمتك.')}</span>
       </div>
 
-      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>⟳ جاري التحقق...</div> : (
+      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>⟳ {L('Checking...', 'جارٍ التحقق...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 14 }}>
           {KB_FOUNDATION_DOCS.map(doc => {
             const available = isKbDocAvailable(doc.key, doc.titleAr)
@@ -97,8 +98,8 @@ function Step1KB({ onNext }: any) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 15, flexShrink: 0 }}>{available ? '✅' : doc.required ? '⭐' : '📄'}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{doc.titleAr}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{doc.whyItMatters}</div>
+                    <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{isAR ? doc.titleAr : doc.titleEn}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isAR ? doc.whyItMatters : doc.whyItMattersEn}</div>
                   </div>
                   <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, flexShrink: 0, background: available ? 'rgba(22,163,74,0.12)' : doc.required ? 'rgba(220,38,38,0.1)' : 'rgba(100,100,100,0.1)', color: available ? 'var(--success)' : doc.required ? 'var(--danger)' : 'var(--text-dim)' }}>
                     {available ? isAR ? 'متاح ✓' : 'Available ✓' : doc.required ? isAR ? 'مطلوب' : 'Required' : isAR ? 'اختياري' : 'Optional'}
@@ -111,8 +112,8 @@ function Step1KB({ onNext }: any) {
       )}
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
-        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/knowledge', '_blank')}>🔗 رفع وثائق المرجعية</button>
-        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>المتابعة →</button>
+        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/knowledge', '_blank')}>🔗 {L('Upload reference documents', 'رفع الوثائق المرجعية')}</button>
+        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>{L('Continue →', 'المتابعة ←')}</button>
       </div>
     </div>
   )
@@ -121,6 +122,7 @@ function Step1KB({ onNext }: any) {
 // ── Step 3: Repo Setup + Repo Gap Detection + Repo Generation ─────────────────
 function Step2Repo({ onNext }: any) {
   const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [repoAssets, setRepoAssets] = useState<any[]>([])
   const [generating, setGenerating] = useState<string | null>(null)
   const [generatedContent, setGeneratedContent] = useState<Record<string, any>>({})
@@ -159,9 +161,9 @@ function Step2Repo({ onNext }: any) {
       const res = await authFetch(`/setup/generate/${docKey}`, { method: 'POST' })
       if (res.asset) {
         setGeneratedContent((g: Record<string,any>) => ({ ...g, [docKey]: res.content }))
-        setMsg({ type: 'success', text: `✓ تم توليد "${res.asset.nameAr}" وحفظه في المستودع` })
+        setMsg({ type: 'success', text: L(`✓ "${res.asset.name || res.asset.nameAr}" generated and saved to the repository`, `✓ تم توليد "${res.asset.nameAr || res.asset.name}" وحفظه في المستودع`) })
         load() // refresh asset list
-      } else setMsg({ type: 'error', text: res.message || isAR ? 'فشل التوليد' : 'Generation failed' })
+      } else setMsg({ type: 'error', text: res.message || L('Generation failed', 'فشل التوليد') })
     } finally { setGenerating(null) }
   }
 
@@ -170,12 +172,12 @@ function Step2Repo({ onNext }: any) {
   return (
     <div>
       <div style={{ padding: 10, background: 'rgba(217,119,6,0.07)', border: '1px solid rgba(217,119,6,0.2)', borderRadius: 4, marginBottom: 14, fontSize: 12, color: 'var(--border)' }}>
-        <strong style={{ color: 'var(--warning)' }}>🗄 مستودع البنية المؤسسية:</strong> الأصول المعمارية الخاصة بمنظمتك. <span style={{ color: 'var(--accent)' }}>يمكن توليد الوثائق المفقودة بالذكاء الاصطناعي.</span>
+        <strong style={{ color: 'var(--warning)' }}>🗄 {L('EA Repository:', 'مستودع البنية المؤسسية:')}</strong> {L("Your organization's own architecture assets.", 'الأصول المعمارية الخاصة بمنظمتك.')} <span style={{ color: 'var(--accent)' }}>{L('Missing documents can be generated with AI.', 'يمكن توليد الوثائق المفقودة بالذكاء الاصطناعي.')}</span>
       </div>
 
       {msg && <div style={{ padding: '6px 10px', borderRadius: 4, background: msg.type === 'success' ? 'rgba(22,163,74,0.12)' : 'rgba(220,38,38,0.12)', color: msg.type === 'success' ? 'var(--success)' : 'var(--danger)', fontSize: 11, marginBottom: 10 }}>{msg.text}</div>}
 
-      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>⟳ جاري التحقق...</div> : (
+      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>⟳ {L('Checking...', 'جارٍ التحقق...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14, maxHeight: 380, overflowY: 'auto' }}>
           {REPO_FOUNDATION_DOCS.map(doc => {
             const available = isRepoDocAvailable(doc)
@@ -185,12 +187,12 @@ function Step2Repo({ onNext }: any) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: 14, flexShrink: 0 }}>{available || done ? '✅' : '📄'}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{doc.titleAr}</div>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{doc.whyItMatters}</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{isAR ? doc.titleAr : doc.titleEn}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isAR ? doc.whyItMatters : doc.whyItMattersEn}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 5, alignItems: 'center', flexShrink: 0 }}>
                     {(available || done) ? (
-                      <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: 'rgba(22,163,74,0.12)', color: 'var(--success)' }}>متاح ✓</span>
+                      <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: 'rgba(22,163,74,0.12)', color: 'var(--success)' }}>{L('Available ✓', 'متاح ✓')}</span>
                     ) : (
                       <>
                         <span style={{ fontSize: 9, padding: '1px 5px', borderRadius: 2, background: `${impColor(doc.importance)}18`, color: impColor(doc.importance) }}>{doc.importance === 'CRITICAL' ? isAR ? 'حرجة' : 'Critical' : isAR ? 'عالية' : 'High'}</span>
@@ -200,7 +202,7 @@ function Step2Repo({ onNext }: any) {
                       </>
                     )}
                     {done && !available && (
-                      <button onClick={() => setPreview(generatedContent[doc.key])} style={{ fontSize: 9, padding: '2px 8px', background: 'rgba(15,23,42,0.04)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', color: 'var(--text-dim)' }}>معاينة</button>
+                      <button onClick={() => setPreview(generatedContent[doc.key])} style={{ fontSize: 9, padding: '2px 8px', background: 'rgba(15,23,42,0.04)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', color: 'var(--text-dim)' }}>{L('Preview', 'معاينة')}</button>
                     )}
                   </div>
                 </div>
@@ -211,20 +213,20 @@ function Step2Repo({ onNext }: any) {
       )}
 
       <div style={{ fontSize: 10, color: 'var(--text-dim)', marginBottom: 12, padding: '6px 10px', background: 'rgba(0,0,0,0.2)', borderRadius: 4 }}>
-        ⚠ الوثائق المولّدة تُحفظ تلقائياً في مستودع البنية المؤسسية بصفة مسودة — بانتظار المراجعة والاعتماد
+        ⚠ {L('Generated documents are saved to the EA Repository as drafts — awaiting review and approval', 'الوثائق المولّدة تُحفظ تلقائياً في مستودع البنية المؤسسية بصفة مسودة — بانتظار المراجعة والاعتماد')}
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/repository', '_blank')}>🔗 المستودع</button>
-        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>المتابعة →</button>
+        <button className="btn btn-secondary btn-sm" style={{ fontSize: 11 }} onClick={() => window.open('/repository', '_blank')}>🔗 {L('Repository', 'المستودع')}</button>
+        <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>{L('Continue →', 'المتابعة ←')}</button>
       </div>
 
       {preview && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3000 }}>
-          <div style={{ background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, width: '80%', maxHeight: '80vh', overflow: 'auto', direction: 'rtl' }}>
+          <div style={{ background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 8, padding: 20, width: '80%', maxHeight: '80vh', overflow: 'auto', direction: isAR ? 'rtl' : 'ltr' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>معاينة الوثيقة المولّدة</div>
-              <button onClick={() => setPreview(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-dim)' }}>✕</button>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{L('Generated document preview', 'معاينة الوثيقة المولّدة')}</div>
+              <button onClick={() => setPreview(null)} aria-label={L('Close', 'إغلاق')} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--text-dim)' }}>✕</button>
             </div>
             <pre style={{ fontSize: 11, whiteSpace: 'pre-wrap', lineHeight: 1.8, color: 'var(--border)' }}>{preview}</pre>
           </div>
@@ -236,66 +238,69 @@ function Step2Repo({ onNext }: any) {
 
 // ── Step 4: Readiness ─────────────────────────────────────────────────────────
 function Step3Readiness({ onNext }: any) {
-  
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
+  // Readiness band, in the UI language (same thresholds as the backend).
+  const band = (s: number) => s >= 80 ? L('Ready', 'جاهز') : s >= 60 ? L('Advanced', 'متقدم') : s >= 40 ? L('Intermediate', 'متوسط') : s >= 20 ? L('Beginner', 'مبتدئ') : L('Incomplete', 'غير مكتمل')
   const [r, setR] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => { authFetch('/setup/readiness').then(setR).finally(() => setLoading(false)) }, [])
-  if (loading) return <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>⟳ جاري الحساب...</div>
+  if (loading) return <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>⟳ {L('Calculating...', 'جارٍ الحساب...')}</div>
   const scores = [
-    { label: 'قاعدة المعرفة', icon: '📚', data: r?.kbReadiness },
-    { label: 'المستودع', icon: '🗄', data: r?.repoReadiness },
-    { label: 'دورة ADM', icon: '⚙', data: r?.admReadiness },
-    { label: 'الحوكمة', icon: '⚖', data: r?.governanceReadiness },
+    { label: L('Knowledge Base', 'قاعدة المعرفة'), icon: '📚', data: r?.kbReadiness },
+    { label: L('Repository', 'المستودع'), icon: '🗄', data: r?.repoReadiness },
+    { label: L('ADM Cycle', 'دورة ADM'), icon: '⚙', data: r?.admReadiness },
+    { label: L('Governance', 'الحوكمة'), icon: '⚖', data: r?.governanceReadiness },
   ]
   return (
     <div>
       <div style={{ textAlign: 'center', marginBottom: 20 }}>
         <div style={{ fontSize: 42, fontWeight: 700, color: SCORE_COLOR(r?.overall || 0) }}>{r?.overall || 0}%</div>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>مؤشر الجاهزية الإجمالي</div>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Overall readiness score', 'مؤشر الجاهزية الإجمالي')}</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
         {scores.map(({ label, icon, data }) => (
           <div key={label} style={{ padding: 12, background: 'rgba(15,23,42,0.04)', border: '1px solid var(--border)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <ScoreRing score={data?.score || 0} label={data?.label || ''} />
+            <ScoreRing score={data?.score || 0} label={band(data?.score || 0)} />
             <div><div style={{ fontSize: 13, color: 'var(--text)' }}>{icon} {label}</div></div>
           </div>
         ))}
       </div>
-      <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>الخطوات التالية →</button>
+      <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onNext}>{L('Next actions →', 'الخطوات التالية ←')}</button>
     </div>
   )
 }
 
 // ── Step 5: Next Actions ──────────────────────────────────────────────────────
 function Step4Actions({ onComplete }: any) {
-  
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => { authFetch('/setup/actions').then(setData).finally(() => setLoading(false)) }, [])
   const routes: Record<string, string> = { UPLOAD_KB: '/knowledge', UPLOAD_REPO: '/repository', GENERATE_FOUNDATION: '/setup', START_ADM: '/adm', SETUP_GOVERNANCE: '/settings' }
   return (
     <div>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>الخطوات المقترحة لتطوير منظومة البنية المؤسسية</div>
-      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>⟳ جاري التحليل...</div> : (
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 14 }}>{L('Suggested steps to develop your enterprise architecture practice', 'الخطوات المقترحة لتطوير منظومة البنية المؤسسية')}</div>
+      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>⟳ {L('Analyzing...', 'جارٍ التحليل...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, marginBottom: 16 }}>
           {(data?.actions || []).map((a: any, i: number) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', background: 'rgba(15,23,42,0.04)', border: '1px solid var(--border)', borderRadius: 6 }}>
               <span style={{ fontSize: 20 }}>{a.icon}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{a.titleAr}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{a.titleEn}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{isAR ? (a.titleAr || a.titleEn) : (a.titleEn || a.titleAr)}</div>
               </div>
-              <button onClick={() => window.location.href = routes[a.type] || '/'} style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(3,105,161,0.1)', border: '1px solid var(--accent)', borderRadius: 2, cursor: 'pointer', color: 'var(--accent)' }}>انتقال</button>
+              <button onClick={() => window.location.href = routes[a.type] || '/'} style={{ fontSize: 10, padding: '3px 10px', background: 'rgba(3,105,161,0.1)', border: '1px solid var(--accent)', borderRadius: 2, cursor: 'pointer', color: 'var(--accent)' }}>{L('Go', 'انتقال')}</button>
             </div>
           ))}
           {(!data?.actions || data.actions.length === 0) && (
             <div style={{ padding: '12px 14px', background: 'rgba(22,163,74,0.06)', border: '1px solid rgba(22,163,74,0.2)', borderRadius: 6, color: 'var(--success)', fontSize: 12 }}>
-              ✓ المنصة جاهزة — يمكنك البدء بأول دورة ADM
+              ✓ {L('The platform is ready — you can start your first ADM cycle', 'المنصة جاهزة — يمكنك البدء بأول دورة ADM')}
             </div>
           )}
         </div>
       )}
-      <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onComplete}>✓ إتمام الإعداد</button>
+      <button className="btn btn-primary" style={{ fontSize: 12 }} onClick={onComplete}>✓ {L('Complete setup', 'إتمام الإعداد')}</button>
     </div>
   )
 }

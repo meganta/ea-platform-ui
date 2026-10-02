@@ -85,7 +85,7 @@ describe('SetupAssistantPage - Step3Readiness', () => {
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     fireEvent.click(screen.getByText('Readiness Score'));
     await waitFor(() => expect(screen.getAllByText('50%').length).toBeGreaterThan(0));
-    fireEvent.click(screen.getByText(/الخطوات التالية/));
+    fireEvent.click(screen.getByText(/Next actions →/));
     expect(await screen.findByText('Step 4 of 4')).toBeInTheDocument();
   });
 });
@@ -107,7 +107,7 @@ describe('SetupAssistantPage - Step4Actions', () => {
     render(<SetupAssistantPage />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     fireEvent.click(screen.getByText('Next Actions'));
-    expect(await screen.findByText(/يمكنك البدء بأول دورة ADM/)).toBeInTheDocument();
+    expect(await screen.findByText(/you can start your first ADM cycle/)).toBeInTheDocument();
   });
 
   it('completing setup calls the complete endpoint', async () => {
@@ -115,8 +115,8 @@ describe('SetupAssistantPage - Step4Actions', () => {
     render(<SetupAssistantPage />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     fireEvent.click(screen.getByText('Next Actions'));
-    await screen.findByText(/يمكنك البدء بأول دورة ADM/);
-    fireEvent.click(screen.getByText(/إتمام الإعداد/));
+    await screen.findByText(/you can start your first ADM cycle/);
+    fireEvent.click(screen.getByText(/Complete setup/));
 
     await waitFor(() => {
       const completeCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/setup/complete'));
@@ -131,8 +131,8 @@ describe('SetupAssistantPage - Step4Actions', () => {
     render(<SetupAssistantPage modal onClose={onClose} />);
     await waitFor(() => expect(global.fetch).toHaveBeenCalled());
     fireEvent.click(screen.getByText('Next Actions'));
-    await screen.findByText(/يمكنك البدء بأول دورة ADM/);
-    fireEvent.click(screen.getByText(/إتمام الإعداد/));
+    await screen.findByText(/you can start your first ADM cycle/);
+    fireEvent.click(screen.getByText(/Complete setup/));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 

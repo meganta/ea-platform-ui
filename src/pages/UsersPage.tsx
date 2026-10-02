@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
+import { enumLabel } from '../lib/enumLabels'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -16,12 +17,6 @@ function useApi() {
   }, [])
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  ARCHITECT: 'Architect',
-  REVIEWER: 'Reviewer',
-  TENANT_ADMIN: 'Tenant Admin',
-}
-
 const ROLE_COLORS: Record<string, string> = {
   ARCHITECT: 'badge-active',
   REVIEWER: 'badge-review',
@@ -29,7 +24,8 @@ const ROLE_COLORS: Record<string, string> = {
 }
 
 export default function UsersPage() {
-  const { t } = useLang()
+  const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const { hasPermission } = useAuth()
   const api = useApi()
   const [users, setUsers] = useState<any[]>([])
@@ -113,7 +109,7 @@ export default function UsersPage() {
   }
 
   const deactivateUser = async (id: string) => {
-    if (!window.confirm(t('users.confirm_deactivate') || 'Deactivate this user?')) return
+    if (!window.confirm(t('users.confirm_deactivate') || L('Deactivate this user?', 'تعطيل هذا المستخدم؟'))) return
     try {
       await api.del(`/users/${id}`)
       showMsg('User deactivated')
@@ -122,7 +118,7 @@ export default function UsersPage() {
   }
 
   const cancelInvitation = async (id: string) => {
-    if (!window.confirm(t('users.confirm_cancel_invite') || 'Cancel this invitation?')) return
+    if (!window.confirm(t('users.confirm_cancel_invite') || L('Cancel this invitation?', 'إلغاء هذه الدعوة؟'))) return
     try {
       await api.del(`/users/invitations/${id}`)
       showMsg('Invitation cancelled')
@@ -138,8 +134,8 @@ export default function UsersPage() {
   return (
     <div style={{ padding: '20px 28px', height: '100%', overflow: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>👥 {t('users.title') || 'Users'}</h1>
-        <HelpTip text={t('users.help') || 'Manage users in your tenant. Invite new users by email, or create them directly. Deactivate users who no longer need access.'} />
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>👥 {t('users.title') || L('Users', 'المستخدمون')}</h1>
+        <HelpTip text={t('users.help') || L('Manage users in your tenant. Invite new users by email, or create them directly. Deactivate users who no longer need access.', 'إدارة مستخدمي جهتك: ادعُ مستخدمين جدداً بالبريد الإلكتروني أو أنشئهم مباشرة، وعطّل من لم يعد بحاجة إلى الوصول.')} />
       </div>
 
       {(error || success) && (
@@ -150,10 +146,10 @@ export default function UsersPage() {
 
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
         <button onClick={() => setTab('users')} style={{ padding: '10px 16px', fontSize: 13, fontWeight: tab === 'users' ? 600 : 400, color: tab === 'users' ? 'var(--accent)' : 'var(--text-dim)', borderBottom: tab === 'users' ? '2px solid var(--accent)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer' }}>
-          {t('users.tab_users') || 'Active Users'} ({users.length})
+          {t('users.tab_users') || L('Active Users', 'المستخدمون النشطون')} ({users.length})
         </button>
         <button onClick={() => setTab('invitations')} style={{ padding: '10px 16px', fontSize: 13, fontWeight: tab === 'invitations' ? 600 : 400, color: tab === 'invitations' ? 'var(--accent)' : 'var(--text-dim)', borderBottom: tab === 'invitations' ? '2px solid var(--accent)' : '2px solid transparent', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', cursor: 'pointer' }}>
-          {t('users.tab_invitations') || 'Pending Invitations'} ({invitations.length})
+          {t('users.tab_invitations') || L('Pending Invitations', 'الدعوات المعلقة')} ({invitations.length})
         </button>
       </div>
 
@@ -163,10 +159,10 @@ export default function UsersPage() {
             {canInvite && (
               <>
                 <button onClick={() => setShowInviteModal(true)} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-                  ✉️ {t('users.invite') || 'Invite by Email'}
+                  ✉️ {t('users.invite') || L('Invite by Email', 'دعوة بالبريد')}
                 </button>
                 <button onClick={() => setShowCreateModal(true)} style={{ padding: '8px 16px', background: 'var(--navy-mid)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>
-                  ➕ {t('users.create') || 'Create User'}
+                  ➕ {t('users.create') || L('Create User', 'إنشاء مستخدم')}
                 </button>
               </>
             )}
@@ -177,12 +173,12 @@ export default function UsersPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.name') || 'Name'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.email') || 'Email'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.role') || 'Role'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.status') || 'Status'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.last_login') || 'Last Login'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.actions') || 'Actions'}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.name') || L('Name', 'الاسم')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.email') || L('Email', 'البريد الإلكتروني')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.role') || L('Role', 'الدور')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.status') || L('Status', 'الحالة')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.last_login') || L('Last Login', 'آخر دخول')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.actions') || L('Actions', 'الإجراءات')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -194,29 +190,29 @@ export default function UsersPage() {
                       </td>
                       <td style={{ padding: '10px 14px', color: 'var(--text-dim)' }}>{u.email}</td>
                       <td style={{ padding: '10px 14px' }}>
-                        <span className={`badge ${ROLE_COLORS[u.role] || 'badge-draft'}`}>{ROLE_LABELS[u.role] || u.role}</span>
+                        <span className={`badge ${ROLE_COLORS[u.role] || 'badge-draft'}`}>{enumLabel(u.role, isAR)}</span>
                       </td>
                       <td style={{ padding: '10px 14px' }}>
-                        <span className={`badge ${u.isActive ? 'badge-approved' : 'badge-draft'}`}>{u.isActive ? (t('users.active') || 'Active') : (t('users.inactive') || 'Inactive')}</span>
+                        <span className={`badge ${u.isActive ? 'badge-approved' : 'badge-draft'}`}>{u.isActive ? (t('users.active') || L('Active', 'نشط')) : (t('users.inactive') || L('Inactive', 'غير نشط'))}</span>
                       </td>
                       <td style={{ padding: '10px 14px', color: 'var(--text-dim)', fontSize: 12 }}>
-                        {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : '—'}
+                        {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString(isAR ? 'ar' : 'en-US') : '—'}
                       </td>
                       <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           {canEdit && (
                             <button onClick={() => setEditingUser({ ...u })} style={{ padding: '4px 10px', fontSize: 11, background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}>
-                              {t('users.edit') || 'Edit'}
+                              {t('users.edit') || L('Edit', 'تعديل')}
                             </button>
                           )}
                           {canEdit && (
                             <button onClick={() => setResettingUser(u)} style={{ padding: '4px 10px', fontSize: 11, background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}>
-                              {t('users.reset_pw') || 'Reset PW'}
+                              {t('users.reset_pw') || L('Reset PW', 'إعادة تعيين كلمة المرور')}
                             </button>
                           )}
                           {canDisable && u.isActive && (
                             <button onClick={() => deactivateUser(u.id)} style={{ padding: '4px 10px', fontSize: 11, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', color: 'var(--danger)', borderRadius: 4, cursor: 'pointer' }}>
-                              {t('users.deactivate') || 'Deactivate'}
+                              {t('users.deactivate') || L('Deactivate', 'تعطيل')}
                             </button>
                           )}
                         </div>
@@ -224,7 +220,7 @@ export default function UsersPage() {
                     </tr>
                   ))}
                   {users.length === 0 && (
-                    <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{t('users.no_users') || 'No users yet.'}</td></tr>
+                    <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{t('users.no_users') || L('No users yet.', 'لا يوجد مستخدمون بعد.')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -238,7 +234,7 @@ export default function UsersPage() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             {canInvite && (
               <button onClick={() => setShowInviteModal(true)} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-                ✉️ {t('users.invite') || 'Invite by Email'}
+                ✉️ {t('users.invite') || L('Invite by Email', 'دعوة بالبريد')}
               </button>
             )}
           </div>
@@ -247,34 +243,34 @@ export default function UsersPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)' }}>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.email') || 'Email'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.role') || 'Role'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.expires') || 'Expires'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.status') || 'Status'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.actions') || 'Actions'}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.email') || L('Email', 'البريد الإلكتروني')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.role') || L('Role', 'الدور')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.expires') || L('Expires', 'تنتهي')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.status') || L('Status', 'الحالة')}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase' }}>{t('users.actions') || L('Actions', 'الإجراءات')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {invitations.map(inv => (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '10px 14px' }}>{inv.email}</td>
-                      <td style={{ padding: '10px 14px' }}><span className={`badge ${ROLE_COLORS[inv.role] || 'badge-draft'}`}>{ROLE_LABELS[inv.role] || inv.role}</span></td>
-                      <td style={{ padding: '10px 14px', color: 'var(--text-dim)', fontSize: 12 }}>{new Date(inv.expiresAt).toLocaleDateString()}</td>
-                      <td style={{ padding: '10px 14px' }}><span className="badge badge-progress">{t('users.pending') || 'Pending'}</span></td>
+                      <td style={{ padding: '10px 14px' }}><span className={`badge ${ROLE_COLORS[inv.role] || 'badge-draft'}`}>{enumLabel(inv.role, isAR)}</span></td>
+                      <td style={{ padding: '10px 14px', color: 'var(--text-dim)', fontSize: 12 }}>{new Date(inv.expiresAt).toLocaleDateString(isAR ? 'ar' : 'en-US')}</td>
+                      <td style={{ padding: '10px 14px' }}><span className="badge badge-progress">{t('users.pending') || L('Pending', 'معلّقة')}</span></td>
                       <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           <button onClick={() => copyInviteLink(`${window.location.origin}/invite/${inv.token || inv.id}`)} style={{ padding: '4px 10px', fontSize: 11, background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}>
-                            📋 {t('users.copy_link') || 'Copy Link'}
+                            📋 {t('users.copy_link') || L('Copy Link', 'نسخ الرابط')}
                           </button>
                           <button onClick={() => cancelInvitation(inv.id)} style={{ padding: '4px 10px', fontSize: 11, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.2)', color: 'var(--danger)', borderRadius: 4, cursor: 'pointer' }}>
-                            {t('users.cancel') || 'Cancel'}
+                            {t('users.cancel') || L('Cancel', 'إلغاء')}
                           </button>
                         </div>
                       </td>
                     </tr>
                   ))}
                   {invitations.length === 0 && (
-                    <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{t('users.no_invitations') || 'No pending invitations.'}</td></tr>
+                    <tr><td colSpan={5} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{t('users.no_invitations') || L('No pending invitations.', 'لا توجد دعوات معلقة.')}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -287,26 +283,26 @@ export default function UsersPage() {
       {showInviteModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: 420, maxWidth: '90vw', padding: 24, boxShadow: 'var(--shadow-lg)' }}>
-            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>✉️ {t('users.invite_title') || 'Invite User'}</h3>
+            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>✉️ {t('users.invite_title') || L('Invite User', 'دعوة مستخدم')}</h3>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.email') || 'Email'} *</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.email') || L('Email', 'البريد الإلكتروني')} *</label>
               <input type="email" value={inviteForm.email} onChange={e => setInviteForm({ ...inviteForm, email: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder="user@example.com" />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || 'Full Name'}</label>
-              <input type="text" value={inviteForm.fullName} onChange={e => setInviteForm({ ...inviteForm, fullName: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder="John Doe" />
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || L('Full Name', 'الاسم الكامل')}</label>
+              <input type="text" value={inviteForm.fullName} onChange={e => setInviteForm({ ...inviteForm, fullName: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder={L('John Doe', 'محمد أحمد')} />
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || 'Role'}</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || L('Role', 'الدور')}</label>
               <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }}>
-                <option value="ARCHITECT">{t('users.role_architect') || 'Architect'}</option>
-                <option value="REVIEWER">{t('users.role_reviewer') || 'Reviewer'}</option>
-                <option value="TENANT_ADMIN">{t('users.role_admin') || 'Tenant Admin'}</option>
+                <option value="ARCHITECT">{t('users.role_architect') || L('Architect', 'معماري')}</option>
+                <option value="REVIEWER">{t('users.role_reviewer') || L('Reviewer', 'مراجع')}</option>
+                <option value="TENANT_ADMIN">{t('users.role_admin') || L('Tenant Admin', 'مدير الجهة')}</option>
               </select>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowInviteModal(false)} style={{ padding: '8px 16px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>{t('users.cancel') || 'Cancel'}</button>
-              <button onClick={inviteUser} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{t('users.send_invite') || 'Send Invitation'}</button>
+              <button onClick={() => setShowInviteModal(false)} style={{ padding: '8px 16px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>{t('users.cancel') || L('Cancel', 'إلغاء')}</button>
+              <button onClick={inviteUser} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{t('users.send_invite') || L('Send Invitation', 'إرسال الدعوة')}</button>
             </div>
           </div>
         </div>
@@ -316,30 +312,30 @@ export default function UsersPage() {
       {showCreateModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: 420, maxWidth: '90vw', padding: 24, boxShadow: 'var(--shadow-lg)' }}>
-            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>➕ {t('users.create_title') || 'Create User'}</h3>
+            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>➕ {t('users.create_title') || L('Create User', 'إنشاء مستخدم')}</h3>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.email') || 'Email'} *</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.email') || L('Email', 'البريد الإلكتروني')} *</label>
               <input type="email" value={createForm.email} onChange={e => setCreateForm({ ...createForm, email: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder="user@example.com" />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || 'Full Name'}</label>
-              <input type="text" value={createForm.fullName} onChange={e => setCreateForm({ ...createForm, fullName: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder="John Doe" />
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || L('Full Name', 'الاسم الكامل')}</label>
+              <input type="text" value={createForm.fullName} onChange={e => setCreateForm({ ...createForm, fullName: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder={L('John Doe', 'محمد أحمد')} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.password') || 'Password'} *</label>
-              <input type="password" value={createForm.password} onChange={e => setCreateForm({ ...createForm, password: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder="Min 8 characters" />
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.password') || L('Password', 'كلمة المرور')} *</label>
+              <input type="password" value={createForm.password} onChange={e => setCreateForm({ ...createForm, password: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder={L('Min 8 characters', '8 أحرف على الأقل')} />
             </div>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || 'Role'}</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || L('Role', 'الدور')}</label>
               <select value={createForm.role} onChange={e => setCreateForm({ ...createForm, role: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }}>
-                <option value="ARCHITECT">{t('users.role_architect') || 'Architect'}</option>
-                <option value="REVIEWER">{t('users.role_reviewer') || 'Reviewer'}</option>
-                <option value="TENANT_ADMIN">{t('users.role_admin') || 'Tenant Admin'}</option>
+                <option value="ARCHITECT">{t('users.role_architect') || L('Architect', 'معماري')}</option>
+                <option value="REVIEWER">{t('users.role_reviewer') || L('Reviewer', 'مراجع')}</option>
+                <option value="TENANT_ADMIN">{t('users.role_admin') || L('Tenant Admin', 'مدير الجهة')}</option>
               </select>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowCreateModal(false)} style={{ padding: '8px 16px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>{t('users.cancel') || 'Cancel'}</button>
-              <button onClick={createUser} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{t('users.create') || 'Create'}</button>
+              <button onClick={() => setShowCreateModal(false)} style={{ padding: '8px 16px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>{t('users.cancel') || L('Cancel', 'إلغاء')}</button>
+              <button onClick={createUser} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{t('users.create') || L('Create', 'إنشاء')}</button>
             </div>
           </div>
         </div>
@@ -349,26 +345,26 @@ export default function UsersPage() {
       {editingUser && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: 420, maxWidth: '90vw', padding: 24, boxShadow: 'var(--shadow-lg)' }}>
-            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>✏️ {t('users.edit_title') || 'Edit User'}</h3>
+            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>✏️ {t('users.edit_title') || L('Edit User', 'تعديل المستخدم')}</h3>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || 'Full Name'}</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || L('Full Name', 'الاسم الكامل')}</label>
               <input type="text" value={editingUser.fullName || ''} onChange={e => setEditingUser({ ...editingUser, fullName: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || 'Role'}</label>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || L('Role', 'الدور')}</label>
               <select value={editingUser.role} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }}>
-                <option value="ARCHITECT">{t('users.role_architect') || 'Architect'}</option>
-                <option value="REVIEWER">{t('users.role_reviewer') || 'Reviewer'}</option>
-                <option value="TENANT_ADMIN">{t('users.role_admin') || 'Tenant Admin'}</option>
+                <option value="ARCHITECT">{t('users.role_architect') || L('Architect', 'معماري')}</option>
+                <option value="REVIEWER">{t('users.role_reviewer') || L('Reviewer', 'مراجع')}</option>
+                <option value="TENANT_ADMIN">{t('users.role_admin') || L('Tenant Admin', 'مدير الجهة')}</option>
               </select>
             </div>
             <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="checkbox" id="active" checked={editingUser.isActive} onChange={e => setEditingUser({ ...editingUser, isActive: e.target.checked })} style={{ cursor: 'pointer' }} />
-              <label htmlFor="active" style={{ fontSize: 13, cursor: 'pointer' }}>{t('users.active') || 'Active'}</label>
+              <label htmlFor="active" style={{ fontSize: 13, cursor: 'pointer' }}>{t('users.active') || L('Active', 'نشط')}</label>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => setEditingUser(null)} style={{ padding: '8px 16px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>{t('users.cancel') || 'Cancel'}</button>
-              <button onClick={updateUser} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{t('users.save') || 'Save'}</button>
+              <button onClick={() => setEditingUser(null)} style={{ padding: '8px 16px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>{t('users.cancel') || L('Cancel', 'إلغاء')}</button>
+              <button onClick={updateUser} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{t('users.save') || L('Save', 'حفظ')}</button>
             </div>
           </div>
         </div>
@@ -378,15 +374,15 @@ export default function UsersPage() {
       {resettingUser && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: 420, maxWidth: '90vw', padding: 24, boxShadow: 'var(--shadow-lg)' }}>
-            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>🔑 {t('users.reset_title') || 'Reset Password'}</h3>
-            <p style={{ marginBottom: 12, fontSize: 13, color: 'var(--text-dim)' }}>{t('users.reset_for') || 'Reset password for'} <strong>{resettingUser.email}</strong></p>
+            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>🔑 {t('users.reset_title') || L('Reset Password', 'إعادة تعيين كلمة المرور')}</h3>
+            <p style={{ marginBottom: 12, fontSize: 13, color: 'var(--text-dim)' }}>{t('users.reset_for') || L('Reset password for', 'إعادة تعيين كلمة المرور لـ')} <strong>{resettingUser.email}</strong></p>
             <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.new_password') || 'New Password'} *</label>
-              <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder="Min 8 characters" />
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.new_password') || L('New Password', 'كلمة المرور الجديدة')} *</label>
+              <input type="password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder={L('Min 8 characters', '8 أحرف على الأقل')} />
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button onClick={() => { setResettingUser(null); setResetPassword('') }} style={{ padding: '8px 16px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>{t('users.cancel') || 'Cancel'}</button>
-              <button onClick={doResetPassword} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{t('users.reset') || 'Reset'}</button>
+              <button onClick={() => { setResettingUser(null); setResetPassword('') }} style={{ padding: '8px 16px', background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>{t('users.cancel') || L('Cancel', 'إلغاء')}</button>
+              <button onClick={doResetPassword} style={{ padding: '8px 16px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 'var(--radius)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{t('users.reset') || L('Reset', 'إعادة تعيين')}</button>
             </div>
           </div>
         </div>

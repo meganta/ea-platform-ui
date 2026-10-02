@@ -428,8 +428,8 @@ function TemplateForm({ api, isAR, t, onDone, onCancel }: any) {
         <div>
           <div style={S.label}>{t('notif.language')}</div>
           <select style={S.input} value={form.language} onChange={e => setForm(f => ({ ...f, language: e.target.value }))}>
-            <option value="EN">English</option>
-            <option value="AR">العربية</option>
+            <option value="EN">{isAR ? 'الإنجليزية' : 'English'}</option>
+            <option value="AR">{isAR ? 'العربية' : 'Arabic'}</option>
           </select>
         </div>
       </div>

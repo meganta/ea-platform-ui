@@ -344,7 +344,7 @@ function CatalogTab({ api, isAR, t }: any) {
 
   return (
     <div>
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t('bill.tab_catalog')} — Products</div>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t('bill.tab_catalog')} — {isAR ? 'المنتجات' : 'Products'}</div>
       <button style={{ ...S.btn('primary'), marginBottom: 16 }} onClick={() => setAddingProduct(true)}>{t('bill.new_product')}</button>
       {addingProduct && <ProductForm api={api} isAR={isAR} t={t} onDone={() => { setAddingProduct(false); load() }} onCancel={() => setAddingProduct(false)} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 28 }}>
@@ -357,7 +357,7 @@ function CatalogTab({ api, isAR, t }: any) {
         ))}
       </div>
 
-      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t('bill.tab_catalog')} — Plans</div>
+      <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{t('bill.tab_catalog')} — {isAR ? 'الخطط' : 'Plans'}</div>
       <button style={{ ...S.btn('primary'), marginBottom: 16 }} onClick={() => setAddingPlan(true)}>{t('bill.new_plan')}</button>
       {addingPlan && <PlanForm api={api} isAR={isAR} t={t} onDone={() => { setAddingPlan(false); load() }} onCancel={() => setAddingPlan(false)} />}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

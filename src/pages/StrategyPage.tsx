@@ -34,13 +34,13 @@ const S = {
 }
 
 const STRATEGY_TYPES = [
-  { code: 'BUSINESS_STRATEGY', label: 'Business Strategy', color: '#e74c3c' },
-  { code: 'DT_STRATEGY', label: 'Digital Transformation Strategy', color: '#f39c12' },
-  { code: 'EA_STRATEGY', label: 'EA Strategy', color: '#3498db' },
-  { code: 'VISION_2030', label: 'Vision 2030', color: '#8e44ad' },
-  { code: 'NDP', label: 'National Development Plan', color: '#8e44ad' },
-  { code: 'NATIONAL', label: 'Other National Strategy', color: '#8e44ad' },
-  { code: 'OTHER', label: 'Other', color: '#7f8c8d' },
+  { code: 'BUSINESS_STRATEGY', label: 'Business Strategy', labelAr: 'استراتيجية الأعمال', color: '#e74c3c' },
+  { code: 'DT_STRATEGY', label: 'Digital Transformation Strategy', labelAr: 'استراتيجية التحول الرقمي', color: '#f39c12' },
+  { code: 'EA_STRATEGY', label: 'EA Strategy', labelAr: 'استراتيجية البنية المؤسسية', color: '#3498db' },
+  { code: 'VISION_2030', label: 'Vision 2030', labelAr: 'رؤية 2030', color: '#8e44ad' },
+  { code: 'NDP', label: 'National Development Plan', labelAr: 'خطة التنمية الوطنية', color: '#8e44ad' },
+  { code: 'NATIONAL', label: 'Other National Strategy', labelAr: 'استراتيجية وطنية أخرى', color: '#8e44ad' },
+  { code: 'OTHER', label: 'Other', labelAr: 'أخرى', color: '#7f8c8d' },
 ]
 const typeInfo = (code: string) => STRATEGY_TYPES.find(t => t.code === code) || STRATEGY_TYPES[STRATEGY_TYPES.length - 1]
 const GAP_COLOR: Record<string, string> = { STRONG: '#2ecc71', PARTIAL: '#f39c12', GAP: '#e74c3c' }
@@ -48,6 +48,7 @@ const GAP_COLOR: Record<string, string> = { STRONG: '#2ecc71', PARTIAL: '#f39c12
 export default function StrategyPage() {
   const api = useApi()
   const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [strategies, setStrategies] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [creating, setCreating] = useState(false)
@@ -60,12 +61,12 @@ export default function StrategyPage() {
   const open = async (s: any) => { const full = await api.get(`/strategy/${s.id}`); setSelected(full) }
 
   const create = async () => {
-    if (!newStrategy.name) return alert('Name is required')
+    if (!newStrategy.name) return alert(L('Name is required', 'الاسم مطلوب'))
     setSaving(true)
     try { const created = await api.post('/strategy', newStrategy); setCreating(false); setNewStrategy({ name: '', nameAr: '', description: '', vision: '', timeframe: '', strategyType: 'EA_STRATEGY' }); load(); open(created) } catch (e: any) { alert(e.message) } finally { setSaving(false) }
   }
 
-  const remove = async (id: string) => { if (!window.confirm('Delete this strategy and all its goals/alignments?')) return; await api.del(`/strategy/${id}`); load() }
+  const remove = async (id: string) => { if (!window.confirm(L('Delete this strategy and all its goals/alignments?', 'حذف هذه الاستراتيجية وجميع أهدافها ومواءماتها؟'))) return; await api.del(`/strategy/${id}`); load() }
 
   if (selected) return <StrategyDetail api={api} strategy={selected} onBack={() => { setSelected(null); load() }} onRefresh={() => open(selected)} />
 
@@ -73,7 +74,7 @@ export default function StrategyPage() {
     <div style={S.page} dir={isAR ? 'rtl' : 'ltr'}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🎯 {t('strategy.title')}<HelpTip text="Record your organization's strategic goals here, then connect each one to the specific capabilities that support it. This helps show whether your architecture is actually working toward what the organization is trying to achieve, and highlights any gaps." /></div>
+          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🎯 {t('strategy.title')}<HelpTip text={L('Record your organization\'s strategic goals here, then connect each one to the specific capabilities that support it. This helps show whether your architecture is actually working toward what the organization is trying to achieve, and highlights any gaps.', 'سجّل هنا الأهداف الاستراتيجية لجهتك، ثم اربط كل هدف بالقدرات التي تدعمه. يساعد ذلك على إظهار ما إذا كانت البنية تعمل فعلاً نحو ما تسعى الجهة إلى تحقيقه، ويُبرز أي فجوات.')} /></div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('strategy.subtitle')}</div>
         </div>
         <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('strategy.new')}</button>
@@ -88,10 +89,10 @@ export default function StrategyPage() {
               <div>
                 <div style={S.label}>{t('strategy.type')}</div>
                 <select style={S.input} value={newStrategy.strategyType} onChange={e => setNewStrategy(s => ({ ...s, strategyType: e.target.value }))}>
-                  {STRATEGY_TYPES.map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
+                  {STRATEGY_TYPES.map(t => <option key={t.code} value={t.code}>{isAR ? t.labelAr : t.label}</option>)}
                 </select>
               </div>
-              <div><div style={S.label}>{t('strategy.timeframe')}</div><input style={S.input} placeholder="e.g. 2026-2030" value={newStrategy.timeframe} onChange={e => setNewStrategy(s => ({ ...s, timeframe: e.target.value }))} /></div>
+              <div><div style={S.label}>{t('strategy.timeframe')}</div><input style={S.input} placeholder={isAR ? "مثال: 2026-2030" : "e.g. 2026-2030"} value={newStrategy.timeframe} onChange={e => setNewStrategy(s => ({ ...s, timeframe: e.target.value }))} /></div>
             </div>
             <div style={S.label}>{t('strategy.vision')}</div><input style={S.input} value={newStrategy.vision} onChange={e => setNewStrategy(s => ({ ...s, vision: e.target.value }))} />
             <div style={S.label}>{t('strategy.description')}</div><input style={S.input} value={newStrategy.description} onChange={e => setNewStrategy(s => ({ ...s, description: e.target.value }))} />
@@ -108,9 +109,9 @@ export default function StrategyPage() {
                 <div key={s.id} style={{ ...S.card, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }} onClick={() => open(s)}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{s.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{s.timeframe || 'No timeframe set'} · {s._count?.goals ?? 0} goal(s)</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{s.timeframe || L('No timeframe set', 'لم يُحدد إطار زمني')} · {s._count?.goals ?? 0} {L('goal(s)', 'هدف')}</div>
                   </div>
-                  <span style={S.badge(ti.color)}>{ti.label}</span>
+                  <span style={S.badge(ti.color)}>{isAR ? ti.labelAr : ti.label}</span>
                   <span style={S.badge(s.status === 'ACTIVE' ? '#2ecc71' : '#7f8c8d')}>{s.status}</span>
                   <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={e => { e.stopPropagation(); remove(s.id) }}>{t('strategy.delete')}</button>
                 </div>
@@ -136,7 +137,7 @@ function StrategyDetail({ api, strategy, onBack, onRefresh }: { api: any, strate
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 18, fontWeight: 700 }}>{strategy.name}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <span style={S.badge(ti.color)}>{ti.label}</span>
+            <span style={S.badge(ti.color)}>{isAR ? ti.labelAr : ti.label}</span>
             <span style={S.badge('#2ecc71')}>{strategy.status}</span>
           </div>
         </div>
@@ -167,6 +168,7 @@ function StrategyDetail({ api, strategy, onBack, onRefresh }: { api: any, strate
 // ── Goals Tab ────────────────────────────────────────────────────────────────
 function GoalsTab({ api, strategy, onRefresh }: { api: any, strategy: any, onRefresh: () => void }) {
   const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [creating, setCreating] = useState(false)
   const [newGoal, setNewGoal] = useState({ title: '', titleAr: '', description: '', pillar: '', targetYear: '', kpis: '' })
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null)
@@ -195,7 +197,7 @@ function GoalsTab({ api, strategy, onRefresh }: { api: any, strategy: any, onRef
           <div style={S.grid2}>
             <div><div style={S.label}>{t('strategy.goal_title')} *</div><input style={S.input} value={newGoal.title} onChange={e => setNewGoal(g => ({ ...g, title: e.target.value }))} /></div>
             <div><div style={S.label}>{t('strategy.goal_title_ar')}</div><input style={S.input} dir="rtl" value={newGoal.titleAr} onChange={e => setNewGoal(g => ({ ...g, titleAr: e.target.value }))} /></div>
-            <div><div style={S.label}>{t('strategy.pillar')}</div><input style={S.input} placeholder="e.g. Digital Excellence" value={newGoal.pillar} onChange={e => setNewGoal(g => ({ ...g, pillar: e.target.value }))} /></div>
+            <div><div style={S.label}>{t('strategy.pillar')}</div><input style={S.input} placeholder={L('e.g. Digital Excellence', 'مثال: التميّز الرقمي')} value={newGoal.pillar} onChange={e => setNewGoal(g => ({ ...g, pillar: e.target.value }))} /></div>
             <div><div style={S.label}>{t('strategy.target_year')}</div><input style={S.input} type="number" value={newGoal.targetYear} onChange={e => setNewGoal(g => ({ ...g, targetYear: e.target.value }))} /></div>
           </div>
           <div style={S.label}>{t('strategy.description')}</div><input style={S.input} value={newGoal.description} onChange={e => setNewGoal(g => ({ ...g, description: e.target.value }))} />
@@ -217,7 +219,7 @@ function GoalsTab({ api, strategy, onRefresh }: { api: any, strategy: any, onRef
                 <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => setExpandedGoal(expandedGoal === g.id ? null : g.id)}>{expandedGoal === g.id ? t('strategy.collapse') : t('strategy.manage_align')}</button>
                 <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => deleteGoal(g.id)}>{t('strategy.delete')}</button>
               </div>
-              {g.kpis?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>KPIs: {g.kpis.join(', ')}</div>}
+              {g.kpis?.length > 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>{L('KPIs:', 'مؤشرات الأداء:')} {g.kpis.join(', ')}</div>}
               {expandedGoal === g.id && <AlignmentsPanel api={api} strategyId={strategy.id} goal={g} onRefresh={onRefresh} />}
             </div>
           ))}
@@ -229,6 +231,8 @@ function GoalsTab({ api, strategy, onRefresh }: { api: any, strategy: any, onRef
 
 // ── Alignments Panel (per goal) ──────────────────────────────────────────────
 function AlignmentsPanel({ api, strategyId, goal, onRefresh }: { api: any, strategyId: string, goal: any, onRefresh: () => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [capabilities, setCapabilities] = useState<any[]>([])
   const [suggestions, setSuggestions] = useState<any[] | null>(null)
   const [suggesting, setSuggesting] = useState(false)
@@ -264,16 +268,16 @@ function AlignmentsPanel({ api, strategyId, goal, onRefresh }: { api: any, strat
 
   return (
     <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
-      <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8 }}>Current Alignments</div>
+      <div style={{ fontWeight: 600, fontSize: 12, marginBottom: 8 }}>{L('Current Alignments', 'المواءمات الحالية')}</div>
       {(!goal.alignments || goal.alignments.length === 0) ? (
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>No capabilities aligned yet.</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>{L('No capabilities aligned yet.', 'لا توجد قدرات مواءمة بعد.')}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
           {goal.alignments.map((a: any) => (
             <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, padding: '4px 0' }}>
               <div style={{ flex: 1 }}>{a.capability?.name || capName(a.capabilityId)}</div>
               <span style={S.badge(a.score >= 70 ? '#2ecc71' : a.score >= 40 ? '#f39c12' : '#e74c3c')}>{a.score}%</span>
-              <button style={{ ...S.btn('danger'), fontSize: 10, padding: '3px 8px' }} onClick={() => removeAlignment(a.id)}>Remove</button>
+              <button style={{ ...S.btn('danger'), fontSize: 10, padding: '3px 8px' }} onClick={() => removeAlignment(a.id)}>{L('Remove', 'إزالة')}</button>
             </div>
           ))}
         </div>
@@ -281,14 +285,14 @@ function AlignmentsPanel({ api, strategyId, goal, onRefresh }: { api: any, strat
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <select style={{ ...S.input, marginBottom: 0, flex: 1 }} value={manualCapId} onChange={e => setManualCapId(e.target.value)}>
-          <option value="">Add capability manually…</option>
+          <option value="">{L('Add capability manually…', 'إضافة قدرة يدوياً…')}</option>
           {capabilities.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <input style={{ ...S.input, marginBottom: 0, width: 70 }} type="number" min={0} max={100} value={manualScore} onChange={e => setManualScore(e.target.value)} />
-        <button style={S.btn()} onClick={addManual}>Add</button>
+        <button style={S.btn()} onClick={addManual}>{L('Add', 'إضافة')}</button>
       </div>
 
-      <button style={{ ...S.btn('primary'), fontSize: 11 }} onClick={suggest} disabled={suggesting}>{suggesting ? '⏳ Analyzing…' : '✨ AI-Suggest Alignments'}</button>
+      <button style={{ ...S.btn('primary'), fontSize: 11 }} onClick={suggest} disabled={suggesting}>{suggesting ? L('⏳ Analyzing…', '⏳ جارٍ التحليل…') : L('✨ AI-Suggest Alignments', '✨ اقتراح مواءمات بالذكاء الاصطناعي')}</button>
 
       {suggestions && suggestions.length > 0 && (
         <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -297,20 +301,22 @@ function AlignmentsPanel({ api, strategyId, goal, onRefresh }: { api: any, strat
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ flex: 1, fontWeight: 600 }}>{capName(s.capabilityId)}</div>
                 <span style={S.badge(s.score >= 70 ? '#2ecc71' : '#f39c12')}>{s.score}%</span>
-                <button style={{ ...S.btn('primary'), fontSize: 10, padding: '3px 10px' }} onClick={() => confirmSuggestion(s)}>Confirm</button>
+                <button style={{ ...S.btn('primary'), fontSize: 10, padding: '3px 10px' }} onClick={() => confirmSuggestion(s)}>{L('Confirm', 'تأكيد')}</button>
               </div>
               <div style={{ color: 'var(--text-dim)', marginTop: 4 }}>{s.justification}</div>
             </div>
           ))}
         </div>
       )}
-      {suggestions && suggestions.length === 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>No new suggestions — all relevant capabilities may already be aligned.</div>}
+      {suggestions && suggestions.length === 0 && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 8 }}>{L('No new suggestions — all relevant capabilities may already be aligned.', 'لا توجد اقتراحات جديدة — قد تكون جميع القدرات ذات الصلة مواءمة بالفعل.')}</div>}
     </div>
   )
 }
 
 // ── Gap Score Tab ────────────────────────────────────────────────────────────
 function GapScoreTab({ api, strategyId }: { api: any, strategyId: string }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 
@@ -320,24 +326,24 @@ function GapScoreTab({ api, strategyId }: { api: any, strategyId: string }) {
   }, [api, strategyId])
   useEffect(() => { calculate() }, [calculate])
 
-  if (loading && !result) return <div style={{ color: 'var(--text-dim)' }}>Calculating…</div>
+  if (loading && !result) return <div style={{ color: 'var(--text-dim)' }}>{L('Calculating…', 'جارٍ الحساب…')}</div>
   if (!result) return null
 
   return (
     <div>
       <div style={S.grid3}>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Overall Score</div><div style={{ fontSize: 28, fontWeight: 700, color: GAP_COLOR[result.overallStatus] }}>{result.overallScore}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Strong Goals</div><div style={{ fontSize: 28, fontWeight: 700, color: GAP_COLOR.STRONG }}>{result.summary.strong}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Goals with Gaps</div><div style={{ fontSize: 28, fontWeight: 700, color: GAP_COLOR.GAP }}>{result.summary.gap}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Overall Score', 'الدرجة الإجمالية')}</div><div style={{ fontSize: 28, fontWeight: 700, color: GAP_COLOR[result.overallStatus] }}>{result.overallScore}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Strong Goals', 'أهداف قوية')}</div><div style={{ fontSize: 28, fontWeight: 700, color: GAP_COLOR.STRONG }}>{result.summary.strong}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Goals with Gaps', 'أهداف بها فجوات')}</div><div style={{ fontSize: 28, fontWeight: 700, color: GAP_COLOR.GAP }}>{result.summary.gap}</div></div>
       </div>
-      <button style={{ ...S.btn(), marginTop: 16, marginBottom: 16 }} onClick={calculate}>🔄 Recalculate</button>
+      <button style={{ ...S.btn(), marginTop: 16, marginBottom: 16 }} onClick={calculate}>{L('🔄 Recalculate', '🔄 إعادة الحساب')}</button>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {result.goalScores.map((g: any) => (
           <div key={g.goalId} style={{ ...S.card, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={S.badge(GAP_COLOR[g.status])}>{g.status}</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 600 }}>{g.goalTitle}</div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{g.alignedCapabilityCount}/{g.totalCapabilities} capabilities aligned · avg score {g.avgAlignmentScore}%</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{g.alignedCapabilityCount}/{g.totalCapabilities} {L('capabilities aligned · avg score', 'قدرات مواءمة · متوسط الدرجة')} {g.avgAlignmentScore}%</div>
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, color: GAP_COLOR[g.status] }}>{g.gapScore}</div>
           </div>
@@ -349,13 +355,15 @@ function GapScoreTab({ api, strategyId }: { api: any, strategyId: string }) {
 
 // ── Alignment Matrix Tab ─────────────────────────────────────────────────────
 function AlignmentMatrixTab({ api, strategyId }: { api: any, strategyId: string }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [matrix, setMatrix] = useState<any>(null)
 
   useEffect(() => { api.get(`/strategy/${strategyId}/alignment-matrix`).then(setMatrix) }, [api, strategyId])
 
-  if (!matrix) return <div style={{ color: 'var(--text-dim)' }}>Loading…</div>
-  if (matrix.capabilities.length === 0) return <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No capabilities in the EA Repository yet — add some to see the alignment matrix.</div>
-  if (matrix.goals.length === 0) return <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No goals defined yet.</div>
+  if (!matrix) return <div style={{ color: 'var(--text-dim)' }}>{L('Loading…', 'جارٍ التحميل…')}</div>
+  if (matrix.capabilities.length === 0) return <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{L('No capabilities in the EA Repository yet — add some to see the alignment matrix.', 'لا توجد قدرات في مستودع البنية المؤسسية بعد — أضف بعضها لعرض مصفوفة المواءمة.')}</div>
+  if (matrix.goals.length === 0) return <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{L('No goals defined yet.', 'لم تُحدد أهداف بعد.')}</div>
 
   const cellColor = (score: number) => score === 0 ? 'var(--navy)' : score >= 70 ? '#2ecc7133' : score >= 40 ? '#f39c1233' : '#e74c3c33'
   const textColor = (score: number) => score === 0 ? 'var(--text-dim)' : score >= 70 ? '#2ecc71' : score >= 40 ? '#f39c12' : '#e74c3c'
@@ -365,7 +373,7 @@ function AlignmentMatrixTab({ api, strategyId }: { api: any, strategyId: string 
       <table style={{ borderCollapse: 'collapse', fontSize: 12 }}>
         <thead>
           <tr>
-            <th style={{ ...S.label, textAlign: 'left', padding: 8, position: 'sticky', left: 0, background: 'var(--navy)' }}>Goal \ Capability</th>
+            <th style={{ ...S.label, textAlign: 'left', padding: 8, position: 'sticky', left: 0, background: 'var(--navy)' }}>{L('Goal \\ Capability', 'الهدف \\ القدرة')}</th>
             {matrix.capabilities.map((c: any) => (
               <th key={c.id} style={{ padding: 8, fontSize: 10, color: 'var(--text-dim)', writingMode: 'vertical-rl' as const, textOrientation: 'mixed' as const, maxHeight: 100, fontWeight: 500 }}>{c.name}</th>
             ))}
