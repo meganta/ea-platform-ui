@@ -321,3 +321,43 @@ it('shows principles, standards and policies in their own section, not mixed int
   expect(section).toHaveTextContent('Strategy Layer')
   expect(screen.getByTestId('impact-domain-STRATEGY_LAYER')).not.toHaveTextContent('Integration Architecture')
 })
+
+jest.mock('../../lib/strategy-alignment', () => ({
+  ...jest.requireActual('../../lib/strategy-alignment'),
+  alignmentApi: { latest: jest.fn().mockResolvedValue({ run: null }), units: jest.fn().mockResolvedValue([]), kpis: jest.fn().mockResolvedValue([]), setStrategyType: jest.fn().mockResolvedValue({}) },
+}))
+
+describe('strategy workspace', () => {
+  beforeEach(() => {
+    const { alignmentApi } = jest.requireMock('../../lib/strategy-alignment')
+    alignmentApi.latest.mockResolvedValue({ run: null }); alignmentApi.units.mockResolvedValue([]); alignmentApi.kpis.mockResolvedValue([]); alignmentApi.setStrategyType.mockResolvedValue({})
+  })
+  it('switches between refreshes, the strategic alignment and KPI measurement', async () => {
+    render(<StrategyRefreshPage />)
+    expect(await screen.findByRole('button', { name: /Strategy 2027/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'strategy.home.alignment' }))
+    expect(await screen.findByText('strategy.align.empty')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'strategy.home.kpis' }))
+    expect(await screen.findByText('strategy.kpi.no_units')).toBeInTheDocument()
+  })
+
+  it('sets a strategy\'s type, which decides its role in the alignment', async () => {
+    const { alignmentApi } = jest.requireMock('../../lib/strategy-alignment')
+    api.get.mockResolvedValue({ ...ready, strategy: { name: 'HRDF', strategyType: 'OTHER' } })
+    render(<StrategyRefreshPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+    fireEvent.change(await screen.findByRole('combobox', { name: /strategy.type.label/ }), { target: { value: 'DT_STRATEGY' } })
+    await waitFor(() => expect(alignmentApi.setStrategyType).toHaveBeenCalledWith('refresh-a', 'DT_STRATEGY'))
+  })
+
+  it('asks for the type of a new strategy when starting a refresh', async () => {
+    api.create.mockResolvedValue({ ...ready, id: 'refresh-n' }); api.upload.mockResolvedValue({}); api.analyze.mockResolvedValue({})
+    render(<StrategyRefreshPage />)
+    fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.start' }))
+    fireEvent.change(screen.getByLabelText('strategy.refresh.title'), { target: { value: 'EA Strategy v3' } })
+    fireEvent.change(screen.getByLabelText('strategy.type.label'), { target: { value: 'EA_STRATEGY' } })
+    fireEvent.change(screen.getByLabelText('strategy.refresh.documents'), { target: { files: [new File(['x'], 'ea.pdf')] } })
+    fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.analyze' }))
+    await waitFor(() => expect(api.create).toHaveBeenCalledWith('EA Strategy v3', undefined, 'EA_STRATEGY'))
+  })
+})

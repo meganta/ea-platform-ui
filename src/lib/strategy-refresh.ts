@@ -85,7 +85,7 @@ async function request<T>(path: string, body?: object | FormData): Promise<T> {
 export const strategyRefreshApi = {
   list: () => request<StrategyRefresh[]>(''),
   get: (id: string) => request<StrategyRefresh>(`/${encodeURIComponent(id)}`),
-  create: (title: string, strategyId?: string) => request<StrategyRefresh>('', { title, ...(strategyId ? { strategyId } : {}) }),
+  create: (title: string, strategyId?: string, strategyType?: string) => request<StrategyRefresh>('', { title, ...(strategyId ? { strategyId } : strategyType ? { strategyType } : {}) }),
   upload: (id: string, file: File) => { const form = new FormData(); form.append('file', file); return request(`/${encodeURIComponent(id)}/documents`, form) },
   analyze: (id: string) => request<StrategyRefresh>(`/${encodeURIComponent(id)}/analyze`, {}),
   decide: (id: string, finding: RefreshFinding, action: 'APPROVE' | 'REJECT' | 'AMEND', reason: string, amendment?: { title: string; description: string }) => request(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(finding.id)}/decisions`, { action, revision: finding.revision, reason, ...amendment }),
