@@ -1,6 +1,11 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MetaModelPage from '../MetaModelPage';
 
+jest.mock('../../contexts/LangContext', () => ({
+  useLang: () => ({ isAR: false, locale: 'EN', setLocale: jest.fn(), t: (key: string) => key }),
+}));
+
+
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ token: 'fake-token' }),
 }));

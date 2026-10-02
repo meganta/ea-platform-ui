@@ -1,3 +1,5 @@
+import { useLang } from '../contexts/LangContext'
+import { enumLabel } from '../lib/enumLabels'
 import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
@@ -52,6 +54,8 @@ const S = {
 
 // ── Setup wizard ──────────────────────────────────────────────────────────────
 function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [step, setStep] = useState<'choose'|'framework'|'blank'>('choose')
   const [frameworks, setFrameworks] = useState<any[]>([])
   const [selected, setSelected] = useState<string>('')
@@ -74,20 +78,20 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
       }
       onCreated()
     } catch (e: any) {
-      setError(e.message || 'Failed to create meta-model')
+      setError(e.message || L('Failed to create meta-model', 'تعذّر إنشاء النموذج الوصفي'))
     } finally { setLoading(false) }
   }
 
   return (
     <div style={{ maxWidth: 560, margin: '60px auto', ...S.card }}>
-      <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>🏗 Create Your EA Meta-Model</div>
-      <div style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 24 }}>Define the object types, attributes, and relationships that form your Enterprise Architecture</div>
+      <div style={{ fontSize: 22, fontWeight: 700, marginBottom: 6 }}>{L('🏗 Create Your EA Meta-Model', '🏗 أنشئ النموذج الوصفي للبنية المؤسسية')}</div>
+      <div style={{ color: 'var(--text-dim)', fontSize: 13, marginBottom: 24 }}>{L('Define the object types, attributes, and relationships that form your Enterprise Architecture', 'حدّد أنواع العناصر والسمات والعلاقات التي تشكّل بنيتك المؤسسية')}</div>
 
       {step === 'choose' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[
-            { id: 'framework', icon: '📐', title: 'Start from a Framework', desc: 'Use TOGAF or NORA 2.0 as your baseline — customize from there' },
-            { id: 'blank', icon: '📄', title: 'Start Blank', desc: 'Build your own custom meta-model from scratch' },
+            { id: 'framework', icon: '📐', title: L('Start from a Framework', 'البدء من إطار مرجعي'), desc: L('Use TOGAF or NORA 2.0 as your baseline — customize from there', 'استخدم TOGAF أو نورة 2.0 أساساً ثم خصّص انطلاقاً منه') },
+            { id: 'blank', icon: '📄', title: L('Start Blank', 'البدء من الصفر'), desc: L('Build your own custom meta-model from scratch', 'ابنِ نموذجك الوصفي المخصص من الصفر') },
           ].map(opt => (
             <div key={opt.id} onClick={() => setStep(opt.id as any)} style={{ padding: '16px 20px', borderRadius: 10, border: '1px solid var(--border)', cursor: 'pointer', display: 'flex', gap: 16, alignItems: 'flex-start', transition: 'all 0.15s', background: 'var(--navy)' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
@@ -105,28 +109,28 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
             {(frameworks.length ? frameworks : [{ code: 'TOGAF', name: 'TOGAF 9.2' }, { code: 'NORA_2_0', name: 'NORA 2.0' }]).map((fw: any) => (
               <div key={fw.code} onClick={() => setSelected(fw.code)} style={{ flex: 1, padding: '14px 16px', borderRadius: 10, border: `2px solid ${selected === fw.code ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', textAlign: 'center', background: selected === fw.code ? 'rgba(3,105,161,0.08)' : 'var(--navy)' }}>
                 <div style={{ fontWeight: 700, marginBottom: 4 }}>{fw.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fw.versions?.[0]?.description || 'EA Framework'}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{fw.versions?.[0]?.description || L('EA Framework', 'إطار البنية المؤسسية')}</div>
               </div>
             ))}
           </div>
-          <div><label style={S.label}>Meta-Model Name *</label><input style={S.input} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. HRDF Enterprise Architecture Meta-Model" /></div>
-          <div><label style={S.label}>Description</label><input style={S.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" /></div>
+          <div><label style={S.label}>{L('Meta-Model Name *', 'اسم النموذج الوصفي *')}</label><input style={S.input} value={name} onChange={e => setName(e.target.value)} placeholder={L('e.g. HRDF Enterprise Architecture Meta-Model', 'مثال: النموذج الوصفي للبنية المؤسسية لصندوق هدف')} /></div>
+          <div><label style={S.label}>{L('Description', 'الوصف')}</label><input style={S.input} value={description} onChange={e => setDescription(e.target.value)} placeholder={L('Optional description', 'وصف اختياري')} /></div>
           {error && <div style={{ padding: '10px 14px', borderRadius: 8, background: '#e74c3c22', color: '#e74c3c', fontSize: 13 }}>{error}</div>}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button style={S.btn()} onClick={() => setStep('choose')}>← Back</button>
-            <button style={{ ...S.btn('primary'), flex: 1 }} onClick={create} disabled={!name || !selected || loading}>{loading ? 'Creating...' : 'Create from Framework'}</button>
+            <button style={S.btn()} onClick={() => setStep('choose')}>{L('← Back', '→ رجوع')}</button>
+            <button style={{ ...S.btn('primary'), flex: 1 }} onClick={create} disabled={!name || !selected || loading}>{loading ? L('Creating...', 'جارٍ الإنشاء...') : L('Create from Framework', 'إنشاء من الإطار')}</button>
           </div>
         </div>
       )}
 
       {step === 'blank' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div><label style={S.label}>Meta-Model Name *</label><input style={S.input} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Custom EA Meta-Model" /></div>
-          <div><label style={S.label}>Description</label><input style={S.input} value={description} onChange={e => setDescription(e.target.value)} placeholder="Optional description" /></div>
+          <div><label style={S.label}>{L('Meta-Model Name *', 'اسم النموذج الوصفي *')}</label><input style={S.input} value={name} onChange={e => setName(e.target.value)} placeholder={L('e.g. Custom EA Meta-Model', 'مثال: نموذج وصفي مخصص للبنية المؤسسية')} /></div>
+          <div><label style={S.label}>{L('Description', 'الوصف')}</label><input style={S.input} value={description} onChange={e => setDescription(e.target.value)} placeholder={L('Optional description', 'وصف اختياري')} /></div>
           {error && <div style={{ padding: '10px 14px', borderRadius: 8, background: '#e74c3c22', color: '#e74c3c', fontSize: 13 }}>{error}</div>}
           <div style={{ display: 'flex', gap: 10 }}>
-            <button style={S.btn()} onClick={() => setStep('choose')}>← Back</button>
-            <button style={{ ...S.btn('primary'), flex: 1 }} onClick={create} disabled={!name || loading}>{loading ? 'Creating...' : 'Create Blank Meta-Model'}</button>
+            <button style={S.btn()} onClick={() => setStep('choose')}>{L('← Back', '→ رجوع')}</button>
+            <button style={{ ...S.btn('primary'), flex: 1 }} onClick={create} disabled={!name || loading}>{loading ? L('Creating...', 'جارٍ الإنشاء...') : L('Create Blank Meta-Model', 'إنشاء نموذج وصفي فارغ')}</button>
           </div>
         </div>
       )}
@@ -136,6 +140,8 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({ stats, onTab }: { stats: any, onTab: (t: string) => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const model = stats?.model
   const fw = model?.frameworkVersion
 
@@ -145,29 +151,29 @@ function Dashboard({ stats, onTab }: { stats: any, onTab: (t: string) => void })
       <div style={{ ...S.card, display: 'flex', alignItems: 'center', gap: 20 }}>
         <div style={{ width: 56, height: 56, borderRadius: 12, background: 'rgba(3,105,161,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 28, flexShrink: 0 }}>🏛</div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{model?.name || 'EA Meta-Model'}</div>
-          <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{model?.description || 'No description'}</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{model?.name || L('EA Meta-Model', 'النموذج الوصفي للبنية المؤسسية')}</div>
+          <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{model?.description || L('No description', 'لا يوجد وصف')}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             {fw && <span style={S.badge('var(--accent)')}>{fw.framework?.name} {fw.version}</span>}
-            {stats?.draftVersion && <span style={S.badge('#f39c12')}>Draft v{stats.draftVersion.version}</span>}
-            {stats?.publishedVersion && <span style={S.badge('#2ecc71')}>Published v{stats.publishedVersion.version}</span>}
+            {stats?.draftVersion && <span style={S.badge('#f39c12')}>{L('Draft v', 'مسودة الإصدار ')}{stats.draftVersion.version}</span>}
+            {stats?.publishedVersion && <span style={S.badge('#2ecc71')}>{L('Published v', 'الإصدار المنشور ')}{stats.publishedVersion.version}</span>}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button style={S.btn('primary')} onClick={() => onTab('designer')}>🎨 Open Designer</button>
-          <button style={S.btn()} onClick={() => onTab('versions')}>📋 Versions</button>
+          <button style={S.btn('primary')} onClick={() => onTab('designer')}>{L('🎨 Open Designer', '🎨 فتح المصمم')}</button>
+          <button style={S.btn()} onClick={() => onTab('versions')}>{L('📋 Versions', '📋 الإصدارات')}</button>
         </div>
       </div>
 
       {/* Stats */}
       <div style={S.grid3}>
         {[
-          { icon: '🗂', label: 'Domains', value: stats?.domains ?? 0, tab: 'domains', color: '#3498db' },
-          { icon: '⬛', label: 'Object Types', value: stats?.objectTypes ?? 0, tab: 'objects', color: '#e67e22' },
-          { icon: '📋', label: 'Attributes', value: stats?.attributes ?? 0, tab: 'objects', color: '#9b59b6' },
-          { icon: '🔗', label: 'Relationships', value: stats?.relationships ?? 0, tab: 'relationships', color: '#1abc9c' },
-          { icon: '🔄', label: 'Draft Changes', value: stats?.draftVersion ? 'Active' : 'None', tab: 'versions', color: '#f39c12' },
-          { icon: '✅', label: 'Published', value: stats?.publishedVersion ? `v${stats.publishedVersion.version}` : 'None', tab: 'versions', color: '#2ecc71' },
+          { icon: '🗂', label: L('Domains', 'المجالات'), value: stats?.domains ?? 0, tab: 'domains', color: '#3498db' },
+          { icon: '⬛', label: L('Object Types', 'أنواع العناصر'), value: stats?.objectTypes ?? 0, tab: 'objects', color: '#e67e22' },
+          { icon: '📋', label: L('Attributes', 'السمات'), value: stats?.attributes ?? 0, tab: 'objects', color: '#9b59b6' },
+          { icon: '🔗', label: L('Relationships', 'العلاقات'), value: stats?.relationships ?? 0, tab: 'relationships', color: '#1abc9c' },
+          { icon: '🔄', label: L('Draft Changes', 'تغييرات المسودة'), value: stats?.draftVersion ? 'Active' : 'None', tab: 'versions', color: '#f39c12' },
+          { icon: '✅', label: L('Published', 'منشور'), value: stats?.publishedVersion ? `v${stats.publishedVersion.version}` : 'None', tab: 'versions', color: '#2ecc71' },
         ].map(st => (
           <div key={st.label} style={{ ...S.statCard, cursor: 'pointer' }} onClick={() => onTab(st.tab)}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -181,15 +187,15 @@ function Dashboard({ stats, onTab }: { stats: any, onTab: (t: string) => void })
 
       {/* Quick actions */}
       <div style={S.card}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14, color: 'var(--text-dim)' }}>QUICK ACTIONS</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14, color: 'var(--text-dim)' }}>{L('QUICK ACTIONS', 'إجراءات سريعة')}</div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' as const }}>
           {[
-            { label: '+ Add Domain', tab: 'domains', icon: '🗂' },
-            { label: '+ Add Object Type', tab: 'objects', icon: '⬛' },
-            { label: '+ Add Relationship', tab: 'relationships', icon: '🔗' },
-            { label: '📥 Import', tab: 'import', icon: '' },
-            { label: '📤 Export', tab: 'export', icon: '' },
-            { label: '✅ Validate', tab: 'validation', icon: '' },
+            { label: L('+ Add Domain', '+ إضافة مجال'), tab: 'domains', icon: '🗂' },
+            { label: L('+ Add Object Type', '+ إضافة نوع عنصر'), tab: 'objects', icon: '⬛' },
+            { label: L('+ Add Relationship', '+ إضافة علاقة'), tab: 'relationships', icon: '🔗' },
+            { label: L('📥 Import', '📥 استيراد'), tab: 'import', icon: '' },
+            { label: L('📤 Export', '📤 تصدير'), tab: 'export', icon: '' },
+            { label: L('✅ Validate', '✅ تحقق'), tab: 'validation', icon: '' },
           ].map(a => (
             <button key={a.label} style={S.btn()} onClick={() => onTab(a.tab)}>{a.label}</button>
           ))}
@@ -201,6 +207,8 @@ function Dashboard({ stats, onTab }: { stats: any, onTab: (t: string) => void })
 
 // ── Domains Manager ───────────────────────────────────────────────────────────
 function DomainsManager({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [domains, setDomains] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -223,7 +231,7 @@ function DomainsManager({ api }: { api: any }) {
   }
 
   const remove = async (id: string) => {
-    if (!window.confirm('Delete this domain? Object types must be reassigned first.')) return
+    if (!window.confirm(L('Delete this domain? Object types must be reassigned first.', 'حذف هذا المجال؟ يجب إعادة إسناد أنواع العناصر أولاً.'))) return
     await api.del(`/meta-model/domains/${id}`); load()
   }
 
@@ -236,60 +244,59 @@ function DomainsManager({ api }: { api: any }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Domains</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Organize your meta-model by architectural domains</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{L('Domains', 'المجالات')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Organize your meta-model by architectural domains', 'نظّم نموذجك الوصفي حسب المجالات المعمارية')}</div>
         </div>
-        <button style={S.btn('primary')} onClick={() => { setEditing(null); setForm({ code: '', name: '', nameAr: '', color: '#3498db', icon: '📁', description: '' }); setShowForm(true) }}>+ Add Domain</button>
+        <button style={S.btn('primary')} onClick={() => { setEditing(null); setForm({ code: '', name: '', nameAr: '', color: '#3498db', icon: '📁', description: '' }); setShowForm(true) }}>{L('+ Add Domain', '+ إضافة مجال')}</button>
       </div>
 
       {showForm && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{editing ? 'Edit Domain' : 'New Domain'}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{editing ? L('Edit Domain', 'تعديل المجال') : L('New Domain', 'مجال جديد')}</div>
           <div style={S.grid2}>
-            <div><label style={S.label}>Code *</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g,'_') }))} placeholder="BUSINESS" disabled={!!editing} /></div>
-            <div><label style={S.label}>Name *</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Business Architecture" /></div>
-            <div><label style={S.label}>Arabic Name</label><input style={{ ...S.input, direction: 'rtl' }} value={form.nameAr} onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))} placeholder="البنية المعمارية للأعمال" /></div>
-            <div><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" /></div>
+            <div><label style={S.label}>{L('Code *', 'الرمز *')}</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g,'_') }))} placeholder="BUSINESS" disabled={!!editing} /></div>
+            <div><label style={S.label}>{L('Name *', 'الاسم *')}</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={L('Business Architecture', 'معمارية الأعمال')} /></div>
+            <div><label style={S.label}>{L('Arabic Name', 'الاسم العربي')}</label><input style={{ ...S.input, direction: 'rtl' }} value={form.nameAr} onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))} placeholder="البنية المعمارية للأعمال" /></div>
+            <div><label style={S.label}>{L('Description', 'الوصف')}</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder={L('Optional description', 'وصف اختياري')} /></div>
           </div>
           <div style={{ marginTop: 12 }}>
-            <label style={S.label}>Icon</label>
+            <label style={S.label}>{L('Icon', 'الأيقونة')}</label>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
               {ICONS.map(ic => <span key={ic} onClick={() => setForm(f => ({ ...f, icon: ic }))} style={{ fontSize: 22, cursor: 'pointer', padding: 4, borderRadius: 6, background: form.icon === ic ? 'rgba(3,105,161,0.2)' : 'transparent', border: `1px solid ${form.icon === ic ? 'var(--accent)' : 'transparent'}` }}>{ic}</span>)}
             </div>
           </div>
           <div style={{ marginTop: 12 }}>
-            <label style={S.label}>Color</label>
+            <label style={S.label}>{L('Color', 'اللون')}</label>
             <div style={{ display: 'flex', gap: 8 }}>
               {COLORS.map(c => <div key={c} onClick={() => setForm(f => ({ ...f, color: c }))} style={{ width: 28, height: 28, borderRadius: '50%', background: c, cursor: 'pointer', border: `3px solid ${form.color === c ? '#fff' : 'transparent'}` }} />)}
               <input type="color" value={form.color} onChange={e => setForm(f => ({ ...f, color: e.target.value }))} style={{ width: 28, height: 28, border: 'none', borderRadius: '50%', cursor: 'pointer', padding: 0 }} />
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button style={S.btn()} onClick={() => { setShowForm(false); setEditing(null) }}>Cancel</button>
-            <button style={S.btn('primary')} onClick={save}>{editing ? 'Save Changes' : 'Create Domain'}</button>
+            <button style={S.btn()} onClick={() => { setShowForm(false); setEditing(null) }}>{L('Cancel', 'إلغاء')}</button>
+            <button style={S.btn('primary')} onClick={save}>{editing ? L('Save Changes', 'حفظ التغييرات') : L('Create Domain', 'إنشاء المجال')}</button>
           </div>
         </div>
       )}
 
-      {loading ? <div style={{ color: 'var(--text-dim)', padding: 40, textAlign: 'center' }}>Loading...</div> : (
+      {loading ? <div style={{ color: 'var(--text-dim)', padding: 40, textAlign: 'center' }}>{L('Loading...', 'جارٍ التحميل...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {domains.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No domains yet. Add your first domain to organize your meta-model.</div>}
+          {domains.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{L('No domains yet. Add your first domain to organize your meta-model.', 'لا توجد مجالات بعد. أضف أول مجال لتنظيم نموذجك الوصفي.')}</div>}
           {domains.map((d, idx) => (
             <div key={d.id} style={{ ...S.card, display: 'flex', alignItems: 'center', gap: 16, padding: '14px 20px' }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: d.color + '33', border: `1px solid ${d.color}44`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>{d.icon || '📁'}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {d.name}
+                  {isAR ? (d.nameAr || d.name) : d.name}
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'monospace' }}>{d.code}</span>
-                  {d.nameAr && <span style={{ fontSize: 12, color: 'var(--text-dim)', direction: 'rtl' }}>{d.nameAr}</span>}
                 </div>
                 {d.description && <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{d.description}</div>}
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{d._count?.objectTypes || 0} object types</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{d._count?.objectTypes || 0} {L('object types', 'نوع عنصر')}</div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 12, height: 12, borderRadius: '50%', background: d.color }} />
-                <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => startEdit(d)}>Edit</button>
-                <button style={{ ...S.btn('danger'), padding: '4px 10px', fontSize: 12 }} onClick={() => remove(d.id)}>Delete</button>
+                <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => startEdit(d)}>{L('Edit', 'تعديل')}</button>
+                <button style={{ ...S.btn('danger'), padding: '4px 10px', fontSize: 12 }} onClick={() => remove(d.id)}>{L('Delete', 'حذف')}</button>
               </div>
             </div>
           ))}
@@ -301,6 +308,8 @@ function DomainsManager({ api }: { api: any }) {
 
 // ── Object Types List ─────────────────────────────────────────────────────────
 function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [types, setTypes] = useState<any[]>([])
   const [domains, setDomains] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -338,56 +347,56 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Object Types</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>EA entity types defined in your meta-model</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{L('Object Types', 'أنواع العناصر')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('EA entity types defined in your meta-model', 'أنواع كيانات البنية المؤسسية المعرّفة في نموذجك الوصفي')}</div>
         </div>
-        <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ Add Object Type</button>
+        <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>{L('+ Add Object Type', '+ إضافة نوع عنصر')}</button>
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        <input style={{ ...S.input, maxWidth: 280 }} placeholder="🔍 Search object types..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input style={{ ...S.input, maxWidth: 280 }} placeholder={L('🔍 Search object types...', '🔍 ابحث في أنواع العناصر...')} value={search} onChange={e => setSearch(e.target.value)} />
         <select style={{ ...S.input, maxWidth: 200 }} value={filterDomain} onChange={e => setFilterDomain(e.target.value)}>
-          <option value="">All Domains</option>
+          <option value="">{L('All Domains', 'كل المجالات')}</option>
           {domains.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>{filtered.length} / {types.length} types</div>
+        <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>{filtered.length} / {types.length} {L('types', 'نوع')}</div>
       </div>
 
       {showForm && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>New Object Type</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{L('New Object Type', 'نوع عنصر جديد')}</div>
           <div style={S.grid2}>
-            <div><label style={S.label}>Code *</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="BusinessCapability" /></div>
-            <div><label style={S.label}>Name *</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Business Capability" /></div>
-            <div><label style={S.label}>Singular Label *</label><input style={S.input} value={form.singularLabel} onChange={e => setForm(f => ({ ...f, singularLabel: e.target.value }))} placeholder="Capability" /></div>
-            <div><label style={S.label}>Plural Label</label><input style={S.input} value={form.pluralLabel} onChange={e => setForm(f => ({ ...f, pluralLabel: e.target.value }))} placeholder="Capabilities" /></div>
-            <div><label style={S.label}>Domain</label>
+            <div><label style={S.label}>{L('Code *', 'الرمز *')}</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="BusinessCapability" /></div>
+            <div><label style={S.label}>{L('Name *', 'الاسم *')}</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={L('Business Capability', 'قدرة أعمال')} /></div>
+            <div><label style={S.label}>{L('Singular Label *', 'تسمية المفرد *')}</label><input style={S.input} value={form.singularLabel} onChange={e => setForm(f => ({ ...f, singularLabel: e.target.value }))} placeholder={L('Capability', 'قدرة')} /></div>
+            <div><label style={S.label}>{L('Plural Label', 'تسمية الجمع')}</label><input style={S.input} value={form.pluralLabel} onChange={e => setForm(f => ({ ...f, pluralLabel: e.target.value }))} placeholder={L('Capabilities', 'قدرات')} /></div>
+            <div><label style={S.label}>{L('Domain', 'المجال')}</label>
               <select style={S.input} value={form.domainId} onChange={e => setForm(f => ({ ...f, domainId: e.target.value }))}>
-                <option value="">No Domain</option>
+                <option value="">{L('No Domain', 'بلا مجال')}</option>
                 {domains.map((d: any) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
             </div>
-            <div><label style={S.label}>Semantic Type</label><input style={S.input} value={form.semanticType} onChange={e => setForm(f => ({ ...f, semanticType: e.target.value }))} placeholder="e.g. BusinessCapability" /></div>
-            <div style={{ gridColumn: '1/-1' }}><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+            <div><label style={S.label}>{L('Semantic Type', 'النوع الدلالي')}</label><input style={S.input} value={form.semanticType} onChange={e => setForm(f => ({ ...f, semanticType: e.target.value }))} placeholder="e.g. BusinessCapability" /></div>
+            <div style={{ gridColumn: '1/-1' }}><label style={S.label}>{L('Description', 'الوصف')}</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
           </div>
           <div style={{ display: 'flex', gap: 12, marginTop: 12, alignItems: 'center' }}>
-            <label style={S.label}>Icon</label>
+            <label style={S.label}>{L('Icon', 'الأيقونة')}</label>
             <div style={{ display: 'flex', gap: 6 }}>
               {ICONS.map(ic => <span key={ic} onClick={() => setForm(f => ({ ...f, icon: ic }))} style={{ fontSize: 18, cursor: 'pointer', padding: 3, borderRadius: 4, background: form.icon === ic ? 'rgba(3,105,161,0.2)' : 'transparent', border: `1px solid ${form.icon === ic ? 'var(--accent)' : 'transparent'}` }}>{ic}</span>)}
             </div>
-            <label style={{ ...S.label, marginLeft: 12 }}>Allow Hierarchy</label>
+            <label style={{ ...S.label, marginLeft: 12 }}>{L('Allow Hierarchy', 'السماح بالتسلسل الهرمي')}</label>
             <input type="checkbox" checked={form.allowHierarchy} onChange={e => setForm(f => ({ ...f, allowHierarchy: e.target.checked }))} style={{ width: 16, height: 16 }} />
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button style={S.btn()} onClick={() => setShowForm(false)}>Cancel</button>
-            <button style={S.btn('primary')} onClick={save}>Create Object Type</button>
+            <button style={S.btn()} onClick={() => setShowForm(false)}>{L('Cancel', 'إلغاء')}</button>
+            <button style={S.btn('primary')} onClick={save}>{L('Create Object Type', 'إنشاء نوع العنصر')}</button>
           </div>
         </div>
       )}
 
-      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
+      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{L('Loading...', 'جارٍ التحميل...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {filtered.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No object types found. {types.length === 0 ? 'Create your first object type.' : 'Try a different search.'}</div>}
+          {filtered.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{L('No object types found.', 'لا توجد أنواع عناصر.')} {types.length === 0 ? L('Create your first object type.', 'أنشئ أول نوع عنصر.') : L('Try a different search.', 'جرّب بحثاً مختلفاً.')}</div>}
           {filtered.map(ot => (
             <div key={ot.id} onClick={() => onSelect(ot)} style={{ ...S.card, padding: '12px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 14, transition: 'all 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--accent)')}
@@ -397,13 +406,13 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontWeight: 600 }}>{ot.name}</span>
                   <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'monospace' }}>{ot.code}</span>
-                  {ot.allowHierarchy && <span style={{ fontSize: 10, color: '#f39c12' }}>🌳 Hierarchical</span>}
+                  {ot.allowHierarchy && <span style={{ fontSize: 10, color: '#f39c12' }}>{L('🌳 Hierarchical', '🌳 هرمي')}</span>}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{ot.domain?.name || 'No domain'} · {ot.singularLabel} / {ot.pluralLabel}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{ot.domain?.name || L('No domain', 'بلا مجال')} · {ot.singularLabel} / {ot.pluralLabel}</div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                 <span style={S.badge(CLASSIFICATION_COLOR[ot.classification] || '#7f8c8d')}>{ot.classification}</span>
-                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{ot._count?.attributeDefs || 0} attrs · {(ot._count?.sourceRelationships || 0) + (ot._count?.targetRelationships || 0)} rels</span>
+                <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{ot._count?.attributeDefs || 0} {L('attrs ·', 'سمة ·')} {(ot._count?.sourceRelationships || 0) + (ot._count?.targetRelationships || 0)} {L('rels', 'علاقة')}</span>
                 <span style={{ color: 'var(--accent)', fontSize: 16 }}>›</span>
               </div>
             </div>
@@ -416,6 +425,8 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
 
 // ── Object Type Editor ────────────────────────────────────────────────────────
 function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: any, onBack: () => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [detail, setDetail] = useState<any>(null)
   const [tab, setTab] = useState<'overview'|'attributes'|'relationships'>('overview')
   const [attrForm, setAttrForm] = useState({ code: '', name: '', attributeType: 'TEXT', isRequired: false, helpText: '' })
@@ -442,18 +453,18 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
   const ATTR_TYPES = ['TEXT','LONG_TEXT','RICH_TEXT','INTEGER','DECIMAL','PERCENTAGE','BOOLEAN','DATE','DATETIME','URL','EMAIL','ENUM','MULTI_ENUM','REFERENCE','MULTI_REFERENCE','USER','CURRENCY','LIFECYCLE_STATUS','MATURITY_SCORE','JSON_DATA']
   const ATTR_TYPE_COLOR: Record<string, string> = { TEXT: '#3498db', ENUM: '#e67e22', REFERENCE: '#9b59b6', BOOLEAN: '#1abc9c', DATE: '#f39c12', INTEGER: '#e74c3c', DECIMAL: '#e74c3c' }
 
-  if (!detail) return <div style={{ color: 'var(--text-dim)', padding: 40, textAlign: 'center' }}>Loading...</div>
+  if (!detail) return <div style={{ color: 'var(--text-dim)', padding: 40, textAlign: 'center' }}>{L('Loading...', 'جارٍ التحميل...')}</div>
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
-        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>← Back</button>
+        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{L('← Back', '→ رجوع')}</button>
         <div style={{ width: 44, height: 44, borderRadius: 10, background: detail.color + '33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22 }}>{detail.icon}</div>
         <div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>{detail.name}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{detail.code} · {detail.domain?.name || 'No domain'} · {detail.singularLabel} / {detail.pluralLabel}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{detail.code} · {detail.domain?.name || L('No domain', 'بلا مجال')} · {detail.singularLabel} / {detail.pluralLabel}</div>
         </div>
-        {detail.allowHierarchy && <span style={S.badge('#f39c12')}>🌳 Hierarchical</span>}
+        {detail.allowHierarchy && <span style={S.badge('#f39c12')}>{L('🌳 Hierarchical', '🌳 هرمي')}</span>}
         <span style={S.badge(detail.classification === 'FRAMEWORK' ? '#3498db' : '#9b59b6')}>{detail.classification}</span>
       </div>
 
@@ -466,62 +477,62 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
       {tab === 'overview' && (
         <div style={S.grid2}>
           {[
-            { label: 'Code', value: detail.code },
-            { label: 'Semantic Type', value: detail.semanticType || '—' },
-            { label: 'Domain', value: detail.domain?.name || 'Not assigned' },
-            { label: 'Classification', value: detail.classification },
-            { label: 'Singular Label', value: detail.singularLabel },
-            { label: 'Plural Label', value: detail.pluralLabel },
-            { label: 'Allow Hierarchy', value: detail.allowHierarchy ? 'Yes' : 'No' },
-            { label: 'Allow Attachments', value: detail.allowAttachments ? 'Yes' : 'No' },
+            { label: L('Code', 'الرمز'), value: detail.code },
+            { label: L('Semantic Type', 'النوع الدلالي'), value: detail.semanticType || '—' },
+            { label: L('Domain', 'المجال'), value: detail.domain?.name || 'Not assigned' },
+            { label: L('Classification', 'التصنيف'), value: detail.classification },
+            { label: L('Singular Label', 'تسمية المفرد'), value: detail.singularLabel },
+            { label: L('Plural Label', 'تسمية الجمع'), value: detail.pluralLabel },
+            { label: L('Allow Hierarchy', 'السماح بالتسلسل الهرمي'), value: detail.allowHierarchy ? 'Yes' : 'No' },
+            { label: L('Allow Attachments', 'السماح بالمرفقات'), value: detail.allowAttachments ? 'Yes' : 'No' },
           ].map(f => (
             <div key={f.label} style={S.card}>
               <div style={S.label}>{f.label}</div>
               <div style={{ fontWeight: 500 }}>{f.value}</div>
             </div>
           ))}
-          {detail.description && <div style={{ ...S.card, gridColumn: '1/-1' }}><div style={S.label}>Description</div><div>{detail.description}</div></div>}
+          {detail.description && <div style={{ ...S.card, gridColumn: '1/-1' }}><div style={S.label}>{L('Description', 'الوصف')}</div><div>{detail.description}</div></div>}
         </div>
       )}
 
       {tab === 'attributes' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-            <button style={S.btn('primary')} onClick={() => setShowAttrForm(!showAttrForm)}>+ Add Attribute</button>
+            <button style={S.btn('primary')} onClick={() => setShowAttrForm(!showAttrForm)}>{L('+ Add Attribute', '+ إضافة سمة')}</button>
           </div>
           {showAttrForm && (
             <div style={{ ...S.card, marginBottom: 16, borderColor: 'var(--accent)' }}>
               <div style={S.grid2}>
-                <div><label style={S.label}>Code *</label><input style={S.input} value={attrForm.code} onChange={e => setAttrForm(f => ({ ...f, code: e.target.value }))} placeholder="criticality" /></div>
-                <div><label style={S.label}>Name *</label><input style={S.input} value={attrForm.name} onChange={e => setAttrForm(f => ({ ...f, name: e.target.value }))} placeholder="Criticality" /></div>
-                <div><label style={S.label}>Type</label>
+                <div><label style={S.label}>{L('Code *', 'الرمز *')}</label><input style={S.input} value={attrForm.code} onChange={e => setAttrForm(f => ({ ...f, code: e.target.value }))} placeholder="criticality" /></div>
+                <div><label style={S.label}>{L('Name *', 'الاسم *')}</label><input style={S.input} value={attrForm.name} onChange={e => setAttrForm(f => ({ ...f, name: e.target.value }))} placeholder={L('Criticality', 'الأهمية الحرجة')} /></div>
+                <div><label style={S.label}>{L('Type', 'النوع')}</label>
                   <select style={S.input} value={attrForm.attributeType} onChange={e => setAttrForm(f => ({ ...f, attributeType: e.target.value }))}>
-                    {ATTR_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+                    {ATTR_TYPES.map(t => <option key={t} value={t}>{enumLabel(t, isAR)}</option>)}
                   </select>
                 </div>
-                <div><label style={S.label}>Help Text</label><input style={S.input} value={attrForm.helpText} onChange={e => setAttrForm(f => ({ ...f, helpText: e.target.value }))} /></div>
+                <div><label style={S.label}>{L('Help Text', 'نص المساعدة')}</label><input style={S.input} value={attrForm.helpText} onChange={e => setAttrForm(f => ({ ...f, helpText: e.target.value }))} /></div>
               </div>
               <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
                 <input type="checkbox" id="req" checked={attrForm.isRequired} onChange={e => setAttrForm(f => ({ ...f, isRequired: e.target.checked }))} />
-                <label htmlFor="req" style={{ fontSize: 13 }}>Required</label>
+                <label htmlFor="req" style={{ fontSize: 13 }}>{L('Required', 'مطلوب')}</label>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
-                  <button style={S.btn()} onClick={() => setShowAttrForm(false)}>Cancel</button>
-                  <button style={S.btn('primary')} onClick={addAttr}>Add Attribute</button>
+                  <button style={S.btn()} onClick={() => setShowAttrForm(false)}>{L('Cancel', 'إلغاء')}</button>
+                  <button style={S.btn('primary')} onClick={addAttr}>{L('Add Attribute', 'إضافة السمة')}</button>
                 </div>
               </div>
             </div>
           )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {(detail.attributeDefs || []).length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>No attributes defined yet</div>}
+            {(detail.attributeDefs || []).length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>{L('No attributes defined yet', 'لم تُعرّف سمات بعد')}</div>}
             {(detail.attributeDefs || []).map((a: any) => (
               <div key={a.id} style={{ ...S.card, padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: ATTR_TYPE_COLOR[a.attributeType] || '#7f8c8d', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 500, display: 'flex', gap: 8, alignItems: 'center' }}>
                     {a.name}
-                    {a.isRequired && <span style={{ fontSize: 10, color: '#e74c3c', fontWeight: 700 }}>REQUIRED</span>}
+                    {a.isRequired && <span style={{ fontSize: 10, color: '#e74c3c', fontWeight: 700 }}>{L('REQUIRED', 'مطلوب')}</span>}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.code} · {a.attributeType.replace(/_/g,' ')}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.code} · {enumLabel(a.attributeType, isAR)}</div>
                 </div>
                 <button style={{ ...S.btn('danger'), padding: '3px 10px', fontSize: 11 }} onClick={() => deleteAttr(a.id)}>✕</button>
               </div>
@@ -532,15 +543,15 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
 
       {tab === 'relationships' && (
         <div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 14 }}>Relationships where this object type is source or target</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 14 }}>{L('Relationships where this object type is source or target', 'العلاقات التي يكون فيها هذا النوع مصدراً أو هدفاً')}</div>
           {[...( detail.sourceRelationships || []), ...(detail.targetRelationships || [])].length === 0
-            ? <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>No relationships defined yet</div>
+            ? <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 32 }}>{L('No relationships defined yet', 'لم تُعرّف علاقات بعد')}</div>
             : [...(detail.sourceRelationships || [])].map((r: any) => (
               <div key={r.id} style={{ ...S.card, padding: '10px 16px', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{detail.name}</span>
                 <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>→ {r.forwardLabel} →</span>
                 <span style={{ fontWeight: 600 }}>{r.targetType?.name}</span>
-                <span style={{ ...S.badge('#1abc9c'), marginLeft: 'auto' }}>{r.cardinality?.replace(/_/g,' ')}</span>
+                <span style={{ ...S.badge('#1abc9c'), marginLeft: 'auto' }}>{enumLabel(r.cardinality, isAR)}</span>
               </div>
             ))
           }
@@ -552,6 +563,8 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
 
 // ── Relationships Manager ─────────────────────────────────────────────────────
 function RelationshipsManager({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [rels, setRels] = useState<any[]>([])
   const [types, setTypes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -594,54 +607,54 @@ function RelationshipsManager({ api }: { api: any }) {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>Relationships</div>
-          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Define allowed connections between object types</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{L('Relationships', 'العلاقات')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Define allowed connections between object types', 'حدّد الروابط المسموح بها بين أنواع العناصر')}</div>
         </div>
         <div style={S.row}>
           <div style={{ display: 'flex', gap: 2, background: 'var(--navy-light)', borderRadius: 8, padding: 2 }}>
-            {(['list','matrix'] as const).map(m => <button key={m} style={{ ...S.btn(), padding: '5px 12px', background: viewMode === m ? 'var(--accent)' : 'none', color: viewMode === m ? 'var(--navy)' : 'var(--text-dim)' }} onClick={() => setViewMode(m)}>{m === 'list' ? '☰ List' : '⊞ Matrix'}</button>)}
+            {(['list','matrix'] as const).map(m => <button key={m} style={{ ...S.btn(), padding: '5px 12px', background: viewMode === m ? 'var(--accent)' : 'none', color: viewMode === m ? 'var(--navy)' : 'var(--text-dim)' }} onClick={() => setViewMode(m)}>{m === 'list' ? L('☰ List', '☰ قائمة') : L('⊞ Matrix', '⊞ مصفوفة')}</button>)}
           </div>
-          <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ Add Relationship</button>
+          <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>{L('+ Add Relationship', '+ إضافة علاقة')}</button>
         </div>
       </div>
 
       {showForm && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>New Relationship</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{L('New Relationship', 'علاقة جديدة')}</div>
           <div style={S.grid2}>
-            <div><label style={S.label}>Code *</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="CAP_SUPPORTED_BY_APP" /></div>
-            <div><label style={S.label}>Name</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Capability supported by Application" /></div>
-            <div><label style={S.label}>Source Type *</label>
+            <div><label style={S.label}>{L('Code *', 'الرمز *')}</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value }))} placeholder="CAP_SUPPORTED_BY_APP" /></div>
+            <div><label style={S.label}>{L('Name', 'الاسم')}</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={L('Capability supported by Application', 'قدرة يدعمها تطبيق')} /></div>
+            <div><label style={S.label}>{L('Source Type *', 'النوع المصدر *')}</label>
               <select style={S.input} value={form.sourceTypeId} onChange={e => setForm(f => ({ ...f, sourceTypeId: e.target.value }))}>
-                <option value="">Select source...</option>
+                <option value="">{L('Select source...', 'اختر المصدر...')}</option>
                 {types.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
               </select>
             </div>
-            <div><label style={S.label}>Target Type *</label>
+            <div><label style={S.label}>{L('Target Type *', 'النوع الهدف *')}</label>
               <select style={S.input} value={form.targetTypeId} onChange={e => setForm(f => ({ ...f, targetTypeId: e.target.value }))}>
-                <option value="">Select target...</option>
+                <option value="">{L('Select target...', 'اختر الهدف...')}</option>
                 {types.map((t: any) => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
               </select>
             </div>
-            <div><label style={S.label}>Forward Label *</label><input style={S.input} value={form.forwardLabel} onChange={e => setForm(f => ({ ...f, forwardLabel: e.target.value }))} placeholder="supported by" /></div>
-            <div><label style={S.label}>Reverse Label</label><input style={S.input} value={form.reverseLabel} onChange={e => setForm(f => ({ ...f, reverseLabel: e.target.value }))} placeholder="supports" /></div>
-            <div><label style={S.label}>Cardinality</label>
+            <div><label style={S.label}>{L('Forward Label *', 'التسمية الأمامية *')}</label><input style={S.input} value={form.forwardLabel} onChange={e => setForm(f => ({ ...f, forwardLabel: e.target.value }))} placeholder={L('supported by', 'يدعمها')} /></div>
+            <div><label style={S.label}>{L('Reverse Label', 'التسمية العكسية')}</label><input style={S.input} value={form.reverseLabel} onChange={e => setForm(f => ({ ...f, reverseLabel: e.target.value }))} placeholder="supports" /></div>
+            <div><label style={S.label}>{L('Cardinality', 'التعدد')}</label>
               <select style={S.input} value={form.cardinality} onChange={e => setForm(f => ({ ...f, cardinality: e.target.value }))}>
-                {CARDINALITIES.map(c => <option key={c} value={c}>{c.replace(/_/g,' ')}</option>)}
+                {CARDINALITIES.map(c => <option key={c} value={c}>{enumLabel(c, isAR)}</option>)}
               </select>
             </div>
-            <div><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+            <div><label style={S.label}>{L('Description', 'الوصف')}</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button style={S.btn()} onClick={() => setShowForm(false)}>Cancel</button>
-            <button style={S.btn('primary')} onClick={save}>Create Relationship</button>
+            <button style={S.btn()} onClick={() => setShowForm(false)}>{L('Cancel', 'إلغاء')}</button>
+            <button style={S.btn('primary')} onClick={save}>{L('Create Relationship', 'إنشاء العلاقة')}</button>
           </div>
         </div>
       )}
 
-      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : viewMode === 'list' ? (
+      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{L('Loading...', 'جارٍ التحميل...')}</div> : viewMode === 'list' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {rels.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No relationships defined yet</div>}
+          {rels.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{L('No relationships defined yet', 'لم تُعرّف علاقات بعد')}</div>}
           {rels.map(r => (
             <div key={r.id} style={{ ...S.card, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 14 }}>
               <div style={{ flex: 1 }}>
@@ -653,7 +666,7 @@ function RelationshipsManager({ api }: { api: any }) {
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{r.code} · {r.classification}</div>
               </div>
-              <span style={S.badge(CARD_COLOR[r.cardinality] || '#7f8c8d')}>{r.cardinality?.replace(/_/g,' ')}</span>
+              <span style={S.badge(CARD_COLOR[r.cardinality] || '#7f8c8d')}>{enumLabel(r.cardinality, isAR)}</span>
               {r.classification === 'CUSTOM' && <button style={{ ...S.btn('danger'), padding: '3px 10px', fontSize: 11 }} onClick={() => remove(r.id)}>✕</button>}
             </div>
           ))}
@@ -665,7 +678,7 @@ function RelationshipsManager({ api }: { api: any }) {
             <table style={{ borderCollapse: 'collapse', minWidth: '100%' }}>
               <thead>
                 <tr>
-                  <th style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, position: 'sticky', left: 0 }}>Source ↓ / Target →</th>
+                  <th style={{ padding: '8px 12px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', textAlign: 'left', fontSize: 11, color: 'var(--text-dim)', fontWeight: 600, position: 'sticky', left: 0 }}>{L('Source ↓ / Target →', 'المصدر ↓ / الهدف ←')}</th>
                   {matrix.objectTypes?.map((ot: any) => (
                     <th key={ot.id} style={{ padding: '8px 10px', background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', minWidth: 100 }}>
                       {ot.icon} {ot.name}
@@ -692,7 +705,7 @@ function RelationshipsManager({ api }: { api: any }) {
               </tbody>
             </table>
           </div>
-        ) : <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading matrix...</div>
+        ) : <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{L('Loading matrix...', 'جارٍ تحميل المصفوفة...')}</div>
       )}
     </div>
   )
@@ -700,6 +713,8 @@ function RelationshipsManager({ api }: { api: any }) {
 
 // ── Visual Designer (SVG graph) ───────────────────────────────────────────────
 function MetaModelDesigner({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [graph, setGraph] = useState<{ nodes: any[], edges: any[] }>({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -737,7 +752,7 @@ function MetaModelDesigner({ api }: { api: any }) {
       // real, expected 404 "No draft version found" case) left loading
       // stuck true forever, showing an infinite "Loading graph..." with
       // no way out.
-      setLoadError(err?.message || err?.data?.message || 'Failed to load the graph.')
+      setLoadError(err?.message || err?.data?.message || L('Failed to load the graph.', 'تعذّر تحميل المخطط.'))
       setLoading(false)
     })
   }, [api])
@@ -750,7 +765,7 @@ function MetaModelDesigner({ api }: { api: any }) {
       await api.post('/meta-model/versions', { version: `draft-${Date.now()}` })
       loadGraph()
     } catch (err: any) {
-      setLoadError(err?.message || err?.data?.message || 'Failed to create a draft version.')
+      setLoadError(err?.message || err?.data?.message || L('Failed to create a draft version.', 'تعذّر إنشاء إصدار مسودة.'))
     } finally {
       setCreatingDraft(false)
     }
@@ -796,25 +811,25 @@ function MetaModelDesigner({ api }: { api: any }) {
         {/* Toolbar */}
         <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
           <select style={{ ...S.input, maxWidth: 160, fontSize: 12 }} value={filterDomain} onChange={e => setFilterDomain(e.target.value)}>
-            <option value="">All Domains</option>
+            <option value="">{L('All Domains', 'كل المجالات')}</option>
             {domains.map(d => <option key={d} value={d}>{d}</option>)}
           </select>
           <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.min(2, z + 0.1))}>+</button>
           <span style={{ fontSize: 12, color: 'var(--text-dim)', minWidth: 36, textAlign: 'center' }}>{Math.round(zoom * 100)}%</span>
           <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => setZoom(z => Math.max(0.3, z - 0.1))}>−</button>
-          <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>⊡ Fit</button>
-          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{filtered.nodes.length} types · {filtered.edges.length} relationships</span>
+          <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>{L('⊡ Fit', '⊡ ملاءمة')}</button>
+          <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>{filtered.nodes.length} {L('types ·', 'نوع ·')} {filtered.edges.length} {L('relationships', 'علاقة')}</span>
         </div>
 
-        {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>Loading graph...</div> : loadError ? (
+        {loading ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>{L('Loading graph...', 'جارٍ تحميل المخطط...')}</div> : loadError ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: 20, textAlign: 'center' }}>
             <div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{loadError}</div>
             {loadError.toLowerCase().includes('draft version') && (
               <button style={S.btn('primary')} onClick={createDraftVersion} disabled={creatingDraft}>
-                {creatingDraft ? 'Creating...' : '+ Create Draft Version'}
+                {creatingDraft ? L('Creating...', 'جارٍ الإنشاء...') : L('+ Create Draft Version', '+ إنشاء إصدار مسودة')}
               </button>
             )}
-            <button style={S.btn()} onClick={loadGraph}>Retry</button>
+            <button style={S.btn()} onClick={loadGraph}>{L('Retry', 'إعادة المحاولة')}</button>
           </div>
         ) : (
           <svg ref={svgRef} style={{ width: '100%', height: '100%', cursor: panStart ? 'grabbing' : dragging ? 'grabbing' : 'grab' }}
@@ -849,7 +864,7 @@ function MetaModelDesigner({ api }: { api: any }) {
                     <rect width={4} height={40} rx={2} fill={domColor} />
                     <text x={24} y={15} fontSize={16}>{n.icon}</text>
                     <text x={48} y={16} fontSize={11} fontWeight={600} fill="var(--text)">{n.name.length > 16 ? n.name.slice(0,15) + '…' : n.name}</text>
-                    <text x={48} y={30} fontSize={9} fill="rgba(100,116,139,0.7)">{n.domain || 'No domain'}</text>
+                    <text x={48} y={30} fontSize={9} fill="rgba(100,116,139,0.7)">{n.domain || L('No domain', 'بلا مجال')}</text>
                     {n.allowHierarchy && <text x={148} y={14} fontSize={10}>🌳</text>}
                   </g>
                 )
@@ -865,25 +880,25 @@ function MetaModelDesigner({ api }: { api: any }) {
           <>
             <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>{selected.icon} {selected.name}</div>
             {[
-              { label: 'Code', value: selected.code },
-              { label: 'Domain', value: selected.domain || '—' },
-              { label: 'Semantic Type', value: selected.semanticType || '—' },
-              { label: 'Hierarchy', value: selected.allowHierarchy ? 'Yes' : 'No' },
+              { label: L('Code', 'الرمز'), value: selected.code },
+              { label: L('Domain', 'المجال'), value: selected.domain || '—' },
+              { label: L('Semantic Type', 'النوع الدلالي'), value: selected.semanticType || '—' },
+              { label: L('Hierarchy', 'التسلسل الهرمي'), value: selected.allowHierarchy ? 'Yes' : 'No' },
             ].map(f => (
               <div key={f.label} style={{ marginBottom: 10 }}>
                 <div style={S.label}>{f.label}</div>
                 <div style={{ fontSize: 13 }}>{f.value}</div>
               </div>
             ))}
-            <div style={S.label}>Connections</div>
+            <div style={S.label}>{L('Connections', 'الروابط')}</div>
             <div style={{ fontSize: 13 }}>
-              {graph.edges.filter(e => e.source === selected.id || e.target === selected.id).length} relationships
+              {graph.edges.filter(e => e.source === selected.id || e.target === selected.id).length} {L('relationships', 'علاقة')}
             </div>
           </>
         ) : (
           <div style={{ color: 'var(--text-dim)', fontSize: 13, textAlign: 'center', paddingTop: 40 }}>
-            Click a node to see details.<br /><br />
-            <span style={{ fontSize: 11 }}>Drag nodes to rearrange<br />Scroll to zoom<br />Drag background to pan</span>
+            {L('Click a node to see details.', 'انقر على عقدة لعرض التفاصيل.')}<br /><br />
+            <span style={{ fontSize: 11 }}>{L('Drag nodes to rearrange', 'اسحب العقد لإعادة الترتيب')}<br />{L('Scroll to zoom', 'مرّر للتكبير')}<br />{L('Drag background to pan', 'اسحب الخلفية للتحريك')}</span>
           </div>
         )}
       </div>
@@ -893,6 +908,8 @@ function MetaModelDesigner({ api }: { api: any }) {
 
 // ── Validation Panel ──────────────────────────────────────────────────────────
 function ValidationPanel({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [issues, setIssues] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [ran, setRan] = useState(false)
@@ -912,14 +929,14 @@ function ValidationPanel({ api }: { api: any }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div><div style={{ fontSize: 18, fontWeight: 700 }}>Meta-Model Validation</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Check for errors, warnings, and improvements</div></div>
-        <button style={S.btn('primary')} onClick={run} disabled={loading}>{loading ? '⏳ Validating...' : '▶ Run Validation'}</button>
+        <div><div style={{ fontSize: 18, fontWeight: 700 }}>{L('Meta-Model Validation', 'التحقق من النموذج الوصفي')}</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Check for errors, warnings, and improvements', 'افحص الأخطاء والتحذيرات وفرص التحسين')}</div></div>
+        <button style={S.btn('primary')} onClick={run} disabled={loading}>{loading ? L('⏳ Validating...', '⏳ جارٍ التحقق...') : L('▶ Run Validation', '▶ تشغيل التحقق')}</button>
       </div>
 
       {ran && (
         <>
           <div style={S.grid3}>
-            {[{ label: 'Errors', count: errors.length, color: '#e74c3c' }, { label: 'Warnings', count: warnings.length, color: '#f39c12' }, { label: 'Info', count: infos.length, color: '#3498db' }].map(s => (
+            {[{ label: L('Errors', 'أخطاء'), count: errors.length, color: '#e74c3c' }, { label: L('Warnings', 'تحذيرات'), count: warnings.length, color: '#f39c12' }, { label: L('Info', 'معلومات'), count: infos.length, color: '#3498db' }].map(s => (
               <div key={s.label} style={{ ...S.statCard }}>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', fontWeight: 600 }}>{s.label}</div>
                 <div style={{ fontSize: 32, fontWeight: 700, color: s.color }}>{s.count}</div>
@@ -927,7 +944,7 @@ function ValidationPanel({ api }: { api: any }) {
             ))}
           </div>
           <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {issues.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: '#2ecc71', padding: 40, fontSize: 16 }}>✅ No issues found — meta-model is valid!</div>}
+            {issues.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: '#2ecc71', padding: 40, fontSize: 16 }}>{L('✅ No issues found — meta-model is valid!', '✅ لا توجد مشكلات — النموذج الوصفي سليم!')}</div>}
             {issues.map((issue, i) => (
               <div key={i} style={{ ...S.card, padding: '12px 16px', borderLeft: `3px solid ${SEV_COLOR[issue.severity]}` }}>
                 <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -944,13 +961,15 @@ function ValidationPanel({ api }: { api: any }) {
         </>
       )}
 
-      {!ran && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 60 }}>Click "Run Validation" to check your meta-model for issues</div>}
+      {!ran && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 60 }}>{L('Click "Run Validation" to check your meta-model for issues', 'انقر "تشغيل التحقق" لفحص نموذجك الوصفي')}</div>}
     </div>
   )
 }
 
 // ── AI Advisor ────────────────────────────────────────────────────────────────
 function AiAdvisor({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState('')
   const [loading, setLoading] = useState(false)
@@ -972,25 +991,25 @@ function AiAdvisor({ api }: { api: any }) {
     setLoadingGaps(false)
   }
 
-  const QUICK = ['Should I create separate object types for Application and Application Component?', 'What relationships should a Business Capability have?', 'How should I model government services in NORA 2.0?', 'What attributes should a Technology Component have?']
+  const QUICK = [L('Should I create separate object types for Application and Application Component?', 'هل أنشئ نوعي عنصرين منفصلين للتطبيق ومكوّن التطبيق؟'), L('What relationships should a Business Capability have?', 'ما العلاقات التي ينبغي أن تكون لقدرة الأعمال؟'), L('How should I model government services in NORA 2.0?', 'كيف أنمذج الخدمات الحكومية في نورة 2.0؟'), L('What attributes should a Technology Component have?', 'ما السمات التي ينبغي أن يملكها المكوّن التقني؟')]
 
   return (
     <div>
-      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>🤖 AI Meta-Model Advisor</div>
-      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>Ask the AI for meta-model design advice based on your current configuration and EA best practices</div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{L('🤖 AI Meta-Model Advisor', '🤖 مستشار النموذج الوصفي بالذكاء الاصطناعي')}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>{L('Ask the AI for meta-model design advice based on your current configuration and EA best practices', 'اطلب من الذكاء الاصطناعي نصيحة في تصميم النموذج الوصفي بناءً على إعداداتك الحالية وأفضل ممارسات البنية المؤسسية')}</div>
 
       <div style={S.card}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: 'var(--text-dim)' }}>Quick Questions</div>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: 'var(--text-dim)' }}>{L('Quick Questions', 'أسئلة سريعة')}</div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const, marginBottom: 16 }}>
           {QUICK.map(q => <button key={q} style={{ ...S.btn(), fontSize: 12, padding: '5px 12px' }} onClick={() => setQuestion(q)}>{q.length > 60 ? q.slice(0,58) + '…' : q}</button>)}
         </div>
-        <textarea style={{ ...S.input, height: 80, resize: 'vertical' as const }} value={question} onChange={e => setQuestion(e.target.value)} placeholder="Ask about your meta-model design..." />
+        <textarea style={{ ...S.input, height: 80, resize: 'vertical' as const }} value={question} onChange={e => setQuestion(e.target.value)} placeholder={L('Ask about your meta-model design...', 'اسأل عن تصميم نموذجك الوصفي...')} />
         <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
-          <button style={S.btn('primary')} onClick={ask} disabled={loading || !question.trim()}>{loading ? '⏳ Thinking...' : '💬 Ask AI'}</button>
+          <button style={S.btn('primary')} onClick={ask} disabled={loading || !question.trim()}>{loading ? L('⏳ Thinking...', '⏳ جارٍ التفكير...') : L('💬 Ask AI', '💬 اسأل الذكاء الاصطناعي')}</button>
         </div>
         {answer && (
           <div style={{ marginTop: 16, padding: 16, background: 'var(--navy)', borderRadius: 8, fontSize: 13, lineHeight: 1.7, borderLeft: '3px solid var(--accent)' }}>
-            <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 8 }}>AI ADVISOR</div>
+            <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 600, marginBottom: 8 }}>{L('AI ADVISOR', 'المستشار الذكي')}</div>
             {answer}
           </div>
         )}
@@ -998,10 +1017,10 @@ function AiAdvisor({ api }: { api: any }) {
 
       <div style={{ ...S.card, marginTop: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>🔍 Gap Detection</div>
-          <button style={S.btn()} onClick={detectGaps} disabled={loadingGaps}>{loadingGaps ? '⏳ Analyzing...' : 'Detect Gaps'}</button>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>{L('🔍 Gap Detection', '🔍 كشف الفجوات')}</div>
+          <button style={S.btn()} onClick={detectGaps} disabled={loadingGaps}>{loadingGaps ? L('⏳ Analyzing...', '⏳ جارٍ التحليل...') : L('Detect Gaps', 'كشف الفجوات')}</button>
         </div>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 10 }}>AI analyzes your meta-model and identifies potential missing elements</div>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 10 }}>{L('AI analyzes your meta-model and identifies potential missing elements', 'يحلل الذكاء الاصطناعي نموذجك الوصفي ويحدد العناصر التي قد تكون ناقصة')}</div>
         {gaps.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {gaps.map((g, i) => <div key={i} style={{ padding: '10px 14px', background: 'var(--navy)', borderRadius: 8, fontSize: 13, borderLeft: '3px solid #f39c12' }}>⚠ {g}</div>)}
@@ -1014,6 +1033,8 @@ function AiAdvisor({ api }: { api: any }) {
 
 // ── Versions Manager ──────────────────────────────────────────────────────────
 function VersionsManager({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [versions, setVersions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -1030,7 +1051,7 @@ function VersionsManager({ api }: { api: any }) {
   }
 
   const publish = async (id: string) => {
-    if (!window.confirm('Publish this version? It will become the active meta-model.')) return
+    if (!window.confirm(L('Publish this version? It will become the active meta-model.', 'نشر هذا الإصدار؟ سيصبح النموذج الوصفي النشط.'))) return
     await api.post(`/meta-model/versions/${id}/publish`, { force: false })
     load()
   }
@@ -1042,39 +1063,39 @@ function VersionsManager({ api }: { api: any }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div><div style={{ fontSize: 18, fontWeight: 700 }}>Versions</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Manage meta-model versions and publish changes</div></div>
-        <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ New Version</button>
+        <div><div style={{ fontSize: 18, fontWeight: 700 }}>{L('Versions', 'الإصدارات')}</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Manage meta-model versions and publish changes', 'إدارة إصدارات النموذج الوصفي ونشر التغييرات')}</div></div>
+        <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>{L('+ New Version', '+ إصدار جديد')}</button>
       </div>
 
       {showForm && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
           <div style={S.grid2}>
-            <div><label style={S.label}>Version *</label><input style={S.input} value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} placeholder="1.1" /></div>
-            <div><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
+            <div><label style={S.label}>{L('Version *', 'الإصدار *')}</label><input style={S.input} value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} placeholder="1.1" /></div>
+            <div><label style={S.label}>{L('Description', 'الوصف')}</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            <button style={S.btn()} onClick={() => setShowForm(false)}>Cancel</button>
-            <button style={S.btn('primary')} onClick={create}>Create Version</button>
+            <button style={S.btn()} onClick={() => setShowForm(false)}>{L('Cancel', 'إلغاء')}</button>
+            <button style={S.btn('primary')} onClick={create}>{L('Create Version', 'إنشاء الإصدار')}</button>
           </div>
         </div>
       )}
 
       {impact && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: impact.canPublish ? '#2ecc71' : '#e74c3c' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Impact Analysis — v{impact.version}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>{L('Impact Analysis — v', 'تحليل الأثر — الإصدار ')}{impact.version}</div>
           <div style={S.grid3}>
-            <div style={{ ...S.statCard }}><div style={S.label}>Breaking</div><div style={{ fontSize: 24, fontWeight: 700, color: '#e74c3c' }}>{impact.breaking.count}</div></div>
-            <div style={{ ...S.statCard }}><div style={S.label}>Potentially Breaking</div><div style={{ fontSize: 24, fontWeight: 700, color: '#f39c12' }}>{impact.potentiallyBreaking.count}</div></div>
-            <div style={{ ...S.statCard }}><div style={S.label}>Non-Breaking</div><div style={{ fontSize: 24, fontWeight: 700, color: '#2ecc71' }}>{impact.nonBreaking.count}</div></div>
+            <div style={{ ...S.statCard }}><div style={S.label}>{L('Breaking', 'كاسر')}</div><div style={{ fontSize: 24, fontWeight: 700, color: '#e74c3c' }}>{impact.breaking.count}</div></div>
+            <div style={{ ...S.statCard }}><div style={S.label}>{L('Potentially Breaking', 'قد يكون كاسراً')}</div><div style={{ fontSize: 24, fontWeight: 700, color: '#f39c12' }}>{impact.potentiallyBreaking.count}</div></div>
+            <div style={{ ...S.statCard }}><div style={S.label}>{L('Non-Breaking', 'غير كاسر')}</div><div style={{ fontSize: 24, fontWeight: 700, color: '#2ecc71' }}>{impact.nonBreaking.count}</div></div>
           </div>
           <div style={{ marginTop: 12, color: impact.canPublish ? '#2ecc71' : '#e74c3c', fontWeight: 600, fontSize: 13 }}>
-            {impact.canPublish ? '✅ Safe to publish' : '⚠ Breaking changes detected — review before publishing'}
+            {impact.canPublish ? L('✅ Safe to publish', '✅ آمن للنشر') : L('⚠ Breaking changes detected — review before publishing', '⚠ رُصدت تغييرات كاسرة — راجعها قبل النشر')}
           </div>
-          <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => setImpact(null)}>Close</button>
+          <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => setImpact(null)}>{L('Close', 'إغلاق')}</button>
         </div>
       )}
 
-      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
+      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{L('Loading...', 'جارٍ التحميل...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {versions.map(v => (
             <div key={v.id} style={{ ...S.card, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -1085,13 +1106,13 @@ function VersionsManager({ api }: { api: any }) {
                 </div>
                 {v.description && <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>{v.description}</div>}
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                  {v._count?.domains || 0} domains · {v._count?.objectTypes || 0} types · {v._count?.relationships || 0} relationships
-                  {v.publishedAt && ` · Published ${new Date(v.publishedAt).toLocaleDateString()}`}
+                  {v._count?.domains || 0} {L('domains ·', 'مجال ·')} {v._count?.objectTypes || 0} {L('types ·', 'نوع ·')} {v._count?.relationships || 0} {L('relationships', 'علاقة')}
+                  {v.publishedAt && L(` · Published ${new Date(v.publishedAt).toLocaleDateString('en-US')}`, ` · نُشر ${new Date(v.publishedAt).toLocaleDateString('ar')}`)}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button style={{ ...S.btn(), fontSize: 12, padding: '4px 12px' }} onClick={() => loadImpact(v.id)}>📊 Impact</button>
-                {v.status === 'DRAFT' && <button style={{ ...S.btn('primary'), fontSize: 12, padding: '4px 12px' }} onClick={() => publish(v.id)}>🚀 Publish</button>}
+                <button style={{ ...S.btn(), fontSize: 12, padding: '4px 12px' }} onClick={() => loadImpact(v.id)}>{L('📊 Impact', '📊 الأثر')}</button>
+                {v.status === 'DRAFT' && <button style={{ ...S.btn('primary'), fontSize: 12, padding: '4px 12px' }} onClick={() => publish(v.id)}>{L('🚀 Publish', '🚀 نشر')}</button>}
               </div>
             </div>
           ))}
@@ -1103,6 +1124,8 @@ function VersionsManager({ api }: { api: any }) {
 
 // ── Import Wizard ─────────────────────────────────────────────────────────────
 function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [step, setStep] = useState<'upload'|'validate'|'preview'|'confirm'|'done'>('upload')
   const [file, setFile] = useState<File | null>(null)
   const [validationResult, setValidationResult] = useState<any>(null)
@@ -1139,12 +1162,12 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
 
   return (
     <div>
-      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>📥 Import Meta-Model</div>
-      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>Import object types, domains, and relationships from JSON or CSV</div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{L('📥 Import Meta-Model', '📥 استيراد نموذج وصفي')}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>{L('Import object types, domains, and relationships from JSON or CSV', 'استيراد أنواع العناصر والمجالات والعلاقات من JSON أو CSV')}</div>
 
       {/* Step indicator */}
       <div style={{ display: 'flex', gap: 0, marginBottom: 28, alignItems: 'center' }}>
-        {['Upload', 'Validate', 'Preview', 'Confirm', 'Done'].map((s, i) => (
+        {[L('Upload', 'رفع'), L('Validate', 'تحقق'), L('Preview', 'معاينة'), L('Confirm', 'تأكيد'), L('Done', 'تم')].map((s, i) => (
           <React.Fragment key={s}>
             <div style={{ display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4 }}>
               <div style={{ width: 28, height: 28, borderRadius: '50%', background: i <= stepIdx ? 'var(--accent)' : 'var(--navy-mid)', color: i <= stepIdx ? 'var(--navy)' : 'var(--text-dim)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700 }}>{i < stepIdx ? '✓' : i + 1}</div>
@@ -1162,26 +1185,26 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
             onDragLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}
             onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) setFile(f) }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>📁</div>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Drop file here or click to browse</div>
-            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Supported: JSON (full meta-model), CSV (object types only)</div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>{L('Drop file here or click to browse', 'أفلت الملف هنا أو انقر للاستعراض')}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>{L('Supported: JSON (full meta-model), CSV (object types only)', 'المدعوم: JSON (نموذج وصفي كامل)، CSV (أنواع العناصر فقط)')}</div>
             <input type="file" accept=".json,.csv" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} id="mm-import-file" />
-            <label htmlFor="mm-import-file" style={{ ...S.btn(), cursor: 'pointer' }}>Browse File</label>
+            <label htmlFor="mm-import-file" style={{ ...S.btn(), cursor: 'pointer' }}>{L('Browse File', 'استعراض ملف')}</label>
           </div>
           {file && (
             <div style={{ marginTop: 16, padding: '10px 14px', background: 'var(--navy)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 18 }}>{file.name.endsWith('.json') ? '📄' : '📊'}</span>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 500 }}>{file.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{(file.size / 1024).toFixed(1)} KB</div>
+                <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{(file.size / 1024).toFixed(1)} {L('KB', 'كيلوبايت')}</div>
               </div>
               <button style={{ ...S.btn('danger'), fontSize: 12 }} onClick={() => setFile(null)}>✕</button>
             </div>
           )}
           <div style={{ marginTop: 16, padding: '12px 16px', background: 'rgba(3,105,161,0.06)', borderRadius: 8, fontSize: 12, color: 'var(--text-dim)' }}>
-            <strong>JSON format:</strong> {`{ "metaModel": { "name": "...", "domains": [...], "objectTypes": [...], "relationships": [...] } }`}
+            <strong>{L('JSON format:', 'صيغة JSON:')}</strong> {`{ "metaModel": { "name": "...", "domains": [...], "objectTypes": [...], "relationships": [...] } }`}
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button style={S.btn('primary')} onClick={validate} disabled={!file || loading}>{loading ? '⏳ Validating...' : 'Next: Validate →'}</button>
+            <button style={S.btn('primary')} onClick={validate} disabled={!file || loading}>{loading ? L('⏳ Validating...', '⏳ جارٍ التحقق...') : L('Next: Validate →', 'التالي: التحقق ←')}</button>
           </div>
         </div>
       )}
@@ -1189,10 +1212,10 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
       {step === 'validate' && validationResult && (
         <div style={S.card}>
           <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>Errors</div><div style={{ fontSize: 28, fontWeight: 700, color: validationResult.errors?.length ? '#e74c3c' : '#2ecc71' }}>{validationResult.errors?.length || 0}</div></div>
-            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>Warnings</div><div style={{ fontSize: 28, fontWeight: 700, color: '#f39c12' }}>{validationResult.warnings?.length || 0}</div></div>
-            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>Object Types</div><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{validationResult.data?.metaModel?.objectTypes?.length || 0}</div></div>
-            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>Relationships</div><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{validationResult.data?.metaModel?.relationships?.length || 0}</div></div>
+            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>{L('Errors', 'أخطاء')}</div><div style={{ fontSize: 28, fontWeight: 700, color: validationResult.errors?.length ? '#e74c3c' : '#2ecc71' }}>{validationResult.errors?.length || 0}</div></div>
+            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>{L('Warnings', 'تحذيرات')}</div><div style={{ fontSize: 28, fontWeight: 700, color: '#f39c12' }}>{validationResult.warnings?.length || 0}</div></div>
+            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>{L('Object Types', 'أنواع العناصر')}</div><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{validationResult.data?.metaModel?.objectTypes?.length || 0}</div></div>
+            <div style={{ ...S.statCard, flex: 1 }}><div style={S.label}>{L('Relationships', 'العلاقات')}</div><div style={{ fontSize: 28, fontWeight: 700, color: 'var(--accent)' }}>{validationResult.data?.metaModel?.relationships?.length || 0}</div></div>
           </div>
           {validationResult.errors?.length > 0 && (
             <div style={{ marginBottom: 12 }}>
@@ -1201,23 +1224,23 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
           )}
           {validationResult.warnings?.map((w: string, i: number) => <div key={i} style={{ padding: '8px 12px', background: '#f39c1211', borderRadius: 6, borderLeft: '3px solid #f39c12', fontSize: 12, marginBottom: 4 }}>⚠ {w}</div>)}
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button style={S.btn()} onClick={() => setStep('upload')}>← Back</button>
-            <button style={S.btn('primary')} onClick={() => setStep('preview')} disabled={validationResult.errors?.length > 0}>Next: Preview →</button>
+            <button style={S.btn()} onClick={() => setStep('upload')}>{L('← Back', '→ رجوع')}</button>
+            <button style={S.btn('primary')} onClick={() => setStep('preview')} disabled={validationResult.errors?.length > 0}>{L('Next: Preview →', 'التالي: المعاينة ←')}</button>
           </div>
         </div>
       )}
 
       {step === 'preview' && validationResult?.data && (
         <div style={S.card}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>Preview — {validationResult.data.metaModel.name}</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{L('Preview —', 'معاينة —')} {validationResult.data.metaModel.name}</div>
           <div style={{ marginBottom: 16 }}>
-            <div style={S.label}>Domains ({validationResult.data.metaModel.domains?.length || 0})</div>
+            <div style={S.label}>{L('Domains (', 'المجالات (')}{validationResult.data.metaModel.domains?.length || 0})</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
               {validationResult.data.metaModel.domains?.map((d: any) => <span key={d.code} style={{ ...S.badge(d.color || '#3498db'), fontSize: 12 }}>{d.icon} {d.name}</span>)}
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
-            <div style={S.label}>Object Types ({validationResult.data.metaModel.objectTypes?.length || 0})</div>
+            <div style={S.label}>{L('Object Types (', 'أنواع العناصر (')}{validationResult.data.metaModel.objectTypes?.length || 0})</div>
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 4, maxHeight: 200, overflowY: 'auto' as const }}>
               {validationResult.data.metaModel.objectTypes?.map((ot: any) => (
                 <div key={ot.code} style={{ fontSize: 12, padding: '4px 8px', background: 'var(--navy)', borderRadius: 4, display: 'flex', gap: 8 }}>
@@ -1227,40 +1250,40 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
             </div>
           </div>
           <div style={{ marginBottom: 16 }}>
-            <div style={S.label}>Import Mode</div>
+            <div style={S.label}>{L('Import Mode', 'وضع الاستيراد')}</div>
             <div style={{ display: 'flex', gap: 10 }}>
               {(['MERGE', 'REPLACE'] as const).map(m => (
                 <div key={m} onClick={() => setMode(m)} style={{ flex: 1, padding: '12px 16px', borderRadius: 8, border: `2px solid ${mode === m ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', background: mode === m ? 'rgba(3,105,161,0.08)' : 'transparent' }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{m === 'MERGE' ? '🔀 Merge' : '🔄 Replace'}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{m === 'MERGE' ? 'Add new items, skip existing codes' : 'Clear draft and replace all content'}</div>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>{m === 'MERGE' ? L('🔀 Merge', '🔀 دمج') : L('🔄 Replace', '🔄 استبدال')}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{m === 'MERGE' ? L('Add new items, skip existing codes', 'إضافة عناصر جديدة وتجاوز الرموز الموجودة') : L('Clear draft and replace all content', 'مسح المسودة واستبدال كل المحتوى')}</div>
                 </div>
               ))}
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button style={S.btn()} onClick={() => setStep('validate')}>← Back</button>
-            <button style={S.btn('primary')} onClick={() => setStep('confirm')}>Next: Confirm →</button>
+            <button style={S.btn()} onClick={() => setStep('validate')}>{L('← Back', '→ رجوع')}</button>
+            <button style={S.btn('primary')} onClick={() => setStep('confirm')}>{L('Next: Confirm →', 'التالي: التأكيد ←')}</button>
           </div>
         </div>
       )}
 
       {step === 'confirm' && (
         <div style={S.card}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Confirm Import</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>{L('Confirm Import', 'تأكيد الاستيراد')}</div>
           <div style={{ padding: '14px 16px', background: mode === 'REPLACE' ? '#e74c3c11' : 'rgba(3,105,161,0.06)', borderRadius: 8, borderLeft: `3px solid ${mode === 'REPLACE' ? '#e74c3c' : 'var(--accent)'}`, marginBottom: 16, fontSize: 13 }}>
-            {mode === 'REPLACE' ? '⚠ REPLACE mode will clear all existing content in the draft version before importing.' : '✅ MERGE mode will add new items without affecting existing ones.'}
+            {mode === 'REPLACE' ? L('⚠ REPLACE mode will clear all existing content in the draft version before importing.', '⚠ سيمسح وضع الاستبدال كل المحتوى الحالي في إصدار المسودة قبل الاستيراد.') : L('✅ MERGE mode will add new items without affecting existing ones.', '✅ سيضيف وضع الدمج عناصر جديدة دون المساس بالموجودة.')}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button style={S.btn()} onClick={() => setStep('preview')}>← Back</button>
-            <button style={S.btn('primary')} onClick={doImport} disabled={loading}>{loading ? '⏳ Importing...' : `🚀 Import (${mode})`}</button>
+            <button style={S.btn()} onClick={() => setStep('preview')}>{L('← Back', '→ رجوع')}</button>
+            <button style={S.btn('primary')} onClick={doImport} disabled={loading}>{loading ? L('⏳ Importing...', '⏳ جارٍ الاستيراد...') : L(`🚀 Import (${mode})`, `🚀 استيراد (${mode})`)}</button>
           </div>
         </div>
       )}
 
       {step === 'done' && result && (
         <div style={{ ...S.card, textAlign: 'center', padding: 40 }}>
-          {result.success === false ? <div style={{ color: '#e74c3c', fontSize: 18 }}>❌ Import failed<br /><span style={{ fontSize: 13 }}>{result.errors?.join(', ')}</span></div>
-            : <><div style={{ fontSize: 40, marginBottom: 12 }}>✅</div><div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>Import Complete</div><div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{result.imported?.objectTypes || 0} object types · {result.imported?.domains || 0} domains imported</div></>}
+          {result.success === false ? <div style={{ color: '#e74c3c', fontSize: 18 }}>{L('❌ Import failed', '❌ فشل الاستيراد')}<br /><span style={{ fontSize: 13 }}>{result.errors?.join(', ')}</span></div>
+            : <><div style={{ fontSize: 40, marginBottom: 12 }}>✅</div><div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{L('Import Complete', 'اكتمل الاستيراد')}</div><div style={{ color: 'var(--text-dim)', fontSize: 13 }}>{result.imported?.objectTypes || 0} {L('object types ·', 'نوع عنصر ·')} {result.imported?.domains || 0} {L('domains imported', 'مجال مستورد')}</div></>}
         </div>
       )}
     </div>
@@ -1269,6 +1292,8 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
 
 // ── Export Panel ──────────────────────────────────────────────────────────────
 function ExportPanel({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const download = async (fmt: 'json' | 'csv') => {
     const token = localStorage.getItem('ea_token') || ''
     const base = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -1281,12 +1306,12 @@ function ExportPanel({ api }: { api: any }) {
 
   return (
     <div>
-      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>📤 Export Meta-Model</div>
-      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24 }}>Download your meta-model for backup, sharing, or use in other tools</div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{L('📤 Export Meta-Model', '📤 تصدير النموذج الوصفي')}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 24 }}>{L('Download your meta-model for backup, sharing, or use in other tools', 'نزّل نموذجك الوصفي للنسخ الاحتياطي أو المشاركة أو الاستخدام في أدوات أخرى')}</div>
       <div style={S.grid2}>
         {[
-          { fmt: 'json' as const, icon: '📄', title: 'JSON Export', desc: 'Full meta-model including domains, object types, attributes, relationships and enum definitions. Use this for backup or migration.', badge: 'Recommended' },
-          { fmt: 'csv' as const, icon: '📊', title: 'CSV Export', desc: 'Object types only — code, name, domain, labels, icon, color. Use for spreadsheet review or bulk editing.', badge: 'Object Types Only' },
+          { fmt: 'json' as const, icon: '📄', title: L('JSON Export', 'تصدير JSON'), desc: L('Full meta-model including domains, object types, attributes, relationships and enum definitions. Use this for backup or migration.', 'النموذج الوصفي كاملاً بما فيه المجالات وأنواع العناصر والسمات والعلاقات وتعريفات القوائم. استخدمه للنسخ الاحتياطي أو الترحيل.'), badge: 'Recommended' },
+          { fmt: 'csv' as const, icon: '📊', title: L('CSV Export', 'تصدير CSV'), desc: L('Object types only — code, name, domain, labels, icon, color. Use for spreadsheet review or bulk editing.', 'أنواع العناصر فقط — الرمز والاسم والمجال والتسميات والأيقونة واللون. استخدمه للمراجعة في جدول بيانات أو للتعديل المجمّع.'), badge: 'Object Types Only' },
         ].map(opt => (
           <div key={opt.fmt} style={S.card}>
             <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
@@ -1297,12 +1322,12 @@ function ExportPanel({ api }: { api: any }) {
               </div>
             </div>
             <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 16, lineHeight: 1.6 }}>{opt.desc}</div>
-            <button style={S.btn('primary')} onClick={() => download(opt.fmt)}>⬇ Download .{opt.fmt.toUpperCase()}</button>
+            <button style={S.btn('primary')} onClick={() => download(opt.fmt)}>{L('⬇ Download .', '⬇ تنزيل .')}{opt.fmt.toUpperCase()}</button>
           </div>
         ))}
       </div>
       <div style={{ ...S.card, marginTop: 16, fontSize: 13, color: 'var(--text-dim)', lineHeight: 1.7 }}>
-        <strong style={{ color: 'var(--text)' }}>💡 Tip:</strong> Export uses the current draft version. Publish the draft first if you want to export the official published meta-model.
+        <strong style={{ color: 'var(--text)' }}>{L('💡 Tip:', '💡 نصيحة:')}</strong> {L('Export uses the current draft version. Publish the draft first if you want to export the official published meta-model.', 'يستخدم التصدير إصدار المسودة الحالي. انشر المسودة أولاً إذا أردت تصدير النموذج الوصفي المنشور الرسمي.')}
       </div>
     </div>
   )
@@ -1310,6 +1335,8 @@ function ExportPanel({ api }: { api: any }) {
 
 // ── Enum Designer ─────────────────────────────────────────────────────────────
 function EnumDesigner({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [enums, setEnums] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -1365,29 +1392,29 @@ function EnumDesigner({ api }: { api: any }) {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div><div style={{ fontSize: 18, fontWeight: 700 }}>Enum Definitions</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Define dropdown option sets used by ENUM attributes</div></div>
-        <button style={S.btn('primary')} onClick={() => { setShowForm(true); setSelected(null) }}>+ New Enum</button>
+        <div><div style={{ fontSize: 18, fontWeight: 700 }}>{L('Enum Definitions', 'تعريفات القوائم')}</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Define dropdown option sets used by ENUM attributes', 'حدّد مجموعات الخيارات المنسدلة التي تستخدمها سمات القوائم')}</div></div>
+        <button style={S.btn('primary')} onClick={() => { setShowForm(true); setSelected(null) }}>{L('+ New Enum', '+ قائمة جديدة')}</button>
       </div>
 
       {showForm && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>New Enum Definition</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>{L('New Enum Definition', 'تعريف قائمة جديد')}</div>
           <div style={S.grid2}>
-            <div><label style={S.label}>Code *</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g,'_') }))} placeholder="MATURITY_LEVEL" /></div>
-            <div><label style={S.label}>Name *</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Maturity Level" /></div>
-            <div style={{ gridColumn: '1/-1' }}><label style={S.label}>Arabic Name</label><input style={{ ...S.input, direction: 'rtl' }} value={form.nameAr} onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))} placeholder="مستوى النضج" /></div>
+            <div><label style={S.label}>{L('Code *', 'الرمز *')}</label><input style={S.input} value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g,'_') }))} placeholder="MATURITY_LEVEL" /></div>
+            <div><label style={S.label}>{L('Name *', 'الاسم *')}</label><input style={S.input} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder={L('Maturity Level', 'مستوى النضج')} /></div>
+            <div style={{ gridColumn: '1/-1' }}><label style={S.label}>{L('Arabic Name', 'الاسم العربي')}</label><input style={{ ...S.input, direction: 'rtl' }} value={form.nameAr} onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))} placeholder="مستوى النضج" /></div>
           </div>
           <div style={{ marginTop: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <label style={S.label}>Values</label>
-              <button style={{ ...S.btn(), fontSize: 11, padding: '3px 10px' }} onClick={addValue}>+ Add Value</button>
+              <label style={S.label}>{L('Values', 'القيم')}</label>
+              <button style={{ ...S.btn(), fontSize: 11, padding: '3px 10px' }} onClick={addValue}>{L('+ Add Value', '+ إضافة قيمة')}</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 6 }}>
               {form.values.map((v, i) => (
                 <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <input style={{ ...S.input, width: 120 }} value={v.code} onChange={e => updateValue(i, 'code', e.target.value.toUpperCase().replace(/\s+/g,'_'))} placeholder="CODE" />
-                  <input style={{ ...S.input, flex: 1 }} value={v.label} onChange={e => updateValue(i, 'label', e.target.value)} placeholder="Label" />
-                  <input style={{ ...S.input, flex: 1, direction: 'rtl' }} value={v.labelAr} onChange={e => updateValue(i, 'labelAr', e.target.value)} placeholder="التسمية" />
+                  <input style={{ ...S.input, flex: 1 }} value={v.label} onChange={e => updateValue(i, 'label', e.target.value)} placeholder={L('Label', 'التسمية')} />
+                  <input style={{ ...S.input, flex: 1, direction: 'rtl' }} value={v.labelAr} onChange={e => updateValue(i, 'labelAr', e.target.value)} placeholder={L('Arabic label', 'التسمية')} />
                   <div style={{ display: 'flex', gap: 4 }}>
                     {COLORS.map(c => <div key={c} onClick={() => updateValue(i, 'color', c)} style={{ width: 16, height: 16, borderRadius: '50%', background: c, cursor: 'pointer', border: `2px solid ${v.color === c ? '#fff' : 'transparent'}` }} />)}
                   </div>
@@ -1397,27 +1424,27 @@ function EnumDesigner({ api }: { api: any }) {
             </div>
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <button style={S.btn()} onClick={() => setShowForm(false)}>Cancel</button>
-            <button style={S.btn('primary')} onClick={save}>Create Enum</button>
+            <button style={S.btn()} onClick={() => setShowForm(false)}>{L('Cancel', 'إلغاء')}</button>
+            <button style={S.btn('primary')} onClick={save}>{L('Create Enum', 'إنشاء القائمة')}</button>
           </div>
         </div>
       )}
 
-      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
+      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{L('Loading...', 'جارٍ التحميل...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 8 }}>
-          {enums.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No enum definitions yet. Create one to use with ENUM-type attributes.</div>}
+          {enums.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{L('No enum definitions yet. Create one to use with ENUM-type attributes.', 'لا توجد تعريفات قوائم بعد. أنشئ واحداً لاستخدامه مع سمات القوائم.')}</div>}
           {enums.map((e: any) => (
             <div key={e.id} style={{ ...S.card, cursor: 'pointer', transition: 'all 0.15s' }} onClick={() => setSelected(selected?.id === e.id ? null : e)}
               onMouseEnter={ev => (ev.currentTarget.style.borderColor = 'var(--accent)')}
               onMouseLeave={ev => (ev.currentTarget.style.borderColor = 'var(--border)')}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600 }}>{e.name} {e.nameAr && <span style={{ color: 'var(--text-dim)', direction: 'rtl', fontSize: 13 }}>· {e.nameAr}</span>}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'monospace' }}>{e.code} · {e.values?.length || 0} values</div>
+                  <div style={{ fontWeight: 600 }}>{isAR ? (e.nameAr || e.name) : e.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)', fontFamily: 'monospace' }}>{e.code} · {e.values?.length || 0} {L('values', 'قيمة')}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
                   {e.values?.slice(0, 5).map((v: any) => <span key={v.code} style={{ ...S.badge(v.color || '#3498db'), fontSize: 11 }}>{v.label}</span>)}
-                  {e.values?.length > 5 && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>+{e.values.length - 5} more</span>}
+                  {e.values?.length > 5 && <span style={{ fontSize: 11, color: 'var(--text-dim)' }}>+{e.values.length - 5} {L('more', 'أخرى')}</span>}
                 </div>
               </div>
               {selected?.id === e.id && (
@@ -1428,7 +1455,7 @@ function EnumDesigner({ api }: { api: any }) {
                       <span style={{ fontWeight: 500, flex: 1 }}>{v.label}</span>
                       {v.labelAr && <span style={{ color: 'var(--text-dim)', direction: 'rtl', fontSize: 12 }}>{v.labelAr}</span>}
                       <span style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'monospace' }}>{v.code}</span>
-                      {v.isDefault && <span style={{ ...S.badge('#2ecc71'), fontSize: 10 }}>Default</span>}
+                      {v.isDefault && <span style={{ ...S.badge('#2ecc71'), fontSize: 10 }}>{L('Default', 'افتراضي')}</span>}
                     </div>
                   ))}
                 </div>
@@ -1443,6 +1470,8 @@ function EnumDesigner({ api }: { api: any }) {
 
 // ── Shared Attribute Library ──────────────────────────────────────────────────
 function SharedAttributeLibrary({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [attrs, setAttrs] = useState<any[]>([])
   const [, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -1453,21 +1482,21 @@ function SharedAttributeLibrary({ api }: { api: any }) {
   }, [api])
 
   const SYSTEM_ATTRS = [
-    { code: 'owner', name: 'Owner', nameAr: 'المالك', attributeType: 'USER', description: 'Person responsible for this element' },
-    { code: 'status', name: 'Status', nameAr: 'الحالة', attributeType: 'LIFECYCLE_STATUS', description: 'Current lifecycle status' },
-    { code: 'maturity', name: 'Maturity Level', nameAr: 'مستوى النضج', attributeType: 'MATURITY_SCORE', description: 'Maturity score 1-5' },
-    { code: 'tags', name: 'Tags', nameAr: 'الوسوم', attributeType: 'TEXT', description: 'Classification tags' },
-    { code: 'description', name: 'Description', nameAr: 'الوصف', attributeType: 'LONG_TEXT', description: 'Detailed description' },
-    { code: 'startDate', name: 'Start Date', nameAr: 'تاريخ البدء', attributeType: 'DATE', description: 'When this element became active' },
-    { code: 'endDate', name: 'End Date', nameAr: 'تاريخ الانتهاء', attributeType: 'DATE', description: 'When this element will be retired' },
-    { code: 'costCenter', name: 'Cost Center', nameAr: 'مركز التكلفة', attributeType: 'TEXT', description: 'Financial cost center code' },
-    { code: 'budget', name: 'Annual Budget', nameAr: 'الميزانية السنوية', attributeType: 'CURRENCY', description: 'Annual budget in SAR' },
-    { code: 'slaLevel', name: 'SLA Level', nameAr: 'مستوى الخدمة', attributeType: 'ENUM', description: 'Service level agreement tier' },
-    { code: 'riskLevel', name: 'Risk Level', nameAr: 'مستوى المخاطر', attributeType: 'ENUM', description: 'Risk exposure level' },
-    { code: 'dataClassification', name: 'Data Classification', nameAr: 'تصنيف البيانات', attributeType: 'ENUM', description: 'Confidential / Internal / Public' },
-    { code: 'ncaCompliance', name: 'NCA Compliance', nameAr: 'امتثال هيئة الأمن', attributeType: 'PERCENTAGE', description: 'NCA ECC compliance percentage' },
-    { code: 'vendor', name: 'Vendor', nameAr: 'المورّد', attributeType: 'TEXT', description: 'Vendor or supplier name' },
-    { code: 'version', name: 'Version', nameAr: 'الإصدار', attributeType: 'TEXT', description: 'Current version number' },
+    { code: 'owner', name: 'Owner', nameAr: 'المالك', attributeType: 'USER', description: 'Person responsible for this element', descriptionAr: 'الشخص المسؤول عن هذا العنصر' },
+    { code: 'status', name: 'Status', nameAr: 'الحالة', attributeType: 'LIFECYCLE_STATUS', description: 'Current lifecycle status', descriptionAr: 'حالة دورة الحياة الحالية' },
+    { code: 'maturity', name: 'Maturity Level', nameAr: 'مستوى النضج', attributeType: 'MATURITY_SCORE', description: 'Maturity score 1-5', descriptionAr: 'درجة النضج من 1 إلى 5' },
+    { code: 'tags', name: 'Tags', nameAr: 'الوسوم', attributeType: 'TEXT', description: 'Classification tags', descriptionAr: 'وسوم التصنيف' },
+    { code: 'description', name: 'Description', nameAr: 'الوصف', attributeType: 'LONG_TEXT', description: 'Detailed description', descriptionAr: 'وصف تفصيلي' },
+    { code: 'startDate', name: 'Start Date', nameAr: 'تاريخ البدء', attributeType: 'DATE', description: 'When this element became active', descriptionAr: 'تاريخ بدء نشاط هذا العنصر' },
+    { code: 'endDate', name: 'End Date', nameAr: 'تاريخ الانتهاء', attributeType: 'DATE', description: 'When this element will be retired', descriptionAr: 'تاريخ إيقاف هذا العنصر' },
+    { code: 'costCenter', name: 'Cost Center', nameAr: 'مركز التكلفة', attributeType: 'TEXT', description: 'Financial cost center code', descriptionAr: 'رمز مركز التكلفة المالي' },
+    { code: 'budget', name: 'Annual Budget', nameAr: 'الميزانية السنوية', attributeType: 'CURRENCY', description: 'Annual budget in SAR', descriptionAr: 'الميزانية السنوية بالريال السعودي' },
+    { code: 'slaLevel', name: 'SLA Level', nameAr: 'مستوى الخدمة', attributeType: 'ENUM', description: 'Service level agreement tier', descriptionAr: 'فئة اتفاقية مستوى الخدمة' },
+    { code: 'riskLevel', name: 'Risk Level', nameAr: 'مستوى المخاطر', attributeType: 'ENUM', description: 'Risk exposure level', descriptionAr: 'مستوى التعرض للمخاطر' },
+    { code: 'dataClassification', name: 'Data Classification', nameAr: 'تصنيف البيانات', attributeType: 'ENUM', description: 'Confidential / Internal / Public', descriptionAr: 'سري / داخلي / عام' },
+    { code: 'ncaCompliance', name: 'NCA Compliance', nameAr: 'امتثال هيئة الأمن', attributeType: 'PERCENTAGE', description: 'NCA ECC compliance percentage', descriptionAr: 'نسبة الامتثال للضوابط الأساسية للأمن السيبراني' },
+    { code: 'vendor', name: 'Vendor', nameAr: 'المورّد', attributeType: 'TEXT', description: 'Vendor or supplier name', descriptionAr: 'اسم المورّد' },
+    { code: 'version', name: 'Version', nameAr: 'الإصدار', attributeType: 'TEXT', description: 'Current version number', descriptionAr: 'رقم الإصدار الحالي' },
   ]
 
   const ATTR_TYPE_COLOR: Record<string, string> = { TEXT: '#3498db', LONG_TEXT: '#3498db', ENUM: '#e67e22', USER: '#9b59b6', DATE: '#f39c12', CURRENCY: '#2ecc71', PERCENTAGE: '#1abc9c', LIFECYCLE_STATUS: '#e67e22', MATURITY_SCORE: '#e74c3c' }
@@ -1479,16 +1508,16 @@ function SharedAttributeLibrary({ api }: { api: any }) {
 
   return (
     <div>
-      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>📚 Shared Attribute Library</div>
-      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>Common attributes that can be added to any object type — ensures consistency across your meta-model</div>
+      <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>{L('📚 Shared Attribute Library', '📚 مكتبة السمات المشتركة')}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-dim)', marginBottom: 20 }}>{L('Common attributes that can be added to any object type — ensures consistency across your meta-model', 'سمات شائعة يمكن إضافتها إلى أي نوع عنصر — لضمان الاتساق في نموذجك الوصفي')}</div>
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
-        <input style={{ ...S.input, maxWidth: 280 }} placeholder="🔍 Search attributes..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input style={{ ...S.input, maxWidth: 280 }} placeholder={L('🔍 Search attributes...', '🔍 ابحث في السمات...')} value={search} onChange={e => setSearch(e.target.value)} />
         <select style={{ ...S.input, maxWidth: 180 }} value={filterType} onChange={e => setFilterType(e.target.value)}>
-          <option value="">All Types</option>
-          {['TEXT','LONG_TEXT','ENUM','USER','DATE','CURRENCY','PERCENTAGE','LIFECYCLE_STATUS','MATURITY_SCORE'].map(t => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+          <option value="">{L('All Types', 'كل الأنواع')}</option>
+          {['TEXT','LONG_TEXT','ENUM','USER','DATE','CURRENCY','PERCENTAGE','LIFECYCLE_STATUS','MATURITY_SCORE'].map(t => <option key={t} value={t}>{enumLabel(t, isAR)}</option>)}
         </select>
-        <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>{filtered.length} attributes</span>
+        <span style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>{filtered.length} {L('attributes', 'سمة')}</span>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -1496,11 +1525,11 @@ function SharedAttributeLibrary({ api }: { api: any }) {
           <div key={a.code} style={{ ...S.card, padding: '12px 14px', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: ATTR_TYPE_COLOR[a.attributeType] || '#7f8c8d', flexShrink: 0, marginTop: 5 }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{a.name}{a.nameAr && <span style={{ color: 'var(--text-dim)', fontWeight: 400, marginLeft: 6, direction: 'rtl', fontSize: 12 }}>{a.nameAr}</span>}</div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{isAR ? (a.nameAr || a.name) : a.name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4, fontFamily: 'monospace' }}>{a.code}</div>
-              {a.description && <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{a.description}</div>}
+              {a.description && <div style={{ fontSize: 11, color: 'var(--text-dim)', lineHeight: 1.5 }}>{isAR ? (a.descriptionAr || a.description) : a.description}</div>}
             </div>
-            <span style={{ ...S.badge(ATTR_TYPE_COLOR[a.attributeType] || '#7f8c8d'), flexShrink: 0, fontSize: 10 }}>{a.attributeType.replace(/_/g,' ')}</span>
+            <span style={{ ...S.badge(ATTR_TYPE_COLOR[a.attributeType] || '#7f8c8d'), flexShrink: 0, fontSize: 10 }}>{enumLabel(a.attributeType, isAR)}</span>
           </div>
         ))}
       </div>
@@ -1510,6 +1539,8 @@ function SharedAttributeLibrary({ api }: { api: any }) {
 
 // ── Audit History ─────────────────────────────────────────────────────────────
 function AuditHistory({ api }: { api: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [logs, setLogs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [limit, setLimit] = useState(50)
@@ -1529,34 +1560,42 @@ function AuditHistory({ api }: { api: any }) {
     RELATIONSHIP_CREATED: '#1abc9c', RELATIONSHIP_UPDATED: '#f39c12', RELATIONSHIP_DELETED: '#e74c3c',
     VERSION_CREATED: '#3498db', VERSION_PUBLISHED: '#2ecc71',
   }
+  const ACTION_LABEL: Record<string, { en: string; ar: string }> = {
+    META_MODEL_CREATED: { en: 'Meta-model created', ar: 'أُنشئ النموذج الوصفي' }, META_MODEL_IMPORTED: { en: 'Meta-model imported', ar: 'استُورد النموذج الوصفي' },
+    DOMAIN_CREATED: { en: 'Domain created', ar: 'أُنشئ مجال' }, DOMAIN_UPDATED: { en: 'Domain updated', ar: 'عُدّل مجال' }, DOMAIN_DELETED: { en: 'Domain deleted', ar: 'حُذف مجال' },
+    OBJECT_TYPE_CREATED: { en: 'Object type created', ar: 'أُنشئ نوع عنصر' }, OBJECT_TYPE_UPDATED: { en: 'Object type updated', ar: 'عُدّل نوع عنصر' }, OBJECT_TYPE_DELETED: { en: 'Object type deleted', ar: 'حُذف نوع عنصر' },
+    ATTRIBUTE_CREATED: { en: 'Attribute created', ar: 'أُنشئت سمة' }, ATTRIBUTE_UPDATED: { en: 'Attribute updated', ar: 'عُدّلت سمة' }, ATTRIBUTE_DELETED: { en: 'Attribute deleted', ar: 'حُذفت سمة' },
+    RELATIONSHIP_CREATED: { en: 'Relationship created', ar: 'أُنشئت علاقة' }, RELATIONSHIP_UPDATED: { en: 'Relationship updated', ar: 'عُدّلت علاقة' }, RELATIONSHIP_DELETED: { en: 'Relationship deleted', ar: 'حُذفت علاقة' },
+    VERSION_CREATED: { en: 'Version created', ar: 'أُنشئ إصدار' }, VERSION_PUBLISHED: { en: 'Version published', ar: 'نُشر إصدار' },
+  }
 
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div><div style={{ fontSize: 18, fontWeight: 700 }}>Audit History</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Track all changes made to the meta-model</div></div>
+        <div><div style={{ fontSize: 18, fontWeight: 700 }}>{L('Audit History', 'سجل التدقيق')}</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Track all changes made to the meta-model', 'تتبّع كل التغييرات على النموذج الوصفي')}</div></div>
         <div style={S.row}>
           <select style={{ ...S.input, maxWidth: 120 }} value={limit} onChange={e => setLimit(Number(e.target.value))}>
-            {[20, 50, 100, 200].map(l => <option key={l} value={l}>Last {l}</option>)}
+            {[20, 50, 100, 200].map(l => <option key={l} value={l}>{L('Last', 'آخر')} {l}</option>)}
           </select>
-          <button style={S.btn()} onClick={load}>↻ Refresh</button>
+          <button style={S.btn()} onClick={load}>{L('↻ Refresh', '↻ تحديث')}</button>
         </div>
       </div>
 
-      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
+      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>{L('Loading...', 'جارٍ التحميل...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 2 }}>
-          {logs.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No audit logs yet</div>}
+          {logs.length === 0 && <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{L('No audit logs yet', 'لا توجد سجلات تدقيق بعد')}</div>}
           {logs.map((log, i) => (
             <div key={log.id || i} style={{ padding: '10px 16px', background: i % 2 === 0 ? 'var(--navy-light)' : 'transparent', borderRadius: 6, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
               <div style={{ width: 8, height: 8, borderRadius: '50%', background: ACTION_COLOR[log.action] || '#7f8c8d', flexShrink: 0, marginTop: 5 }} />
               <div style={{ flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' as const }}>
-                  <span style={{ fontWeight: 600, fontSize: 13, color: ACTION_COLOR[log.action] || 'var(--text)' }}>{log.action?.replace(/_/g,' ')}</span>
+                  <span style={{ fontWeight: 600, fontSize: 13, color: ACTION_COLOR[log.action] || 'var(--text)' }}>{enumLabel(log.action, isAR, ACTION_LABEL)}</span>
                   <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{log.resourceType}</span>
                   {log.resourceName && <span style={{ fontSize: 12 }}>{log.resourceName}</span>}
                 </div>
-                {log.userId && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>by {log.userId}</div>}
+                {log.userId && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('by', 'بواسطة')} {log.userId}</div>}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0, textAlign: 'right' }}>{log.createdAt ? new Date(log.createdAt).toLocaleString() : ''}</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', flexShrink: 0, textAlign: 'right' }}>{log.createdAt ? new Date(log.createdAt).toLocaleString(isAR ? 'ar' : 'en-US') : ''}</div>
             </div>
           ))}
         </div>
@@ -1567,6 +1606,8 @@ function AuditHistory({ api }: { api: any }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function MetaModelPage() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const api = useMetaApi()
   const [stats, setStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -1578,43 +1619,43 @@ export default function MetaModelPage() {
     setLoadError(null)
     api.get('/meta-model/stats')
       .then((s: any) => { setStats(s); setLoading(false) })
-      .catch((e: any) => { setLoadError(e.message || 'Failed to load meta-model'); setLoading(false) })
+      .catch((e: any) => { setLoadError(e.message || L('Failed to load meta-model', 'تعذّر تحميل النموذج الوصفي')); setLoading(false) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadStats() }, [loadStats])
 
   const TABS = [
-    { id: 'dashboard', label: '🏠 Dashboard' },
-    { id: 'domains', label: '🗂 Domains' },
-    { id: 'objects', label: '⬛ Object Types' },
-    { id: 'relationships', label: '🔗 Relationships' },
-    { id: 'enums', label: '🏷 Enums' },
-    { id: 'shared-attrs', label: '📚 Shared Attrs' },
-    { id: 'designer', label: '🎨 Designer' },
-    { id: 'import', label: '📥 Import' },
-    { id: 'export', label: '📤 Export' },
-    { id: 'validation', label: '✅ Validation' },
-    { id: 'ai', label: '🤖 AI Advisor' },
-    { id: 'versions', label: '📋 Versions' },
-    { id: 'audit', label: '📜 Audit' },
+    { id: 'dashboard', label: L('🏠 Dashboard', '🏠 لوحة المعلومات') },
+    { id: 'domains', label: L('🗂 Domains', '🗂 المجالات') },
+    { id: 'objects', label: L('⬛ Object Types', '⬛ أنواع العناصر') },
+    { id: 'relationships', label: L('🔗 Relationships', '🔗 العلاقات') },
+    { id: 'enums', label: L('🏷 Enums', '🏷 القوائم') },
+    { id: 'shared-attrs', label: L('📚 Shared Attrs', '📚 السمات المشتركة') },
+    { id: 'designer', label: L('🎨 Designer', '🎨 المصمم') },
+    { id: 'import', label: L('📥 Import', '📥 استيراد') },
+    { id: 'export', label: L('📤 Export', '📤 تصدير') },
+    { id: 'validation', label: L('✅ Validation', '✅ التحقق') },
+    { id: 'ai', label: L('🤖 AI Advisor', '🤖 المستشار الذكي') },
+    { id: 'versions', label: L('📋 Versions', '📋 الإصدارات') },
+    { id: 'audit', label: L('📜 Audit', '📜 التدقيق') },
   ]
 
-  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>Loading...</div>
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-dim)' }}>{L('Loading...', 'جارٍ التحميل...')}</div>
 
   if (loadError) return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 12, padding: 20, textAlign: 'center' }}>
       <div style={{ fontSize: 32 }}>⚠️</div>
-      <div style={{ fontSize: 14, fontWeight: 600 }}>Couldn't load the meta-model</div>
+      <div style={{ fontSize: 14, fontWeight: 600 }}>{L('Couldn\'t load the meta-model', 'تعذّر تحميل النموذج الوصفي')}</div>
       <div style={{ fontSize: 12, color: 'var(--text-dim)', maxWidth: 400 }}>{loadError}</div>
-      <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => { setLoading(true); loadStats() }}>Retry</button>
+      <button className="btn btn-primary" style={{ marginTop: 8 }} onClick={() => { setLoading(true); loadStats() }}>{L('Retry', 'إعادة المحاولة')}</button>
     </div>
   )
 
   if (!stats?.model) return (
     <div style={S.page}>
       <div style={S.header}>
-        <div style={{ fontSize: 22, fontWeight: 700 }}>🏛 EA Meta-Model Studio</div>
-        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Define and manage your Enterprise Architecture meta-model</div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{L('🏛 EA Meta-Model Studio', '🏛 استوديو النموذج الوصفي للبنية المؤسسية')}</div>
+        <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Define and manage your Enterprise Architecture meta-model', 'عرّف النموذج الوصفي لبنيتك المؤسسية وأدِره')}</div>
       </div>
       <SetupWizard api={api} onCreated={loadStats} />
     </div>
@@ -1624,7 +1665,7 @@ export default function MetaModelPage() {
     <div style={S.page}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🏛 EA Meta-Model Studio<HelpTip text="This is where you define the building blocks your organization's architecture is made of - things like 'Application' or 'Business Capability' - and what information gets tracked for each one. Most people won't need to change this; it's usually set up once by an administrator." /></div>
+          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>{L('🏛 EA Meta-Model Studio', '🏛 استوديو النموذج الوصفي للبنية المؤسسية')}<HelpTip text={L('This is where you define the building blocks your organization\'s architecture is made of - things like \'Application\' or \'Business Capability\' - and what information gets tracked for each one. Most people won\'t need to change this; it\'s usually set up once by an administrator.', 'هنا تعرّف لبنات البناء التي تتكون منها بنية جهتك، مثل "التطبيق" أو "قدرة الأعمال"، والمعلومات التي تُتتبّع لكل منها. لن يحتاج معظم المستخدمين إلى تغيير ذلك؛ فعادة يُعدّ مرة واحدة من قبل المسؤول.')} /></div>
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{stats?.model?.name}</div>
         </div>
       </div>
