@@ -63,3 +63,16 @@ it('publishes only explicitly selected canonical properties with typed values', 
   fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.publication.authorize' }))
   await waitFor(() => expect(api.publish).toHaveBeenCalledWith('refresh-a', finding, { action: 'SCENARIO_DELTA', viewId: 'view-a', scenarioId: 'target-a', assetId: 'asset-a', operation: 'UPDATE', overrides: { count: 3 } }))
 })
+
+it('requires explicit Governance type and recorded framework before creating a review draft', async () => {
+  api.publicationOptions.mockResolvedValue({ ...options, actions: ['GOVERNANCE_REVIEW_DRAFT'], governanceFrameworks: ['CUSTOM_FRAMEWORK'], governanceReviewTypes: ['CHANGE_REQUEST'] })
+  render(<StrategyPublicationDialog refreshId="refresh-a" finding={finding} onClose={jest.fn()} onPublished={jest.fn().mockResolvedValue(undefined)} />)
+  await screen.findByLabelText('strategy.refresh.destination')
+  fireEvent.change(screen.getByLabelText('strategy.refresh.destination'), { target: { value: 'GOVERNANCE_REVIEW_DRAFT' } })
+  expect(api.publish).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText('strategy.refresh.publication.reviewType'), { target: { value: 'CHANGE_REQUEST' } })
+  expect(screen.getByRole('button', { name: 'strategy.refresh.publication.authorize' })).toBeDisabled()
+  fireEvent.change(screen.getByLabelText('strategy.refresh.publication.framework'), { target: { value: 'CUSTOM_FRAMEWORK' } })
+  fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.publication.authorize' }))
+  await waitFor(() => expect(api.publish).toHaveBeenCalledWith('refresh-a', finding, { action: 'GOVERNANCE_REVIEW_DRAFT', reviewType: 'CHANGE_REQUEST', framework: 'CUSTOM_FRAMEWORK' }))
+})

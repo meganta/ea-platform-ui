@@ -122,6 +122,8 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
     'strategy.refresh.publication.framework': { EN: 'Reviewed tenant framework', AR: 'إطار المستأجر الذي تمت مراجعته' },
     'strategy.refresh.metric.FINDINGS': { EN: 'Recorded analysis findings', AR: 'نتائج التحليل المسجلة' },
     'strategy.refresh.metric.REFERENCED_OBJECTS': { EN: 'Distinct referenced objects — not authorized changes', AR: 'عناصر متميزة مستشهد بها — وليست تغييرات معتمدة' },
+    'strategy.refresh.insight_evidence': { EN: 'Recorded objects behind this view insight', AR: 'العناصر المسجلة التي تدعم استنتاج المشهد' },
+    'strategy.refresh.declared_attributes': { EN: 'Document-declared attributes', AR: 'الخصائص المصرح بها في الوثيقة' },
     'strategy.refresh.label.NOT_REQUESTED': { EN: 'Not published', AR: 'غير منشور' },
     'strategy.refresh.label.PUBLISHED': { EN: 'Published', AR: 'منشور' },
     'strategy.refresh.view_snapshot_note': { EN: 'Recorded architecture evidence, resolved by shared EA Views. Proposed strategic changes are not applied to this picture.', AR: 'أدلة بنية مسجلة، تمت معالجتها بواسطة مشاهد البنية المشتركة. لا تُطبق التغييرات الاستراتيجية المقترحة على هذه الصورة.' },

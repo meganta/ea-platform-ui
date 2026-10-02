@@ -49,6 +49,18 @@ it('makes refresh the primary action and drills summary facts into their evidenc
   expect(screen.getByRole('dialog')).toHaveTextContent('Objectives')
 })
 
+it('drills a distinct-object metric into exactly its cited findings, across categories', async () => {
+  const impact: any = { ...finding, id: 'impact-a', category: 'ARCHITECTURE_IMPACT', title: 'Review application impact' }
+  const capability: any = { ...finding, id: 'cap-a', category: 'CAPABILITY_IMPACT', title: 'Review capability impact' }
+  api.get.mockResolvedValue({ ...ready, findings: [finding, impact, capability], summary: [{ id: 'objects:Application', category: 'ARCHITECTURE_IMPACT', semanticType: 'Application', measure: 'REFERENCED_OBJECTS', count: 1, findingIds: ['impact-a', 'cap-a'] }] })
+  render(<StrategyRefreshPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+  fireEvent.click(await screen.findByRole('button', { name: /Application/ }))
+  expect(screen.getByRole('heading', { name: impact.title })).toBeInTheDocument()
+  expect(screen.getByRole('heading', { name: capability.title })).toBeInTheDocument()
+  expect(screen.queryByRole('heading', { name: finding.title })).not.toBeInTheDocument()
+})
+
 it('does not silently approve a fact, and records a reason plus expected revision', async () => {
   render(<StrategyRefreshPage />)
   fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
