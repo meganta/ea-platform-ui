@@ -864,8 +864,9 @@ describe('InnovationPage - Studies tab: list and creation', () => {
     fireEvent.click(await screen.findByText('innov.new_study'));
     expect(screen.queryByText('innov.select_radar_item')).not.toBeInTheDocument(); // not shown by default (MANUAL)
 
-    const selects = screen.getAllByRole('combobox');
-    fireEvent.change(selects[1], { target: { value: 'RADAR_ITEM' } }); // selects[0] is the list's own status filter, still rendered alongside the form
+    // The list's own status and author filters are still rendered alongside the form; pick the origin-type select by its value.
+    const originSelect = screen.getAllByRole('combobox').find(el => (el as HTMLSelectElement).value === 'MANUAL')!;
+    fireEvent.change(originSelect, { target: { value: 'RADAR_ITEM' } });
     expect(await screen.findByText('innov.select_radar_item')).toBeInTheDocument();
   });
 });
@@ -1903,5 +1904,38 @@ describe('InnovationPage - Studies: EA View pictures in the impact analysis', ()
       const app = body.content.domains.find((d: any) => d.domain === 'APPLICATION_INTEGRATION');
       expect(app.view).toEqual({ title: 'Application Landscape', source: 'SAVED_VIEW' });
     });
+  });
+});
+
+describe('InnovationPage - Studies: who prepared them (platform users vs Copilot)', () => {
+  const fetchedUrls = () => (global.fetch as jest.Mock).mock.calls.map(c => String(c[0]));
+
+  it('lists platform users\' studies by default and can switch to Copilot-prepared or all studies', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [STUDY] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    await screen.findByText('AI Chatbot Consultation Study');
+    expect(fetchedUrls().some(u => u.endsWith('/innovation/studies?author=USER'))).toBe(true);
+    const author = screen.getByLabelText('innov.author_filter') as HTMLSelectElement;
+    expect(author.value).toBe('USER');
+    fireEvent.change(author, { target: { value: 'COPILOT' } });
+    await waitFor(() => expect(fetchedUrls().some(u => u.endsWith('/innovation/studies?author=COPILOT'))).toBe(true));
+    fireEvent.change(author, { target: { value: 'ALL' } });
+    await waitFor(() => expect(fetchedUrls().some(u => u.endsWith('/innovation/studies?author=ALL'))).toBe(true));
+  });
+
+  it('marks a study the Chief Architect prepared in Copilot', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [{ ...STUDY, authorType: 'COPILOT' }] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    expect(await screen.findByText('copilot.study.by_copilot')).toBeInTheDocument();
+  });
+
+  it('opens the linked study from /innovation?study=<id> (Copilot study cards, notifications)', async () => {
+    window.history.pushState({}, '', '/innovation?study=study-1');
+    mockFetch({ '/innovation/radar': [], '/innovation/studies/study-1': STUDY, '/innovation/studies': [STUDY] });
+    render(<InnovationPage />);
+    expect(await screen.findByText('innov.not_generated_yet')).toBeInTheDocument();
+    window.history.pushState({}, '', '/');
   });
 });
