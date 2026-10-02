@@ -4,7 +4,7 @@ export interface RefreshFinding {
   id: string; title: string; category: string; authority: string; confidence: number | null
   decision: string; revision: number; destination: string | null; publishedId: string | null; publishedAt: string | null
   publicationStatus?: string; publicationFailureCode?: string
-  payload: { semanticType?: string; description?: string; ambiguity?: string; limitation?: string; classification?: string; explanation?: string; factId?: string; predecessorId?: string; warnings?: string[]; attributes?: Array<{ name: string; value: string; quote: string }> }
+  payload: { semanticType?: string; description?: string; ambiguity?: string; limitation?: string; classification?: string; explanation?: string; factId?: string; predecessorId?: string; warnings?: string[]; attributes?: Array<{ name: string; value: string; quote: string }>; sourceFilename?: string; sourceId?: string; namedEntities?: string[]; recommendedAction?: string; priority?: string }
   evidence: any
 }
 export interface StrategyRefresh {
@@ -16,13 +16,19 @@ export interface StrategyRefresh {
   context?: { limitations: string[]; evidence: Array<{ id: string; module: string; authority: string; data: any }>; previous?: Array<{ id: string; title: string; payload: any; evidence: any }> }
   responseProgress?: { total: number; published: number; pending: number }
   impact?: StrategyImpact | null
+  /** Limits of this analysis, coded; the UI words them (strategy.refresh.limits.*). */
+  limits?: StrategyLimit[]
 }
+
+export interface StrategyLimit { code: string; params?: Record<string, string | number | string[]> }
 
 export type ImpactLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE'
 export interface StrategyImpactedObject {
   assetId: string; name: string; assetType: string; typeLabel: string
   impactType: string; nature: 'DIRECT' | 'INDIRECT'; impactLevel: 'HIGH' | 'MEDIUM' | 'LOW'; description: string
   factIds: string[]; namedInStrategy: boolean
+  /** A principle, standard, policy or regulation (own register section). */
+  governance?: boolean
 }
 export interface StrategyImpactView {
   source: 'SAVED_VIEW' | 'VIEW_LIBRARY'; viewId: string | null; viewpointId: string | null; title: string; visualization: string

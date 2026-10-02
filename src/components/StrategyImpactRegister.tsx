@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import HelpTip from './HelpTip'
-import { RefreshFinding, StrategyDomainImpact, StrategyImpact, StrategyImpactView } from '../lib/strategy-refresh'
+import { factType, factTypeLabel } from './StrategyRefreshSections'
+import { RefreshFinding, StrategyDomainImpact, StrategyImpact, StrategyImpactView, StrategyImpactedObject } from '../lib/strategy-refresh'
 
 type T = (key: string) => string
 const fill = (text: string, values: Record<string, string | number>) => Object.entries(values).reduce((out, [k, v]) => out.split(`{${k}}`).join(String(v)), text)
@@ -56,20 +57,42 @@ function ImpactViewFigure({ view, t }: { view: StrategyImpactView; t: T }) {
  * and the strategy statements behind it, per-domain EA Views, and the names the documents
  * use that the Repository does not model.
  */
-export function StrategyImpactRegister({ impact, findings, t, domain, onDomainChange, onShowFact }: {
+export function StrategyImpactRegister({ impact, findings, t, domain, onDomainChange, onShowFact, factFilter = null, onClearFact }: {
   impact: StrategyImpact; findings: RefreshFinding[]; t: T; domain: string; onDomainChange: (domain: string) => void; onShowFact: (finding: RefreshFinding) => void
+  /** Only objects driven by this strategy statement (from the Strategy Map). */
+  factFilter?: RefreshFinding | null; onClearFact?: () => void
 }) {
   const [level, setLevel] = useState('')
   const [impactType, setImpactType] = useState('')
   const [namedOnly, setNamedOnly] = useState(false)
   const facts = useMemo(() => new Map(findings.map(f => [f.id, f])), [findings])
-  const shown: StrategyDomainImpact[] = impact.domains.filter(d => d.status !== 'NO_OBJECTS' && (!domain || d.domain === domain))
+  const shownDomains = () => impact.domains.filter(d => d.status !== 'NO_OBJECTS' && (!domain || d.domain === domain))
+  const shown: StrategyDomainImpact[] = shownDomains()
   const types = useMemo(() => [...new Set(impact.domains.flatMap(d => d.impactedObjects.map(o => o.impactType)))].sort(), [impact])
-  const rows = (d: StrategyDomainImpact) => d.impactedObjects.filter(o => (!level || o.impactLevel === level) && (!impactType || o.impactType === impactType) && (!namedOnly || o.namedInStrategy))
+  const matches = (o: StrategyImpactedObject) => (!level || o.impactLevel === level) && (!impactType || o.impactType === impactType) && (!namedOnly || o.namedInStrategy) && (!factFilter || o.factIds.includes(factFilter.id))
+  const rows = (d: StrategyDomainImpact) => d.impactedObjects.filter(o => !o.governance && matches(o))
+  const governanceRows = shownDomains().flatMap(d => d.impactedObjects.filter(o => o.governance && matches(o)).map(o => ({ ...o, domainLabel: domainLabel(t, d) })))
+  const objectTable = (list: Array<StrategyImpactedObject & { domainLabel?: string }>) => <div className="impact-table-wrap"><table>
+            <thead><tr>
+              <th scope="col">{t('strategy.refresh.impact.col.object')}</th>
+              <th scope="col">{t('strategy.refresh.impact.col.type')}</th>
+              <th scope="col">{t('strategy.refresh.impact.col.impact')}</th>
+              <th scope="col">{t('strategy.refresh.impact.col.description')}</th>
+              <th scope="col">{t('strategy.refresh.impact.col.basis')}</th>
+            </tr></thead>
+            <tbody>{list.map(o => <tr key={o.assetId}>
+              <td><strong>{o.name}</strong>{o.namedInStrategy && <span className="impact-named">{t('strategy.refresh.impact.named')}</span>}</td>
+              <td>{o.typeLabel || o.assetType}{o.domainLabel && <small className="impact-domain-label"> · {o.domainLabel}</small>}</td>
+              <td><span className={`impact-level level-${o.impactLevel}`}>{t(`strategy.refresh.impact.level.${o.impactLevel}`)}</span> {labelOf(t, `strategy.refresh.impact.type.${o.impactType}`, o.impactType)} · {t(`strategy.refresh.impact.nature.${o.nature}`)}</td>
+              <td>{o.description}</td>
+              <td>{basis(o.factIds).map(f => <button key={f.id} className="impact-fact" onClick={() => onShowFact(f)}><span className="impact-fact-type">{factTypeLabel(t, factType(f))}</span> · {f.title}</button>)}</td>
+            </tr>)}</tbody>
+          </table></div>
   const basis = (ids: string[]) => ids.map(id => facts.get(id)).filter((f): f is RefreshFinding => !!f)
 
   return <section className="impact-register">
     <h2>{t('strategy.refresh.impact.register')}<HelpTip text={t('strategy.refresh.impact.register_help')} /></h2>
+    {factFilter && <p className="impact-driven" role="status">{fill(t('strategy.refresh.impact.driven_filter'), { title: `${factTypeLabel(t, factType(factFilter))} · ${factFilter.title}` })} <button onClick={onClearFact}>{t('strategy.refresh.impact.clear_filter')}</button></p>}
     <div className="impact-filters">
       <label htmlFor="impact-domain">{t('strategy.refresh.impact.filter.domain')}
         <select id="impact-domain" value={domain} onChange={e => onDomainChange(e.target.value)}>
@@ -92,7 +115,11 @@ export function StrategyImpactRegister({ impact, findings, t, domain, onDomainCh
       <label htmlFor="impact-named" className="impact-check"><input id="impact-named" type="checkbox" checked={namedOnly} onChange={e => setNamedOnly(e.target.checked)} />{t('strategy.refresh.impact.filter.named')}</label>
     </div>
 
-    {shown.map(d => {
+    {governanceRows.length > 0 && <article className="impact-governance" data-testid="impact-governance">
+      <h3>{t('strategy.refresh.impact.governance')}<HelpTip text={t('strategy.refresh.impact.governance_help')} /></h3>
+      {objectTable(governanceRows)}
+    </article>}
+    {shown.filter(d => !factFilter || rows(d).length).map(d => {
       const list = rows(d)
       return <article key={d.domain} className="impact-domain" data-testid={`impact-domain-${d.domain}`}>
         <div className="finding-meta"><span className={`impact-level level-${d.status === 'FAILED' ? 'FAILED' : d.impactLevel}`}>{d.status === 'FAILED' ? '!' : t(`strategy.refresh.impact.level.${d.impactLevel}`)}</span></div>
@@ -101,22 +128,7 @@ export function StrategyImpactRegister({ impact, findings, t, domain, onDomainCh
           {d.summary && <p>{d.summary}</p>}
           {d.assessedCount < d.objectCount && <p className="impact-note">{fill(t('strategy.refresh.impact.partial'), { assessed: d.assessedCount, total: d.objectCount })}</p>}
           {d.view?.image?.svg && <ImpactViewFigure view={d.view} t={t} />}
-          {list.length ? <div className="impact-table-wrap"><table>
-            <thead><tr>
-              <th scope="col">{t('strategy.refresh.impact.col.object')}</th>
-              <th scope="col">{t('strategy.refresh.impact.col.type')}</th>
-              <th scope="col">{t('strategy.refresh.impact.col.impact')}</th>
-              <th scope="col">{t('strategy.refresh.impact.col.description')}</th>
-              <th scope="col">{t('strategy.refresh.impact.col.basis')}</th>
-            </tr></thead>
-            <tbody>{list.map(o => <tr key={o.assetId}>
-              <td><strong>{o.name}</strong>{o.namedInStrategy && <span className="impact-named">{t('strategy.refresh.impact.named')}</span>}</td>
-              <td>{o.typeLabel || o.assetType}</td>
-              <td><span className={`impact-level level-${o.impactLevel}`}>{t(`strategy.refresh.impact.level.${o.impactLevel}`)}</span> {labelOf(t, `strategy.refresh.impact.type.${o.impactType}`, o.impactType)} · {t(`strategy.refresh.impact.nature.${o.nature}`)}</td>
-              <td>{o.description}</td>
-              <td>{basis(o.factIds).map(f => <button key={f.id} className="impact-fact" onClick={() => onShowFact(f)}>{f.title}</button>)}</td>
-            </tr>)}</tbody>
-          </table></div> : <p className="impact-note">{t('strategy.refresh.impact.no_rows')}</p>}
+          {list.length ? objectTable(list) : <p className="impact-note">{t('strategy.refresh.impact.no_rows')}</p>}
         </>}
       </article>
     })}
