@@ -4,7 +4,7 @@ export interface RefreshFinding {
   id: string; title: string; category: string; authority: string; confidence: number | null
   decision: string; revision: number; destination: string | null; publishedId: string | null; publishedAt: string | null
   publicationStatus?: string; publicationFailureCode?: string
-  payload: { semanticType?: string; description?: string; ambiguity?: string; limitation?: string; classification?: string; explanation?: string; factId?: string; predecessorId?: string; warnings?: string[]; attributes?: Array<{ name: string; value: string; quote: string }> }
+  payload: { semanticType?: string; description?: string; ambiguity?: string; limitation?: string; classification?: string; explanation?: string; factId?: string; predecessorId?: string; warnings?: string[]; attributes?: Array<{ name: string; value: string; quote: string }>; sourceFilename?: string; sourceId?: string; namedEntities?: string[]; recommendedAction?: string; priority?: string }
   evidence: any
 }
 export interface StrategyRefresh {
