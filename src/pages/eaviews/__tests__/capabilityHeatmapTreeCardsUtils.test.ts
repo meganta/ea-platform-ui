@@ -169,6 +169,28 @@ describe('capabilityHeatmapTreeCardsUtils', () => {
     expect(result.eligible).toBe(false)
   })
 
+  it('HEATMAP: object fields (source "field") are read from the object, attributes from metadata; tiles grouped by type, primary first', () => {
+    const ds = {
+      objects: [
+        { id: 'p1', name: 'Hire', role: 'RELATED', assetType: 'BusinessProcess', owner: 'HR', metadata: {} },
+        { id: 'a1', name: 'Payroll', role: 'PRIMARY', assetType: 'Application', owner: 'IT', metadata: { owner: 'not this', tier: 1 } },
+      ],
+      hierarchies: [],
+      metrics: [
+        { key: 'owner', label: 'Owner', dataType: 'categorical', coveragePercent: 100, distinctValues: ['HR', 'IT'], source: 'field' },
+        { key: 'tier', label: 'Tier', dataType: 'numeric', coveragePercent: 50, min: 1, max: 1, source: 'attribute' },
+      ],
+    }
+    const owner = buildHeatmapDisplay(ds, eligibleFor('HEATMAP', { metricKey: 'owner', candidateMetrics: ['owner', 'tier'] }))
+    expect(owner.tiles?.map(t => t.value)).toEqual(['HR', 'IT'])
+    expect(owner.groups?.map(g => [g.assetType, g.tiles.map(t => t.objectId)])).toEqual([['Application', ['a1']], ['BusinessProcess', ['p1']]])
+    expect(owner.metricOptions).toEqual([{ key: 'owner', label: 'Owner', coveragePercent: 100 }, { key: 'tier', label: 'Tier', coveragePercent: 50 }])
+    const tier = buildHeatmapDisplay(ds, eligibleFor('HEATMAP', { metricKey: 'owner', candidateMetrics: ['owner', 'tier'] }), 'tier')
+    expect(tier.tiles?.map(t => t.value)).toEqual([null, 1])
+    // a stale selection that is no longer offered falls back to the recommended attribute
+    expect(buildHeatmapDisplay(ds, eligibleFor('HEATMAP', { metricKey: 'owner', candidateMetrics: ['owner'] }), 'gone').metricKey).toBe('owner')
+  })
+
   // ── Tree ───────────────────────────────────────────────────────────
 
   // Test 16: Genuine hierarchy renders correctly - the acceptance fixture

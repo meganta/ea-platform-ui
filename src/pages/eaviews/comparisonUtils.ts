@@ -310,7 +310,7 @@ export function buildHeatmapComparison(comparison: any, metricKey: string): { el
   if (leftMetric.dataType !== rightMetric.dataType) return { eligible: false, reason: `Metric "${metricKey}" has an incompatible type between the two scenarios (${leftMetric.dataType} vs ${rightMetric.dataType}).` }
 
   const isNumeric = leftMetric.dataType === 'numeric'
-  const getValue = (obj: any) => metricKey === 'status' ? obj?.status : obj?.metadata?.[metricKey]
+  const getValue = (obj: any) => (leftMetric.source === 'field' || metricKey === 'status') ? obj?.[metricKey] : obj?.metadata?.[metricKey]
   const cells: HeatmapComparisonCell[] = []
   for (const bucket of ['modified', 'unchanged'] as const) {
     for (const o of comparison?.objects?.[bucket] ?? []) {

@@ -6,6 +6,7 @@ import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { exportFileName } from '../lib/exportFileName'
 
+import { STUDY_STATUS_LABEL, RECOMMENDATION_LABEL } from '../components/studyLabels'
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
 function useApi() {
@@ -188,7 +189,11 @@ export default function InnovationPage() {
   const { t, isAR } = useLang()
   const { user } = useAuth() as any
   const isAdmin = user?.role === 'TENANT_ADMIN'
-  const [tab, setTab] = useState<'radar' | 'favorites' | 'watchlist' | 'ideas' | 'studies' | 'profile'>('radar')
+  // /innovation?study=<id> (Copilot study cards, study notifications) opens that study.
+  const [linkedStudyId] = useState<string | null>(() => {
+    try { return new URLSearchParams(window.location.search).get('study') } catch { return null }
+  })
+  const [tab, setTab] = useState<'radar' | 'favorites' | 'watchlist' | 'ideas' | 'studies' | 'profile'>(linkedStudyId ? 'studies' : 'radar')
   const [selected, setSelected] = useState<any>(null)
   const [ideaSeed, setIdeaSeed] = useState<any>(null)
   const createIdeaFrom = (item: any) => {
@@ -221,7 +226,7 @@ export default function InnovationPage() {
         {tab === 'favorites' && <FavoritesTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} selected={selected} setSelected={setSelected} onCreateIdeaFrom={createIdeaFrom} />}
         {tab === 'watchlist' && <WatchlistTab api={api} isAdmin={isAdmin} isAR={isAR} t={t} userId={user?.userId} selected={selected} setSelected={setSelected} onCreateIdeaFrom={createIdeaFrom} />}
         {tab === 'ideas' && <IdeasTab api={api} isAR={isAR} t={t} userRole={user?.role} seed={ideaSeed} onSeedConsumed={() => setIdeaSeed(null)} />}
-        {tab === 'studies' && <StudiesTab api={api} isAR={isAR} t={t} />}
+        {tab === 'studies' && <StudiesTab api={api} isAR={isAR} t={t} initialStudyId={linkedStudyId} />}
         {tab === 'profile' && <ProfileTab api={api} isAR={isAR} t={t} />}
       </div>
     </div>
@@ -1896,18 +1901,6 @@ const STUDY_STATUS_COLOR: Record<string, string> = {
   DRAFT: '#7f8c8d', AI_RESEARCH: '#f39c12', UNDER_REVIEW: '#3498db', REWORK: '#e67e22',
   APPROVED: '#27ae60', RECOMMENDED: '#2ecc71', PILOT_INITIATIVE: '#9b59b6', IMPLEMENTED: '#16a085', CLOSED_ARCHIVED: '#7f8c8d',
 }
-const STUDY_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
-  DRAFT: { en: 'Draft', ar: 'مسودة' }, AI_RESEARCH: { en: 'AI Research…', ar: 'بحث الذكاء الاصطناعي…' },
-  UNDER_REVIEW: { en: 'Under Review', ar: 'قيد المراجعة' }, REWORK: { en: 'Rework', ar: 'إعادة عمل' },
-  APPROVED: { en: 'Approved', ar: 'معتمدة' }, RECOMMENDED: { en: 'Recommended', ar: 'موصى بها' },
-  PILOT_INITIATIVE: { en: 'Pilot / Initiative', ar: 'تجريبية / مبادرة' }, IMPLEMENTED: { en: 'Implemented', ar: 'منفَّذة' },
-  CLOSED_ARCHIVED: { en: 'Closed / Archived', ar: 'مغلقة / مؤرشفة' },
-}
-const RECOMMENDATION_LABEL: Record<string, { en: string; ar: string }> = {
-  PROCEED: { en: 'Proceed', ar: 'المضي قدمًا' }, PROCEED_WITH_CONDITIONS: { en: 'Proceed with Conditions', ar: 'المضي قدمًا بشروط' },
-  POC_FIRST: { en: 'PoC First', ar: 'إثبات مفهوم أولاً' }, PILOT: { en: 'Pilot', ar: 'تجريب' },
-  DEFER: { en: 'Defer', ar: 'تأجيل' }, WATCH: { en: 'Watch', ar: 'متابعة' }, REJECT: { en: 'Reject', ar: 'رفض' },
-}
 // Mirrors apps/api/src/innovation/study.service.ts's STUDY_SECTION_DEFS (story order: summary, why, what it enables,
 // how, cost and value, risks, recommendation) - keep in sync if that list changes.
 const STUDY_SECTIONS: { key: string; en: string; ar: string; shape: 'text' | 'list' | 'recommendation' | 'impact' }[] = [
@@ -2420,17 +2413,28 @@ function PortfolioSummary({ api, isAR, t }: any) {
   )
 }
 
-function StudiesTab({ api, isAR, t }: any) {
+// Who prepared a study: platform users in this module (the default view), or
+// the Chief Architect in Copilot.
+export type StudyAuthorFilter = 'USER' | 'COPILOT' | 'ALL'
+export function studiesQuery(status: string, author: StudyAuthorFilter): string {
+  const params = new URLSearchParams()
+  if (status) params.set('status', status)
+  params.set('author', author)
+  return `/innovation/studies?${params.toString()}`
+}
+
+function StudiesTab({ api, isAR, t, initialStudyId }: any) {
   const [studies, setStudies] = useState<any[]>([])
   const [statusFilter, setStatusFilter] = useState('')
+  const [authorFilter, setAuthorFilter] = useState<StudyAuthorFilter>('USER')
   const [creating, setCreating] = useState(false)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(initialStudyId || null)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(() => {
     setLoading(true)
-    api.get(`/innovation/studies${statusFilter ? `?status=${statusFilter}` : ''}`).then((d: any) => setStudies(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
-  }, [api, statusFilter])
+    api.get(studiesQuery(statusFilter, authorFilter)).then((d: any) => setStudies(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
+  }, [api, statusFilter, authorFilter])
   useEffect(() => { load() }, [load])
 
   if (selectedId) return <StudyDetail api={api} studyId={selectedId} isAR={isAR} t={t} onBack={() => { setSelectedId(null); load() }} />
@@ -2443,6 +2447,13 @@ function StudiesTab({ api, isAR, t }: any) {
           <option value="">{t('innov.all_statuses')}</option>
           {Object.keys(STUDY_STATUS_LABEL).map(s => <option key={s} value={s}>{isAR ? STUDY_STATUS_LABEL[s].ar : STUDY_STATUS_LABEL[s].en}</option>)}
         </select>
+        <label htmlFor="study-author-filter" style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('innov.author_filter')}</label>
+        <select id="study-author-filter" style={{ ...S.input, marginBottom: 0, width: 220 }} value={authorFilter} onChange={e => setAuthorFilter(e.target.value as StudyAuthorFilter)}>
+          <option value="USER">{t('innov.author_users')}</option>
+          <option value="COPILOT">{t('innov.author_copilot')}</option>
+          <option value="ALL">{t('innov.author_all')}</option>
+        </select>
+        <HelpTip text={t('innov.author_help')} />
         <div style={{ flex: 1 }} />
         <button style={S.btn('primary')} onClick={() => setCreating(true)}>{t('innov.new_study')}</button>
       </div>
@@ -2458,7 +2469,10 @@ function StudiesTab({ api, isAR, t }: any) {
           {studies.map((s: any) => (
             <div key={s.id} style={{ ...S.card, padding: '14px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }} onClick={() => setSelectedId(s.id)}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{isAR && s.titleAr ? s.titleAr : s.title}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>
+                  {isAR && s.titleAr ? s.titleAr : s.title}
+                  {s.authorType === 'COPILOT' && <span style={{ ...S.badge('#38bdf8'), marginInlineStart: 8 }}>{t('copilot.study.by_copilot')}</span>}
+                </div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>{s.objective}</div>
               </div>
               {s.qualityScore != null && <div style={{ fontSize: 15, fontWeight: 700 }}>{s.qualityScore}</div>}
