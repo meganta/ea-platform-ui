@@ -215,6 +215,8 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'strategy.refresh.changes.no_baseline': { EN: 'There is no approved earlier version of this strategy to compare with. Once you review and activate a version, the next refresh will show what changed: new, modified, retained and removed statements.', AR: 'لا يوجد إصدار سابق معتمد من هذه الاستراتيجية للمقارنة به. بعد مراجعة إصدار وتفعيله، سيعرض التحديث التالي ما الذي تغيّر: البيانات الجديدة والمعدلة والمستمرة والمحذوفة.' },
   'strategy.refresh.changes.none': { EN: 'No changes were found compared with the active version.', AR: 'لم تُرصد تغييرات مقارنة بالإصدار الفعّال.' },
   'strategy.refresh.impact.driven_filter': { EN: 'Showing the objects driven by: {title}', AR: 'العناصر التي يؤثر فيها: {title}' },
+  'strategy.refresh.impact.governance': { EN: 'Principles, standards & policies', AR: 'المبادئ والمعايير والسياسات' },
+  'strategy.refresh.impact.governance_help': { EN: 'Your EA principles, standards and policies that the refreshed strategy requires to be revised, strengthened, replaced or retired. All of them are assessed, not a sample.', AR: 'مبادئ البنية المؤسسية ومعاييرها وسياساتها التي تتطلب الاستراتيجية المحدّثة مراجعتها أو تعزيزها أو استبدالها أو إيقافها. تُقيَّم جميعها لا عينة منها.' },
   'strategy.refresh.impact.clear_filter': { EN: 'Show all', AR: 'عرض الكل' },
   'strategy.refresh.card.action': { EN: 'Recommended action', AR: 'الإجراء الموصى به' },
   'strategy.refresh.card.affects': { EN: 'Affects', AR: 'يمسّ' },

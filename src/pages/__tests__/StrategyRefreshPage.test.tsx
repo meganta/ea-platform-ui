@@ -307,3 +307,17 @@ describe('reading the refresh step by step', () => {
     expect(api.activate).not.toHaveBeenCalled()
   })
 })
+
+it('shows principles, standards and policies in their own section, not mixed into the domain tables', async () => {
+  const std: any = { assetId: 's1', name: 'Integration Architecture', assetType: 'EAStandard', typeLabel: 'EA Standard', impactType: 'MODIFY', nature: 'DIRECT', impactLevel: 'HIGH', description: 'Revise for API-first integration.', factIds: ['fact-b'], namedInStrategy: true, governance: true }
+  const layer: any = { domain: 'STRATEGY_LAYER', domainName: 'Strategy Layer', status: 'ASSESSED', objectCount: 571, assessedCount: 300, impactLevel: 'HIGH', summary: '', impactedObjects: [std] }
+  api.get.mockResolvedValue({ ...withImpact, impact: { ...impact, domains: [...impact.domains, layer] } })
+  render(<StrategyRefreshPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+  fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.impact' }))
+  const section = screen.getByTestId('impact-governance')
+  expect(section).toHaveTextContent('strategy.refresh.impact.governance')
+  expect(section).toHaveTextContent('Integration Architecture')
+  expect(section).toHaveTextContent('Strategy Layer')
+  expect(screen.getByTestId('impact-domain-STRATEGY_LAYER')).not.toHaveTextContent('Integration Architecture')
+})

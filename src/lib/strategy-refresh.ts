@@ -27,6 +27,8 @@ export interface StrategyImpactedObject {
   assetId: string; name: string; assetType: string; typeLabel: string
   impactType: string; nature: 'DIRECT' | 'INDIRECT'; impactLevel: 'HIGH' | 'MEDIUM' | 'LOW'; description: string
   factIds: string[]; namedInStrategy: boolean
+  /** A principle, standard, policy or regulation (own register section). */
+  governance?: boolean
 }
 export interface StrategyImpactView {
   source: 'SAVED_VIEW' | 'VIEW_LIBRARY'; viewId: string | null; viewpointId: string | null; title: string; visualization: string
