@@ -25,40 +25,44 @@ it('offers publication on the reviewed finding card without duplicating it or si
   expect(api.activate).not.toHaveBeenCalled();
 });
 
-it('shows the recorded shared ViewDataset picture without applying or re-querying architecture', async () => {
-  api.get.mockResolvedValue({ ...ready, context: { limitations: [], evidence: [{ id: 'view-a:target-a', module: 'EA_VIEW_DATASET', authority: 'TENANT_FACT', data: { viewId: 'view-a', viewName: 'Strategic Target', scenarioType: 'TARGET', dataset: { objects: [{ id: 'asset-a' }], relationships: [] }, image: { svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Asset A</text></svg>', shownNodes: 1, shownEdges: 0 } } }] } });
+it('shows the Strategy Map as the statements grouped by kind, with no unrelated view pictures', async () => {
+  api.get.mockResolvedValue({ ...ready, context: { limitations: [], evidence: [{ id: 'view-a:target-a', module: 'EA_VIEW_DATASET', authority: 'TENANT_FACT', data: { viewId: 'view-a', viewName: 'Strategic Target', image: { svg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>' } } }] } });
   render(<StrategyRefreshPage />);
   fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }));
   fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.map' }));
-  expect(screen.getByRole('img', { name: 'Strategic Target' })).toHaveAttribute('src', expect.stringContaining('data:image/svg+xml'));
-  expect(screen.getByText('strategy.refresh.view_snapshot_note')).toBeInTheDocument();
+  expect(screen.getByTestId('map-group-Objective')).toHaveTextContent(finding.title);
+  expect(screen.queryByRole('img', { name: 'Strategic Target' })).not.toBeInTheDocument();
   expect(api.decide).not.toHaveBeenCalled();
-  expect(api.activate).not.toHaveBeenCalled();
 });
 
-it('makes refresh the primary action and drills summary facts into their evidence', async () => {
+it('makes refresh the primary action and drills a kind of statement into the Strategy Map and its evidence', async () => {
   render(<StrategyRefreshPage />)
   expect(screen.getByRole('button', { name: 'strategy.refresh.start' })).toBeInTheDocument()
   fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
   expect(await screen.findByText('strategy.refresh.summary')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: /strategy structure/ }))
-  expect(screen.getByRole('heading', { name: finding.title })).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.why' }))
+  fireEvent.click(screen.getByRole('button', { name: /^1\s*Objective$/ }))
+  expect(screen.getByRole('button', { name: /Objective \(1\)/ })).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(within(screen.getByTestId('map-group-Objective')).getByRole('button', { name: 'strategy.refresh.why' }))
   expect(screen.getByRole('dialog')).toHaveTextContent('Increase service access')
   expect(screen.getByRole('dialog')).toHaveTextContent('document declared fact')
   expect(screen.getByRole('dialog')).toHaveTextContent('Objectives')
 })
 
-it('drills a distinct-object metric into exactly its cited findings, across categories', async () => {
-  const impact: any = { ...finding, id: 'impact-a', category: 'ARCHITECTURE_IMPACT', title: 'Review application impact' }
-  const capability: any = { ...finding, id: 'cap-a', category: 'CAPABILITY_IMPACT', title: 'Review capability impact' }
-  api.get.mockResolvedValue({ ...ready, findings: [finding, impact, capability], summary: [{ id: 'objects:Application', category: 'ARCHITECTURE_IMPACT', semanticType: 'Application', measure: 'REFERENCED_OBJECTS', count: 1, findingIds: ['impact-a', 'cap-a'] }] })
+it('opens a kind of conclusion where it is acted on, with action, priority, what it affects, its basis and the publish effect', async () => {
+  const gap: any = { ...finding, id: 'gap-a', category: 'ARCHITECTURE_GAP', title: 'Address vendor concentration', authority: 'AI_INFERENCE', destination: 'SCENARIO', payload: { description: 'Delivery depends on few vendors.', recommendedAction: 'Plan a second supplier.', priority: 'HIGH' }, evidence: { factIds: ['fact-a'], tenantEvidenceIds: ['app-1'] } }
+  api.get.mockResolvedValue({ ...ready, findings: [finding, gap], context: { limitations: [], evidence: [{ id: 'app-1', module: 'REPOSITORY', authority: 'TENANT_FACT', data: { name: 'Citizen Portal', typeLabel: 'Application' } }] } })
   render(<StrategyRefreshPage />)
   fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
-  fireEvent.click(await screen.findByRole('button', { name: /Application/ }))
-  expect(screen.getByRole('heading', { name: impact.title })).toBeInTheDocument()
-  expect(screen.getByRole('heading', { name: capability.title })).toBeInTheDocument()
-  expect(screen.queryByRole('heading', { name: finding.title })).not.toBeInTheDocument()
+  fireEvent.click(await screen.findByRole('button', { name: /^1\s*ARCHITECTURE_GAP$/ }))
+  const card = screen.getByTestId('finding-gap-a')
+  expect(screen.getByRole('button', { name: 'strategy.refresh.tab.impact' })).toHaveAttribute('aria-current', 'page')
+  expect(card).toHaveTextContent('Plan a second supplier.')
+  expect(card).toHaveTextContent('strategy.refresh.card.priority.HIGH')
+  expect(card).toHaveTextContent('Application · Citizen Portal')
+  expect(card).toHaveTextContent('strategy.refresh.card.effect.SCENARIO')
+  expect(screen.queryByTestId('finding-fact-a')).not.toBeInTheDocument()
+  fireEvent.click(within(card).getByRole('button', { name: /Increase service access/ }))
+  expect(screen.getByRole('dialog')).toHaveTextContent('Objectives')
 })
 
 it('does not silently approve a fact, and records a reason plus expected revision', async () => {
@@ -179,7 +183,8 @@ describe('EA impact register', () => {
     expect(row).toHaveTextContent('CONSOLIDATE')
     expect(screen.getByRole('img', { name: 'strategy.refresh.impact.view_alt' })).toHaveAttribute('src', expect.stringContaining('data:image/svg+xml'))
     expect(screen.getByText('strategy.refresh.impact.partial')).toBeInTheDocument()
-    fireEvent.click(within(row).getByRole('button', { name: 'Unify beneficiary channels' }))
+    expect(screen.getByText('strategy.refresh.impact.col.basis')).toBeInTheDocument()
+    fireEvent.click(within(row).getByRole('button', { name: /Initiative · Unify beneficiary channels/ }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Unify beneficiary channels')
   })
 
@@ -217,8 +222,8 @@ describe('EA impact register', () => {
     api.source.mockResolvedValue(new Blob(['%PDF']))
     render(<StrategyRefreshPage />)
     fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
-    fireEvent.click(await screen.findByRole('button', { name: /strategy structure/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.why' }))
+    fireEvent.click(await screen.findByRole('button', { name: /^1\s*Objective$/ }))
+    fireEvent.click(within(screen.getByTestId('map-group-Objective')).getByRole('button', { name: 'strategy.refresh.why' }))
     fireEvent.click(screen.getByRole('button', { name: 'Strategy.pdf' }))
     await waitFor(() => expect(api.source).toHaveBeenCalledWith('refresh-a', 'doc-a'))
     await waitFor(() => expect(click).toHaveBeenCalled())
@@ -234,5 +239,71 @@ describe('EA impact register', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.impact' }))
     expect(screen.getByRole('main')).toHaveAttribute('dir', 'rtl')
     expect(screen.getByText('strategy.refresh.impact.not_in_repo')).toBeInTheDocument()
+  })
+})
+
+describe('reading the refresh step by step', () => {
+  it('links a statement on the Strategy Map to the objects it drives', async () => {
+    api.get.mockResolvedValue(withImpact)
+    render(<StrategyRefreshPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.map' }))
+    expect(screen.queryByText('strategy.refresh.map.drives', { exact: false })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.map.drives' }))
+    expect(screen.getByRole('status')).toHaveTextContent('strategy.refresh.impact.driven_filter')
+    expect(screen.getByText('Beneficiary Portal')).toBeInTheDocument()
+    expect(screen.getByText('CRM')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.impact.clear_filter' }))
+    expect(screen.queryByText('strategy.refresh.impact.driven_filter')).not.toBeInTheDocument()
+  })
+
+  it('explains an empty What Changed tab instead of showing nothing', async () => {
+    render(<StrategyRefreshPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.changes' }))
+    expect(screen.getByText('strategy.refresh.changes.no_baseline')).toBeInTheDocument()
+  })
+
+  it('words the limits of the analysis from codes, collapsed, without ids', async () => {
+    api.get.mockResolvedValue({ ...ready, limits: [{ code: 'VIEWS_TOO_LARGE', params: { count: 2, names: ['Application Landscape'] } }, { code: 'MODULE_BOUNDED', params: { module: 'GOVERNANCE' } }] })
+    render(<StrategyRefreshPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+    const panel = (await screen.findByText(/strategy.refresh.limits.title/)).closest('details')!
+    expect(panel).not.toHaveAttribute('open')
+    expect(panel).toHaveTextContent('strategy.refresh.limits.VIEWS_TOO_LARGE')
+    expect(panel).toHaveTextContent('strategy.refresh.limits.MODULE_BOUNDED')
+    expect(screen.queryByText(/Repository evidence is incomplete/)).not.toBeInTheDocument()
+  })
+
+  it('splits Execution & Outcomes into its three questions, each saying when nothing was found', async () => {
+    const plan: any = { ...finding, id: 'plan-c', category: 'INITIATIVE_REVIEW', title: 'Review the 2026 Second Half Plan', authority: 'AI_INFERENCE', destination: 'PLANNING', payload: { description: 'x', recommendedAction: 'Add cloud migration activities.', priority: 'MEDIUM' }, evidence: { factIds: [], tenantEvidenceIds: ['plan-1'] } }
+    api.get.mockResolvedValue({ ...ready, findings: [finding, plan], context: { limitations: [], evidence: [{ id: 'plan-1', module: 'PLANNING', authority: 'TENANT_FACT', data: { nameEn: '2026 Second Half Plan' } }] } })
+    render(<StrategyRefreshPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.execution' }))
+    expect(screen.getByTestId('execution-INITIATIVE_REVIEW')).toHaveTextContent('strategy.refresh.affects.PLANNING · 2026 Second Half Plan')
+    expect(screen.getByTestId('execution-INITIATIVE_REVIEW')).toHaveTextContent('strategy.refresh.card.effect.PLAN')
+    expect(screen.getByTestId('execution-ADM_REVALIDATION')).toHaveTextContent('strategy.refresh.execution.none')
+    expect(screen.getByTestId('execution-OUTCOME_TRACEABILITY')).toHaveTextContent('strategy.refresh.execution.none')
+  })
+
+  it('shows the review steps and approves a whole group with one reason, recording each decision', async () => {
+    const second: any = { ...finding, id: 'fact-c', title: 'Raise digital adoption', evidence: [{ sourceId: 'doc-a', quote: 'Raise digital adoption', section: 'Objectives', page: null }] }
+    api.get.mockResolvedValue({ ...ready, findings: [finding, second] })
+    api.decide.mockResolvedValue({})
+    render(<StrategyRefreshPage />)
+    fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'strategy.refresh.tab.review' }))
+    expect(screen.getByRole('list', { name: 'strategy.refresh.steps.title' })).toHaveTextContent('strategy.refresh.steps.review.detail')
+    const group = screen.getByTestId('review-group-fact-Objective')
+    fireEvent.click(within(group).getByRole('button', { name: 'strategy.refresh.review.approve_group' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByRole('button', { name: 'strategy.refresh.review.approve_group' })).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('strategy.refresh.reason'), { target: { value: 'Matches the roadmap' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'strategy.refresh.review.approve_group' }))
+    await waitFor(() => expect(api.decide).toHaveBeenCalledTimes(2))
+    expect(api.decide).toHaveBeenCalledWith('refresh-a', finding, 'APPROVE', 'Matches the roadmap')
+    expect(api.decide).toHaveBeenCalledWith('refresh-a', second, 'APPROVE', 'Matches the roadmap')
+    expect(api.activate).not.toHaveBeenCalled()
   })
 })

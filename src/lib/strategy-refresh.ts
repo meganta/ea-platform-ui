@@ -16,7 +16,11 @@ export interface StrategyRefresh {
   context?: { limitations: string[]; evidence: Array<{ id: string; module: string; authority: string; data: any }>; previous?: Array<{ id: string; title: string; payload: any; evidence: any }> }
   responseProgress?: { total: number; published: number; pending: number }
   impact?: StrategyImpact | null
+  /** Limits of this analysis, coded; the UI words them (strategy.refresh.limits.*). */
+  limits?: StrategyLimit[]
 }
+
+export interface StrategyLimit { code: string; params?: Record<string, string | number | string[]> }
 
 export type ImpactLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE'
 export interface StrategyImpactedObject {
