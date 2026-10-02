@@ -355,7 +355,7 @@ function OrgBrandingSection() {
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          {[['organizationNameEn', 'Organization Name (EN)', false], ['organizationNameAr', 'Organization Name (AR)', true]].map(([k, l, rtl]) => (
+          {[['organizationNameEn', L('Organization Name (EN)', 'اسم الجهة (بالإنجليزية)'), false], ['organizationNameAr', L('Organization Name (AR)', 'اسم الجهة (بالعربية)'), true]].map(([k, l, rtl]) => (
             <div key={k as string}>
               <div style={{ fontSize: 11, marginBottom: 3 }}>{l as string}</div>
               <input className="form-input" type="text" value={(form as any)[k as string] || ''} onChange={e => setForm(f => ({ ...f, [k as string]: e.target.value }))} style={{ width: '100%', fontSize: 11, direction: rtl ? 'rtl' : 'ltr' }} />
@@ -394,7 +394,7 @@ function OrgBrandingSection() {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          {[['primaryColor', 'Primary Color'], ['secondaryColor', 'Secondary Color'], ['accentColor', 'Accent Color (live preview)']].map(([k, l]) => (
+          {[['primaryColor', L('Primary Color', 'اللون الأساسي')], ['secondaryColor', L('Secondary Color', 'اللون الثانوي')], ['accentColor', L('Accent Color (live preview)', 'لون التمييز (معاينة مباشرة)')]].map(([k, l]) => (
             <div key={k}>
               <div style={{ fontSize: 11, marginBottom: 3 }}>{l}</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

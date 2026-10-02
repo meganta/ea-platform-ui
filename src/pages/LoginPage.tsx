@@ -23,7 +23,8 @@ const HOSTNAME_TENANT_MAP: Record<string, string> = {
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const { t, locale, setLocale } = useLang()
+  const { t, locale, setLocale, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const nav = useNavigate()
   const [searchParams] = useSearchParams()
   const boundTenant = HOSTNAME_TENANT_MAP[window.location.hostname]
@@ -57,7 +58,7 @@ export default function LoginPage() {
   const submit = async (e:FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true)
     try { await login(form.email, form.password, form.tenantSlug); nav('/app') }
-    catch(err:any) { setError(err.message||'Login failed') }
+    catch(err:any) { setError(err.message||L('Login failed', 'فشل تسجيل الدخول')) }
     finally { setLoading(false) }
   }
   return (
@@ -66,7 +67,7 @@ export default function LoginPage() {
       <div className="login-card">
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:4}}>
           {orgBranding?.hasLogo && !logoFailed
-            ? <img src={`${API_BASE}/public/branding/${encodeURIComponent(form.tenantSlug.trim())}/logo`} alt={orgName || 'Logo'} style={{ maxHeight: 28, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />
+            ? <img src={`${API_BASE}/public/branding/${encodeURIComponent(form.tenantSlug.trim())}/logo`} alt={orgName || L('Logo', 'الشعار')} style={{ maxHeight: 28, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />
             : orgName ? <div className="login-logo">{orgName}</div> : <BrandLogo size={24} />}
           <button type="button" className="login-lang" onClick={()=>setLocale(locale==='EN'?'AR':'EN')}>
             {locale==='EN'?'🌐 العربية':'🌐 English'}

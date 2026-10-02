@@ -45,6 +45,15 @@ export const COMMON_ENUM_LABELS: Record<string, BiLabel> = {
   PUBLISHED: { en: 'Published', ar: 'منشور' },
   GENERATING: { en: 'Generating', ar: 'قيد الإنشاء' },
   AI_DRAFT: { en: 'AI Draft', ar: 'مسودة الذكاء الاصطناعي' },
+  // Compliance
+  COMPLIANT: { en: 'Compliant', ar: 'ممتثل' },
+  PARTIALLY_COMPLIANT: { en: 'Partially Compliant', ar: 'ممتثل جزئياً' },
+  NON_COMPLIANT: { en: 'Non-Compliant', ar: 'غير ممتثل' },
+  REQUIRES_EXCEPTION: { en: 'Requires Exception', ar: 'يتطلب استثناء' },
+  NOT_APPLICABLE: { en: 'Not Applicable', ar: 'غير منطبق' },
+  RECOMMENDED: { en: 'Recommended', ar: 'موصى به' },
+  EXCEPTION: { en: 'Exception', ar: 'استثناء' },
+  EXCEPTION_REQUESTED: { en: 'Exception Requested', ar: 'طُلب استثناء' },
   // Governance decisions
   APPROVED_WITH_CONDITIONS: { en: 'Approved with Conditions', ar: 'معتمد بشروط' },
   REQUIRES_CHANGES: { en: 'Requires Changes', ar: 'يتطلب تعديلات' },

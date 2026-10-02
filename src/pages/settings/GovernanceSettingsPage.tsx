@@ -70,7 +70,7 @@ function GovernanceSection() {
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {[['requireApprovalForPublish', 'Require approval before publishing outputs'], ['reviewerApprovalRequired', 'Require reviewer sign-off in addition to architect']].map(([k, l]) => (
+          {[['requireApprovalForPublish', L('Require approval before publishing outputs', 'اشتراط الاعتماد قبل نشر المخرجات')], ['reviewerApprovalRequired', L('Require reviewer sign-off in addition to architect', 'اشتراط اعتماد المراجع إضافة إلى المعماري')]].map(([k, l]) => (
             <label key={k} style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 12 }}>
               <input type="checkbox" checked={(form as any)[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.checked }))} />
               {l}

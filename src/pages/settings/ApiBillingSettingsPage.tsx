@@ -22,7 +22,7 @@ export default function ApiBillingSettingsPage() {
         <div className="page-title">{L('API & Billing', 'واجهات البرمجة والفوترة')}</div>
         <div className="page-subtitle">{L('AI PROVIDER KEYS, SUBSCRIPTION & USAGE', 'مفاتيح مزوّدي الذكاء الاصطناعي والاشتراك والاستخدام')}</div>
         <div className="page-tabs">
-          {[['apikeys', 'API Keys'], ['billing', 'Billing']].map(([k, l]) => (
+          {[['apikeys', L('API Keys', 'مفاتيح API')], ['billing', L('Billing', 'الفوترة')]].map(([k, l]) => (
             <button key={k} className={`tab-btn${subTab === k ? ' active' : ''}`} onClick={() => setSubTab(k as any)}>{l}</button>
           ))}
         </div>

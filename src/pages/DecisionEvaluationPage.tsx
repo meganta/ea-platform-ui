@@ -198,6 +198,7 @@ function NewVersionModal({ isAR, onClose, onConfirm }: any) {
 }
 
 function AssessmentDetail({ id, onBack, api, isAR }: any) {
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [tab, setTab] = useState<'overview' | 'criteria' | 'candidates' | 'compare' | 'decision'>('overview')
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -218,7 +219,7 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
     try {
       const token = localStorage.getItem('ea_token')
       const res = await fetch(`${API}/decision-evaluation/${id}/export/word?lang=${isAR ? 'ar' : 'en'}`, { headers: { Authorization: `Bearer ${token}` } })
-      if (!res.ok) throw new Error('Export failed')
+      if (!res.ok) throw new Error(L('Export failed', 'فشل التصدير'))
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
