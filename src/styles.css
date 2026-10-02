@@ -294,3 +294,19 @@ button.insight-tile:hover, button.insight-tile:focus-visible { border-color:var(
   .eav-heatmap-legend { margin-inline-start: 0; max-width: 100%; }
   .eav-heatmap-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
 }
+
+/* ── Innovation idea assessment ── the scorecard row (name | bar | score),
+   the overview (scores beside the matrix) and the filter bar reflow to one
+   column on a phone. */
+.idea-overview { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,320px); gap:20px; align-items:center }
+.idea-criterion { display:grid; grid-template-columns:minmax(150px,220px) minmax(0,1fr) auto; gap:12px; align-items:center }
+.idea-filters { display:grid; grid-template-columns:minmax(180px,2fr) repeat(5,minmax(0,1fr)); gap:8px; align-items:center }
+@media (max-width: 900px) {
+  .idea-overview { grid-template-columns:1fr }
+  .idea-filters { grid-template-columns:repeat(3,minmax(0,1fr)) }
+}
+@media (max-width: 600px) {
+  .idea-criterion { grid-template-columns:1fr auto }
+  .idea-criterion .idea-criterion-bar { grid-column:1 / -1; grid-row:2 }
+  .idea-filters { grid-template-columns:1fr 1fr }
+}

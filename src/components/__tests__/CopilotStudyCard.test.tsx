@@ -73,6 +73,37 @@ describe('CopilotStudyCard', () => {
     expect(screen.getByTestId('copilot-study-card').getAttribute('dir')).toBe('rtl');
   });
 
+  it('a large study\'s export shows that it is being prepared and downloads once ready', async () => {
+    jest.useFakeTimers();
+    let attempts = 0;
+    (global as any).fetch = jest.fn(async (url: string) => {
+      if (url.includes('/export/')) {
+        exportCalls.push(url);
+        return ++attempts < 3
+          ? { status: 202, ok: true, json: async () => ({ status: 'PREPARING', translated: attempts * 10, total: 30 }) }
+          : { status: 200, ok: true, blob: async () => new Blob(['x']) };
+      }
+      return { ok: true, json: async () => ({ id: 's1', title: 'Cloud data platform', status: 'UNDER_REVIEW', sections: sections(4) }) };
+    });
+    render(<CopilotStudyCard attachment={{ ...STARTED, action: 'EXISTING', status: 'UNDER_REVIEW' } as any} />);
+    fireEvent.click(await screen.findByText(/copilot.study.download_pptx/));
+    expect(await screen.findByText(/copilot.study.export_preparing \(10\/30\)/)).toBeInTheDocument();
+    await act(async () => { jest.advanceTimersByTime(3000); });
+    await act(async () => { jest.advanceTimersByTime(3000); });
+    await waitFor(() => expect(anchor?.download).toBe('Cloud_data_platform_EN.pptx'));
+    expect(exportCalls).toHaveLength(3);
+    expect(screen.queryByText(/copilot.study.export_preparing/)).toBeNull();
+  });
+
+  it('shows the API\'s reason when an export fails', async () => {
+    (global as any).fetch = jest.fn(async (url: string) => url.includes('/export/')
+      ? { status: 400, ok: false, json: async () => ({ message: 'The translation provider is temporarily rate limited. Please retry shortly.' }) }
+      : { ok: true, json: async () => ({ id: 's1', title: 'Cloud data platform', status: 'UNDER_REVIEW', sections: sections(4) }) });
+    render(<CopilotStudyCard attachment={{ ...STARTED, action: 'EXISTING', status: 'UNDER_REVIEW' } as any} />);
+    fireEvent.click(await screen.findByText(/copilot.study.download_word/));
+    expect(await screen.findByRole('alert')).toHaveTextContent('rate limited');
+  });
+
   it('says plainly when generation stopped, and asks to refresh it', async () => {
     studyResponses = [{ id: 's1', title: 'Cloud data platform', status: 'DRAFT', sections: sections(2) }];
     render(<CopilotStudyCard attachment={STARTED as any} />);
