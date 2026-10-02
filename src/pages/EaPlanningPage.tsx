@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import HelpTip from '../components/HelpTip'
 import { useLang } from '../contexts/LangContext'
+import { enumLabel } from '../lib/enumLabels'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -36,12 +37,17 @@ const S = {
 
 const STATUS_COLOR: Record<string, string> = { DRAFT: '#7f8c8d', ACTIVE: '#2ecc71', COMPLETED: '#3498db', CANCELLED: '#e74c3c' }
 const FREQ_LABEL: Record<string, string> = { ANNUAL: 'Annual', SEMI_ANNUAL: 'Semi-Annual', QUARTERLY: 'Quarterly', ON_DEMAND: 'On-Demand' }
+const FREQ_LABEL_AR: Record<string, string> = { ANNUAL: 'سنوية', SEMI_ANNUAL: 'نصف سنوية', QUARTERLY: 'ربعية', ON_DEMAND: 'عند الطلب' }
+const DOMAIN_LABEL: Record<string, [string, string]> = { BUSINESS: ['Business', 'الأعمال'], BENEFICIARY_EXPERIENCE: ['Beneficiary Experience', 'تجربة المستفيد'], APPLICATIONS: ['Applications', 'التطبيقات'], DATA: ['Data', 'البيانات'], TECHNOLOGY: ['Technology', 'التقنية'], SECURITY: ['Security', 'الأمن'] }
+const domainName = (d: string, isAR: boolean) => (DOMAIN_LABEL[d] ? DOMAIN_LABEL[d][isAR ? 1 : 0] : d)
+const localName = (x: any, isAR: boolean) => (isAR ? (x?.nameAr || x?.nameEn) : x?.nameEn) || ''
 const DOMAINS = ['BUSINESS', 'BENEFICIARY_EXPERIENCE', 'APPLICATIONS', 'DATA', 'TECHNOLOGY', 'SECURITY']
 const PRIORITY_COLOR: Record<string, string> = { HIGH: '#e74c3c', MEDIUM: '#f39c12', LOW: '#2ecc71' }
 
 export default function EaPlanningPage() {
   const api = useApi()
-  const { t } = useLang()
+  const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [tab, setTab] = useState<'dashboard'|'plans'|'roadmap'>('dashboard')
   const [dashboard, setDashboard] = useState<any>(null)
   const [planTypes, setPlanTypes] = useState<any[]>([])
@@ -61,14 +67,14 @@ export default function EaPlanningPage() {
     <div style={S.page}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>🗓 EA Planning<HelpTip text="Create and track the plans that guide the EA practice's work over time - like an annual roadmap or a quarterly focus plan. You can write these yourself or have AI draft a starting point based on your goals." /></div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Strategic and operational plans for the EA practice</div>
+          <div style={{ fontSize: 20, fontWeight: 700, display: 'flex', alignItems: 'center' }}>{L('🗓 EA Planning', '🗓 تخطيط البنية المؤسسية')}<HelpTip text={L('Create and track the plans that guide the EA practice\'s work over time - like an annual roadmap or a quarterly focus plan. You can write these yourself or have AI draft a starting point based on your goals.', 'أنشئ الخطط التي توجّه عمل ممارسة البنية المؤسسية وتابعها بمرور الوقت، مثل خارطة طريق سنوية أو خطة تركيز ربعية. يمكنك كتابتها بنفسك أو جعل الذكاء الاصطناعي يعدّ مسودة أولية بناءً على أهدافك.')} /></div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('Strategic and operational plans for the EA practice', 'الخطط الاستراتيجية والتشغيلية لممارسة البنية المؤسسية')}</div>
         </div>
-        <button style={S.btn('primary')} onClick={() => setCreating(true)}>+ New Plan</button>
+        <button style={S.btn('primary')} onClick={() => setCreating(true)}>{L('+ New Plan', '+ خطة جديدة')}</button>
       </div>
       <div style={S.tabs}>
-        <button style={S.tab(tab === 'dashboard')} onClick={() => setTab('dashboard')}>📊 Dashboard</button>
-        <button style={S.tab(tab === 'plans')} onClick={() => setTab('plans')}>📋 All Plans</button>
+        <button style={S.tab(tab === 'dashboard')} onClick={() => setTab('dashboard')}>{L('📊 Dashboard', '📊 لوحة المعلومات')}</button>
+        <button style={S.tab(tab === 'plans')} onClick={() => setTab('plans')}>{L('📋 All Plans', '📋 كل الخطط')}</button>
         <button style={S.tab(tab === 'roadmap')} onClick={() => setTab('roadmap')}>{t('planning.tab_roadmap')}</button>
       </div>
       <div style={S.content}>
@@ -82,6 +88,8 @@ export default function EaPlanningPage() {
 
 // ── Roadmap ──────────────────────────────────────────────────────────────────
 function RoadmapTab({ api, t }: { api: any, t: (k: string) => string }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [domain, setDomain] = useState('')
@@ -98,12 +106,12 @@ function RoadmapTab({ api, t }: { api: any, t: (k: string) => string }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
         <div style={{ fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>{t('planning.roadmap_filter_domain')}<HelpTip text={t('planning.roadmap_help')} /></div>
         <select style={{ ...S.input, width: 200, marginBottom: 0 }} value={domain} onChange={e => setDomain(e.target.value)}>
-          <option value="">All</option>
-          {DOMAINS.map(d => <option key={d} value={d}>{d.replace('_', ' ')}</option>)}
+          <option value="">{L('All', 'الكل')}</option>
+          {DOMAINS.map(d => <option key={d} value={d}>{domainName(d, isAR)}</option>)}
         </select>
       </div>
       {loading ? (
-        <div style={{ color: 'var(--text-dim)' }}>Loading…</div>
+        <div style={{ color: 'var(--text-dim)' }}>{L('Loading…', 'جارٍ التحميل…')}</div>
       ) : items.length === 0 ? (
         <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{t('planning.roadmap_empty')}</div>
       ) : (
@@ -117,7 +125,7 @@ function RoadmapTab({ api, t }: { api: any, t: (k: string) => string }) {
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', textAlign: 'right' as const }}>
                 {item.periodLabel || '—'}
-                {item.periodStart && <div>{new Date(item.periodStart).toLocaleDateString()} → {item.periodEnd ? new Date(item.periodEnd).toLocaleDateString() : '?'}</div>}
+                {item.periodStart && <div>{new Date(item.periodStart).toLocaleDateString(isAR ? 'ar' : 'en-US')} → {item.periodEnd ? new Date(item.periodEnd).toLocaleDateString(isAR ? 'ar' : 'en-US') : '?'}</div>}
               </div>
             </div>
           ))}
@@ -160,21 +168,23 @@ function AssetPicker({ api, t, onPick, onCancel }: { api: any, t: (k: string) =>
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
 function DashboardTab({ dashboard, onOpenPlans }: { dashboard: any, onOpenPlans: () => void }) {
-  if (!dashboard) return <div style={{ color: 'var(--text-dim)' }}>Loading…</div>
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
+  if (!dashboard) return <div style={{ color: 'var(--text-dim)' }}>{L('Loading…', 'جارٍ التحميل…')}</div>
   return (
     <div>
       <div className="stat-grid-4">
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Total Plans</div><div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard.total}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Active</div><div style={{ fontSize: 28, fontWeight: 700, color: '#2ecc71' }}>{dashboard.active}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Avg Progress</div><div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard.avgProgress}%</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>High-Risk Plans</div><div style={{ fontSize: 28, fontWeight: 700, color: dashboard.highRisk > 0 ? '#e74c3c' : undefined }}>{dashboard.highRisk}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Total Plans', 'إجمالي الخطط')}</div><div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard.total}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Active', 'نشطة')}</div><div style={{ fontSize: 28, fontWeight: 700, color: '#2ecc71' }}>{dashboard.active}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Avg Progress', 'متوسط التقدم')}</div><div style={{ fontSize: 28, fontWeight: 700 }}>{dashboard.avgProgress}%</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('High-Risk Plans', 'خطط عالية المخاطر')}</div><div style={{ fontSize: 28, fontWeight: 700, color: dashboard.highRisk > 0 ? '#e74c3c' : undefined }}>{dashboard.highRisk}</div></div>
       </div>
       <div style={{ ...S.grid2, marginTop: 16 }}>
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 12 }}>By Status</div>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>{L('By Status', 'حسب الحالة')}</div>
           {Object.entries(dashboard.byStatus).map(([status, count]: any) => (
             <div key={status} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <span style={S.badge(STATUS_COLOR[status])}>{status}</span>
+              <span style={S.badge(STATUS_COLOR[status])}>{enumLabel(status, isAR)}</span>
               <div style={{ flex: 1, height: 6, background: 'var(--navy)', borderRadius: 3, overflow: 'hidden' }}>
                 <div style={{ width: `${dashboard.total ? (count / dashboard.total) * 100 : 0}%`, height: '100%', background: STATUS_COLOR[status] }} />
               </div>
@@ -183,21 +193,23 @@ function DashboardTab({ dashboard, onOpenPlans }: { dashboard: any, onOpenPlans:
           ))}
         </div>
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 12 }}>By Plan Type</div>
-          {Object.entries(dashboard.byType).length === 0 ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No plans yet.</div> : Object.entries(dashboard.byType).map(([type, count]: any) => (
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>{L('By Plan Type', 'حسب نوع الخطة')}</div>
+          {Object.entries(dashboard.byType).length === 0 ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('No plans yet.', 'لا توجد خطط بعد.')}</div> : Object.entries(dashboard.byType).map(([type, count]: any) => (
             <div key={type} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, padding: '4px 0' }}>
               <div>{type}</div><div style={{ fontWeight: 600 }}>{count}</div>
             </div>
           ))}
         </div>
       </div>
-      <button style={{ ...S.btn(), marginTop: 16 }} onClick={onOpenPlans}>View All Plans →</button>
+      <button style={{ ...S.btn(), marginTop: 16 }} onClick={onOpenPlans}>{L('View All Plans →', 'عرض كل الخطط ←')}</button>
     </div>
   )
 }
 
 // ── Plans List ───────────────────────────────────────────────────────────────
 function PlansListTab({ api, onOpen }: { api: any, onOpen: (id: string) => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [plans, setPlans] = useState<any[]>([])
   const [statusFilter, setStatusFilter] = useState('')
 
@@ -207,32 +219,32 @@ function PlansListTab({ api, onOpen }: { api: any, onOpen: (id: string) => void 
   }, [api, statusFilter])
   useEffect(() => { load() }, [load])
 
-  const remove = async (e: React.MouseEvent, id: string) => { e.stopPropagation(); if (!window.confirm('Delete this plan?')) return; await api.del(`/ea-planning/plans/${id}`); load() }
+  const remove = async (e: React.MouseEvent, id: string) => { e.stopPropagation(); if (!window.confirm(L('Delete this plan?', 'حذف هذه الخطة؟'))) return; await api.del(`/ea-planning/plans/${id}`); load() }
 
   return (
     <div>
       <div style={{ marginBottom: 16 }}>
         <select style={{ ...S.input, width: 200, marginBottom: 0 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="">All Statuses</option>
-          {Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{s}</option>)}
+          <option value="">{L('All Statuses', 'كل الحالات')}</option>
+          {Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{enumLabel(s, isAR)}</option>)}
         </select>
       </div>
       {plans.length === 0 ? (
-        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>No plans found.</div>
+        <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>{L('No plans found.', 'لا توجد خطط.')}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {plans.map(p => (
             <div key={p.id} style={{ ...S.card, marginBottom: 0, display: 'flex', alignItems: 'center', gap: 14, cursor: 'pointer' }} onClick={() => onOpen(p.id)}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 14, fontWeight: 600 }}>{p.nameEn}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{p.planType?.nameEn} · {p.periodLabel || 'No period set'} · {FREQ_LABEL[p.frequency] || p.frequency}</div>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{localName(p, isAR)}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 3 }}>{localName(p.planType, isAR)} · {p.periodLabel || L('No period set', 'لم تُحدد فترة')} · {(isAR ? FREQ_LABEL_AR : FREQ_LABEL)[p.frequency] || p.frequency}</div>
               </div>
               <div style={{ width: 80 }}>
                 <div style={{ height: 6, background: 'var(--navy)', borderRadius: 3, overflow: 'hidden' }}><div style={{ width: `${p.progressPct || 0}%`, height: '100%', background: 'var(--accent)' }} /></div>
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2, textAlign: 'center' }}>{p.progressPct || 0}%</div>
               </div>
-              <span style={S.badge(STATUS_COLOR[p.status])}>{p.status}</span>
-              <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={e => remove(e, p.id)}>Delete</button>
+              <span style={S.badge(STATUS_COLOR[p.status])}>{enumLabel(p.status, isAR)}</span>
+              <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={e => remove(e, p.id)}>{L('Delete', 'حذف')}</button>
             </div>
           ))}
         </div>
@@ -243,6 +255,8 @@ function PlansListTab({ api, onOpen }: { api: any, onOpen: (id: string) => void 
 
 // ── New Plan Wizard (with AI generation) ─────────────────────────────────────
 function NewPlanWizard({ api, planTypes, onCreated, onCancel }: { api: any, planTypes: any[], onCreated: (p: any) => void, onCancel: () => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [form, setForm] = useState({ planTypeId: '', nameEn: '', nameAr: '', frequency: 'ANNUAL', periodLabel: '', domains: [] as string[], userContext: '' })
   const [generated, setGenerated] = useState<any>(null)
   const [generating, setGenerating] = useState(false)
@@ -253,7 +267,7 @@ function NewPlanWizard({ api, planTypes, onCreated, onCancel }: { api: any, plan
   const toggleDomain = (d: string) => setForm(f => ({ ...f, domains: f.domains.includes(d) ? f.domains.filter(x => x !== d) : [...f.domains, d] }))
 
   const generate = async () => {
-    if (!selectedType) return alert('Select a plan type first')
+    if (!selectedType) return alert(L('Select a plan type first', 'اختر نوع الخطة أولاً'))
     setGenerating(true)
     try {
       const result = await api.post('/ea-planning/generate', { planTypeId: form.planTypeId, planTypeName: selectedType.nameEn, frequency: form.frequency, periodLabel: form.periodLabel, domains: form.domains, userContext: form.userContext })
@@ -263,7 +277,7 @@ function NewPlanWizard({ api, planTypes, onCreated, onCancel }: { api: any, plan
   }
 
   const create = async () => {
-    if (!form.planTypeId || !form.nameEn) return alert('Plan type and name are required')
+    if (!form.planTypeId || !form.nameEn) return alert(L('Plan type and name are required', 'نوع الخطة والاسم مطلوبان'))
     setSaving(true)
     try {
       const created = await api.post('/ea-planning/plans', {
@@ -280,51 +294,51 @@ function NewPlanWizard({ api, planTypes, onCreated, onCancel }: { api: any, plan
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onCancel}>← Cancel</button>
-        <div style={{ fontSize: 18, fontWeight: 700 }}>New EA Plan</div>
+        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onCancel}>{L('← Cancel', '→ إلغاء')}</button>
+        <div style={{ fontSize: 18, fontWeight: 700 }}>{L('New EA Plan', 'خطة بنية مؤسسية جديدة')}</div>
       </div>
       <div style={S.content}>
         <div style={{ maxWidth: 720 }}>
           <div style={S.card}>
             <div style={S.grid2}>
               <div>
-                <div style={S.label}>Plan Type *</div>
+                <div style={S.label}>{L('Plan Type *', 'نوع الخطة *')}</div>
                 <select style={S.input} value={form.planTypeId} onChange={e => setForm(f => ({ ...f, planTypeId: e.target.value }))}>
-                  <option value="">Select…</option>
-                  {planTypes.map(t => <option key={t.id} value={t.id}>{t.nameEn}</option>)}
+                  <option value="">{L('Select…', 'اختر…')}</option>
+                  {planTypes.map(t => <option key={t.id} value={t.id}>{localName(t, isAR)}</option>)}
                 </select>
               </div>
-              <div><div style={S.label}>Frequency</div>
+              <div><div style={S.label}>{L('Frequency', 'التكرار')}</div>
                 <select style={S.input} value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value }))}>
-                  {Object.entries(FREQ_LABEL).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+                  {Object.entries(FREQ_LABEL).map(([k, l]) => <option key={k} value={k}>{isAR ? FREQ_LABEL_AR[k] : l}</option>)}
                 </select>
               </div>
-              <div><div style={S.label}>Period Label</div><input style={S.input} placeholder="e.g. FY2026" value={form.periodLabel} onChange={e => setForm(f => ({ ...f, periodLabel: e.target.value }))} /></div>
-              <div><div style={S.label}>Name (EN) *</div><input style={S.input} value={form.nameEn} onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))} /></div>
+              <div><div style={S.label}>{L('Period Label', 'تسمية الفترة')}</div><input style={S.input} placeholder={L('e.g. FY2026', 'مثال: السنة المالية 2026')} value={form.periodLabel} onChange={e => setForm(f => ({ ...f, periodLabel: e.target.value }))} /></div>
+              <div><div style={S.label}>{L('Name (EN) *', 'الاسم (بالإنجليزية) *')}</div><input style={S.input} value={form.nameEn} onChange={e => setForm(f => ({ ...f, nameEn: e.target.value }))} /></div>
             </div>
-            <div style={S.label}>EA Domains in Scope</div>
+            <div style={S.label}>{L('EA Domains in Scope', 'مجالات البنية المؤسسية ضمن النطاق')}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: 10 }}>
               {DOMAINS.map(d => (
-                <button key={d} style={{ ...S.badge(form.domains.includes(d) ? '#00b4d8' : '#7f8c8d'), cursor: 'pointer', border: 'none' }} onClick={() => toggleDomain(d)}>{d.replace('_', ' ')}</button>
+                <button key={d} style={{ ...S.badge(form.domains.includes(d) ? '#00b4d8' : '#7f8c8d'), cursor: 'pointer', border: 'none' }} onClick={() => toggleDomain(d)}>{domainName(d, isAR)}</button>
               ))}
             </div>
-            <div style={S.label}>Additional Context (optional, for AI generation)</div>
-            <input style={S.input} placeholder="Any specific focus areas or constraints…" value={form.userContext} onChange={e => setForm(f => ({ ...f, userContext: e.target.value }))} />
+            <div style={S.label}>{L('Additional Context (optional, for AI generation)', 'سياق إضافي (اختياري، لإنشاء الذكاء الاصطناعي)')}</div>
+            <input style={S.input} placeholder={L('Any specific focus areas or constraints…', 'أي مجالات تركيز أو قيود محددة…')} value={form.userContext} onChange={e => setForm(f => ({ ...f, userContext: e.target.value }))} />
 
-            <button style={{ ...S.btn('primary'), marginBottom: 10 }} onClick={generate} disabled={generating || !form.planTypeId}>{generating ? '⏳ Generating with AI…' : '✨ Generate Plan Content with AI'}</button>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Generates objectives, activities, deliverables, KPIs, and risks aligned to NORA 2.0. You can review and edit everything after creating the plan.</div>
+            <button style={{ ...S.btn('primary'), marginBottom: 10 }} onClick={generate} disabled={generating || !form.planTypeId}>{generating ? L('⏳ Generating with AI…', '⏳ جارٍ الإنشاء بالذكاء الاصطناعي…') : L('✨ Generate Plan Content with AI', '✨ إنشاء محتوى الخطة بالذكاء الاصطناعي')}</button>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Generates objectives, activities, deliverables, KPIs, and risks aligned to NORA 2.0. You can review and edit everything after creating the plan.', 'يُنشئ الأهداف والأنشطة والمخرجات ومؤشرات الأداء والمخاطر بما يتوافق مع نورة 2.0. يمكنك مراجعة كل شيء وتعديله بعد إنشاء الخطة.')}</div>
           </div>
 
           {generated && (
             <div style={S.card}>
-              <div style={{ fontWeight: 600, marginBottom: 10 }}>✨ AI-Generated Preview</div>
-              <div style={S.label}>Objectives</div><div style={{ fontSize: 12, marginBottom: 10 }}>{generated.objectives}</div>
-              <div style={S.label}>Scope</div><div style={{ fontSize: 12, marginBottom: 10 }}>{generated.scope}</div>
-              <div style={S.label}>{(generated.activities || []).length} activities · {(generated.deliverables || []).length} deliverables · {(generated.kpis || []).length} KPIs · {(generated.risks || []).length} risks generated</div>
+              <div style={{ fontWeight: 600, marginBottom: 10 }}>{L('✨ AI-Generated Preview', '✨ معاينة ما أنشأه الذكاء الاصطناعي')}</div>
+              <div style={S.label}>{L('Objectives', 'الأهداف')}</div><div style={{ fontSize: 12, marginBottom: 10 }}>{generated.objectives}</div>
+              <div style={S.label}>{L('Scope', 'النطاق')}</div><div style={{ fontSize: 12, marginBottom: 10 }}>{generated.scope}</div>
+              <div style={S.label}>{(generated.activities || []).length} {L('activities ·', 'نشاط ·')} {(generated.deliverables || []).length} {L('deliverables ·', 'مخرج ·')} {(generated.kpis || []).length} {L('KPIs ·', 'مؤشر أداء ·')} {(generated.risks || []).length} {L('risks generated', 'خطر مُنشأ')}</div>
             </div>
           )}
 
-          <button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? 'Creating…' : generated ? '💾 Create Plan with Generated Content' : '💾 Create Blank Plan'}</button>
+          <button style={S.btn('primary')} onClick={create} disabled={saving}>{saving ? L('Creating…', 'جارٍ الإنشاء…') : generated ? L('💾 Create Plan with Generated Content', '💾 إنشاء الخطة بالمحتوى المُنشأ') : L('💾 Create Blank Plan', '💾 إنشاء خطة فارغة')}</button>
         </div>
       </div>
     </div>
@@ -353,7 +367,8 @@ function AssetLinkControl({ item, isPicking, onStartPick, onPick, onCancelPick, 
 
 // ── Plan Detail ──────────────────────────────────────────────────────────────
 function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onBack: () => void, onRefresh: () => void }) {
-  const { t } = useLang()
+  const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<any>({ ...plan })
   const [saving, setSaving] = useState(false)
@@ -425,21 +440,21 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>← Back</button>
+        <button style={{ ...S.btn(), padding: '6px 12px' }} onClick={onBack}>{L('← Back', '→ رجوع')}</button>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{plan.nameEn}</div>
+          <div style={{ fontSize: 18, fontWeight: 700 }}>{localName(plan, isAR)}</div>
           <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-            <span style={S.badge(STATUS_COLOR[plan.status])}>{plan.status}</span>
-            <span style={S.badge('#7f8c8d')}>{plan.planType?.nameEn}</span>
+            <span style={S.badge(STATUS_COLOR[plan.status])}>{enumLabel(plan.status, isAR)}</span>
+            <span style={S.badge('#7f8c8d')}>{localName(plan.planType, isAR)}</span>
           </div>
         </div>
         <div style={S.row}>
-          <button style={S.btn()} onClick={() => downloadFile('docx')}>📄 Export Word</button>
-          <button style={S.btn()} onClick={() => downloadFile('pptx')}>📊 Export PowerPoint</button>
-          {!editing ? <button style={S.btn('primary')} onClick={() => { setForm({ ...plan }); setEditing(true) }}>✏ Edit</button> : (
+          <button style={S.btn()} onClick={() => downloadFile('docx')}>{L('📄 Export Word', '📄 تصدير Word')}</button>
+          <button style={S.btn()} onClick={() => downloadFile('pptx')}>{L('📊 Export PowerPoint', '📊 تصدير PowerPoint')}</button>
+          {!editing ? <button style={S.btn('primary')} onClick={() => { setForm({ ...plan }); setEditing(true) }}>{L('✏ Edit', '✏ تعديل')}</button> : (
             <>
-              <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? 'Saving…' : '💾 Save'}</button>
-              <button style={S.btn()} onClick={() => setEditing(false)}>Cancel</button>
+              <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? L('Saving…', 'جارٍ الحفظ…') : L('💾 Save', '💾 حفظ')}</button>
+              <button style={S.btn()} onClick={() => setEditing(false)}>{L('Cancel', 'إلغاء')}</button>
             </>
           )}
         </div>
@@ -447,15 +462,15 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
       <div style={S.content}>
         <div style={S.grid3}>
           <div style={S.card}>
-            <div style={S.label}>Status</div>
-            {editing ? <select style={S.input} value={form.status} onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))}>{Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{s}</option>)}</select> : <div style={{ fontSize: 13 }}>{plan.status}</div>}
+            <div style={S.label}>{L('Status', 'الحالة')}</div>
+            {editing ? <select style={S.input} value={form.status} onChange={e => setForm((f: any) => ({ ...f, status: e.target.value }))}>{Object.keys(STATUS_COLOR).map(s => <option key={s} value={s}>{enumLabel(s, isAR)}</option>)}</select> : <div style={{ fontSize: 13 }}>{plan.status}</div>}
           </div>
           <div style={S.card}>
-            <div style={S.label}>Owner</div>
+            <div style={S.label}>{L('Owner', 'المالك')}</div>
             {editing ? <input style={S.input} value={form.owner || ''} onChange={e => setForm((f: any) => ({ ...f, owner: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.owner || '—'}</div>}
           </div>
           <div style={S.card}>
-            <div style={S.label}>Progress ({editing ? form.progressPct : plan.progressPct}%)</div>
+            <div style={S.label}>{L('Progress (', 'التقدم (')}{editing ? form.progressPct : plan.progressPct}%)</div>
             {editing ? <input style={S.input} type="range" min={0} max={100} value={form.progressPct || 0} onChange={e => setForm((f: any) => ({ ...f, progressPct: parseInt(e.target.value, 10) }))} /> : (
               <div style={{ height: 8, background: 'var(--navy)', borderRadius: 4, overflow: 'hidden', marginTop: 6 }}><div style={{ width: `${plan.progressPct || 0}%`, height: '100%', background: 'var(--accent)' }} /></div>
             )}
@@ -482,25 +497,25 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
         </div>
 
         <div style={S.card}>
-          <div style={S.label}>Objectives</div>
-          {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.objectives || ''} onChange={e => setForm((f: any) => ({ ...f, objectives: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.objectives || 'Not defined.'}</div>}
+          <div style={S.label}>{L('Objectives', 'الأهداف')}</div>
+          {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.objectives || ''} onChange={e => setForm((f: any) => ({ ...f, objectives: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.objectives || L('Not defined.', 'غير محدد.')}</div>}
         </div>
         <div style={S.card}>
-          <div style={S.label}>Scope</div>
-          {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.scope || ''} onChange={e => setForm((f: any) => ({ ...f, scope: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.scope || 'Not defined.'}</div>}
+          <div style={S.label}>{L('Scope', 'النطاق')}</div>
+          {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.scope || ''} onChange={e => setForm((f: any) => ({ ...f, scope: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.scope || L('Not defined.', 'غير محدد.')}</div>}
         </div>
 
         {/* Activities */}
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 10 }}>Key Activities ({activities.length})</div>
+          <div style={{ fontWeight: 600, marginBottom: 10 }}>{L('Key Activities (', 'الأنشطة الرئيسية (')}{activities.length})</div>
           {activities.map((a: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
               {editing ? <>
-                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={a.name || ''} onChange={e => updateListItem('activities', i, { name: e.target.value })} placeholder="Activity name" />
-                <select style={{ ...S.input, marginBottom: 0, width: 100 }} value={a.priority || 'MEDIUM'} onChange={e => updateListItem('activities', i, { priority: e.target.value })}>{['HIGH','MEDIUM','LOW'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={a.name || ''} onChange={e => updateListItem('activities', i, { name: e.target.value })} placeholder={L('Activity name', 'اسم النشاط')} />
+                <select style={{ ...S.input, marginBottom: 0, width: 100 }} value={a.priority || 'MEDIUM'} onChange={e => updateListItem('activities', i, { priority: e.target.value })}>{['HIGH','MEDIUM','LOW'].map(p => <option key={p} value={p}>{enumLabel(p, isAR)}</option>)}</select>
                 <button style={{ ...S.btn('danger'), fontSize: 10, padding: '4px 8px' }} onClick={() => removeListItem('activities', i)}>✕</button>
               </> : <>
-                <span style={S.badge(PRIORITY_COLOR[a.priority] || '#7f8c8d')}>{a.priority || 'MEDIUM'}</span>
+                <span style={S.badge(PRIORITY_COLOR[a.priority] || '#7f8c8d')}>{enumLabel(a.priority || 'MEDIUM', isAR)}</span>
                 <div style={{ flex: 1 }}>{a.name}{a.timeframe ? ` (${a.timeframe})` : ''}{a.description ? ` — ${a.description}` : ''}</div>
                 <AssetLinkControl item={a} field="activities" isPicking={pickingAssetFor?.field === 'activities' && pickingAssetFor?.itemId === a.id}
                   onStartPick={() => setPickingAssetFor({ field: 'activities', itemId: a.id })}
@@ -511,20 +526,20 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
               </>}
             </div>
           ))}
-          {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('activities', { name: '', priority: 'MEDIUM' })}>+ Add Activity</button>}
+          {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('activities', { name: '', priority: 'MEDIUM' })}>{L('+ Add Activity', '+ إضافة نشاط')}</button>}
         </div>
 
         {/* Deliverables */}
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 10 }}>Expected Deliverables ({deliverables.length})</div>
+          <div style={{ fontWeight: 600, marginBottom: 10 }}>{L('Expected Deliverables (', 'المخرجات المتوقعة (')}{deliverables.length})</div>
           {deliverables.map((d: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
               {editing ? <>
-                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={d.name || ''} onChange={e => updateListItem('deliverables', i, { name: e.target.value })} placeholder="Deliverable name" />
-                <input style={{ ...S.input, marginBottom: 0, width: 120 }} value={d.dueTimeframe || ''} onChange={e => updateListItem('deliverables', i, { dueTimeframe: e.target.value })} placeholder="Due" />
+                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={d.name || ''} onChange={e => updateListItem('deliverables', i, { name: e.target.value })} placeholder={L('Deliverable name', 'اسم المخرج')} />
+                <input style={{ ...S.input, marginBottom: 0, width: 120 }} value={d.dueTimeframe || ''} onChange={e => updateListItem('deliverables', i, { dueTimeframe: e.target.value })} placeholder={L('Due', 'الاستحقاق')} />
                 <button style={{ ...S.btn('danger'), fontSize: 10, padding: '4px 8px' }} onClick={() => removeListItem('deliverables', i)}>✕</button>
               </> : <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ flex: 1 }}>{d.name} {d.type ? `— ${d.type}` : ''}{d.dueTimeframe ? `, due ${d.dueTimeframe}` : ''}</span>
+                <span style={{ flex: 1 }}>{d.name} {d.type ? `— ${d.type}` : ''}{d.dueTimeframe ? L(`, due ${d.dueTimeframe}`, `، تستحق ${d.dueTimeframe}`) : ''}</span>
                 <AssetLinkControl item={d} field="deliverables" isPicking={pickingAssetFor?.field === 'deliverables' && pickingAssetFor?.itemId === d.id}
                   onStartPick={() => setPickingAssetFor({ field: 'deliverables', itemId: d.id })}
                   onPick={(asset) => linkItemAsset('deliverables', d.id, asset)}
@@ -534,45 +549,45 @@ function PlanDetail({ api, plan, onBack, onRefresh }: { api: any, plan: any, onB
               </div>}
             </div>
           ))}
-          {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('deliverables', { name: '' })}>+ Add Deliverable</button>}
+          {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('deliverables', { name: '' })}>{L('+ Add Deliverable', '+ إضافة مخرج')}</button>}
         </div>
 
         {/* KPIs */}
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 10 }}>KPIs ({kpis.length})</div>
+          <div style={{ fontWeight: 600, marginBottom: 10 }}>{L('KPIs (', 'مؤشرات الأداء (')}{kpis.length})</div>
           {kpis.map((k: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
               {editing ? <>
-                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={k.name || ''} onChange={e => updateListItem('kpis', i, { name: e.target.value })} placeholder="KPI name" />
-                <input style={{ ...S.input, marginBottom: 0, width: 100 }} value={k.target || ''} onChange={e => updateListItem('kpis', i, { target: e.target.value })} placeholder="Target" />
+                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={k.name || ''} onChange={e => updateListItem('kpis', i, { name: e.target.value })} placeholder={L('KPI name', 'اسم المؤشر')} />
+                <input style={{ ...S.input, marginBottom: 0, width: 100 }} value={k.target || ''} onChange={e => updateListItem('kpis', i, { target: e.target.value })} placeholder={L('Target', 'المستهدف')} />
                 <button style={{ ...S.btn('danger'), fontSize: 10, padding: '4px 8px' }} onClick={() => removeListItem('kpis', i)}>✕</button>
-              </> : <div style={{ flex: 1 }}>{k.name} | Target: {k.target || 'TBD'}</div>}
+              </> : <div style={{ flex: 1 }}>{k.name} {L('| Target:', '| المستهدف:')} {k.target || 'TBD'}</div>}
             </div>
           ))}
-          {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('kpis', { name: '' })}>+ Add KPI</button>}
+          {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('kpis', { name: '' })}>{L('+ Add KPI', '+ إضافة مؤشر')}</button>}
         </div>
 
         {/* Risks */}
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 10 }}>Risks ({risks.length})</div>
+          <div style={{ fontWeight: 600, marginBottom: 10 }}>{L('Risks (', 'المخاطر (')}{risks.length})</div>
           {risks.map((r: any, i: number) => (
             <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: 12 }}>
               {editing ? <>
-                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={r.name || ''} onChange={e => updateListItem('risks', i, { name: e.target.value })} placeholder="Risk name" />
-                <select style={{ ...S.input, marginBottom: 0, width: 100 }} value={r.severity || 'MEDIUM'} onChange={e => updateListItem('risks', i, { severity: e.target.value })}>{['HIGH','MEDIUM','LOW'].map(p => <option key={p} value={p}>{p}</option>)}</select>
+                <input style={{ ...S.input, marginBottom: 0, flex: 1 }} value={r.name || ''} onChange={e => updateListItem('risks', i, { name: e.target.value })} placeholder={L('Risk name', 'اسم الخطر')} />
+                <select style={{ ...S.input, marginBottom: 0, width: 100 }} value={r.severity || 'MEDIUM'} onChange={e => updateListItem('risks', i, { severity: e.target.value })}>{['HIGH','MEDIUM','LOW'].map(p => <option key={p} value={p}>{enumLabel(p, isAR)}</option>)}</select>
                 <button style={{ ...S.btn('danger'), fontSize: 10, padding: '4px 8px' }} onClick={() => removeListItem('risks', i)}>✕</button>
               </> : <>
                 <span style={S.badge(PRIORITY_COLOR[r.severity] || '#7f8c8d')}>{r.severity || 'MEDIUM'}</span>
-                <div style={{ flex: 1 }}>{r.name}{r.mitigation ? ` — Mitigation: ${r.mitigation}` : ''}</div>
+                <div style={{ flex: 1 }}>{r.name}{r.mitigation ? L(` — Mitigation: ${r.mitigation}`, `— المعالجة: ${r.mitigation}`) : ''}</div>
               </>}
             </div>
           ))}
-          {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('risks', { name: '', severity: 'MEDIUM' })}>+ Add Risk</button>}
+          {editing && <button style={{ ...S.btn(), fontSize: 11, marginTop: 8 }} onClick={() => addListItem('risks', { name: '', severity: 'MEDIUM' })}>{L('+ Add Risk', '+ إضافة خطر')}</button>}
         </div>
 
         <div style={S.card}>
-          <div style={S.label}>Notes</div>
-          {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.notes || ''} onChange={e => setForm((f: any) => ({ ...f, notes: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.notes || 'None.'}</div>}
+          <div style={S.label}>{L('Notes', 'ملاحظات')}</div>
+          {editing ? <textarea style={{ ...S.input, minHeight: 60 }} value={form.notes || ''} onChange={e => setForm((f: any) => ({ ...f, notes: e.target.value }))} /> : <div style={{ fontSize: 13 }}>{plan.notes || L('None.', 'لا يوجد.')}</div>}
         </div>
       </div>
     </div>
