@@ -15,6 +15,33 @@ export interface StrategyRefresh {
   summary?: Array<{ id?: string; category: string; count: number; findingIds: string[]; measure?: 'FINDINGS' | 'REFERENCED_OBJECTS'; classification?: string; semanticType?: string }>
   context?: { limitations: string[]; evidence: Array<{ id: string; module: string; authority: string; data: any }>; previous?: Array<{ id: string; title: string; payload: any; evidence: any }> }
   responseProgress?: { total: number; published: number; pending: number }
+  impact?: StrategyImpact | null
+}
+
+export type ImpactLevel = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE'
+export interface StrategyImpactedObject {
+  assetId: string; name: string; assetType: string; typeLabel: string
+  impactType: string; nature: 'DIRECT' | 'INDIRECT'; impactLevel: 'HIGH' | 'MEDIUM' | 'LOW'; description: string
+  factIds: string[]; namedInStrategy: boolean
+}
+export interface StrategyImpactView {
+  source: 'SAVED_VIEW' | 'VIEW_LIBRARY'; viewId: string | null; viewpointId: string | null; title: string; visualization: string
+  architectureState: string; reason: string; objects: number; impactedShown: number
+  image?: { mimeType: string; svg: string; width: number; height: number }
+}
+export interface StrategyDomainImpact {
+  domain: string; domainName: string; status: 'ASSESSED' | 'FAILED' | 'NO_OBJECTS' | string
+  objectCount: number; assessedCount: number; impactLevel: ImpactLevel; summary: string
+  impactedObjects: StrategyImpactedObject[]; view?: StrategyImpactView
+}
+/** The refresh's EA impact register over the Current architecture (absent on refreshes analysed before it existed). */
+export interface StrategyImpact {
+  scope: 'CURRENT_ARCHITECTURE'; analyzedAt: string
+  totals: { repositoryObjects: number; assessedObjects: number; impactedObjects: number; impactedDomains: number; namedObjects: number; notInRepository: number }
+  domains: StrategyDomainImpact[]
+  notInRepository: Array<{ name: string; factIds: string[] }>
+  synthesis?: { headline: string; overview: string; keyMessages: string[] }
+  limitations: string[]
 }
 
 export interface PublicationOptions {
@@ -62,5 +89,15 @@ export const strategyRefreshApi = {
   preview: (id: string, finding: RefreshFinding, contract: Record<string, unknown>) => request<PublicationPreview>(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(finding.id)}/publication-preview`, { ...contract, revision: finding.revision }),
   publish: (id: string, finding: RefreshFinding, contract: Record<string, unknown>) => request(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(finding.id)}/publication`, { ...contract, revision: finding.revision }),
   cancelPublication: (id: string, findingId: string) => request(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(findingId)}/publication/cancel`, {}),
-  source: (id: string, sourceId: string) => request<{ url: string }>(`/${encodeURIComponent(id)}/documents/${encodeURIComponent(sourceId)}/url`),
+  rerun: (id: string) => request<StrategyRefresh>(`/${encodeURIComponent(id)}/rerun`, {}),
+  /** The uploaded document, streamed through the API (tenant-scoped; no signed storage URL). */
+  source: async (id: string, sourceId: string): Promise<Blob> => {
+    const token = getToken()
+    const response = await fetch(`${API_BASE}/strategy-refreshes/${encodeURIComponent(id)}/documents/${encodeURIComponent(sourceId)}/content`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.message || `HTTP ${response.status}`)
+    }
+    return response.blob()
+  },
 }
