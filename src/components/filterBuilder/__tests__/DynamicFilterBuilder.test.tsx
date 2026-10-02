@@ -1,6 +1,11 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import DynamicFilterBuilder, { ConditionGroup } from '../DynamicFilterBuilder'
 
+jest.mock('../../../contexts/LangContext', () => ({
+  useLang: () => ({ isAR: false, locale: 'EN', setLocale: jest.fn(), t: (key: string) => key }),
+}));
+
+
 const APPLICATION_DEFINITION = {
   objectType: 'Application',
   identityFields: [{ code: '__status', name: 'Status', dataType: 'ENUM', supportedOperators: ['IS', 'IS_NOT'], enumValues: [{ code: 'ACTIVE', label: 'Active' }, { code: 'PLANNED', label: 'Planned' }] }],

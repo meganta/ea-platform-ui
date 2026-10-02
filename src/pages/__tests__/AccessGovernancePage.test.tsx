@@ -1,6 +1,11 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AccessGovernancePage from '../AccessGovernancePage';
 
+jest.mock('../../contexts/LangContext', () => ({
+  useLang: () => ({ isAR: false, locale: 'EN', setLocale: jest.fn(), t: (key: string) => key }),
+}));
+
+
 let mockUser: any = { role: 'TENANT_ADMIN' };
 jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: mockUser }),
@@ -163,7 +168,7 @@ describe('AccessGovernancePage - SodTab', () => {
     render(<AccessGovernancePage />);
     fireEvent.click(screen.getByText('Segregation of Duties'));
     expect(await screen.findByText(/Requester\/Approver split/)).toBeInTheDocument();
-    expect(screen.getByText('BLOCKING')).toBeInTheDocument();
+    expect(screen.getByText('Blocking')).toBeInTheDocument();
   });
 
   it('shows "no conflicts detected" when there are none', async () => {

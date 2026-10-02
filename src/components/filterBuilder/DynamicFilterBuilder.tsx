@@ -54,6 +54,8 @@ interface Props {
 const emptyGroup = (): Group => ({ operator: 'AND', conditions: [] })
 
 export default function DynamicFilterBuilder({ objectType, api, value, onChange, onApply, onClear, locale = 'EN' }: Props) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [definition, setDefinition] = useState<FilterDefinition | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -185,8 +187,8 @@ export default function DynamicFilterBuilder({ objectType, api, value, onChange,
                 <div key={i}>
                   {i > 0 && (
                     <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                      <button type="button" onClick={() => setGroupOperator('AND')} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', background: group.operator === 'AND' ? 'var(--accent)' : 'transparent', color: group.operator === 'AND' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>AND</button>
-                      <button type="button" onClick={() => setGroupOperator('OR')} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', background: group.operator === 'OR' ? 'var(--accent)' : 'transparent', color: group.operator === 'OR' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>OR</button>
+                      <button type="button" onClick={() => setGroupOperator('AND')} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', background: group.operator === 'AND' ? 'var(--accent)' : 'transparent', color: group.operator === 'AND' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>{L('AND', 'و')}</button>
+                      <button type="button" onClick={() => setGroupOperator('OR')} style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, border: '1px solid var(--border)', background: group.operator === 'OR' ? 'var(--accent)' : 'transparent', color: group.operator === 'OR' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>{L('OR', 'أو')}</button>
                     </div>
                   )}
                   {isGroup(node)
@@ -215,6 +217,8 @@ export default function DynamicFilterBuilder({ objectType, api, value, onChange,
 }
 
 function NestedGroupBox({ group, fields, onChange, onRemove, locale }: { group: NestedGroup; fields: FilterAttributeDef[]; onChange: (g: NestedGroup) => void; onRemove: () => void; locale: 'EN' | 'AR' }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const updateCondition = (index: number, next: AttrCondition) => {
     const conditions = [...group.conditions]; conditions[index] = next
     onChange({ ...group, conditions })
@@ -242,8 +246,8 @@ function NestedGroupBox({ group, fields, onChange, onRemove, locale }: { group: 
           <div key={i}>
             {i > 0 && (
               <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                <button type="button" onClick={() => onChange({ ...group, operator: 'AND' })} style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border)', background: group.operator === 'AND' ? 'var(--accent)' : 'transparent', color: group.operator === 'AND' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>AND</button>
-                <button type="button" onClick={() => onChange({ ...group, operator: 'OR' })} style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border)', background: group.operator === 'OR' ? 'var(--accent)' : 'transparent', color: group.operator === 'OR' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>OR</button>
+                <button type="button" onClick={() => onChange({ ...group, operator: 'AND' })} style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border)', background: group.operator === 'AND' ? 'var(--accent)' : 'transparent', color: group.operator === 'AND' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>{L('AND', 'و')}</button>
+                <button type="button" onClick={() => onChange({ ...group, operator: 'OR' })} style={{ fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, border: '1px solid var(--border)', background: group.operator === 'OR' ? 'var(--accent)' : 'transparent', color: group.operator === 'OR' ? '#fff' : 'var(--text-dim)', cursor: 'pointer' }}>{L('OR', 'أو')}</button>
               </div>
             )}
             <AttributeConditionRow condition={c} fields={fields} onChange={next => updateCondition(i, next)} onRemove={() => removeCondition(i)} locale={locale} />

@@ -159,10 +159,10 @@ function SavingsReport() {
                         background: (SEV_COLOR[item.status]||'#64748B') + '18', color: SEV_COLOR[item.status]||'#64748B',
                         fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
                     >
-                      <option value={L('OPEN', 'مفتوحة')}>{L('OPEN', 'مفتوحة')}</option>
-                      <option value={L('ACCEPTED', 'مقبولة')}>{L('ACCEPTED', 'مقبولة')}</option>
+                      <option value='OPEN'>{L('OPEN', 'مفتوحة')}</option>
+                      <option value='ACCEPTED'>{L('ACCEPTED', 'مقبولة')}</option>
                       <option value='APPROVED'>{L('CONFIRMED', 'مؤكدة')}</option>
-                      <option value={L('REJECTED', 'مرفوضة')}>{L('REJECTED', 'مرفوضة')}</option>
+                      <option value='REJECTED'>{L('REJECTED', 'مرفوضة')}</option>
                       <option value='EXCEPTION_REQUESTED'>{L('EXCEPTION', 'استثناء')}</option>
                     </select>
                   </td>

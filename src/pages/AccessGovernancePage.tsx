@@ -1,3 +1,5 @@
+import { useLang } from '../contexts/LangContext'
+import { enumLabel } from '../lib/enumLabels'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
@@ -39,6 +41,8 @@ const RISK_COLORS: Record<string, string> = { NORMAL: '#64748B', SENSITIVE: '#f3
 const STATUS_COLORS: Record<string, string> = { PENDING: '#f39c12', APPROVED: '#27ae60', REJECTED: '#e74c3c', CANCELLED: '#64748B', ACTIVE: '#00b4d8', COMPLETED: '#27ae60' }
 
 export default function AccessGovernancePage() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const api = useApi()
   const { user } = useAuth()
   const isAdmin = user?.role === 'TENANT_ADMIN'
@@ -48,12 +52,12 @@ export default function AccessGovernancePage() {
     <div style={S.page}>
       <div style={S.header}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>🔐 Access Governance</div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Roles, permissions, access requests, and governance policies</div>
+          <div style={{ fontSize: 20, fontWeight: 700 }}>{L('🔐 Access Governance', '🔐 حوكمة الوصول')}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('Roles, permissions, access requests, and governance policies', 'الأدوار والصلاحيات وطلبات الوصول وسياسات الحوكمة')}</div>
         </div>
       </div>
       <div style={S.tabs}>
-        {[['overview','Overview'],['roles','Roles'],['users','Users'],['requests','Access Requests'],['sod','Segregation of Duties'],['reviews','Access Reviews'],['audit','Audit']].map(([k,l]) => (
+        {[['overview',L('Overview', 'نظرة عامة')],['roles',L('Roles', 'الأدوار')],['users',L('Users', 'المستخدمون')],['requests',L('Access Requests', 'طلبات الوصول')],['sod',L('Segregation of Duties', 'فصل المهام')],['reviews',L('Access Reviews', 'مراجعات الوصول')],['audit',L('Audit', 'التدقيق')]].map(([k,l]) => (
           <button key={k} style={S.tab(tab===k)} onClick={() => setTab(k as any)}>{l}</button>
         ))}
       </div>
@@ -88,6 +92,8 @@ export default function AccessGovernancePage() {
 
 // ── Overview ───────────────────────────────────────────────────────────────
 function OverviewTab({ api, isAdmin }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [roles, setRoles] = useState<any[]>([])
   const [requests, setRequests] = useState<any[]>([])
   const [conflicts, setConflicts] = useState<any[]>([])
@@ -106,23 +112,25 @@ function OverviewTab({ api, isAdmin }: any) {
   return (
     <div>
       <div style={S.grid3}>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Tenant Roles</div><div style={{ fontSize: 28, fontWeight: 700 }}>{roles.length}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>Pending Access Requests</div><div style={{ fontSize: 28, fontWeight: 700, color: requests.length > 0 ? '#f39c12' : undefined }}>{requests.length}</div></div>
-        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>SoD Conflicts</div><div style={{ fontSize: 28, fontWeight: 700, color: conflicts.length > 0 ? '#e74c3c' : undefined }}>{conflicts.reduce((s: number, c: any) => s + c.conflicts.length, 0)}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Tenant Roles', 'أدوار الجهة')}</div><div style={{ fontSize: 28, fontWeight: 700 }}>{roles.length}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('Pending Access Requests', 'طلبات الوصول المعلقة')}</div><div style={{ fontSize: 28, fontWeight: 700, color: requests.length > 0 ? '#f39c12' : undefined }}>{requests.length}</div></div>
+        <div style={S.statCard}><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{L('SoD Conflicts', 'تعارضات فصل المهام')}</div><div style={{ fontSize: 28, fontWeight: 700, color: conflicts.length > 0 ? '#e74c3c' : undefined }}>{conflicts.reduce((s: number, c: any) => s + c.conflicts.length, 0)}</div></div>
       </div>
       {isAdmin && dormant.length > 0 && (
         <div style={{ ...S.card, marginTop: 16, borderColor: '#f39c1244' }}>
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>⚠ {dormant.length} dormant account{dormant.length !== 1 ? 's' : ''}</div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No login activity in 90+ days. Review in the Users tab.</div>
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>⚠ {dormant.length} {L('dormant account', 'حساب خامل')}{dormant.length !== 1 ? 's' : ''}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('No login activity in 90+ days. Review in the Users tab.', 'لا يوجد نشاط دخول منذ أكثر من 90 يوماً. راجعه في تبويب المستخدمين.')}</div>
         </div>
       )}
-      {!isAdmin && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 16 }}>Some sections require Tenant Administrator access.</div>}
+      {!isAdmin && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 16 }}>{L('Some sections require Tenant Administrator access.', 'تتطلب بعض الأقسام صلاحية مدير الجهة.')}</div>}
     </div>
   )
 }
 
 // ── Roles ──────────────────────────────────────────────────────────────────
 function RolesTab({ api, isAdmin }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [roles, setRoles] = useState<any[]>([])
   const [permissions, setPermissions] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
@@ -162,7 +170,7 @@ function RolesTab({ api, isAdmin }: any) {
   }
 
   const cloneRole = async (r: any) => {
-    const name = prompt(`Clone "${r.name}" as:`, `${r.name} (Copy)`)
+    const name = prompt(L(`Clone "${r.name}" as:`, `استنساخ "${r.name}" باسم:`), L(`${r.name} (Copy)`, `${r.name} (نسخة)`))
     if (!name) return
     try {
       await api.post(`/access-governance/roles/${r.id}/clone`, { code: name.toLowerCase().replace(/[^a-z0-9]+/g, '-'), name })
@@ -171,7 +179,7 @@ function RolesTab({ api, isAdmin }: any) {
   }
 
   const deleteRole = async (r: any) => {
-    if (!window.confirm(`Delete role "${r.name}"?`)) return
+    if (!window.confirm(L(`Delete role "${r.name}"?`, `حذف الدور "${r.name}"؟`))) return
     try { await api.del(`/access-governance/roles/${r.id}`); load() } catch (e: any) { alert(e.message) }
   }
 
@@ -181,18 +189,18 @@ function RolesTab({ api, isAdmin }: any) {
   if (selected) {
     return (
       <div>
-        <button style={S.btn()} onClick={() => setSelected(null)}>← Back to Roles</button>
+        <button style={S.btn()} onClick={() => setSelected(null)}>{L('← Back to Roles', '→ العودة إلى الأدوار')}</button>
         <div style={{ ...S.card, marginTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700 }}>{selected.name}{selected.isSystemRole && <span style={{ ...S.badge('#64748B'), marginLeft: 8 }}>System Template</span>}{selected.isPrivileged && <span style={{ ...S.badge('#e67e22'), marginLeft: 6 }}>Privileged</span>}</div>
+              <div style={{ fontSize: 16, fontWeight: 700 }}>{selected.name}{selected.isSystemRole && <span style={{ ...S.badge('#64748B'), marginLeft: 8 }}>{L('System Template', 'قالب النظام')}</span>}{selected.isPrivileged && <span style={{ ...S.badge('#e67e22'), marginLeft: 6 }}>{L('Privileged', 'مميز')}</span>}</div>
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{selected.description}</div>
             </div>
-            {isAdmin && <button style={S.btn('primary')} disabled={saving} onClick={savePermissions}>{saving ? 'Saving…' : 'Save Permissions'}</button>}
+            {isAdmin && <button style={S.btn('primary')} disabled={saving} onClick={savePermissions}>{saving ? L('Saving…', 'جارٍ الحفظ…') : L('Save Permissions', 'حفظ الصلاحيات')}</button>}
           </div>
         </div>
         <div style={S.card}>
-          <div style={{ fontWeight: 600, marginBottom: 12 }}>Permissions</div>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>{L('Permissions', 'الصلاحيات')}</div>
           {Object.entries(permsByModule).map(([mod, perms]) => (
             <div key={mod} style={{ marginBottom: 14 }}>
               <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 6 }}>{mod}</div>
@@ -220,31 +228,31 @@ function RolesTab({ api, isAdmin }: any) {
     <div>
       {isAdmin && (
         <div style={{ marginBottom: 16 }}>
-          {!creating ? <button style={S.btn('primary')} onClick={() => setCreating(true)}>+ Create Role</button> : (
+          {!creating ? <button style={S.btn('primary')} onClick={() => setCreating(true)}>{L('+ Create Role', '+ إنشاء دور')}</button> : (
             <div style={S.card}>
               <div style={S.grid2}>
-                <div><div style={S.label}>Code (slug)</div><input style={S.input} value={newRole.code} onChange={e => setNewRole(r => ({ ...r, code: e.target.value }))} placeholder="e.g. data-steward" /></div>
-                <div><div style={S.label}>Name</div><input style={S.input} value={newRole.name} onChange={e => setNewRole(r => ({ ...r, name: e.target.value }))} placeholder="e.g. Data Steward" /></div>
+                <div><div style={S.label}>{L('Code (slug)', 'الرمز (المعرّف النصي)')}</div><input style={S.input} value={newRole.code} onChange={e => setNewRole(r => ({ ...r, code: e.target.value }))} placeholder="e.g. data-steward" /></div>
+                <div><div style={S.label}>{L('Name', 'الاسم')}</div><input style={S.input} value={newRole.name} onChange={e => setNewRole(r => ({ ...r, name: e.target.value }))} placeholder={L('e.g. Data Steward', 'مثال: أمين البيانات')} /></div>
               </div>
-              <div style={S.row}><button style={S.btn('primary')} onClick={createRole}>Create</button><button style={S.btn()} onClick={() => setCreating(false)}>Cancel</button></div>
+              <div style={S.row}><button style={S.btn('primary')} onClick={createRole}>{L('Create', 'إنشاء')}</button><button style={S.btn()} onClick={() => setCreating(false)}>{L('Cancel', 'إلغاء')}</button></div>
             </div>
           )}
         </div>
       )}
       <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr><th style={S.th}>Name</th><th style={S.th}>Permissions</th><th style={S.th}>Users</th><th style={S.th}>Type</th><th style={S.th}></th></tr></thead>
+        <thead><tr><th style={S.th}>{L('Name', 'الاسم')}</th><th style={S.th}>{L('Permissions', 'الصلاحيات')}</th><th style={S.th}>{L('Users', 'المستخدمون')}</th><th style={S.th}>{L('Type', 'النوع')}</th><th style={S.th}></th></tr></thead>
         <tbody>
           {roles.map(r => (
             <tr key={r.id}>
               <td style={S.td}><span style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => openRole(r)}>{r.name}</span></td>
               <td style={S.td}>{r.rolePermissions?.length || 0}</td>
               <td style={S.td}>{r._count?.assignments || 0}</td>
-              <td style={S.td}>{r.isSystemRole ? <span style={S.badge('#64748B')}>System</span> : <span style={S.badge('#00b4d8')}>Custom</span>}{r.isPrivileged && <span style={{ ...S.badge('#e67e22'), marginLeft: 4 }}>Privileged</span>}</td>
+              <td style={S.td}>{r.isSystemRole ? <span style={S.badge('#64748B')}>{L('System', 'النظام')}</span> : <span style={S.badge('#00b4d8')}>{L('Custom', 'مخصص')}</span>}{r.isPrivileged && <span style={{ ...S.badge('#e67e22'), marginLeft: 4 }}>{L('Privileged', 'مميز')}</span>}</td>
               <td style={S.td}>
                 {isAdmin && <>
-                  <button style={{ ...S.btn(), fontSize: 11, padding: '4px 8px', marginRight: 6 }} onClick={() => cloneRole(r)}>Clone</button>
-                  <button style={{ ...S.btn('danger'), fontSize: 11, padding: '4px 8px' }} onClick={() => deleteRole(r)}>Delete</button>
+                  <button style={{ ...S.btn(), fontSize: 11, padding: '4px 8px', marginRight: 6 }} onClick={() => cloneRole(r)}>{L('Clone', 'استنساخ')}</button>
+                  <button style={{ ...S.btn('danger'), fontSize: 11, padding: '4px 8px' }} onClick={() => deleteRole(r)}>{L('Delete', 'حذف')}</button>
                 </>}
               </td>
             </tr>
@@ -258,6 +266,8 @@ function RolesTab({ api, isAdmin }: any) {
 
 // ── Users ──────────────────────────────────────────────────────────────────
 function UsersTab({ api, isAdmin }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [users, setUsers] = useState<any[]>([])
   const [roles, setRoles] = useState<any[]>([])
   const [effective, setEffective] = useState<{ userId: string; perms: any[] } | null>(null)
@@ -286,48 +296,48 @@ function UsersTab({ api, isAdmin }: any) {
   }
 
   const removeRole = async (userId: string, roleId: string) => {
-    if (!window.confirm('Remove this role assignment?')) return
+    if (!window.confirm(L('Remove this role assignment?', 'إزالة إسناد هذا الدور؟'))) return
     try { await api.del(`/access-governance/roles/${roleId}/assign/${userId}`); load() } catch (e: any) { alert(e.message) }
   }
 
-  if (!isAdmin) return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Requires Tenant Administrator access.</div>
+  if (!isAdmin) return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Requires Tenant Administrator access.', 'يتطلب صلاحية مدير الجهة.')}</div>
 
   return (
     <div>
       <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr><th style={S.th}>User</th><th style={S.th}>Legacy Role</th><th style={S.th}>Governance Roles</th><th style={S.th}>Last Login</th><th style={S.th}></th></tr></thead>
+        <thead><tr><th style={S.th}>{L('User', 'المستخدم')}</th><th style={S.th}>{L('Legacy Role', 'الدور القديم')}</th><th style={S.th}>{L('Governance Roles', 'أدوار الحوكمة')}</th><th style={S.th}>{L('Last Login', 'آخر دخول')}</th><th style={S.th}></th></tr></thead>
         <tbody>
           {users.map(u => (
             <>
               <tr key={u.id}>
                 <td style={S.td}><div>{u.fullName}</div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{u.email}</div></td>
-                <td style={S.td}>{u.role}</td>
+                <td style={S.td}>{enumLabel(u.role, isAR)}</td>
                 <td style={S.td}>{u.tenantRoles.length === 0 ? <span style={{ color: 'var(--text-dim)' }}>—</span> : u.tenantRoles.map((r: any) => (
-                  <span key={r.id} style={{ ...S.badge('#00b4d8'), marginRight: 4, cursor: 'pointer' }} onClick={() => removeRole(u.id, r.id)} title="Click to remove">{r.name} ✕</span>
+                  <span key={r.id} style={{ ...S.badge('#00b4d8'), marginRight: 4, cursor: 'pointer' }} onClick={() => removeRole(u.id, r.id)} title={L('Click to remove', 'انقر للإزالة')}>{r.name} ✕</span>
                 ))}</td>
-                <td style={S.td}>{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : <span style={{ color: '#f39c12' }}>Never</span>}</td>
+                <td style={S.td}>{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString(isAR ? 'ar' : 'en-US') : <span style={{ color: '#f39c12' }}>{L('Never', 'أبداً')}</span>}</td>
                 <td style={S.td}>
-                  <button style={{ ...S.btn(), fontSize: 11, padding: '4px 8px', marginRight: 6 }} onClick={() => viewEffective(u.id)}>Effective Access</button>
-                  <button style={{ ...S.btn('primary'), fontSize: 11, padding: '4px 8px' }} onClick={() => setAssigning(assigning === u.id ? null : u.id)}>+ Assign</button>
+                  <button style={{ ...S.btn(), fontSize: 11, padding: '4px 8px', marginRight: 6 }} onClick={() => viewEffective(u.id)}>{L('Effective Access', 'الوصول الفعلي')}</button>
+                  <button style={{ ...S.btn('primary'), fontSize: 11, padding: '4px 8px' }} onClick={() => setAssigning(assigning === u.id ? null : u.id)}>{L('+ Assign', '+ إسناد')}</button>
                 </td>
               </tr>
               {assigning === u.id && (
                 <tr><td colSpan={5} style={S.td}>
                   <div style={S.row}>
                     <select style={{ ...S.input, marginBottom: 0, width: 240 }} value={assignRoleId} onChange={e => setAssignRoleId(e.target.value)}>
-                      <option value="">Select role…</option>
+                      <option value="">{L('Select role…', 'اختر دوراً…')}</option>
                       {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
-                    <button style={S.btn('primary')} onClick={() => assignRole(u.id)}>Assign</button>
+                    <button style={S.btn('primary')} onClick={() => assignRole(u.id)}>{L('Assign', 'إسناد')}</button>
                   </div>
                 </td></tr>
               )}
               {effective?.userId === u.id && effective && (
                 <tr><td colSpan={5} style={S.td}>
                   <div style={{ fontSize: 12 }}>
-                    {effective.perms.length === 0 ? <span style={{ color: 'var(--text-dim)' }}>No permissions granted.</span> : effective.perms.map((p: any, i: number) => (
-                      <div key={i} style={{ padding: '3px 0' }}>{p.code} <span style={{ color: 'var(--text-dim)' }}>via {p.source}</span>{p.domainScope?.length > 0 && <span style={{ color: 'var(--text-dim)' }}> · scoped to {p.domainScope.join(', ')}</span>}</div>
+                    {effective.perms.length === 0 ? <span style={{ color: 'var(--text-dim)' }}>{L('No permissions granted.', 'لم تُمنح أي صلاحيات.')}</span> : effective.perms.map((p: any, i: number) => (
+                      <div key={i} style={{ padding: '3px 0' }}>{p.code} <span style={{ color: 'var(--text-dim)' }}>{L('via', 'عبر')} {p.source}</span>{p.domainScope?.length > 0 && <span style={{ color: 'var(--text-dim)' }}> {L('· scoped to', '· ضمن نطاق')} {p.domainScope.join(', ')}</span>}</div>
                     ))}
                   </div>
                 </td></tr>
@@ -343,6 +353,8 @@ function UsersTab({ api, isAdmin }: any) {
 
 // ── Access Requests ────────────────────────────────────────────────────────
 function RequestsTab({ api, isAdmin }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [requests, setRequests] = useState<any[]>([])
   const [myRequests, setMyRequests] = useState<any[]>([])
   const [roles, setRoles] = useState<any[]>([])
@@ -358,7 +370,7 @@ function RequestsTab({ api, isAdmin }: any) {
   useEffect(() => { load() }, [load])
 
   const submitRequest = async () => {
-    if (!newReq.tenantRoleId || !newReq.reason.trim()) return alert('Select a role and provide a reason')
+    if (!newReq.tenantRoleId || !newReq.reason.trim()) return alert(L('Select a role and provide a reason', 'اختر دوراً واذكر السبب'))
     try { await api.post('/access-governance/access-requests', newReq); setNewReq({ tenantRoleId: '', reason: '' }); load() } catch (e: any) { alert(e.message) }
   }
 
@@ -367,7 +379,7 @@ function RequestsTab({ api, isAdmin }: any) {
       await api.post(`/access-governance/access-requests/${id}/${decision}`, { force })
       load()
     } catch (e: any) {
-      if (e.message.includes('Segregation') && !force && window.confirm(`${e.message}\n\nApprove anyway (override)?`)) {
+      if (e.message.includes('Segregation') && !force && window.confirm(L(`${e.message}\n\nApprove anyway (override)?`, `${e.message} الاعتماد رغم ذلك (تجاوز)؟`))) {
         return decide(id, decision, true)
       }
       alert(e.message)
@@ -379,65 +391,65 @@ function RequestsTab({ api, isAdmin }: any) {
   return (
     <div>
       <div style={S.card}>
-        <div style={{ fontWeight: 600, marginBottom: 10 }}>Request Access</div>
+        <div style={{ fontWeight: 600, marginBottom: 10 }}>{L('Request Access', 'طلب وصول')}</div>
         <div style={S.grid2}>
           <div>
-            <div style={S.label}>Role</div>
+            <div style={S.label}>{L('Role', 'الدور')}</div>
             <select style={S.input} value={newReq.tenantRoleId} onChange={e => setNewReq(r => ({ ...r, tenantRoleId: e.target.value }))}>
-              <option value="">Select role…</option>
+              <option value="">{L('Select role…', 'اختر دوراً…')}</option>
               {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
             </select>
           </div>
           <div>
-            <div style={S.label}>Reason</div>
-            <input style={S.input} value={newReq.reason} onChange={e => setNewReq(r => ({ ...r, reason: e.target.value }))} placeholder="Why do you need this access?" />
+            <div style={S.label}>{L('Reason', 'السبب')}</div>
+            <input style={S.input} value={newReq.reason} onChange={e => setNewReq(r => ({ ...r, reason: e.target.value }))} placeholder={L('Why do you need this access?', 'لماذا تحتاج إلى هذا الوصول؟')} />
           </div>
         </div>
-        <button style={S.btn('primary')} onClick={submitRequest}>Submit Request</button>
+        <button style={S.btn('primary')} onClick={submitRequest}>{L('Submit Request', 'إرسال الطلب')}</button>
       </div>
 
-      <div style={{ fontWeight: 600, margin: '20px 0 8px' }}>My Requests</div>
+      <div style={{ fontWeight: 600, margin: '20px 0 8px' }}>{L('My Requests', 'طلباتي')}</div>
       <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-        <thead><tr><th style={S.th}>Role</th><th style={S.th}>Reason</th><th style={S.th}>Status</th><th style={S.th}></th></tr></thead>
+        <thead><tr><th style={S.th}>{L('Role', 'الدور')}</th><th style={S.th}>{L('Reason', 'السبب')}</th><th style={S.th}>{L('Status', 'الحالة')}</th><th style={S.th}></th></tr></thead>
         <tbody>
           {myRequests.map(r => (
             <tr key={r.id}>
               <td style={S.td}>{r.tenantRole?.name}</td>
               <td style={S.td}>{r.reason}</td>
-              <td style={S.td}><span style={S.badge(STATUS_COLORS[r.status])}>{r.status}</span></td>
-              <td style={S.td}>{r.status === 'PENDING' && <button style={{ ...S.btn(), fontSize: 11, padding: '4px 8px' }} onClick={() => cancel(r.id)}>Cancel</button>}</td>
+              <td style={S.td}><span style={S.badge(STATUS_COLORS[r.status])}>{enumLabel(r.status, isAR)}</span></td>
+              <td style={S.td}>{r.status === 'PENDING' && <button style={{ ...S.btn(), fontSize: 11, padding: '4px 8px' }} onClick={() => cancel(r.id)}>{L('Cancel', 'إلغاء')}</button>}</td>
             </tr>
           ))}
-          {myRequests.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>No requests yet.</td></tr>}
+          {myRequests.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>{L('No requests yet.', 'لا توجد طلبات بعد.')}</td></tr>}
         </tbody>
       </table>
       </div>
 
       {isAdmin && <>
         <div style={S.row}>
-          <div style={{ fontWeight: 600 }}>All Requests</div>
+          <div style={{ fontWeight: 600 }}>{L('All Requests', 'كل الطلبات')}</div>
           <select style={{ ...S.input, marginBottom: 0, width: 160 }} value={filter} onChange={e => setFilter(e.target.value)}>
-            {['PENDING','APPROVED','REJECTED','CANCELLED',''].map(s => <option key={s} value={s}>{s || 'All'}</option>)}
+            {['PENDING','APPROVED','REJECTED','CANCELLED',''].map(s => <option key={s} value={s}>{s || L('All', 'الكل')}</option>)}
           </select>
         </div>
         <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 8 }}>
-          <thead><tr><th style={S.th}>Requester</th><th style={S.th}>Role</th><th style={S.th}>Reason</th><th style={S.th}>Status</th><th style={S.th}></th></tr></thead>
+          <thead><tr><th style={S.th}>{L('Requester', 'مقدم الطلب')}</th><th style={S.th}>{L('Role', 'الدور')}</th><th style={S.th}>{L('Reason', 'السبب')}</th><th style={S.th}>{L('Status', 'الحالة')}</th><th style={S.th}></th></tr></thead>
           <tbody>
             {requests.map(r => (
               <tr key={r.id}>
                 <td style={S.td}>{r.requesterId}</td>
                 <td style={S.td}>{r.tenantRole?.name}</td>
                 <td style={S.td}>{r.reason}</td>
-                <td style={S.td}><span style={S.badge(STATUS_COLORS[r.status])}>{r.status}</span></td>
+                <td style={S.td}><span style={S.badge(STATUS_COLORS[r.status])}>{enumLabel(r.status, isAR)}</span></td>
                 <td style={S.td}>{r.status === 'PENDING' && <>
-                  <button style={{ ...S.btn('primary'), fontSize: 11, padding: '4px 8px', marginRight: 6 }} onClick={() => decide(r.id, 'approve')}>Approve</button>
-                  <button style={{ ...S.btn('danger'), fontSize: 11, padding: '4px 8px' }} onClick={() => decide(r.id, 'reject')}>Reject</button>
+                  <button style={{ ...S.btn('primary'), fontSize: 11, padding: '4px 8px', marginRight: 6 }} onClick={() => decide(r.id, 'approve')}>{L('Approve', 'اعتماد')}</button>
+                  <button style={{ ...S.btn('danger'), fontSize: 11, padding: '4px 8px' }} onClick={() => decide(r.id, 'reject')}>{L('Reject', 'رفض')}</button>
                 </>}</td>
               </tr>
             ))}
-            {requests.length === 0 && <tr><td colSpan={5} style={{ ...S.td, color: 'var(--text-dim)' }}>No requests.</td></tr>}
+            {requests.length === 0 && <tr><td colSpan={5} style={{ ...S.td, color: 'var(--text-dim)' }}>{L('No requests.', 'لا توجد طلبات.')}</td></tr>}
           </tbody>
         </table>
         </div>
@@ -448,6 +460,8 @@ function RequestsTab({ api, isAdmin }: any) {
 
 // ── Segregation of Duties ──────────────────────────────────────────────────
 function SodTab({ api, isAdmin }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [rules, setRules] = useState<any[]>([])
   const [roles, setRoles] = useState<any[]>([])
   const [conflicts, setConflicts] = useState<any[]>([])
@@ -465,62 +479,62 @@ function SodTab({ api, isAdmin }: any) {
   useEffect(() => { load() }, [load])
 
   const createRule = async () => {
-    if (!newRule.name || !newRule.roleAId || !newRule.roleBId) return alert('Fill in all fields')
+    if (!newRule.name || !newRule.roleAId || !newRule.roleBId) return alert(L('Fill in all fields', 'املأ جميع الحقول'))
     try { await api.post('/access-governance/sod-rules', newRule); setCreating(false); setNewRule({ name: '', roleAId: '', roleBId: '', severity: 'WARNING' }); load() } catch (e: any) { alert(e.message) }
   }
-  const deleteRule = async (id: string) => { if (!window.confirm('Delete this rule?')) return; try { await api.del(`/access-governance/sod-rules/${id}`); load() } catch (e: any) { alert(e.message) } }
+  const deleteRule = async (id: string) => { if (!window.confirm(L('Delete this rule?', 'حذف هذه القاعدة؟'))) return; try { await api.del(`/access-governance/sod-rules/${id}`); load() } catch (e: any) { alert(e.message) } }
 
-  if (!isAdmin) return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Requires Tenant Administrator access.</div>
+  if (!isAdmin) return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Requires Tenant Administrator access.', 'يتطلب صلاحية مدير الجهة.')}</div>
 
   return (
     <div>
-      {!creating ? <button style={S.btn('primary')} onClick={() => setCreating(true)}>+ Create SoD Rule</button> : (
+      {!creating ? <button style={S.btn('primary')} onClick={() => setCreating(true)}>{L('+ Create SoD Rule', '+ إنشاء قاعدة فصل مهام')}</button> : (
         <div style={S.card}>
           <div style={S.grid2}>
-            <div><div style={S.label}>Rule Name</div><input style={S.input} value={newRule.name} onChange={e => setNewRule(r => ({ ...r, name: e.target.value }))} /></div>
-            <div><div style={S.label}>Severity</div>
+            <div><div style={S.label}>{L('Rule Name', 'اسم القاعدة')}</div><input style={S.input} value={newRule.name} onChange={e => setNewRule(r => ({ ...r, name: e.target.value }))} /></div>
+            <div><div style={S.label}>{L('Severity', 'الخطورة')}</div>
               <select style={S.input} value={newRule.severity} onChange={e => setNewRule(r => ({ ...r, severity: e.target.value }))}>
-                <option value="WARNING">Warning (shown, not blocking)</option>
-                <option value="BLOCKING">Blocking (assignment refused)</option>
+                <option value="WARNING">{L('Warning (shown, not blocking)', 'تحذير (يُعرض دون منع)')}</option>
+                <option value="BLOCKING">{L('Blocking (assignment refused)', 'مانع (يُرفض الإسناد)')}</option>
               </select>
             </div>
-            <div><div style={S.label}>Role A</div>
+            <div><div style={S.label}>{L('Role A', 'الدور (أ)')}</div>
               <select style={S.input} value={newRule.roleAId} onChange={e => setNewRule(r => ({ ...r, roleAId: e.target.value }))}>
-                <option value="">Select…</option>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                <option value="">{L('Select…', 'اختر…')}</option>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
-            <div><div style={S.label}>Role B (conflicts with A)</div>
+            <div><div style={S.label}>{L('Role B (conflicts with A)', 'الدور (ب) (يتعارض مع أ)')}</div>
               <select style={S.input} value={newRule.roleBId} onChange={e => setNewRule(r => ({ ...r, roleBId: e.target.value }))}>
-                <option value="">Select…</option>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                <option value="">{L('Select…', 'اختر…')}</option>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
           </div>
-          <div style={S.row}><button style={S.btn('primary')} onClick={createRule}>Create</button><button style={S.btn()} onClick={() => setCreating(false)}>Cancel</button></div>
+          <div style={S.row}><button style={S.btn('primary')} onClick={createRule}>{L('Create', 'إنشاء')}</button><button style={S.btn()} onClick={() => setCreating(false)}>{L('Cancel', 'إلغاء')}</button></div>
         </div>
       )}
 
-      <div style={{ fontWeight: 600, margin: '20px 0 8px' }}>Rules</div>
+      <div style={{ fontWeight: 600, margin: '20px 0 8px' }}>{L('Rules', 'القواعد')}</div>
       <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
-        <thead><tr><th style={S.th}>Name</th><th style={S.th}>Severity</th><th style={S.th}></th></tr></thead>
+        <thead><tr><th style={S.th}>{L('Name', 'الاسم')}</th><th style={S.th}>{L('Severity', 'الخطورة')}</th><th style={S.th}></th></tr></thead>
         <tbody>
           {rules.map(r => (
             <tr key={r.id}>
               <td style={S.td}>{r.name}</td>
-              <td style={S.td}><span style={S.badge(r.severity === 'BLOCKING' ? '#e74c3c' : '#f39c12')}>{r.severity}</span></td>
-              <td style={S.td}><button style={{ ...S.btn('danger'), fontSize: 11, padding: '4px 8px' }} onClick={() => deleteRule(r.id)}>Delete</button></td>
+              <td style={S.td}><span style={S.badge(r.severity === 'BLOCKING' ? '#e74c3c' : '#f39c12')}>{enumLabel(r.severity, isAR)}</span></td>
+              <td style={S.td}><button style={{ ...S.btn('danger'), fontSize: 11, padding: '4px 8px' }} onClick={() => deleteRule(r.id)}>{L('Delete', 'حذف')}</button></td>
             </tr>
           ))}
-          {rules.length === 0 && <tr><td colSpan={3} style={{ ...S.td, color: 'var(--text-dim)' }}>No rules configured.</td></tr>}
+          {rules.length === 0 && <tr><td colSpan={3} style={{ ...S.td, color: 'var(--text-dim)' }}>{L('No rules configured.', 'لا توجد قواعد مهيأة.')}</td></tr>}
         </tbody>
       </table>
       </div>
 
-      <div style={{ fontWeight: 600, marginBottom: 8 }}>Current Conflicts</div>
-      {conflicts.length === 0 ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>No conflicts detected.</div> : conflicts.map((c: any, i: number) => (
+      <div style={{ fontWeight: 600, marginBottom: 8 }}>{L('Current Conflicts', 'التعارضات الحالية')}</div>
+      {conflicts.length === 0 ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('No conflicts detected.', 'لم تُرصد تعارضات.')}</div> : conflicts.map((c: any, i: number) => (
         <div key={i} style={{ ...S.card, borderColor: '#e74c3c33' }}>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>User: {c.userId}</div>
-          {c.conflicts.map((cf: any, j: number) => <div key={j} style={{ fontSize: 13 }}>{cf.ruleName}: <span style={S.badge(cf.severity === 'BLOCKING' ? '#e74c3c' : '#f39c12')}>{cf.severity}</span> — {cf.conflictingRoleName}</div>)}
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 4 }}>{L('User:', 'المستخدم:')} {c.userId}</div>
+          {c.conflicts.map((cf: any, j: number) => <div key={j} style={{ fontSize: 13 }}>{cf.ruleName}: <span style={S.badge(cf.severity === 'BLOCKING' ? '#e74c3c' : '#f39c12')}>{enumLabel(cf.severity, isAR)}</span> — {cf.conflictingRoleName}</div>)}
         </div>
       ))}
     </div>
@@ -529,6 +543,8 @@ function SodTab({ api, isAdmin }: any) {
 
 // ── Access Reviews ─────────────────────────────────────────────────────────
 function ReviewsTab({ api, isAdmin }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
   const [items, setItems] = useState<any[]>([])
@@ -550,34 +566,34 @@ function ReviewsTab({ api, isAdmin }: any) {
   }
 
   const complete = async () => {
-    if (!window.confirm('Complete this campaign? Unreviewed items will remain as-is.')) return
+    if (!window.confirm(L('Complete this campaign? Unreviewed items will remain as-is.', 'إكمال هذه الحملة؟ ستبقى العناصر غير المراجعة كما هي.'))) return
     await api.post(`/access-governance/review-campaigns/${selected.id}/complete`)
     setSelected(null); load()
   }
 
-  if (!isAdmin) return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Requires Tenant Administrator access.</div>
+  if (!isAdmin) return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>{L('Requires Tenant Administrator access.', 'يتطلب صلاحية مدير الجهة.')}</div>
 
   if (selected) {
     return (
       <div>
-        <button style={S.btn()} onClick={() => setSelected(null)}>← Back to Campaigns</button>
+        <button style={S.btn()} onClick={() => setSelected(null)}>{L('← Back to Campaigns', '→ العودة إلى الحملات')}</button>
         <div style={{ ...S.card, marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{selected.name}</div><div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{items.filter(i => i.decision).length}/{items.length} reviewed</div></div>
-          {selected.status === 'ACTIVE' && <button style={S.btn('primary')} onClick={complete}>Complete Campaign</button>}
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{selected.name}</div><div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{items.filter(i => i.decision).length}/{items.length} {L('reviewed', 'تمت مراجعته')}</div></div>
+          {selected.status === 'ACTIVE' && <button style={S.btn('primary')} onClick={complete}>{L('Complete Campaign', 'إكمال الحملة')}</button>}
         </div>
         <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead><tr><th style={S.th}>User</th><th style={S.th}>Role</th><th style={S.th}>Decision</th><th style={S.th}></th></tr></thead>
+          <thead><tr><th style={S.th}>{L('User', 'المستخدم')}</th><th style={S.th}>{L('Role', 'الدور')}</th><th style={S.th}>{L('Decision', 'القرار')}</th><th style={S.th}></th></tr></thead>
           <tbody>
             {items.map(i => (
               <tr key={i.id}>
                 <td style={S.td}>{i.user?.fullName || i.userId}</td>
                 <td style={S.td}>{i.roleName}</td>
-                <td style={S.td}>{i.decision ? <span style={S.badge(i.decision === 'REVOKE' ? '#e74c3c' : '#27ae60')}>{i.decision}</span> : <span style={{ color: 'var(--text-dim)' }}>Pending</span>}</td>
+                <td style={S.td}>{i.decision ? <span style={S.badge(i.decision === 'REVOKE' ? '#e74c3c' : '#27ae60')}>{enumLabel(i.decision, isAR)}</span> : <span style={{ color: 'var(--text-dim)' }}>{L('Pending', 'قيد الانتظار')}</span>}</td>
                 <td style={S.td}>{!i.decision && selected.status === 'ACTIVE' && (
                   <div style={S.row}>
-                    <button style={{ ...S.btn('primary'), fontSize: 11, padding: '4px 8px' }} onClick={() => decide(i.id, 'KEEP')}>Keep</button>
-                    <button style={{ ...S.btn('danger'), fontSize: 11, padding: '4px 8px' }} onClick={() => decide(i.id, 'REVOKE')}>Revoke</button>
+                    <button style={{ ...S.btn('primary'), fontSize: 11, padding: '4px 8px' }} onClick={() => decide(i.id, 'KEEP')}>{L('Keep', 'إبقاء')}</button>
+                    <button style={{ ...S.btn('danger'), fontSize: 11, padding: '4px 8px' }} onClick={() => decide(i.id, 'REVOKE')}>{L('Revoke', 'سحب')}</button>
                   </div>
                 )}</td>
               </tr>
@@ -591,26 +607,26 @@ function ReviewsTab({ api, isAdmin }: any) {
 
   return (
     <div>
-      {!creating ? <button style={S.btn('primary')} onClick={() => setCreating(true)}>+ Create Review Campaign</button> : (
+      {!creating ? <button style={S.btn('primary')} onClick={() => setCreating(true)}>{L('+ Create Review Campaign', '+ إنشاء حملة مراجعة')}</button> : (
         <div style={S.card}>
-          <div style={S.label}>Name</div><input style={S.input} value={newCampaign.name} onChange={e => setNewCampaign(c => ({ ...c, name: e.target.value }))} placeholder="e.g. Q3 2026 Privileged Access Review" />
-          <div style={S.label}>Description</div><input style={S.input} value={newCampaign.description} onChange={e => setNewCampaign(c => ({ ...c, description: e.target.value }))} />
-          <div style={S.row}><button style={S.btn('primary')} onClick={createCampaign}>Create</button><button style={S.btn()} onClick={() => setCreating(false)}>Cancel</button></div>
+          <div style={S.label}>{L('Name', 'الاسم')}</div><input style={S.input} value={newCampaign.name} onChange={e => setNewCampaign(c => ({ ...c, name: e.target.value }))} placeholder={L('e.g. Q3 2026 Privileged Access Review', 'مثال: مراجعة الوصول المميز للربع الثالث 2026')} />
+          <div style={S.label}>{L('Description', 'الوصف')}</div><input style={S.input} value={newCampaign.description} onChange={e => setNewCampaign(c => ({ ...c, description: e.target.value }))} />
+          <div style={S.row}><button style={S.btn('primary')} onClick={createCampaign}>{L('Create', 'إنشاء')}</button><button style={S.btn()} onClick={() => setCreating(false)}>{L('Cancel', 'إلغاء')}</button></div>
         </div>
       )}
       <div style={{ overflowX: 'auto' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 16 }}>
-        <thead><tr><th style={S.th}>Name</th><th style={S.th}>Status</th><th style={S.th}>Items</th><th style={S.th}>Created</th></tr></thead>
+        <thead><tr><th style={S.th}>{L('Name', 'الاسم')}</th><th style={S.th}>{L('Status', 'الحالة')}</th><th style={S.th}>{L('Items', 'العناصر')}</th><th style={S.th}>{L('Created', 'تاريخ الإنشاء')}</th></tr></thead>
         <tbody>
           {campaigns.map(c => (
             <tr key={c.id}>
               <td style={S.td}><span style={{ cursor: 'pointer', color: 'var(--accent)' }} onClick={() => openCampaign(c)}>{c.name}</span></td>
-              <td style={S.td}><span style={S.badge(STATUS_COLORS[c.status])}>{c.status}</span></td>
+              <td style={S.td}><span style={S.badge(STATUS_COLORS[c.status])}>{enumLabel(c.status, isAR)}</span></td>
               <td style={S.td}>{c._count?.items || 0}</td>
-              <td style={S.td}>{new Date(c.createdAt).toLocaleDateString()}</td>
+              <td style={S.td}>{new Date(c.createdAt).toLocaleDateString(isAR ? 'ar' : 'en-US')}</td>
             </tr>
           ))}
-          {campaigns.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>No review campaigns yet.</td></tr>}
+          {campaigns.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>{L('No review campaigns yet.', 'لا توجد حملات مراجعة بعد.')}</td></tr>}
         </tbody>
       </table>
       </div>
@@ -620,22 +636,24 @@ function ReviewsTab({ api, isAdmin }: any) {
 
 // ── Audit ──────────────────────────────────────────────────────────────────
 function AuditTab({ api }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [logs, setLogs] = useState<any[]>([])
   useEffect(() => { api.get('/access-governance/audit?limit=100').then(setLogs).catch(() => {}) }, [api])
   return (
     <div style={{ overflowX: 'auto' }}>
     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead><tr><th style={S.th}>Time</th><th style={S.th}>Actor</th><th style={S.th}>Action</th><th style={S.th}>Target</th></tr></thead>
+      <thead><tr><th style={S.th}>{L('Time', 'الوقت')}</th><th style={S.th}>{L('Actor', 'المنفّذ')}</th><th style={S.th}>{L('Action', 'الإجراء')}</th><th style={S.th}>{L('Target', 'الهدف')}</th></tr></thead>
       <tbody>
         {logs.map(l => (
           <tr key={l.id}>
-            <td style={S.td}>{new Date(l.createdAt).toLocaleString()}</td>
+            <td style={S.td}>{new Date(l.createdAt).toLocaleString(isAR ? 'ar' : 'en-US')}</td>
             <td style={S.td}>{l.actorId}</td>
             <td style={S.td}>{l.action}</td>
             <td style={S.td}>{l.targetType ? `${l.targetType}: ${l.targetId}` : '—'}</td>
           </tr>
         ))}
-        {logs.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>No audit events yet.</td></tr>}
+        {logs.length === 0 && <tr><td colSpan={4} style={{ ...S.td, color: 'var(--text-dim)' }}>{L('No audit events yet.', 'لا توجد أحداث تدقيق بعد.')}</td></tr>}
       </tbody>
     </table>
     </div>

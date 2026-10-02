@@ -60,6 +60,10 @@ export const COMMON_ENUM_LABELS: Record<string, BiLabel> = {
   DECISION_EVALUATION: { en: 'Decision & Evaluation', ar: 'القرار والتقييم' },
   INNOVATION: { en: 'Innovation', ar: 'الابتكار' },
   ADM: { en: 'ADM', ar: 'ADM' },
+  BLOCKING: { en: 'Blocking', ar: 'مانع' },
+  WARNING: { en: 'Warning', ar: 'تحذير' },
+  KEEP: { en: 'Keep', ar: 'إبقاء' },
+  REVOKE: { en: 'Revoke', ar: 'سحب' },
   // Governance decisions
   APPROVED_WITH_CONDITIONS: { en: 'Approved with Conditions', ar: 'معتمد بشروط' },
   REQUIRES_CHANGES: { en: 'Requires Changes', ar: 'يتطلب تعديلات' },
