@@ -19,7 +19,7 @@ export interface StrategyRefresh {
 
 export interface PublicationOptions {
   revision: number; actions: string[]
-  objectTypes: Array<{ id: string; code: string; name: string; operatingDomain: string; canCreate: boolean; canUpdate: boolean }>
+  objectTypes: Array<{ id: string; code: string; name: string; operatingDomain: string; canCreate: boolean; canUpdate: boolean; attributeMapping?: { properties: Record<string, unknown>; unmapped: Array<{ name: string; value: string; reason: string }> } }>
   relationships: Array<{ id: string; code: string; forwardLabel: string }>
   assets: Array<{ id: string; name: string; assetType: string; domain: string; editable?: boolean }>
   plans: Array<{ id: string; name: string }>; cycles: Array<{ id: string; name: string }>
@@ -30,6 +30,11 @@ export interface PublicationOptions {
 export interface PublicationPropertyOptions {
   versionId: string
   properties: Array<{ code: string; name: string; nameAr?: string | null; attributeType: string; isRequired: boolean; values: Array<{ code: string; name: string; nameAr?: string | null }> }>
+}
+export interface PublicationPreview {
+  valid: boolean; representation: 'PROPOSAL_OVERLAY_NOT_APPLIED'; originalAuthority: string
+  image: { svg: string }; issues: Array<{ severity: string; message: string }>
+  annotations: Array<{ assetId: string; operation: string; visibleInRecordedView: boolean; properties: Array<{ code: string; recordedValue: unknown; proposedValue: unknown }> }>
 }
 
 async function request<T>(path: string, body?: object | FormData): Promise<T> {
@@ -54,6 +59,7 @@ export const strategyRefreshApi = {
   activate: (id: string) => request(`/${encodeURIComponent(id)}/activate`, {}),
   publicationOptions: (id: string, findingId: string) => request<PublicationOptions>(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(findingId)}/publication-options`),
   propertyOptions: (id: string, findingId: string, assetId: string) => request<PublicationPropertyOptions>(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(findingId)}/property-options/${encodeURIComponent(assetId)}`),
+  preview: (id: string, finding: RefreshFinding, contract: Record<string, unknown>) => request<PublicationPreview>(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(finding.id)}/publication-preview`, { ...contract, revision: finding.revision }),
   publish: (id: string, finding: RefreshFinding, contract: Record<string, unknown>) => request(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(finding.id)}/publication`, { ...contract, revision: finding.revision }),
   cancelPublication: (id: string, findingId: string) => request(`/${encodeURIComponent(id)}/findings/${encodeURIComponent(findingId)}/publication/cancel`, {}),
   source: (id: string, sourceId: string) => request<{ url: string }>(`/${encodeURIComponent(id)}/documents/${encodeURIComponent(sourceId)}/url`),

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
-import { PublicationOptions, PublicationPropertyOptions, RefreshFinding, strategyRefreshApi } from '../lib/strategy-refresh'
+import { PublicationOptions, PublicationPropertyOptions, PublicationPreview, RefreshFinding, strategyRefreshApi } from '../lib/strategy-refresh'
 
 export function StrategyPublicationDialog({ refreshId, finding, onClose, onPublished }: { refreshId: string; finding: RefreshFinding; onClose: () => void; onPublished: () => Promise<void> }) {
   const { t, isAR } = useLang()
@@ -13,6 +13,11 @@ export function StrategyPublicationDialog({ refreshId, finding, onClose, onPubli
   const [properties, setProperties] = useState<PublicationPropertyOptions | null>(null)
   const [propertyError, setPropertyError] = useState('')
   const [overrides, setOverrides] = useState<Record<string, string | string[]>>({})
+  const [preview, setPreview] = useState<{ key: string; data: PublicationPreview } | null>(null)
+  const previewKey = JSON.stringify({ action, values, overrides })
+  const currentPreviewKey = useRef(previewKey)
+  currentPreviewKey.current = previewKey
+  const previewValid = preview?.key === previewKey && preview.data.valid
   useEffect(() => {
     let cancelled = false
     setProperties(null); setOverrides({}); setPropertyError('')
@@ -61,9 +66,16 @@ export function StrategyPublicationDialog({ refreshId, finding, onClose, onPubli
   }
   const submit = async () => {
     const selected = contract()
-    if (!selected || busy) return
+    if (!selected || busy || (action === 'SCENARIO_DELTA' && !previewValid)) return
     setBusy(true); setError('')
     try { await strategyRefreshApi.publish(refreshId, finding, selected); await onPublished(); onClose() }
+    catch (e: any) { setError(e.message) } finally { setBusy(false) }
+  }
+  const showPreview = async () => {
+    const selected = contract(), key = previewKey
+    if (!selected || busy) return
+    setBusy(true); setError(''); setPreview(null)
+    try { const data = await strategyRefreshApi.preview(refreshId, finding, selected); if (currentPreviewKey.current === key) setPreview({ key, data }) }
     catch (e: any) { setError(e.message) } finally { setBusy(false) }
   }
   return <div className="modal-backdrop"><section ref={dialog} tabIndex={-1} className="refresh-modal" role="dialog" aria-modal="true" aria-label={t('strategy.refresh.publish')} onKeyDown={event => {
@@ -81,6 +93,7 @@ export function StrategyPublicationDialog({ refreshId, finding, onClose, onPubli
     {!options ? <p aria-live="polite">{t('strategy.refresh.publication.loading')}</p> : !options.actions.length ? <p>{t('strategy.refresh.publication.no_destination')}</p> : <>
       <label>{t('strategy.refresh.destination')}<select value={action} onChange={event => { setAction(event.target.value); setValues({}) }}><option value="">{t('strategy.refresh.publication.choose')}</option>{options.actions.map(item => <option key={item} value={item}>{t(`strategy.refresh.publication.${item}`)}</option>)}</select></label>
       {action === 'REPOSITORY_FACT' && <>{field('objectTypeId', options.objectTypes)}{field('existingAssetId', options.assets.filter(asset => { const type = options.objectTypes.find(item => item.id === values.objectTypeId); return type?.canUpdate && asset.assetType === type.code && asset.domain === type.operatingDomain }), options.objectTypes.find(item => item.id === values.objectTypeId)?.canCreate)}</>}
+      {action === 'REPOSITORY_FACT' && options.objectTypes.find(item => item.id === values.objectTypeId)?.attributeMapping && <section><h3>{t('strategy.refresh.publication.mapped_attributes')}</h3><p>{t('strategy.refresh.publication.mapping_note')}</p><dl>{Object.entries(options.objectTypes.find(item => item.id === values.objectTypeId)!.attributeMapping!.properties).map(([code, value]) => <div key={code}><dt>{code}</dt><dd>{String(value)}</dd></div>)}</dl>{options.objectTypes.find(item => item.id === values.objectTypeId)!.attributeMapping!.unmapped.map((attribute, index) => <p key={index}>{attribute.name}: {attribute.value} · {t('strategy.refresh.publication.unmapped_attribute')}</p>)}</section>}
       {action === 'REPOSITORY_RELATIONSHIP' && <>{field('relationshipDefinitionId', options.relationships.map(item => ({ id: item.id, name: item.forwardLabel || item.code })))}{field('sourceAssetId', options.assets.filter(item => item.editable))}{field('targetAssetId', options.assets.filter(item => item.editable))}</>}
       {action === 'PLAN_REVIEW_ACTION' && field('planId', options.plans)}
       {action === 'ADM_REVALIDATION_REQUIREMENT' && field('cycleId', options.cycles)}
@@ -103,6 +116,7 @@ export function StrategyPublicationDialog({ refreshId, finding, onClose, onPubli
         </fieldset>}
       </>}
     </>}
-    <div className="actions"><button disabled={busy} onClick={onClose}>{t('strategy.refresh.cancel')}</button><button className="primary" disabled={busy || !contract()} onClick={submit}>{t('strategy.refresh.publication.authorize')}</button></div>
+    {preview?.key === previewKey && <section><h3>{t('strategy.refresh.publication.preview')}</h3><p>{t('strategy.refresh.publication.preview_note')}</p><img style={{ maxWidth: '100%' }} src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(preview.data.image.svg)}`} alt={t('strategy.refresh.publication.preview')} />{preview.data.issues.map((issue, index) => <p role={issue.severity === 'ERROR' ? 'alert' : undefined} key={index}>{issue.message}</p>)}{preview.data.annotations.map(annotation => <section key={`${annotation.assetId}:${annotation.operation}`}><h4>{options?.assets.find(asset => asset.id === annotation.assetId)?.name || annotation.assetId} · {t(`strategy.refresh.publication.${values.operation}`)}</h4>{!annotation.visibleInRecordedView && <p>{t('strategy.refresh.publication.not_in_view')}</p>}<dl>{annotation.properties.map(property => <div key={property.code}><dt>{properties?.properties.find(item => item.code === property.code)?.name || property.code}</dt><dd>{String(property.recordedValue ?? '—')} → {String(property.proposedValue ?? '—')}</dd></div>)}</dl></section>)}</section>}
+    <div className="actions"><button disabled={busy} onClick={onClose}>{t('strategy.refresh.cancel')}</button>{action === 'SCENARIO_DELTA' && <button disabled={busy || !contract()} onClick={showPreview}>{t('strategy.refresh.publication.preview')}</button>}<button className="primary" disabled={busy || !contract() || (action === 'SCENARIO_DELTA' && !previewValid)} onClick={submit}>{t('strategy.refresh.publication.authorize')}</button></div>
   </section></div>
 }
