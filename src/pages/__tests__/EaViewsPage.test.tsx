@@ -774,77 +774,22 @@ describe('EaViewsPage - Export', () => {
   });
 });
 
-describe('EaViewsPage - Saved Filters', () => {
-  const GRAPH_VIEW = { id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH' };
-  async function openGraphView(extraRoutes: Record<string, any> = {}) {
-    mockFetch({
-      '/ea-views/stats': {}, '/ea-views': [GRAPH_VIEW],
-      '/ea-views/v1/dataset': { legacy: { nodes: [], edges: [], metadata: {} } },
-      '/ea-views/saved-filters': [],
-      ...extraRoutes,
-    });
+describe('EaViewsPage - opened view has no search/filter bar', () => {
+  it('shows no Search, Domain/Type/Status filters or Save Filters controls, and does not fetch saved filters', async () => {
+    const GRAPH_VIEW = { id: 'v1', name: 'App Landscape', category: 'Application', status: 'PUBLISHED', architectureState: 'CURRENT', visualization: 'GRAPH' };
+    const a1 = { id: 'a1', name: 'Payroll', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', tags: [], metadata: {} };
+    mockFetch({ '/ea-views/stats': {}, '/ea-views': [GRAPH_VIEW], '/ea-views/v1/dataset': { legacy: { nodes: [a1], edges: [], metadata: {} } } });
     render(<EaViewsPage />);
     await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
     fireEvent.click(screen.getAllByText('📋 My Views')[0]);
     fireEvent.click(await screen.findByText('App Landscape'));
-  }
-
-  it('fetches the saved filter list when a view opens', async () => {
-    await openGraphView({ '/ea-views/saved-filters': [{ id: 'f1', name: 'Critical Applications', filterConfig: { status: 'APPROVED' } }] });
-    expect(await screen.findByText('📁 Critical Applications')).toBeInTheDocument();
-  });
-
-  it('does not show the saved-filters dropdown/chip list when there are none yet', async () => {
-    await openGraphView({ '/ea-views/saved-filters': [] });
-    await screen.findByText(/objects/); // wait for the view to finish loading
-    expect(screen.queryByText('📁 Apply Saved Filter...')).not.toBeInTheDocument();
-  });
-
-  it('clicking Save Filters opens the name input box', async () => {
-    await openGraphView();
-    fireEvent.click(await screen.findByText('💾 Save Filters'));
-    expect(screen.getByPlaceholderText(/Critical Applications/)).toBeInTheDocument();
-  });
-
-  it('Save Current Filters is disabled until a name is entered', async () => {
-    await openGraphView();
-    fireEvent.click(await screen.findByText('💾 Save Filters'));
-    expect(screen.getByText('Save Current Filters')).toBeDisabled();
-    fireEvent.change(screen.getByPlaceholderText(/Critical Applications/), { target: { value: 'My Preset' } });
-    expect(screen.getByText('Save Current Filters')).not.toBeDisabled();
-  });
-
-  it('saving posts the current filter state and adds the new preset to the visible list', async () => {
-    await openGraphView({
-      '/ea-views/saved-filters': (opts: any) => {
-        if (opts?.method === 'POST') return { id: 'new-f1', name: JSON.parse(opts.body).name, filterConfig: JSON.parse(opts.body).filterConfig };
-        return [];
-      },
-    });
-    fireEvent.click(await screen.findByText('💾 Save Filters'));
-    fireEvent.change(screen.getByPlaceholderText(/Critical Applications/), { target: { value: 'My Preset' } });
-    fireEvent.click(screen.getByText('Save Current Filters'));
-    expect(await screen.findByText('📁 My Preset')).toBeInTheDocument();
-    const postCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ea-views/saved-filters') && c[1]?.method === 'POST');
-    expect(postCall).toBeDefined();
-    expect(JSON.parse(postCall[1].body).name).toBe('My Preset');
-  });
-
-  it('clicking a saved filter chip applies its filterConfig to the current view', async () => {
-    await openGraphView({ '/ea-views/saved-filters': [{ id: 'f1', name: 'Approved Only', filterConfig: { status: 'APPROVED', search: 'payments' } }] });
-    fireEvent.click(await screen.findByText('📁 Approved Only'));
-    expect((screen.getByPlaceholderText('🔍 Search...') as HTMLInputElement).value).toBe('payments');
-  });
-
-  it('deleting a saved filter chip removes it from the list without applying it', async () => {
-    await openGraphView({ '/ea-views/saved-filters': [{ id: 'f1', name: 'To Delete', filterConfig: { status: 'APPROVED' } }] });
-    await screen.findByText('📁 To Delete');
-    fireEvent.click(screen.getByTitle('Delete this saved filter'));
-    await waitFor(() => expect(screen.queryByText('📁 To Delete')).not.toBeInTheDocument());
-    const deleteCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/ea-views/saved-filters/f1'));
-    expect(deleteCall[1].method).toBe('DELETE');
-    // Did not also apply the filter as a side effect of clicking the ✕
-    expect((screen.getByPlaceholderText('🔍 Search...') as HTMLInputElement).value).toBe('');
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('/ea-views/v1/dataset'))).toBe(true));
+    expect(screen.queryByPlaceholderText('🔍 Search...')).not.toBeInTheDocument();
+    expect(screen.queryByText('All Domains')).not.toBeInTheDocument();
+    expect(screen.queryByText('All Types')).not.toBeInTheDocument();
+    expect(screen.queryByText('💾 Save Filters')).not.toBeInTheDocument();
+    expect(screen.queryByText('eaviews.refine_show')).not.toBeInTheDocument();
+    expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('/saved-filters'))).toBe(false);
   });
 });
 
@@ -913,6 +858,38 @@ describe('EaViewsPage - Heatmap metric selection (Phase 4B)', () => {
     fireEvent.click(await screen.findByText(/HEATMAP/));
     expect(await screen.findByText('Cap A')).toBeInTheDocument();
     expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[0].includes('/heatmap-fields'))).toBe(false);
+  });
+
+  it('any view can be coloured by any attribute of its objects: labelled options with coverage, grouped by object type', async () => {
+    const a1 = { id: 'a1', name: 'Payroll', role: 'PRIMARY', assetType: 'Application', domain: 'APPLICATION', status: 'APPROVED', lifecycleStatus: 'ACTIVE', tags: [], metadata: { hostingModel: 'Cloud' } };
+    const a2 = { id: 'a2', name: 'HR Portal', role: 'PRIMARY', assetType: 'Application', domain: 'APPLICATION', status: 'DRAFT', lifecycleStatus: 'PLANNED', tags: [], metadata: {} };
+    const p1 = { id: 'p1', name: 'Hire', role: 'RELATED', assetType: 'BusinessProcess', domain: 'BUSINESS', status: 'APPROVED', tags: [], metadata: {} };
+    mockFetch({
+      '/ea-views/stats': {}, '/ea-views': [{ id: 'v1', name: 'Apps to processes', visualization: 'MATRIX', status: 'PUBLISHED', architectureState: 'CURRENT' }],
+      '/ea-views/v1/dataset': {
+        legacy: { nodes: [a1, a2, p1], edges: [], metadata: {} },
+        dataset: { objects: [a1, a2, p1], relationships: [], paths: [], hierarchies: [], metrics: [
+          { key: 'status', label: 'Status', dataType: 'status', coveragePercent: 100, distinctValues: ['APPROVED', 'DRAFT'], source: 'field' },
+          { key: 'lifecycleStatus', label: 'Lifecycle', dataType: 'categorical', coveragePercent: 67, distinctValues: ['ACTIVE', 'PLANNED'], source: 'field' },
+          { key: 'hostingModel', label: 'Hosting Model', dataType: 'categorical', coveragePercent: 33, distinctValues: ['Cloud'], source: 'attribute' },
+        ] },
+        eligibility: { eligible: [{ visualization: 'MATRIX', eligible: true, score: 0.9, reasons: [] }, { visualization: 'HEATMAP', eligible: true, score: 0.3, reasons: [], recommendedConfig: { metricKey: 'status', candidateMetrics: ['status', 'lifecycleStatus', 'hostingModel'] } }], ineligible: [] },
+        presentation: { primary: 'MATRIX', available: ['MATRIX', 'HEATMAP'], resultState: { state: 'OK' } },
+      },
+    });
+    render(<EaViewsPage />);
+    await waitFor(() => expect(screen.getAllByText('📋 My Views').length).toBeGreaterThan(0));
+    fireEvent.click(screen.getAllByText('📋 My Views')[0]);
+    fireEvent.click(await screen.findByText('Apps to processes'));
+    fireEvent.click(await screen.findByText(/HEATMAP/));
+    const select = await screen.findByLabelText('eaviews.heatmap_color_by');
+    expect(Array.from((select as HTMLSelectElement).options).map(o => o.textContent)).toEqual(['Status (100%)', 'Lifecycle (67%)', 'Hosting Model (33%)']);
+    expect(screen.getByText('Application (2)')).toBeInTheDocument();
+    expect(screen.getByText('BusinessProcess (1)')).toBeInTheDocument();
+    fireEvent.change(select, { target: { value: 'hostingModel' } });
+    await waitFor(() => expect(screen.getAllByTestId('heatmap-tile').map(t => t.textContent)).toEqual(['PayrollCloud', 'HR Portaleaviews.heatmap_no_value', 'Hireeaviews.heatmap_no_value']));
+    fireEvent.change(select, { target: { value: 'lifecycleStatus' } });
+    await waitFor(() => expect(screen.getAllByTestId('heatmap-tile')[1]).toHaveTextContent('PLANNED')); // a top-level field, not metadata
   });
 });
 
@@ -1295,7 +1272,7 @@ describe('EaViewsPage - Scenario switching (Phase 5A)', () => {
     fireEvent.click(await screen.findByText('Target A'));
     await waitFor(() => expect(screen.getByText('Capability A')).toBeInTheDocument());
     // the "Color by" selector should now offer Target A's own recommended metric as an option
-    expect(screen.getByText('maturity')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /maturity/ })).toBeInTheDocument();
   });
 });
 
@@ -2292,7 +2269,7 @@ describe('EaViewsPage - library and direct open (P6)', () => {
     expect(screen.queryByText('API Data Matrix')).not.toBeInTheDocument()
   })
 
-  it('Open goes straight to the view in a private workspace, facts first with refine controls one click away, and can be kept', async () => {
+  it('Open goes straight to the view in a private workspace, facts first with no filter bar, and can be kept', async () => {
     jest.spyOn(window, 'prompt').mockReturnValue('My portfolio')
     setup({ '/ea-views/ws-1/keep': { ...WS, isWorkspace: false, name: 'My portfolio' } })
     fireEvent.click(await screen.findByText('📚 View Library'))
@@ -2302,8 +2279,7 @@ describe('EaViewsPage - library and direct open (P6)', () => {
     const openCall = (global.fetch as jest.Mock).mock.calls.find(([u, o]) => u.includes('/open-viewpoint/vp-1') && o?.method === 'POST')
     expect(openCall).toBeDefined()
     expect(screen.queryByPlaceholderText('🔍 Search...')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByText('eaviews.refine_show'))
-    expect(screen.getByPlaceholderText('🔍 Search...')).toBeInTheDocument()
+    expect(screen.queryByText('eaviews.refine_show')).not.toBeInTheDocument()
     fireEvent.click(screen.getByText('eaviews.keep'))
     await waitFor(() => expect(screen.queryByTestId('workspace-badge')).not.toBeInTheDocument())
     const keepCall = (global.fetch as jest.Mock).mock.calls.find(([u]) => u.includes('/ws-1/keep'))
