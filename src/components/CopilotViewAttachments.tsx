@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from './HelpTip'
 import { CopilotViewAttachment, downloadAttachmentDeck, downloadAttachmentPng, isViewAttachment, svgDataUrl } from './copilotViewExport'
+import CopilotStudyCard, { isStudyAttachment } from './CopilotStudyCard'
 
 /**
  * EA Views that Copilot ran to illustrate an answer, shown under the answer:
@@ -67,11 +68,13 @@ function ViewCard({ attachment: a, question }: { attachment: CopilotViewAttachme
 
 export default function CopilotViewAttachments({ attachments, question }: { attachments?: unknown[] | null; question?: string }) {
   const { isAR } = useLang()
-  const valid = (attachments || []).filter(isViewAttachment)
+  const valid = (attachments || []).filter(a => isViewAttachment(a) || isStudyAttachment(a))
   if (valid.length === 0) return null
   return (
     <div dir={isAR ? 'rtl' : 'ltr'} data-testid="copilot-view-attachments">
-      {valid.map(a => <ViewCard key={a.id} attachment={a} question={question} />)}
+      {valid.map((a: any) => (isStudyAttachment(a)
+        ? <CopilotStudyCard key={a.id} attachment={a} />
+        : <ViewCard key={a.id} attachment={a} question={question} />))}
     </div>
   )
 }
