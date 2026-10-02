@@ -310,3 +310,15 @@ button.insight-tile:hover, button.insight-tile:focus-visible { border-color:var(
   .idea-criterion .idea-criterion-bar { grid-column:1 / -1; grid-row:2 }
   .idea-filters { grid-template-columns:1fr 1fr }
 }
+
+/* ADM: architecture pictures come from linked EA Views */
+.adm-views { margin-top: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 4px; background: rgba(3,105,161,0.05); }
+.adm-views-head { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.adm-views-title { font-size: 11px; font-weight: 700; color: var(--accent); }
+.adm-views-empty { font-size: 11px; color: var(--text-dim); }
+.adm-views-figure { margin: 8px 0 0; }
+.adm-views-img { display: block; width: 100%; max-width: 900px; height: auto; background: #fff; border-radius: 4px; }
+.adm-views-caption { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; font-size: 11px; color: var(--text-dim); }
+.adm-views-caption strong { color: var(--text); }
+.adm-views-open { margin-inline-start: auto; border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font-size: 11px; text-decoration: underline; }
+@media (max-width: 700px) { .adm-views-open { margin-inline-start: 0; } }

@@ -5,7 +5,6 @@ jest.mock('../../contexts/LangContext', () => ({
   useLang: () => ({ t: (key: string) => key, isAR: false, resolveText: (value: string) => value }),
 }));
 jest.mock('react-markdown', () => ({ __esModule: true, default: ({ children }: any) => <div>{children}</div> }), { virtual: true });
-jest.mock('../../components/DiagramViewer', () => ({ DiagramViewer: () => <div /> }));
 jest.mock('../../components/Phase7Workspace', () => ({ Phase7Workspace: () => <div /> }));
 jest.mock('../../components/DesignPicker', () => ({ __esModule: true, default: () => <div data-testid="design-picker" /> }));
 jest.mock('react-router-dom', () => ({ useNavigate: () => jest.fn() }), { virtual: true });

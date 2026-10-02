@@ -6,7 +6,6 @@ jest.mock('../../contexts/LangContext', () => ({
 }));
 
 jest.mock('react-markdown', () => ({ __esModule: true, default: ({ children }: any) => <div>{children}</div> }), { virtual: true });
-jest.mock('../../components/DiagramViewer', () => ({ DiagramViewer: () => <div /> }));
 jest.mock('../../components/Phase7Workspace', () => ({ Phase7Workspace: () => <div /> }));
 
 // AdmPage now uses useNavigate (the "Related Architecture Views" links to
