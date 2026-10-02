@@ -16,16 +16,28 @@ export interface AlignmentState { run: AlignmentRun | null; nodes?: AlignmentNod
 
 export type KpiFrequency = 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL'
 export interface KpiUnit { id: string; name: string; kpis: number; enterpriseArchitecture: boolean }
+/** Evidence behind a measure: a web link or a file (downloaded through the API). */
+export interface KpiEvidence { id: string; kind: 'FILE' | 'LINK'; url?: string; fileName?: string; size?: number; addedAt?: string }
+export interface KpiMeasure { value: string; note?: string | null; evidence?: KpiEvidence[]; updatedAt?: string }
 export interface TrackedKpi {
   id: string; name: string; formula: string; polarity: string; repositoryFrequency: string | null; frequency: KpiFrequency; reported: boolean; target: string | null; unit: string | null
-  measures: Record<string, { value: string; note?: string | null; updatedAt?: string }>
+  measures: Record<string, KpiMeasure>
   schedule: Array<{ period: string; dueDate: string; status: 'RECORDED' | 'DUE' | 'OVERDUE' | 'UPCOMING' }>
 }
-export interface KpiReport { year: number; period: string; measured: number; missing: number; rows: Array<{ id: string; name: string; formula: string; frequency: KpiFrequency; target: string; unit: string; value: string; derived: boolean; previous: string; trend: 'UP' | 'DOWN' | 'SAME' | ''; onTarget: boolean | null; status: 'MEASURED' | 'MISSING' }> }
+export interface KpiReport { year: number; period: string; measured: number; missing: number; rows: Array<{ id: string; name: string; formula: string; frequency: KpiFrequency; target: string; unit: string; value: string; derived: boolean; previous: string; trend: 'UP' | 'DOWN' | 'SAME' | ''; onTarget: boolean | null; status: 'MEASURED' | 'MISSING'; comments?: Array<{ period: string; text: string }>; evidence?: Array<{ id: string; period: string; kind: 'FILE' | 'LINK'; name: string; url?: string }> }> }
 
 async function call<T>(path: string, method = 'GET', body?: object): Promise<T> {
   const token = getToken()
   const response = await fetch(`${API_BASE}${path}`, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
+  const data = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(Array.isArray(data.message) ? data.message.join('; ') : data.message || `HTTP ${response.status}`)
+  return data as T
+}
+async function upload<T>(path: string, file: File): Promise<T> {
+  const token = getToken()
+  const form = new FormData()
+  form.append('file', file)
+  const response = await fetch(`${API_BASE}${path}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(Array.isArray(data.message) ? data.message.join('; ') : data.message || `HTTP ${response.status}`)
   return data as T
@@ -42,6 +54,8 @@ async function download(path: string, filename: string) {
 }
 const q = (params: Record<string, string | number | undefined>) => Object.entries(params).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
 
+const evidencePath = (kpiId: string, period: string) => `/strategy-alignment/kpis/${encodeURIComponent(kpiId)}/measures/${encodeURIComponent(period)}/evidence`
+
 export const alignmentApi = {
   latest: (year: number) => call<AlignmentState>(`/strategy-alignment?${q({ year })}`),
   start: () => call<{ id: string; status: string }>('/strategy-alignment/runs', 'POST', {}),
@@ -52,7 +66,13 @@ export const alignmentApi = {
   units: () => call<KpiUnit[]>('/strategy-alignment/kpis/units'),
   kpis: (unitId: string, year: number) => call<TrackedKpi[]>(`/strategy-alignment/kpis?${q({ unitId, year })}`),
   tracking: (kpiId: string, body: { reported?: boolean; frequency?: KpiFrequency | null; target?: string | null; unit?: string | null }) => call(`/strategy-alignment/kpis/${encodeURIComponent(kpiId)}/tracking`, 'PUT', body),
-  measure: (kpiId: string, year: number, period: string, value: string, note?: string) => call(`/strategy-alignment/kpis/${encodeURIComponent(kpiId)}/measures`, 'POST', { year, period, value, ...(note ? { note } : {}) }),
+  measure: (kpiId: string, year: number, period: string, value: string) => call(`/strategy-alignment/kpis/${encodeURIComponent(kpiId)}/measures`, 'POST', { year, period, value }),
+  /** Saves a measure's comment only (its value is kept); an empty comment removes it. */
+  comment: (kpiId: string, year: number, period: string, note: string) => call(`/strategy-alignment/kpis/${encodeURIComponent(kpiId)}/measures`, 'POST', { year, period, note }),
+  addEvidenceLink: (kpiId: string, year: number, period: string, url: string) => call<KpiEvidence>(`${evidencePath(kpiId, period)}/link`, 'POST', { year, url }),
+  addEvidenceFile: (kpiId: string, year: number, period: string, file: File) => upload<KpiEvidence>(`${evidencePath(kpiId, period)}/file?${q({ year })}`, file),
+  downloadEvidence: (kpiId: string, year: number, period: string, evidence: { id: string; fileName?: string; name?: string }) => download(`${evidencePath(kpiId, period)}/${encodeURIComponent(evidence.id)}?${q({ year })}`, evidence.fileName || evidence.name || 'evidence'),
+  removeEvidence: (kpiId: string, year: number, period: string, evidenceId: string) => call(`${evidencePath(kpiId, period)}/${encodeURIComponent(evidenceId)}?${q({ year })}`, 'DELETE'),
   report: (unitId: string, year: number, period: string) => call<KpiReport>(`/strategy-alignment/kpis/report?${q({ unitId, year, period })}`),
   exportReport: (unitId: string, year: number, period: string) => download(`/strategy-alignment/kpis/report/export?${q({ unitId, year, period })}`, `kpi-report-${year}-${period}.xlsx`),
   setStrategyType: (refreshId: string, strategyType: string) => call(`/strategy-refreshes/${encodeURIComponent(refreshId)}/strategy-type`, 'POST', { strategyType }),
