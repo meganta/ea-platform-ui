@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import InnovationPage from '../InnovationPage';
 
 jest.mock('../../contexts/LangContext', () => ({
@@ -667,10 +667,11 @@ describe('InnovationPage - Ideas tab: list and submission', () => {
     fireEvent.click(await screen.findByText('innov.submit_idea'));
     await screen.findByText('innov.idea_title_ar');
 
-    const textboxes = screen.getAllByRole('textbox');
-    fireEvent.change(textboxes[0], { target: { value: 'New idea title' } }); // title
-    const textarea = document.querySelector('textarea')!;
-    fireEvent.change(textarea, { target: { value: 'A description of the idea.' } });
+    fireEvent.change(screen.getByLabelText(/^innov\.idea_title \*/), { target: { value: 'New idea title' } });
+    fireEvent.change(screen.getByLabelText(/^innov\.idea_description \*/), { target: { value: 'A description of the idea.' } });
+    fireEvent.change(screen.getByLabelText('innov.idea_problem'), { target: { value: 'Manual matching takes days' } });
+    fireEvent.change(screen.getByLabelText('innov.idea_benefits'), { target: { value: 'Faster close' } });
+    fireEvent.change(screen.getByLabelText('innov.idea_beneficiaries'), { target: { value: 'Finance team' } });
 
     fireEvent.click(screen.getByText('innov.submit'));
 
@@ -680,6 +681,7 @@ describe('InnovationPage - Ideas tab: list and submission', () => {
       const body = JSON.parse(postCall[1].body);
       expect(body.title).toBe('New idea title');
       expect(body.description).toBe('A description of the idea.');
+      expect(body).toMatchObject({ problemStatement: 'Manual matching takes days', expectedBenefits: 'Faster close', targetBeneficiaries: 'Finance team' });
     });
   });
 
@@ -1937,5 +1939,197 @@ describe('InnovationPage - Studies: who prepared them (platform users vs Copilot
     render(<InnovationPage />);
     expect(await screen.findByText('innov.not_generated_yet')).toBeInTheDocument();
     window.history.pushState({}, '', '/');
+  });
+});
+
+const CRITERIA_KEYS = ['STRATEGIC_ALIGNMENT', 'BUSINESS_VALUE', 'BENEFICIARY_IMPACT', 'TECHNICAL_FEASIBILITY', 'ORGANIZATIONAL_READINESS', 'COST_EFFORT', 'RISK_COMPLIANCE', 'TIME_TO_VALUE'];
+const ASSESSMENT = {
+  method: 'idea-assessment-v2', assessedAt: '2026-10-02T08:00:00Z',
+  summary: { en: 'High-value automation for finance.', ar: 'أتمتة عالية القيمة للمالية.' },
+  problem: { en: 'Manual matching', ar: 'مطابقة يدوية' }, targetBeneficiaries: { en: 'Finance', ar: 'المالية' },
+  criteria: CRITERIA_KEYS.map((key, i) => ({ key, name: { en: key, ar: key }, group: i < 3 ? 'VALUE' : 'EASE', weight: [20, 20, 10, 15, 10, 10, 10, 5][i], aiScore: 72, score: 72, confidence: 'HIGH', rationale: { en: `Because ${key}`, ar: '' } })),
+  scores: { overall: 72, aiOverall: 72, value: 72, ease: 72, quadrant: 'QUICK_WIN' },
+  recommendation: { decision: 'PROCEED_TO_STUDY', rationale: { en: 'Validate the vendor options first.', ar: '' }, conditions: [{ en: 'Finance sponsor named', ar: '' }], mergeWith: null },
+  swot: { strengths: [{ en: 'Clear ROI', ar: '' }], weaknesses: [{ en: 'Data quality', ar: '' }], opportunities: [], threats: [] },
+  benefits: [{ type: 'EFFICIENCY', text: { en: 'Days to hours', ar: '' } }],
+  risks: [{ category: 'DATA_PRIVACY', likelihood: 'HIGH', impact: 'HIGH', text: { en: 'Supplier data exposure', ar: '' }, mitigation: { en: 'Masking', ar: '' } }],
+  effort: { size: 'M', costBand: 'MEDIUM', timeframe: { en: '3-6 months', ar: '' }, skills: [] },
+  kpis: [{ name: { en: 'Match rate', ar: '' }, target: { en: '90%', ar: '' } }],
+  strategicLinks: [{ goalId: 'g1', goal: 'Efficient operations', strategy: 'DT 2030', contribution: { en: 'Automates finance', ar: '' } }],
+  eaImpact: [{ assetId: 'a1', name: 'ERP Finance', type: 'Application', impact: { en: 'New matching service', ar: '' } }],
+  assumptions: [], openQuestions: [{ en: 'Which ERP module?', ar: '' }], nextSteps: [{ en: 'Run a vendor scan', ar: '' }],
+  confidence: 'MEDIUM', dataGaps: [], similar: [{ kind: 'IDEA', id: 'idea-2', title: 'OCR for invoices', status: 'SUBMITTED', overlap: 50 }],
+  context: { orgProfile: true, strategyGoals: 3, repositoryObjects: 40, relatedTechnology: null, similarItems: 1 },
+};
+const ASSESSED = {
+  ...IDEA, status: 'QUALIFIED', overallScore: 72, valueScore: 72, easeScore: 72, priorityQuadrant: 'QUICK_WIN', aiRecommendation: 'PROCEED_TO_STUDY',
+  qualifiedAt: '2026-10-02T08:00:00Z', createdAt: '2026-10-01T08:00:00Z', assessment: ASSESSMENT,
+  endorsementCount: 2, endorsedByMe: false, comments: [{ id: 'c1', body: 'We tried this in 2024', createdAt: '2026-10-01T09:00:00Z', author: { id: 'u2', name: 'Omar', nameAr: null }, mine: false }],
+  studies: [], submittedBy: { id: 'user-1', name: 'Sara', nameAr: 'سارة' }, problemStatement: 'Manual matching takes days',
+};
+const LIST_ROW = { ...ASSESSED, assessment: undefined, assessmentSummary: ASSESSMENT.summary, commentCount: 1 };
+
+async function openAssessedIdea(extraRoutes: Record<string, any> = {}) {
+  mockFetch({ '/innovation/radar': [], '/innovation/ideas': [LIST_ROW], '/innovation/ideas/idea-1': ASSESSED, ...extraRoutes });
+  render(<InnovationPage />);
+  fireEvent.click(await screen.findByText('innov.tab_ideas'));
+  fireEvent.click(await screen.findByText('Automate invoice matching'));
+  await screen.findByTestId('idea-assessment');
+}
+
+describe('InnovationPage - Ideas tab: assessment, prioritization and collaboration', () => {
+  it('shows pipeline stats, the AI recommendation, priority and endorsements in the list', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [LIST_ROW, { ...IDEA, id: 'idea-3', title: 'Unassessed idea', endorsementCount: 0 }] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    await screen.findByText('Automate invoice matching');
+    expect(screen.getByText('innov.ideas_stat_quick_wins')).toBeInTheDocument();
+    expect(screen.getByText('High-value automation for finance.')).toBeInTheDocument();
+    expect(screen.getAllByText(/Proceed to a detailed study/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Quick win').length).toBeGreaterThan(0);
+    expect(screen.getByText('👍 2')).toBeInTheDocument();
+  });
+
+  it('sends priority, recommendation, sort, search and "mine" filters to the API', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [LIST_ROW] });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    await screen.findByText('Automate invoice matching');
+    fireEvent.change(screen.getByLabelText('innov.ideas_priority'), { target: { value: 'QUICK_WIN' } });
+    fireEvent.change(screen.getByLabelText('innov.ideas_recommendation'), { target: { value: 'FAST_TRACK' } });
+    fireEvent.change(screen.getByLabelText('innov.ideas_sort'), { target: { value: 'endorsed' } });
+    fireEvent.click(screen.getByLabelText('innov.ideas_mine'));
+    fireEvent.change(screen.getByLabelText('innov.ideas_search'), { target: { value: 'invoice' } });
+    await waitFor(() => {
+      const urls = (global.fetch as jest.Mock).mock.calls.map((c: any) => c[0] as string);
+      const last = urls.filter(u => u.includes('/innovation/ideas?')).pop()!;
+      expect(last).toContain('quadrant=QUICK_WIN');
+      expect(last).toContain('recommendation=FAST_TRACK');
+      expect(last).toContain('sort=endorsed');
+      expect(last).toContain('mine=true');
+      expect(last).toContain('search=invoice');
+    });
+  });
+
+  it('switches to the Value / Ease matrix and opens an idea from it', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [LIST_ROW], '/innovation/ideas/idea-1': ASSESSED });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    await screen.findByText('Automate invoice matching');
+    fireEvent.click(screen.getByText(/innov\.ideas_view_matrix/));
+    expect(await screen.findByTestId('idea-matrix')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Automate invoice matching: Value 72/ }));
+    expect(await screen.findByTestId('idea-assessment')).toBeInTheDocument();
+  });
+
+  it('endorses an idea from the list without opening it', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [LIST_ROW], '/innovation/ideas/idea-1/endorse': { endorsementCount: 3, endorsedByMe: true } });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('👍 2'));
+    expect(await screen.findByText('👍 3')).toBeInTheDocument();
+    expect(screen.queryByTestId('idea-detail')).not.toBeInTheDocument();
+    const post = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].endsWith('/innovation/ideas/idea-1/endorse'));
+    expect(post).toBeDefined();
+  });
+
+  it('renders the detailed assessment: recommendation, scorecard, SWOT, risks, strategy, EA impact, next steps', async () => {
+    await openAssessedIdea();
+    expect(screen.getByTestId('idea-recommendation')).toHaveTextContent('Proceed to a detailed study');
+    expect(screen.getByText('Validate the vendor options first.')).toBeInTheDocument();
+    expect(screen.getByText('Finance sponsor named')).toBeInTheDocument();
+    for (const key of CRITERIA_KEYS) expect(screen.getByTestId(`criterion-${key}`)).toBeInTheDocument();
+    expect(screen.getByText('Clear ROI')).toBeInTheDocument();
+    expect(screen.getByTestId('idea-risks')).toHaveTextContent('Supplier data exposure');
+    expect(screen.getByText(/Efficient operations/)).toBeInTheDocument();
+    expect(screen.getByText(/ERP Finance/)).toBeInTheDocument();
+    expect(screen.getByText('Run a vendor scan')).toBeInTheDocument();
+    expect(screen.getByText('Which ERP module?')).toBeInTheDocument();
+    expect(screen.getByText('We tried this in 2024')).toBeInTheDocument();
+  });
+
+  it('a reviewer adjusts a criterion score with a note', async () => {
+    await openAssessedIdea({ '/innovation/ideas/idea-1/assessment/criteria/BUSINESS_VALUE': {} });
+    const row = screen.getByTestId('criterion-BUSINESS_VALUE');
+    fireEvent.click(row.querySelector('button')!);
+    fireEvent.change(screen.getByLabelText('Reviewer score (0-100)'), { target: { value: '90' } });
+    fireEvent.change(screen.getByLabelText('Why (required)'), { target: { value: 'Validated with finance' } });
+    fireEvent.click(screen.getByText('Save'));
+    await waitFor(() => {
+      const put = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].includes('/assessment/criteria/BUSINESS_VALUE'));
+      expect(put).toBeDefined();
+      expect(JSON.parse(put[1].body)).toEqual({ score: 90, note: 'Validated with finance' });
+    });
+  });
+
+  it('an architect sees the scorecard but cannot adjust scores', async () => {
+    mockRole = 'ARCHITECT';
+    await openAssessedIdea();
+    expect(screen.getByTestId('criterion-BUSINESS_VALUE').querySelector('button')).toBeNull();
+  });
+
+  it('starting the assessment shows progress and follows it until the result arrives', async () => {
+    let calls = 0;
+    mockFetch({
+      '/innovation/radar': [], '/innovation/ideas': [IDEA],
+      '/innovation/ideas/idea-1/qualify': { ...IDEA, status: 'QUALIFYING' },
+      '/innovation/ideas/idea-1': () => (++calls > 1 ? ASSESSED : { ...IDEA, comments: [], studies: [] }),
+    });
+    jest.useFakeTimers();
+    try {
+      render(<InnovationPage />);
+      fireEvent.click(await screen.findByText('innov.tab_ideas'));
+      fireEvent.click(await screen.findByText('Automate invoice matching'));
+      fireEvent.click(await screen.findByText('innov.qualify'));
+      expect(await screen.findByText(/innov\.idea_assessing/)).toBeInTheDocument();
+      // The request has returned (the button is gone while the idea is being assessed); the next poll brings the result.
+      await waitFor(() => expect(screen.queryByText('innov.qualifying')).not.toBeInTheDocument());
+      await act(async () => { jest.advanceTimersByTime(5100); });
+      expect(await screen.findByTestId('idea-assessment')).toBeInTheDocument();
+      expect(calls).toBe(2);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('shows a failed assessment and lets the person run it again', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [IDEA], '/innovation/ideas/idea-1': { ...IDEA, qualificationError: 'failed', comments: [], studies: [] } });
+    render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    fireEvent.click(await screen.findByText('Automate invoice matching'));
+    expect(await screen.findByText('innov.idea_assessment_failed')).toBeInTheDocument();
+    expect(screen.getByText('innov.qualify')).toBeInTheDocument();
+  });
+
+  it('posts a comment', async () => {
+    await openAssessedIdea({ '/innovation/ideas/idea-1/comments': { id: 'c2' } });
+    fireEvent.change(screen.getByLabelText('innov.idea_add_comment'), { target: { value: 'Count me in' } });
+    fireEvent.click(screen.getByText('innov.idea_post_comment'));
+    await waitFor(() => {
+      const post = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'POST' && c[0].endsWith('/innovation/ideas/idea-1/comments'));
+      expect(JSON.parse(post[1].body)).toEqual({ body: 'Count me in' });
+    });
+  });
+
+  it('edits an idea in place', async () => {
+    await openAssessedIdea();
+    fireEvent.click(screen.getByText(/innov\.idea_edit/));
+    const title = screen.getByLabelText(/^innov\.idea_title \*/) as HTMLInputElement;
+    expect(title.value).toBe('Automate invoice matching');
+    fireEvent.change(title, { target: { value: 'Automate invoice and receipt matching' } });
+    fireEvent.click(screen.getByText('innov.idea_save_changes'));
+    await waitFor(() => {
+      const put = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT' && c[0].endsWith('/innovation/ideas/idea-1'));
+      expect(JSON.parse(put[1].body).title).toBe('Automate invoice and receipt matching');
+    });
+  });
+
+  it('"Start a detailed study" opens the study form already linked to the idea', async () => {
+    await openAssessedIdea({ '/innovation/studies': [], '/innovation/portfolio': {} });
+    fireEvent.click(screen.getByText(/innov\.idea_start_study/));
+    const title = await screen.findByDisplayValue('Automate invoice matching');
+    expect(title).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Manual matching takes days')).toBeInTheDocument();
+    expect((screen.getByDisplayValue('innov.origin_idea') as HTMLSelectElement).value).toBe('IDEA');
   });
 });

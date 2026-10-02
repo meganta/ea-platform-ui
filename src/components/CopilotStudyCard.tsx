@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from './HelpTip'
 import { exportFileName } from '../lib/exportFileName'
+import { fetchStudyExport, saveBlob, ExportProgress } from '../lib/studyExport'
 import { RECOMMENDATION_LABEL, STUDY_STATUS_LABEL } from './studyLabels'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -60,6 +61,7 @@ export default function CopilotStudyCard({ attachment: a }: { attachment: Copilo
   const [study, setStudy] = useState<any>(null)
   const [busy, setBusy] = useState<'docx' | 'pptx' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [preparing, setPreparing] = useState<ExportProgress | null>(null)
   const startedAt = useRef(Date.now())
   const [now, setNow] = useState(Date.now())
 
@@ -90,19 +92,14 @@ export default function CopilotStudyCard({ attachment: a }: { attachment: Copilo
   const download = async (format: 'docx' | 'pptx') => {
     setBusy(format); setError(null)
     try {
-      const res = await fetch(`${API}/innovation/studies/${encodeURIComponent(a.studyId)}/export/${format}?lang=${lang}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
-      if (!res.ok) throw new Error('export failed')
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = exportFileName(title, 'Innovation_Study', lang, format)
-      document.body.appendChild(link); link.click(); link.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 2000)
-    } catch {
-      setError(t('copilot.study.export_failed'))
+      const blob = await fetchStudyExport(`${API}/innovation/studies/${encodeURIComponent(a.studyId)}/export/${format}?lang=${lang}`, localStorage.getItem('ea_token'), {
+        onPreparing: p => setPreparing(p), fallbackMessage: t('copilot.study.export_failed'),
+      })
+      saveBlob(blob, exportFileName(title, 'Innovation_Study', lang, format))
+    } catch (e: any) {
+      setError(e?.message || t('copilot.study.export_failed'))
     } finally {
-      setBusy(null)
+      setBusy(null); setPreparing(null)
     }
   }
 
@@ -154,6 +151,7 @@ export default function CopilotStudyCard({ attachment: a }: { attachment: Copilo
         )}
         <a href={`/innovation?study=${encodeURIComponent(a.studyId)}`} target="_blank" rel="noopener noreferrer" style={btn(false)}>↗ {t('copilot.study.open')}</a>
       </div>
+      {preparing && <div role="status" style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 6 }}>{t('copilot.study.export_preparing')}{preparing.total ? ` (${Math.min(preparing.translated, preparing.total)}/${preparing.total})` : ''}</div>}
       {error && <div role="alert" style={{ fontSize: 11, color: '#f97316', marginTop: 6 }}>{error}</div>}
     </div>
   )
