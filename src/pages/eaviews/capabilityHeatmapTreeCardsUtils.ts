@@ -108,12 +108,26 @@ export interface HeatmapTile {
   displayValue: string
 }
 
+export interface HeatmapMetricOption {
+  key: string
+  label: string
+  coveragePercent: number
+}
+
+export interface HeatmapGroup {
+  assetType: string
+  tiles: HeatmapTile[]
+}
+
 export interface HeatmapDisplay {
   eligible: boolean
   reason?: string
   metricKey?: string
+  metricLabel?: string
   dataType?: 'numeric' | 'categorical' | 'status'
   candidateMetrics?: string[]
+  metricOptions?: HeatmapMetricOption[]
+  groups?: HeatmapGroup[]
   min?: number
   max?: number
   distinctValues?: string[]
@@ -128,21 +142,30 @@ export interface HeatmapDisplay {
 // Direct-object metrics only in this phase - see class header/Section 8
 // of the completion report for why related-object aggregation is
 // deferred rather than guessed at.
+// The value a metric reads from an object: a top-level field (status,
+// lifecycleStatus, assetType, owner) or a Meta Model attribute in metadata.
+export function heatmapValue(obj: any, metric: { key: string; source?: string } | undefined, key: string): any {
+  const fromField = metric ? metric.source === 'field' : key === 'status'
+  return fromField ? obj?.[key] : obj?.metadata?.[key]
+}
+
 export function buildHeatmapDisplay(dataset: any, eligibility: any, selectedMetricKey?: string): HeatmapDisplay {
   const heatmapEval = eligibility?.eligible?.find((v: any) => v.visualization === 'HEATMAP')
   if (!heatmapEval) {
     const ineligible = eligibility?.ineligible?.find((v: any) => v.visualization === 'HEATMAP')
-    return { eligible: false, reason: ineligible?.reasons?.[0] || 'Heatmap is unavailable because this result has no structural grouping and usable metric together.' }
+    return { eligible: false, reason: ineligible?.reasons?.[0] || 'There are no objects in this result to colour.' }
   }
   const config = heatmapEval.recommendedConfig
-  const metricKey = selectedMetricKey || config?.metricKey
-  const metric = (dataset?.metrics ?? []).find((m: any) => m.key === metricKey)
-  if (!metric) return { eligible: false, reason: 'The selected metric is not available in this dataset.' }
+  const metrics: any[] = dataset?.metrics ?? []
+  const candidates: string[] = config?.candidateMetrics ?? metrics.map(m => m.key)
+  const metricKey = selectedMetricKey && candidates.includes(selectedMetricKey) ? selectedMetricKey : (config?.metricKey ?? candidates[0])
+  const metric = metrics.find((m: any) => m.key === metricKey)
+  if (!metric) return { eligible: false, reason: 'The selected attribute is not available in this result.' }
 
   const objects: any[] = dataset?.objects ?? []
   const tiles: HeatmapTile[] = objects.map(o => {
-    const raw = metricKey === 'status' ? o.status : o.metadata?.[metricKey]
-    if (raw === undefined || raw === null || raw === '') return { objectId: o.id, name: o.name, value: null, displayValue: '—' }
+    const raw = heatmapValue(o, metric, metricKey)
+    if (raw === undefined || raw === null || raw === '' || typeof raw === 'object') return { objectId: o.id, name: o.name, value: null, displayValue: '—' }
     if (metric.dataType === 'numeric') {
       const n = Number(raw)
       return { objectId: o.id, name: o.name, value: Number.isNaN(n) ? null : n, displayValue: Number.isNaN(n) ? '—' : String(n) }
@@ -150,11 +173,27 @@ export function buildHeatmapDisplay(dataset: any, eligibility: any, selectedMetr
     return { objectId: o.id, name: o.name, value: String(raw), displayValue: String(raw) }
   })
 
+  // Grouped by object type, the view's primary objects first.
+  const typeOf = new Map<string, any>(objects.map(o => [o.id, o]))
+  const order: string[] = []
+  const byType: Record<string, HeatmapTile[]> = {}
+  const sorted = [...tiles].sort((a, b) => (typeOf.get(a.objectId)?.role === 'PRIMARY' ? 0 : 1) - (typeOf.get(b.objectId)?.role === 'PRIMARY' ? 0 : 1))
+  for (const tile of sorted) {
+    const t = typeOf.get(tile.objectId)?.assetType || ''
+    if (!byType[t]) { byType[t] = []; order.push(t) }
+    byType[t].push(tile)
+  }
+
   return {
-    eligible: true, metricKey, dataType: metric.dataType,
-    candidateMetrics: config?.candidateMetrics ?? [metricKey],
+    eligible: true, metricKey, metricLabel: metric.label || metricKey, dataType: metric.dataType,
+    candidateMetrics: candidates,
+    metricOptions: candidates.map(k => {
+      const m = metrics.find((x: any) => x.key === k)
+      return { key: k, label: m?.label || k, coveragePercent: m?.coveragePercent ?? 0 }
+    }),
     min: metric.min, max: metric.max, distinctValues: metric.distinctValues,
     tiles,
+    groups: order.map(assetType => ({ assetType, tiles: byType[assetType] })),
   }
 }
 

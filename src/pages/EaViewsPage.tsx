@@ -584,13 +584,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const [vizMode, setVizMode] = useState<string>(view.visualization || 'GRAPH')
   const vizModeRef = React.useRef(vizMode)
   vizModeRef.current = vizMode
-  const [filterDomain, setFilterDomain] = useState('')
-  const [filterType, setFilterType] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
-  const [search, setSearch] = useState('')
-  const [savedFilters, setSavedFilters] = useState<any[]>([])
-  const [showSaveFilterBox, setShowSaveFilterBox] = useState(false)
-  const [saveFilterName, setSaveFilterName] = useState('')
   const [selected, setSelected] = useState<any>(null)
   const [showSharePanel, setShowSharePanel] = useState(false)
   const [shareData, setShareData] = useState<any>(null)
@@ -930,7 +923,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
   const canSnapshot = can('Views.CreateSnapshot')
   // A viewpoint opened directly is a private workspace until kept.
   const isWorkspace = !!(view as any).isWorkspace
-  const [refineOpen, setRefineOpen] = useState(!isWorkspace)
   const keepView = async () => {
     const name = window.prompt(t('eaviews.keep_prompt'), view.name)
     if (name === null) return
@@ -1128,11 +1120,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     if (resolved) setSelected(resolved)
   }
 
-  useEffect(() => {
-    api.get('/ea-views/saved-filters').then((f: any) => setSavedFilters(Array.isArray(f) ? f : [])).catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   // Comparison Graph: initialize progressive disclosure fresh for each
   // newly-loaded comparison (Section 13/14) - reuses the exact same
   // Phase 4C functions the single-scenario Graph uses, over the dataset
@@ -1170,31 +1157,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     if (!authoringMode || !committedScenarioId) { setRemovedAssets([]); return }
     api.get(`/ea-views/scenarios/${committedScenarioId}/removed-assets`).then((r: any) => setRemovedAssets(Array.isArray(r) ? r : [])).catch(() => setRemovedAssets([]))
   }, [authoringMode, committedScenarioId, dataset]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const applySavedFilter = (filterId: string) => {
-    const f = savedFilters.find((sf: any) => sf.id === filterId)
-    if (!f) return
-    const cfg = f.filterConfig || {}
-    setFilterDomain(cfg.domain || '')
-    setFilterType(cfg.assetType || '')
-    setFilterStatus(cfg.status || '')
-    setSearch(cfg.search || '')
-  }
-
-  const saveCurrentFilters = async () => {
-    if (!saveFilterName.trim()) return
-    const filterConfig = { domain: filterDomain || undefined, assetType: filterType || undefined, status: filterStatus || undefined, search: search || undefined }
-    const created = await api.post('/ea-views/saved-filters', { name: saveFilterName.trim(), filterConfig })
-    if (created?.id) setSavedFilters(prev => [...prev, created])
-    setShowSaveFilterBox(false)
-    setSaveFilterName('')
-  }
-
-  const deleteSavedFilter = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation()
-    await api.del(`/ea-views/saved-filters/${id}`)
-    setSavedFilters(prev => prev.filter((f: any) => f.id !== id))
-  }
 
   const publish = async () => {
     const updated = await api.post(`/ea-views/${view.id}/publish`)
@@ -1272,16 +1234,8 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     }
     return ids
   }, [focusInsight, data])
-  const filteredNodes = (data?.nodes || []).filter((n: any) =>
-    (!focusIds || focusIds.has(n.id)) &&
-    (!filterDomain || (n.operatingDomain || n.domain) === filterDomain) &&
-    (!filterType || n.assetType === filterType) &&
-    (!filterStatus || n.status === filterStatus) &&
-    (!search || n.name.toLowerCase().includes(search.toLowerCase()))
-  )
-
-  const domains = [...new Set((data?.nodes||[]).map((n: any) => n.operatingDomain || n.domain))] as string[]
-  const types = [...new Set((data?.nodes||[]).map((n: any) => n.assetType))] as string[]
+  // A selected fact narrows the view to its objects; otherwise everything.
+  const filteredNodes = (data?.nodes || []).filter((n: any) => !focusIds || focusIds.has(n.id))
 
   // ── Graph progressive disclosure (Phase 4C) ──────────────────────────
   //
@@ -1391,7 +1345,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
 
   const runAutoLayout = () => {
     if (filteredNodes.length > FORCE_LAYOUT_MAX_NODES) {
-      alert(`Auto-layout works best under ${FORCE_LAYOUT_MAX_NODES} objects (currently ${filteredNodes.length}). Try narrowing the filters first.`)
+      alert(`Auto-layout works best under ${FORCE_LAYOUT_MAX_NODES} objects (currently ${filteredNodes.length}). Select a fact above to narrow the view first.`)
       return
     }
     setLayoutRunning(true)
@@ -1592,17 +1546,30 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
       return colorByValue[String(tile.value)] || '#7f8c8d'
     }
     const objectById = new Map<string, any>((dataset?.objects ?? []).map((o: any) => [o.id, o]))
+    const tileView = (tile: any) => {
+      const color = getColor(tile)
+      const obj = objectById.get(tile.objectId)
+      return (
+        <button type="button" key={tile.objectId} data-testid="heatmap-tile" onClick={() => setSelected(obj)} title={`${tile.name}: ${tile.displayValue}`}
+          style={{ textAlign: 'start' as const, font: 'inherit', color: 'inherit', padding: '10px 12px', borderRadius: 8, background: color + '22', borderTop: `1px solid ${color}55`, borderRight: `1px solid ${color}55`, borderBottom: `1px solid ${color}55`, borderLeft: `4px solid ${color}`, cursor: 'pointer' }}>
+          <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>{isAR && obj?.nameAr ? obj.nameAr : tile.name}</div>
+          <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{tile.value === null ? t('eaviews.heatmap_no_value') : tile.displayValue}</div>
+        </button>
+      )
+    }
+    const missing = (display.tiles ?? []).filter(x => x.value === null).length
     return (
-      <div>
+      <div data-testid="heatmap">
         {dataset?.provenance?.truncated && (
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>Results are truncated - this heatmap does not represent every matching object.</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 10 }}>{t('eaviews.heatmap_truncated')}</div>
         )}
-        <div style={{ display: 'flex', gap: 10, marginBottom: 16, alignItems: 'center', flexWrap: 'wrap' as const }}>
-          <label style={{ ...S.label, marginBottom: 0 }}>Color by:</label>
-          <select style={{ ...S.input, maxWidth: 220 }} value={heatmapField} onChange={e => setHeatmapField(e.target.value)}>
-            {(display.candidateMetrics ?? [heatmapField]).map(m => <option key={m} value={m}>{m}</option>)}
+        <div className="eav-heatmap-bar">
+          <label htmlFor="heatmap-color-by" style={{ ...S.label, marginBottom: 0 }}>{t('eaviews.heatmap_color_by')}</label>
+          <select id="heatmap-color-by" style={{ ...S.input, maxWidth: 280 }} value={display.metricKey} onChange={e => setHeatmapField(e.target.value)}>
+            {(display.metricOptions ?? []).map(m => <option key={m.key} value={m.key}>{m.label} ({m.coveragePercent}%)</option>)}
           </select>
-          <div style={{ display: 'flex', gap: 10, marginLeft: 'auto', flexWrap: 'wrap' as const, maxWidth: '60%' }}>
+          <HelpTip text={t('eaviews.heatmap_help')} />
+          <div className="eav-heatmap-legend">
             {(display.dataType === 'categorical' || display.dataType === 'status') && Object.entries(colorByValue).map(([k,c]) => <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: c }} />{k}</div>)}
             {display.dataType === 'numeric' && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--text-dim)' }}>
@@ -1611,23 +1578,15 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
                 <span>{display.max}</span>
               </div>
             )}
+            {missing > 0 && <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-dim)' }}><div style={{ width: 10, height: 10, borderRadius: 2, background: '#4b5563' }} />{t('eaviews.heatmap_no_value')} ({missing})</div>}
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-          {(display.tiles ?? []).map(tile => {
-            const color = getColor(tile)
-            const obj = objectById.get(tile.objectId)
-            return (
-              <div key={tile.objectId} onClick={() => setSelected(obj)} style={{ padding: '10px 12px', borderRadius: 8, background: color+'22', border: `1px solid ${color}44`, cursor: 'pointer', transition: 'all 0.15s' }}
-                onMouseEnter={e => (e.currentTarget.style.background = color+'44')}
-                onMouseLeave={e => (e.currentTarget.style.background = color+'22')}>
-                <div style={{ fontSize: 11, fontWeight: 600, color, marginBottom: 4 }}>{obj?.assetType?.replace(/_/g,' ')}</div>
-                <div style={{ fontSize: 12, fontWeight: 500, lineHeight: 1.3 }}>{tile.name}</div>
-                <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 4 }}>{tile.displayValue}</div>
-              </div>
-            )
-          })}
-        </div>
+        {(display.groups ?? []).map(g => (
+          <section key={g.assetType} style={{ marginBottom: 16 }}>
+            {(display.groups ?? []).length > 1 && <h3 style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-dim)', margin: '0 0 8px' }}>{g.assetType.replace(/_/g, ' ')} ({g.tiles.length})</h3>}
+            <div className="eav-heatmap-grid">{g.tiles.map(tileView)}</div>
+          </section>
+        ))}
       </div>
     )
   }
@@ -1926,7 +1885,7 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
     <div>
       {filteredNodes.length > CARDS_WARN_THRESHOLD && (
         <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>
-          {filteredNodes.length} cards - use the filters above to narrow this down for easier browsing.
+          {filteredNodes.length} cards - select a fact above to narrow this down for easier browsing.
         </div>
       )}
       {dataset?.provenance?.truncated && (
@@ -2986,53 +2945,6 @@ function ViewViewer({ api, view: viewProp, onBack, onRefresh }: { api: any, view
         </div>
       )}
 
-      {/* Filters - progressive disclosure: a directly opened viewpoint leads
-          with its facts; refining is one click away. */}
-      {!refineOpen && (
-        <button style={{ ...S.btn(), fontSize:12, marginBottom:16 }} aria-expanded={false} onClick={() => setRefineOpen(true)}>{t('eaviews.refine_show')}</button>
-      )}
-      {refineOpen && <div style={{ display:'flex', gap:8, marginBottom:16, flexWrap:'wrap' as const }}>
-        <input style={{ ...S.input, maxWidth:200 }} placeholder="🔍 Search..." value={search} onChange={e=>setSearch(e.target.value)} />
-        <select style={{ ...S.input, maxWidth:150 }} value={filterDomain} onChange={e=>setFilterDomain(e.target.value)}>
-          <option value="">All Domains</option>
-          {domains.map(d=><option key={d} value={d}>{d}</option>)}
-        </select>
-        <select style={{ ...S.input, maxWidth:160 }} value={filterType} onChange={e=>setFilterType(e.target.value)}>
-          <option value="">All Types</option>
-          {types.map(t=><option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
-        </select>
-        <select style={{ ...S.input, maxWidth:140 }} value={filterStatus} onChange={e=>setFilterStatus(e.target.value)}>
-          <option value="">All Status</option>
-          {['APPROVED','ACTIVE','UNDER_REVIEW','DRAFT','PLANNED','DEPRECATED'].map(s=><option key={s} value={s}>{s}</option>)}
-        </select>
-        {savedFilters.length > 0 && (
-          <select style={{ ...S.input, maxWidth:170 }} value="" onChange={e => { if (e.target.value) applySavedFilter(e.target.value) }}>
-            <option value="">📁 Apply Saved Filter...</option>
-            {savedFilters.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
-        )}
-        <button style={{ ...S.btn(), fontSize:12 }} onClick={() => setShowSaveFilterBox(v => !v)}>💾 Save Filters</button>
-        <div style={{ marginLeft:'auto', fontSize:13, color:'var(--text-dim)', display:'flex', alignItems:'center' }}>{filteredNodes.length} / {data?.nodes?.length||0} objects</div>
-      </div>}
-
-      {showSaveFilterBox && (
-        <div style={{ ...S.card, marginBottom:16, padding:12, display:'flex', gap:8, alignItems:'center' }}>
-          <input style={{ ...S.input, maxWidth:220 }} placeholder="e.g. Critical Applications" value={saveFilterName} onChange={e => setSaveFilterName(e.target.value)} autoFocus />
-          <button style={{ ...S.btn('primary'), fontSize:12 }} disabled={!saveFilterName.trim()} onClick={saveCurrentFilters}>Save Current Filters</button>
-          <button style={{ ...S.btn(), fontSize:12 }} onClick={() => { setShowSaveFilterBox(false); setSaveFilterName('') }}>Cancel</button>
-        </div>
-      )}
-
-      {savedFilters.length > 0 && (
-        <div style={{ display:'flex', gap:6, marginBottom:16, flexWrap:'wrap' as const }}>
-          {savedFilters.map((f: any) => (
-            <span key={f.id} style={{ ...S.badge('#7f8c8d'), display:'flex', alignItems:'center', gap:6, cursor:'pointer' }} onClick={() => applySavedFilter(f.id)}>
-              📁 {f.name}
-              <span onClick={(e) => deleteSavedFilter(e, f.id)} style={{ opacity:0.6 }} title="Delete this saved filter">✕</span>
-            </span>
-          ))}
-        </div>
-      )}
       </>)}
 
       {/* Share panel */}
