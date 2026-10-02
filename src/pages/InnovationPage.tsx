@@ -7,6 +7,7 @@ import HelpTip from '../components/HelpTip'
 import { exportFileName } from '../lib/exportFileName'
 
 import { STUDY_STATUS_LABEL, RECOMMENDATION_LABEL } from '../components/studyLabels'
+import { enumLabel } from '../lib/enumLabels'
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
 function useApi() {
@@ -1210,7 +1211,7 @@ function RadarRelevanceCard({ api, item, isAR, t }: any) {
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-dim)', marginBottom: 8 }}>{isAR ? 'مُراجَع' : 'Reviewed'}</div>
           {decided.map((l: any) => (
             <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', fontSize: 12 }}>
-              <span style={S.badge(l.status === 'CONFIRMED' ? '#2ecc71' : l.status === 'REJECTED' ? '#e74c3c' : '#f1c40f')}>{l.status}</span>
+              <span style={S.badge(l.status === 'CONFIRMED' ? '#2ecc71' : l.status === 'REJECTED' ? '#e74c3c' : '#f1c40f')}>{enumLabel(l.status, isAR)}</span>
               <span>{l.asset ? (isAR && l.asset.nameAr ? l.asset.nameAr : l.asset.name) : (isAR ? '(الأصل محذوف)' : '(asset no longer exists)')}</span>
             </div>
           ))}
@@ -1387,8 +1388,8 @@ function RadarAnalystCard({ api, item, isAR, t }: any) {
         <div style={{ marginTop: 14 }}>
           <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 10 }}>
             {isAR
-              ? `مبني على: موقفنا${result.groundedIn.tenantStatus ? ` (${result.groundedIn.tenantStatus})` : ' (غير محدد)'}${result.groundedIn.hasAssessment ? `، تقييم بدرجة ${result.groundedIn.compositeScore.toFixed(2)}` : '، بلا تقييم بعد'}، ${result.groundedIn.confirmedRelevanceCount} روابط صلة مؤكَّدة.`
-              : `Grounded in: our status${result.groundedIn.tenantStatus ? ` (${result.groundedIn.tenantStatus})` : ' (unset)'}${result.groundedIn.hasAssessment ? `, an assessment scoring ${result.groundedIn.compositeScore.toFixed(2)}` : ', no assessment yet'}, ${result.groundedIn.confirmedRelevanceCount} confirmed relevance link(s).`}
+              ? `مبني على: موقفنا${result.groundedIn.tenantStatus ? ` (${TENANT_STATUS_LABEL[result.groundedIn.tenantStatus]?.ar || result.groundedIn.tenantStatus})` : ' (غير محدد)'}${result.groundedIn.hasAssessment ? `، تقييم بدرجة ${result.groundedIn.compositeScore.toFixed(2)}` : '، بلا تقييم بعد'}، ${result.groundedIn.confirmedRelevanceCount} روابط صلة مؤكَّدة.`
+              : `Grounded in: our status${result.groundedIn.tenantStatus ? ` (${TENANT_STATUS_LABEL[result.groundedIn.tenantStatus]?.en || result.groundedIn.tenantStatus})` : ' (unset)'}${result.groundedIn.hasAssessment ? `, an assessment scoring ${result.groundedIn.compositeScore.toFixed(2)}` : ', no assessment yet'}, ${result.groundedIn.confirmedRelevanceCount} confirmed relevance link(s).`}
           </div>
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{isAR ? IMPACT_FRAMING_LABEL[result.impactFraming]?.ar : IMPACT_FRAMING_LABEL[result.impactFraming]?.en}</div>
@@ -1456,10 +1457,10 @@ function RadarEvidenceCard({ api, item, isAR, t, isAdmin }: any) {
         <div style={{ padding: 12, border: '1px solid var(--border)', borderRadius: 8, marginBottom: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <select style={S.input} value={form.signalType} onChange={e => setForm(f => ({ ...f, signalType: e.target.value }))}>
-              {SIGNAL_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+              {SIGNAL_TYPES.map(s => <option key={s} value={s}>{enumLabel(s, isAR)}</option>)}
             </select>
             <select style={S.input} value={form.confidence} onChange={e => setForm(f => ({ ...f, confidence: e.target.value }))}>
-              {['HIGH', 'MEDIUM', 'LOW'].map(c => <option key={c} value={c}>{c}</option>)}
+              {['HIGH', 'MEDIUM', 'LOW'].map(c => <option key={c} value={c}>{isAR ? `الثقة: ${enumLabel(c, true)}` : `Confidence: ${enumLabel(c, false)}`}</option>)}
             </select>
           </div>
           <input style={S.input} placeholder={isAR ? 'المصدر (مثال: تقرير Gartner)' : 'Source (e.g. Gartner report)'} value={form.source} onChange={e => setForm(f => ({ ...f, source: e.target.value }))} />
@@ -1480,10 +1481,10 @@ function RadarEvidenceCard({ api, item, isAR, t, isAdmin }: any) {
           {signals.map((s: any) => (
             <div key={s.id} style={{ padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={S.badge('#3498db')}>{s.signalType}</span>
+                <span style={S.badge('#3498db')}>{enumLabel(s.signalType, isAR)}</span>
                 <span style={{ fontWeight: 600 }}>{s.sourceUrl ? <a href={s.sourceUrl} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>{s.source}</a> : s.source}</span>
                 {s.publisher && <span style={{ color: 'var(--text-dim)' }}>({s.publisher})</span>}
-                <span style={{ marginLeft: 'auto', color: 'var(--text-dim)' }}>{new Date(s.observedDate).toLocaleDateString()}</span>
+                <span style={{ marginLeft: 'auto', color: 'var(--text-dim)' }}>{new Date(s.observedDate).toLocaleDateString(isAR ? 'ar' : 'en-US')}</span>
                 {isAdmin && <button onClick={() => removeSignal(s.id)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕</button>}
               </div>
               <div>{s.summary}</div>
@@ -1546,15 +1547,15 @@ function RadarPilotsCard({ api, item, isAR, t, isAdmin }: any) {
             <div key={p.id} style={{ padding: '10px 12px', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontWeight: 600, fontSize: 13, flex: 1 }}>{p.title}</span>
-                <span style={S.badge(p.status === 'COMPLETED' ? '#2ecc71' : p.status === 'IN_PROGRESS' ? '#3498db' : '#7f8c8d')}>{p.status}</span>
-                {p.outcome && <span style={S.badge(PILOT_OUTCOME_COLOR[p.outcome])}>{p.outcome}</span>}
+                <span style={S.badge(p.status === 'COMPLETED' ? '#2ecc71' : p.status === 'IN_PROGRESS' ? '#3498db' : '#7f8c8d')}>{enumLabel(p.status, isAR)}</span>
+                {p.outcome && <span style={S.badge(PILOT_OUTCOME_COLOR[p.outcome])}>{enumLabel(p.outcome, isAR)}</span>}
               </div>
               <div style={{ color: 'var(--text-dim)', marginBottom: 6 }}>{p.hypothesis}</div>
               {isAdmin && p.status !== 'COMPLETED' && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
                   {p.status === 'PLANNED' && <button style={{ ...S.btn('primary'), padding: '3px 8px', fontSize: 11 }} onClick={() => setStatus(p.id, 'IN_PROGRESS')}>{isAR ? 'ابدأ' : 'Start'}</button>}
                   {['ADOPT', 'SCALE', 'REASSESS', 'HOLD', 'STOP'].map(o => (
-                    <button key={o} style={{ ...S.btn(), padding: '3px 8px', fontSize: 11 }} onClick={() => setOutcome(p.id, o)}>{isAR ? 'أنهِ:' : 'Conclude:'} {o}</button>
+                    <button key={o} style={{ ...S.btn(), padding: '3px 8px', fontSize: 11 }} onClick={() => setOutcome(p.id, o)}>{isAR ? 'أنهِ:' : 'Conclude:'} {enumLabel(o, isAR)}</button>
                   ))}
                 </div>
               )}
@@ -2685,7 +2686,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
             ? 'يقارن المنتجات المسماة في خيارات التقنية على خمسة معايير. يُعد الصف مستندًا إلى أدلة فقط عندما يستشهد بدليل موثق في رادار التقنية للتقنية محل الدراسة؛ وإلا فهو تقييم نوعي وليس قياسًا. التعديل اليدوي لا يمكنه إضافة دليل.'
             : 'Compares the products named in the technology options on five criteria. A row counts as evidence-backed only when it cites recorded Tech Radar evidence for the study’s technology; otherwise it is a qualitative assessment, not a measurement. Manual edits cannot add evidence.'} />}
         </div>
-        <span style={S.badge(STATUS_COLOR[section.status] || '#64748B')}>{section.status?.replace(/_/g, ' ')}</span>
+        <span style={S.badge(STATUS_COLOR[section.status] || '#64748B')}>{enumLabel(section.status, isAR)}</span>
         {locked && <span style={S.badge('#64748B')}>🔒 {isAR ? 'مقفل' : 'Locked'}</span>}
         {content != null && !editing && (
           <>
@@ -2772,7 +2773,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
             <div key={c.id} style={{ background: 'var(--navy)', borderRadius: 8, padding: 10, marginBottom: 8, opacity: c.resolved ? 0.6 : 1 }}>
               <div style={{ fontSize: 12, marginBottom: 4 }}>{c.body}</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(c.createdAt).toLocaleString()}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(c.createdAt).toLocaleString(isAR ? 'ar' : 'en-US')}</span>
                 {c.resolved ? <span style={S.badge('#2ecc71')}>{isAR ? 'تم الحل' : 'Resolved'}</span> : (
                   <button style={{ ...S.btn(), padding: '2px 8px', fontSize: 10 }} onClick={() => resolveComment(c.id)}>{isAR ? 'وضع علامة كمحلول' : 'Mark resolved'}</button>
                 )}
@@ -2793,7 +2794,7 @@ function StudySectionCard({ section, isAR, api, onUpdated }: any) {
             <div key={v.id} style={{ background: 'var(--navy)', borderRadius: 8, padding: 10, marginBottom: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={S.badge(v.changeType === 'AI_REVISIT' ? '#9b59b6' : '#3498db')}>{v.changeType === 'AI_REVISIT' ? (isAR ? 'مراجعة بالذكاء الاصطناعي' : 'AI Revisit') : (isAR ? 'تعديل يدوي' : 'Manual Edit')}</span>
-                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(v.createdAt).toLocaleString()}</span>
+                <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{new Date(v.createdAt).toLocaleString(isAR ? 'ar' : 'en-US')}</span>
               </div>
               {v.changeReason && <div style={{ fontSize: 11, color: 'var(--text-dim)', fontStyle: 'italic' }}>{v.changeReason}</div>}
             </div>
@@ -3075,7 +3076,7 @@ function RelatedObjectsPanel({ api, studyId, isAR, t }: any) {
             <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
               <span style={S.badge('#8e44ad')}>{isAR ? RELATED_OBJECT_TYPE_LABEL[r.relatedObjectType]?.ar : RELATED_OBJECT_TYPE_LABEL[r.relatedObjectType]?.en}</span>
               <span style={{ flex: 1, fontFamily: 'monospace', color: 'var(--text-dim)' }}>{r.relatedObjectId}</span>
-              <span style={{ color: 'var(--text-dim)' }}>{r.relationshipType}</span>
+              <span style={{ color: 'var(--text-dim)' }}>{enumLabel(r.relationshipType, isAR)}</span>
               <button style={{ ...S.btn('danger'), padding: '2px 8px', fontSize: 11 }} onClick={() => unlink(r.id)}>✕</button>
             </div>
           ))}

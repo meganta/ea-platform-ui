@@ -97,7 +97,7 @@ export function AttachedViewsPanel({ reviewId, apiUrl, token, isAR }: { reviewId
                 {a.snapshotId ? (isAR ? 'لقطة' : 'Snapshot') : (isAR ? 'حي' : 'Live')}
               </span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12 }}>{a.view?.name || a.snapshot?.name || '(deleted)'}</div>
+                <div style={{ fontSize: 12 }}>{a.view?.name || a.snapshot?.name || (isAR ? '(محذوف)' : '(deleted)')}</div>
                 {a.note && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.note}</div>}
               </div>
               <button style={S_LOCAL.btn('danger')} onClick={() => detach(a.id)}>{isAR ? 'إزالة' : 'Remove'}</button>

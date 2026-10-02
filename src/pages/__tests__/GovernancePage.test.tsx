@@ -1,12 +1,14 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import GovernancePage from '../GovernancePage';
+import { findLanguageLeaks, SHARED_TERMS } from '../../testUtils/languageLeaks';
 
 jest.mock('react-router-dom', () => ({
   useLocation: () => ({ state: null }),
 }), { virtual: true });
 
+let mockIsAR = false;
 jest.mock('../../contexts/LangContext', () => ({
-  useLang: () => ({ isAR: false, t: (key: string) => key }),
+  useLang: () => ({ isAR: mockIsAR, t: (key: string) => key, resolveText: (s: string) => s }),
 }));
 
 // AttachedViewsPanel has its own dedicated, thorough test coverage in
@@ -27,6 +29,7 @@ function makeReview(overrides: Partial<Record<string, any>> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockIsAR = false;
   localStorage.setItem('ea_token', 'fake-token');
 });
 
@@ -200,7 +203,7 @@ describe('GovernancePage - report view: Strategic tab in-tab editing', () => {
     fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
     fireEvent.click(await screen.findByText('gov.strategic'));
 
-    const select = await screen.findByDisplayValue('PARTIALLY ALIGNED');
+    const select = await screen.findByDisplayValue('Partially Aligned');
     fireEvent.change(select, { target: { value: 'FULLY_ALIGNED' } });
 
     await waitFor(() => expect(patchBodies.length).toBeGreaterThan(0));
@@ -216,7 +219,7 @@ describe('GovernancePage - report view: Strategic tab in-tab editing', () => {
     fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
     fireEvent.click(await screen.findByText('gov.strategic'));
 
-    const select = await screen.findByDisplayValue('PARTIALLY ALIGNED');
+    const select = await screen.findByDisplayValue('Partially Aligned');
     fireEvent.change(select, { target: { value: 'NOT_APPLICABLE' } });
 
     await waitFor(() => expect(patchBodies.length).toBeGreaterThan(0));
@@ -460,7 +463,7 @@ describe('GovernancePage - report view: READY_FOR_REVIEW status must not be show
 
     fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
     expect(await screen.findByText((_, el) => el?.textContent === '⚠ gov.requires_manual_review')).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent === 'gov.proposed_decision: APPROVED WITH CONDITIONS')).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.textContent === 'gov.proposed_decision: Approved with Conditions')).toBeInTheDocument();
   });
 
   it('shows the raw decision as the primary label (unchanged) for a genuinely COMPLETED review', async () => {
@@ -469,7 +472,8 @@ describe('GovernancePage - report view: READY_FOR_REVIEW status must not be show
     render(<GovernancePage />);
 
     fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
-    expect(await screen.findByText('APPROVED WITH CONDITIONS')).toBeInTheDocument();
+    // Shown in the header badge and as the decision-box label.
+    expect((await screen.findAllByText('Approved with Conditions')).length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByText('gov.requires_manual_review')).not.toBeInTheDocument();
   });
 });
@@ -524,5 +528,65 @@ describe('GovernancePage - report view: sections and scores follow the review ty
     fireEvent.click(await screen.findByText('Tender RFP'));
     expect(await screen.findByText('gov.strategic')).toBeTruthy();
     expect(screen.getByText('gov.financial')).toBeTruthy();
+  });
+});
+
+describe('GovernancePage - one language at a time', () => {
+  const REPORT = {
+    decision: 'REQUIRES_CHANGES', decisionRationale: 'Some issues to address.', executiveSummary: 'Summary text.',
+    overallScore: 70, complianceScore: 50, strategicScore: 50,
+    strategicAlignment: { overallAlignmentPercentage: 60, objectives: [
+      { strategyType: 'BUSINESS_STRATEGY', objectiveName: 'Improve customer retention', alignmentStatus: 'PARTIALLY_ALIGNED', alignmentPercentage: 50, isTenantStrategy: true },
+    ] },
+    complianceMatrix: { complianceRate: 50, items: [{ category: 'TENANT_STANDARD', principleOrStandard: 'Use the API gateway', complianceStatus: 'NON_COMPLIANT', gap: 'No gateway', recommendation: 'Add one' }] },
+    riskRegister: { risks: [{ riskTitle: 'Vendor lock-in', severity: 'HIGH', riskCategory: 'VENDOR_RISK', probability: 'MEDIUM', owner: 'CIO' }] },
+    futureStateAlignment: { alignmentPercentage: 40, overallAlignment: 'PARTIALLY_ALIGNED', summary: 'Partly aligned.', alignmentAreas: [{ area: 'Cloud', status: 'GAP_IDENTIFIED', gap: 'On premises' }], keyGaps: ['Cloud first'] },
+    financialOpportunities: { opportunities: [{ type: 'REUSE_OPPORTUNITY', title: 'Reuse CRM', annualSaving: 1000, confidenceLevel: 'HIGH' }] },
+    domainSummaries: { SECURITY_ARCHITECTURE: { score: 60, complianceScore: 50, riskScore: 60, strategicScore: 70 } },
+  };
+  const FINDINGS = [{ id: 'f1', title: 'Missing WAF', severity: 'CRITICAL', domain: 'SECURITY_ARCHITECTURE', category: 'SECURITY_RISK', description: 'No WAF', recommendation: 'Add a WAF' }];
+  // Tenant data (titles, names, AI text) is shown as stored; only UI text must follow the language.
+  const DATA = ['Payment Gateway HLD Review', 'Improve customer retention', 'Use the API gateway', 'No gateway', 'Add one', 'Vendor lock-in', 'CIO',
+    'Partly aligned.', 'Cloud', 'On premises', 'Cloud first', 'Reuse CRM', 'Missing WAF', 'No WAF', 'Add a WAF', 'Summary text.', 'Some issues to address.', 'Attached Views for', /common\.[a-z_]+/];
+  const TABS = ['gov.summary', 'المجالات والملاحظات', 'gov.strategic', 'gov.compliance', 'gov.risk_register', 'gov.future_state', 'gov.financial'];
+
+  it('the Arabic reviews list shows no English UI text', async () => {
+    mockIsAR = true;
+    mockApiGet([makeReview()]);
+    const { container } = render(<GovernancePage />);
+    await screen.findByText('Payment Gateway HLD Review');
+    expect(findLanguageLeaks(container, 'ar', [...DATA, ...SHARED_TERMS])).toEqual([]);
+  });
+
+  it('every Arabic report tab shows no English UI text', async () => {
+    mockIsAR = true;
+    mockReportView(makeReview({ id: 'r1' }), REPORT, FINDINGS);
+    const { container } = render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    await screen.findByText('gov.summary');
+    for (const tab of TABS) {
+      fireEvent.click(screen.getAllByText(tab)[0]);
+      // t() keys are rendered raw by the test mock; they are translated by LangContext.
+      expect(findLanguageLeaks(container, 'ar', [...DATA, ...SHARED_TERMS, /gov\.[a-z_]+/])).toEqual([]);
+    }
+  });
+
+  it('every English report tab shows no Arabic text', async () => {
+    mockReportView(makeReview({ id: 'r1' }), REPORT, FINDINGS);
+    const { container } = render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    await screen.findByText('gov.summary');
+    for (const tab of TABS.map(tb => (tb === 'المجالات والملاحظات' ? 'Domains & Findings' : tb))) {
+      fireEvent.click(screen.getAllByText(tab)[0]);
+      expect(findLanguageLeaks(container, 'en')).toEqual([]);
+    }
+  });
+
+  it('the Arabic new-review wizard shows no English UI text', async () => {
+    mockIsAR = true;
+    mockApiGet([]);
+    const { container } = render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('+ مراجعة جديدة'));
+    expect(findLanguageLeaks(container, 'ar', SHARED_TERMS)).toEqual([]);
   });
 });

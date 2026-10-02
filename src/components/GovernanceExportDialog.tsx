@@ -32,7 +32,7 @@ export default function GovernanceExportDialog({ onClose, onExport, subject = 'g
    </select>
    <label htmlFor="governance-export-language">{text('Language','اللغة')}</label>
    <select id="governance-export-language" className="form-input" value={language} onChange={e=>setLanguage(e.target.value as 'en'|'ar')} style={{ width:'100%', margin:'8px 0 12px' }}>
-    <option value="en">English</option><option value="ar">العربية</option>
+    <option value="en">{text('English','الإنجليزية')}</option><option value="ar">{text('Arabic','العربية')}</option>
    </select>
    <p role="note" style={{ fontSize:13, lineHeight:1.6, color:'var(--text-muted)' }}>{text('The executive presentation preserves the saved results. Evidence quotations remain in their original language.','يحافظ العرض التنفيذي على النتائج المحفوظة وتبقى الاقتباسات بلغتها الأصلية.')}</p>
    <div style={{ display:'flex', flexWrap:'wrap', gap:12, justifyContent:'flex-end', marginTop:24 }}>

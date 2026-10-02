@@ -1,8 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import InnovationPage from '../InnovationPage';
+import { findLanguageLeaks, fixtureText, SHARED_TERMS } from '../../testUtils/languageLeaks';
 
+let mockIsAR = false;
 jest.mock('../../contexts/LangContext', () => ({
-  useLang: () => ({ t: (key: string) => key, isAR: false }),
+  useLang: () => ({ t: (key: string) => key, isAR: mockIsAR }),
 }));
 
 const mockNavigate = jest.fn();
@@ -18,6 +20,7 @@ jest.mock('../../contexts/AuthContext', () => ({
 beforeEach(() => {
   jest.clearAllMocks();
   mockRole = 'TENANT_ADMIN';
+  mockIsAR = false;
 });
 
 function mockFetch(routes: Record<string, any>) {
@@ -1643,7 +1646,7 @@ describe('InnovationPage - Pilots & Experiments', () => {
     render(<InnovationPage />);
     fireEvent.click(await screen.findByText('AutoArchitect Agents'));
     expect(await screen.findByText('AI Case Handling Pilot')).toBeInTheDocument();
-    expect(screen.getByText('PLANNED')).toBeInTheDocument();
+    expect(screen.getByText('Planned')).toBeInTheDocument();
   });
 
   it('an admin can move a PLANNED pilot to IN_PROGRESS', async () => {
@@ -1664,7 +1667,7 @@ describe('InnovationPage - Pilots & Experiments', () => {
     render(<InnovationPage />);
     fireEvent.click(await screen.findByText('AutoArchitect Agents'));
     await screen.findByText('AI Case Handling Pilot');
-    fireEvent.click(screen.getByText(/Conclude: ADOPT/));
+    fireEvent.click(screen.getByText(/Conclude: Adopt/));
     await waitFor(() => {
       const call = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[0].includes('/innovation/radar/pilots/pilot-1') && c[1]?.method === 'PUT');
       const body = JSON.parse(call[1].body);
@@ -1937,5 +1940,70 @@ describe('InnovationPage - Studies: who prepared them (platform users vs Copilot
     render(<InnovationPage />);
     expect(await screen.findByText('innov.not_generated_yet')).toBeInTheDocument();
     window.history.pushState({}, '', '/');
+  });
+});
+
+describe('InnovationPage - one language at a time', () => {
+  const SIGNAL = { id: 'sig-1', signalType: 'RESEARCH', source: 'Gartner', summary: 'Notable adoption growth', observedDate: '2026-09-01T00:00:00.000Z' };
+  const PILOT = { id: 'pilot-1', title: 'AI Case Handling Pilot', hypothesis: 'Will reduce handling time', status: 'IN_PROGRESS', outcome: null };
+  const ROUTES = {
+    '/innovation/radar/tech-1': RADAR_ITEM, '/innovation/radar/tech-1/evidence': [SIGNAL],
+    '/innovation/radar/tech-1/trend': { trendState: 'RISING', reason: 'Signal frequency increased.' },
+    '/innovation/radar/tech-1/pilots': [PILOT], '/innovation/radar': [RADAR_ITEM],
+  };
+  // Tenant/catalogue data is shown as stored; t() keys are rendered raw by the test mock.
+  const ALLOW = ['AutoArchitect Agents', 'AI systems that can autonomously plan and execute multi-step tasks.', 'Autonomous workflows', 'Reduced manual effort',
+    'Unpredictable outputs', 'Notable adoption growth', 'Signal frequency increased.', 'AI Case Handling Pilot', 'Will reduce handling time',
+    /innov\.[a-z_]+/, /common\.[a-z_]+/, ...SHARED_TERMS]
+
+  it('the Arabic radar item detail (evidence, pilots) shows no English UI text', async () => {
+    mockIsAR = true;
+    mockFetch(ROUTES);
+    const { container } = render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('وكلاء الهندسة الآلية'));
+    await screen.findByText('AI Case Handling Pilot');
+    await screen.findByText('Gartner');
+    expect(findLanguageLeaks(container, 'ar', ALLOW)).toEqual([]);
+  });
+
+  it('the English radar item detail shows no Arabic text', async () => {
+    mockFetch(ROUTES);
+    const { container } = render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('AutoArchitect Agents'));
+    await screen.findByText('AI Case Handling Pilot');
+    await screen.findByText('Gartner');
+    expect(findLanguageLeaks(container, 'en')).toEqual([]);
+  });
+});
+
+describe('InnovationPage - one language at a time: studies and ideas', () => {
+  const KEYS = [/innov\.[a-z_]+/, /common\.[a-z_]+/, ...SHARED_TERMS];
+
+  it('the Arabic generated study shows no English UI text', async () => {
+    mockIsAR = true;
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_STUDY], '/innovation/studies/study-1': GENERATED_STUDY });
+    const { container } = render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findAllByText('الملخص التنفيذي');
+    expect(findLanguageLeaks(container, 'ar', [...fixtureText(GENERATED_STUDY), ...KEYS])).toEqual([]);
+  });
+
+  it('the English generated study shows no Arabic UI text', async () => {
+    mockFetch({ '/innovation/radar': [], '/innovation/studies': [GENERATED_STUDY], '/innovation/studies/study-1': GENERATED_STUDY });
+    const { container } = render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_studies'));
+    fireEvent.click(await screen.findByText('AI Chatbot Consultation Study'));
+    await screen.findAllByText('Executive Summary');
+    expect(findLanguageLeaks(container, 'en')).toEqual([]);
+  });
+
+  it('the Arabic ideas list shows no English UI text', async () => {
+    mockIsAR = true;
+    mockFetch({ '/innovation/radar': [], '/innovation/ideas': [IDEA] });
+    const { container } = render(<InnovationPage />);
+    fireEvent.click(await screen.findByText('innov.tab_ideas'));
+    await screen.findByText('أتمتة مطابقة الفواتير');
+    expect(findLanguageLeaks(container, 'ar', [...fixtureText(IDEA), ...KEYS])).toEqual([]);
   });
 });

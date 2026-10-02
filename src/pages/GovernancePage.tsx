@@ -8,6 +8,7 @@ import { exportFileName } from '../lib/exportFileName'
 import PrincipleCompliancePanel from '../components/PrincipleCompliancePanel'
 import StrategyAlignmentPanel, { usesStrategyAlignment } from '../components/StrategyAlignmentPanel'
 import PipelineStepList, { PipelineStep, stepsRatio } from '../components/PipelineStepList'
+import { enumLabel, humanizeCode } from '../lib/enumLabels'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -22,73 +23,235 @@ function useApi() {
 }
 
 const REVIEW_TYPES = [
-  { value: 'HLD_REVIEW', label: 'High-Level Design Review (HLD)' },
-  { value: 'LLD_REVIEW', label: 'Low-Level Design Review (LLD)' },
-  { value: 'SOLUTION_DESIGN', label: 'Solution Design Review' },
-  { value: 'NEW_PROJECT', label: 'New Project Review' },
-  { value: 'RFP_SOW', label: 'RFP / Scope of Work Review' },
-  { value: 'CHANGE_REQUEST', label: 'Change Request Review' },
-  { value: 'CAB_REVIEW', label: 'CAB Review' },
-  { value: 'DIGITAL_INITIATIVE', label: 'Digital Initiative Review' },
-  { value: 'TECHNICAL_PROPOSAL', label: 'Technical Proposal Review' },
-  { value: 'BUSINESS_DEMAND', label: 'Business Demand Review' },
+  { value: 'HLD_REVIEW', label: 'High-Level Design Review (HLD)', labelAr: 'مراجعة التصميم رفيع المستوى (HLD)' },
+  { value: 'LLD_REVIEW', label: 'Low-Level Design Review (LLD)', labelAr: 'مراجعة التصميم التفصيلي (LLD)' },
+  { value: 'SOLUTION_DESIGN', label: 'Solution Design Review', labelAr: 'مراجعة تصميم الحل' },
+  { value: 'NEW_PROJECT', label: 'New Project Review', labelAr: 'مراجعة مشروع جديد' },
+  { value: 'RFP_SOW', label: 'RFP / Scope of Work Review', labelAr: 'مراجعة كراسة الشروط / نطاق العمل' },
+  { value: 'CHANGE_REQUEST', label: 'Change Request Review', labelAr: 'مراجعة طلب تغيير' },
+  { value: 'CAB_REVIEW', label: 'CAB Review', labelAr: 'مراجعة مجلس استشارات التغيير (CAB)' },
+  { value: 'DIGITAL_INITIATIVE', label: 'Digital Initiative Review', labelAr: 'مراجعة مبادرة رقمية' },
+  { value: 'TECHNICAL_PROPOSAL', label: 'Technical Proposal Review', labelAr: 'مراجعة عرض فني' },
+  { value: 'BUSINESS_DEMAND', label: 'Business Demand Review', labelAr: 'مراجعة طلب أعمال' },
 ]
+const reviewTypeLabel = (value: string, isAR: boolean) => {
+  const rt = REVIEW_TYPES.find(t => t.value === value)
+  return rt ? (isAR ? rt.labelAr : rt.label) : value
+}
 
 const AGGRESSIVENESS_CARDS = [
   {
-    value: 'ADVISORY', label: 'Advisory', icon: '💡', border: '#3498db',
+    value: 'ADVISORY', label: 'Advisory', labelAr: 'استشارية', icon: '💡', border: '#3498db',
     description: 'Lightweight guidance for early-stage exploration.',
+    descriptionAr: 'توجيه مبسّط للاستكشاف في المراحل المبكرة.',
     details: [
       'Constructive tone — findings are suggestions, not blockers',
       'Lower scoring penalties — focus on direction not compliance',
       'Ideal for: concept proposals, feasibility studies, early HLDs',
       'Decision outcome: Guidance only — no formal approval required',
     ],
+    detailsAr: [
+      'نبرة بنّاءة — الملاحظات مقترحات وليست عوائق',
+      'خصم أخف من الدرجة — التركيز على الاتجاه لا على الامتثال',
+      'مناسبة لـ: مقترحات المفاهيم، ودراسات الجدوى، والتصاميم رفيعة المستوى المبكرة',
+      'نتيجة القرار: توجيه فقط — لا يلزم اعتماد رسمي',
+    ],
   },
   {
-    value: 'STANDARD', label: 'Standard', icon: '⚖️', border: '#2ecc71',
+    value: 'STANDARD', label: 'Standard', labelAr: 'قياسية', icon: '⚖️', border: '#2ecc71',
     description: 'Balanced review covering all domains. Default for most HLD reviews.',
+    descriptionAr: 'مراجعة متوازنة تغطي جميع المجالات. الخيار الافتراضي لمعظم مراجعات التصميم رفيع المستوى.',
     details: [
       'Full domain coverage across all 6 NORA architecture domains',
       'Normal compliance thresholds and scoring penalties',
       'Ideal for: standard HLD/LLD reviews, project approvals',
       'Decision outcome: APPROVED / APPROVED WITH CONDITIONS / REQUIRES CHANGES',
     ],
+    detailsAr: [
+      'تغطية كاملة لمجالات البنية الستة في إطار نورة (NORA)',
+      'حدود امتثال وخصم اعتيادي من الدرجة',
+      'مناسبة لـ: مراجعات التصميم رفيع المستوى والتفصيلي القياسية، واعتماد المشاريع',
+      'نتيجة القرار: معتمد / معتمد بشروط / يتطلب تعديلات',
+    ],
   },
   {
-    value: 'STRICT', label: 'Strict', icon: '🔒', border: '#e67e22',
+    value: 'STRICT', label: 'Strict', labelAr: 'صارمة', icon: '🔒', border: '#e67e22',
     description: 'Rigorous analysis with elevated thresholds. For high-impact solutions.',
+    descriptionAr: 'تحليل دقيق بحدود أعلى. للحلول عالية الأثر.',
     details: [
       'Higher scoring penalties — MEDIUM findings also penalize score',
       'Full EA principle enforcement — every deviation flagged',
       'Ideal for: critical systems, cross-domain integrations, large budgets',
       'Decision outcome: Formal ARB approval required before proceeding',
     ],
+    detailsAr: [
+      'خصم أعلى من الدرجة — الملاحظات متوسطة الخطورة تخفض الدرجة أيضاً',
+      'تطبيق كامل لمبادئ البنية المؤسسية — يُرصد كل انحراف',
+      'مناسبة لـ: الأنظمة الحرجة، والتكاملات بين المجالات، والميزانيات الكبيرة',
+      'نتيجة القرار: يلزم اعتماد رسمي من مجلس مراجعة البنية (ARB) قبل المتابعة',
+    ],
   },
   {
-    value: 'EXECUTIVE', label: 'Executive', icon: '🏛️', border: '#e74c3c',
+    value: 'EXECUTIVE', label: 'Executive', labelAr: 'تنفيذية', icon: '🏛️', border: '#e74c3c',
     description: 'Board-level scrutiny with maximum strategic and financial focus.',
+    descriptionAr: 'تدقيق على مستوى مجلس الإدارة بأقصى تركيز استراتيجي ومالي.',
     details: [
       'Deepest assessment — strategic, financial, and risk dimensions weighted highest',
       'Every finding includes business impact and SAR financial implications',
       'Ideal for: strategic platforms, Vision 2030 initiatives, enterprise-wide systems',
       'Decision outcome: Executive committee sign-off required',
     ],
+    detailsAr: [
+      'أعمق تقييم — للأبعاد الاستراتيجية والمالية والمخاطر الوزن الأعلى',
+      'كل ملاحظة تتضمن الأثر على الأعمال والانعكاسات المالية بالريال السعودي',
+      'مناسبة لـ: المنصات الاستراتيجية، ومبادرات رؤية 2030، والأنظمة على مستوى المؤسسة',
+      'نتيجة القرار: يلزم اعتماد اللجنة التنفيذية',
+    ],
   },
 ]
+const aggressivenessLabel = (value: string, isAR: boolean) => {
+  const c = AGGRESSIVENESS_CARDS.find(x => x.value === value)
+  return c ? (isAR ? c.labelAr : c.label) : value
+}
 
+const ADD_TO_REPOSITORY = { en: 'Add to Repository', ar: 'إضافة إلى المستودع' }
+const UPLOAD_TO_KB = { en: 'Upload to Knowledge Base', ar: 'رفع إلى قاعدة المعرفة' }
 const INTELLIGENCE_ITEMS = [
-  { key: 'strategies', label: 'Strategic Objectives & Initiatives', icon: '🎯', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
-  { key: 'ea_assets', label: 'EA Assets & Applications Inventory', icon: '🏗️', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
-  { key: 'capabilities', label: 'Business Capabilities', icon: '⚡', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
-  { key: 'standards', label: 'EA Standards & Principles', icon: '📐', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
-  { key: 'reference_architectures', label: 'Reference Architectures', icon: '🗂️', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
-  { key: 'target_architectures', label: 'Target-State Architectures', icon: '🎯', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
-  { key: 'technology_catalog', label: 'Approved Technology Catalog', icon: '💻', source: 'repository', enrichUrl: '/repository', enrichLabel: 'Add to Repository' },
-  { key: 'arch_decisions', label: 'Previous Architecture Decisions', icon: '📋', source: 'kb', enrichUrl: '/knowledge', enrichLabel: 'Upload to Knowledge Base' },
-  { key: 'security_standards', label: 'Security Standards & Controls', icon: '🔒', source: 'kb', enrichUrl: '/knowledge', enrichLabel: 'Upload to Knowledge Base' },
-  { key: 'similar_reviews', label: 'Similar Previous Reviews', icon: '🔍', source: 'auto', enrichUrl: '', enrichLabel: '' },
+  { key: 'strategies', label: 'Strategic Objectives & Initiatives', labelAr: 'الأهداف والمبادرات الاستراتيجية', icon: '🎯', source: 'repository', enrichUrl: '/repository', enrich: ADD_TO_REPOSITORY },
+  { key: 'ea_assets', label: 'EA Assets & Applications Inventory', labelAr: 'سجل أصول البنية المؤسسية والتطبيقات', icon: '🏗️', source: 'repository', enrichUrl: '/repository', enrich: ADD_TO_REPOSITORY },
+  { key: 'capabilities', label: 'Business Capabilities', labelAr: 'قدرات الأعمال', icon: '⚡', source: 'repository', enrichUrl: '/repository', enrich: ADD_TO_REPOSITORY },
+  { key: 'standards', label: 'EA Standards & Principles', labelAr: 'معايير ومبادئ البنية المؤسسية', icon: '📐', source: 'repository', enrichUrl: '/repository', enrich: ADD_TO_REPOSITORY },
+  { key: 'reference_architectures', label: 'Reference Architectures', labelAr: 'البنى المرجعية', icon: '🗂️', source: 'repository', enrichUrl: '/repository', enrich: ADD_TO_REPOSITORY },
+  { key: 'target_architectures', label: 'Target-State Architectures', labelAr: 'البنى المستهدفة', icon: '🎯', source: 'repository', enrichUrl: '/repository', enrich: ADD_TO_REPOSITORY },
+  { key: 'technology_catalog', label: 'Approved Technology Catalog', labelAr: 'كتالوج التقنيات المعتمدة', icon: '💻', source: 'repository', enrichUrl: '/repository', enrich: ADD_TO_REPOSITORY },
+  { key: 'arch_decisions', label: 'Previous Architecture Decisions', labelAr: 'قرارات البنية السابقة', icon: '📋', source: 'kb', enrichUrl: '/knowledge', enrich: UPLOAD_TO_KB },
+  { key: 'security_standards', label: 'Security Standards & Controls', labelAr: 'معايير وضوابط الأمن', icon: '🔒', source: 'kb', enrichUrl: '/knowledge', enrich: UPLOAD_TO_KB },
+  { key: 'similar_reviews', label: 'Similar Previous Reviews', labelAr: 'المراجعات السابقة المشابهة', icon: '🔍', source: 'auto', enrichUrl: '', enrich: null },
 ]
+
+const FINDING_CATEGORY_LABEL: Record<string, { en: string; ar: string }> = {
+  COMPLIANCE_ISSUE: { en: 'Compliance Issue', ar: 'مشكلة امتثال' },
+  SECURITY_RISK: { en: 'Security Risk', ar: 'خطر أمني' },
+  STRATEGIC_MISALIGNMENT: { en: 'Strategic Misalignment', ar: 'عدم مواءمة استراتيجية' },
+  TECHNOLOGY_VIOLATION: { en: 'Technology Violation', ar: 'مخالفة تقنية' },
+  ARCHITECTURE_GAP: { en: 'Architecture Gap', ar: 'فجوة معمارية' },
+  INTEGRATION_GAP: { en: 'Integration Gap', ar: 'فجوة تكامل' },
+  DATA_GOVERNANCE_ISSUE: { en: 'Data Governance Issue', ar: 'مشكلة في حوكمة البيانات' },
+  PERFORMANCE_CONCERN: { en: 'Performance Concern', ar: 'ملاحظة على الأداء' },
+  SCALABILITY_CONCERN: { en: 'Scalability Concern', ar: 'ملاحظة على قابلية التوسع' },
+  AVAILABILITY_CONCERN: { en: 'Availability Concern', ar: 'ملاحظة على الإتاحة' },
+  OPERATIONAL_RISK: { en: 'Operational Risk', ar: 'خطر تشغيلي' },
+  DUPLICATE_CAPABILITY: { en: 'Duplicate Capability', ar: 'قدرة مكررة' },
+  REUSE_OPPORTUNITY: { en: 'Reuse Opportunity', ar: 'فرصة لإعادة الاستخدام' },
+  FINANCIAL_OPTIMIZATION: { en: 'Financial Optimization', ar: 'تحسين مالي' },
+  TECHNICAL_DEBT: { en: 'Technical Debt', ar: 'دين تقني' },
+  CLOUD_MISALIGNMENT: { en: 'Cloud Misalignment', ar: 'عدم مواءمة سحابية' },
+  VENDOR_LOCKIN_RISK: { en: 'Vendor Lock-in Risk', ar: 'خطر الارتهان للمورّد' },
+  INFRASTRUCTURE_RISK: { en: 'Infrastructure Risk', ar: 'خطر في البنية التحتية' },
+  DOCUMENTATION_GAP: { en: 'Documentation Gap', ar: 'فجوة توثيق' },
+  FUTURE_STATE_MISALIGNMENT: { en: 'Future-State Misalignment', ar: 'عدم مواءمة مع الحالة المستقبلية' },
+}
+
+const REVIEW_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
+  DRAFT: { en: 'Draft', ar: 'مسودة' },
+  INPUTS_PENDING: { en: 'Inputs Pending', ar: 'بانتظار المدخلات' },
+  GAP_DETECTION: { en: 'Gap Detection', ar: 'فحص الفجوات' },
+  READY_FOR_REVIEW: { en: 'Ready for Review', ar: 'جاهزة للمراجعة' },
+  PROCESSING: { en: 'Processing', ar: 'قيد المعالجة' },
+  IN_PROGRESS: { en: 'In Progress', ar: 'قيد التنفيذ' },
+  COMPLETED: { en: 'Completed', ar: 'مكتملة' },
+  CANCELLED: { en: 'Cancelled', ar: 'ملغاة' },
+}
+
+const FRAMEWORK_LABEL: Record<string, { en: string; ar: string }> = {
+  NORA_2_0: { en: 'NORA 2.0', ar: 'نورة 2.0' },
+  TOGAF_10: { en: 'TOGAF 10', ar: 'TOGAF 10' },
+}
+
+const DECISION_LABEL: Record<string, { en: string; ar: string }> = {
+  APPROVED: { en: 'Approved', ar: 'معتمد' },
+  APPROVED_WITH_CONDITIONS: { en: 'Approved with Conditions', ar: 'معتمد بشروط' },
+  REQUIRES_CHANGES: { en: 'Requires Changes', ar: 'يتطلب تعديلات' },
+  REQUIRES_EXCEPTION: { en: 'Requires Exception', ar: 'يتطلب استثناء' },
+  REJECTED: { en: 'Rejected', ar: 'مرفوض' },
+  PENDING: { en: 'Pending', ar: 'قيد الانتظار' },
+}
+
+// CAB readiness checklist rows arrive as "deployment Plan: PRESENT" (see review-report.service.ts).
+const CHECKLIST_ITEM_LABEL: Record<string, { en: string; ar: string }> = {
+  deploymentplan: { en: 'Deployment Plan', ar: 'خطة النشر' },
+  testresults: { en: 'Test Results', ar: 'نتائج الاختبار' },
+  uatsignoff: { en: 'UAT Sign-off', ar: 'اعتماد اختبار قبول المستخدم' },
+  rollbackprocedure: { en: 'Rollback Procedure', ar: 'إجراء التراجع' },
+  communicationplan: { en: 'Communication Plan', ar: 'خطة التواصل' },
+  securitysignoff: { en: 'Security Sign-off', ar: 'الاعتماد الأمني' },
+  stakeholderapproval: { en: 'Stakeholder Approval', ar: 'موافقة أصحاب المصلحة' },
+}
+const checklistItemLabel = (label: string, isAR: boolean) => {
+  const e = CHECKLIST_ITEM_LABEL[String(label || '').replace(/[^a-z]/gi, '').toLowerCase()]
+  return e ? (isAR ? e.ar : e.en) : label
+}
+const checklistStatusLabel = (status: string, isAR: boolean) => {
+  if (!isAR) return status
+  const s = String(status || '').toUpperCase()
+  return s.includes('PRESENT') ? 'متوفر' : s.includes('MISSING') ? 'مفقود' : s.includes('INCOMPLETE') ? 'غير مكتمل' : status
+}
+
+const ALIGNMENT_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
+  FULLY_ALIGNED: { en: 'Fully Aligned', ar: 'متوائم كلياً' },
+  PARTIALLY_ALIGNED: { en: 'Partially Aligned', ar: 'متوائم جزئياً' },
+  WEAKLY_ALIGNED: { en: 'Weakly Aligned', ar: 'مواءمة ضعيفة' },
+  NOT_ALIGNED: { en: 'Not Aligned', ar: 'غير متوائم' },
+  NOT_APPLICABLE: { en: 'Not Applicable', ar: 'غير منطبق' },
+}
+
+const RISK_CATEGORY_LABEL: Record<string, { en: string; ar: string }> = {
+  BUSINESS_RISK: { en: 'Business Risk', ar: 'خطر أعمال' },
+  TECHNICAL_RISK: { en: 'Technical Risk', ar: 'خطر تقني' },
+  SECURITY_RISK: { en: 'Security Risk', ar: 'خطر أمني' },
+  OPERATIONAL_RISK: { en: 'Operational Risk', ar: 'خطر تشغيلي' },
+  VENDOR_RISK: { en: 'Vendor Risk', ar: 'خطر المورّد' },
+  DATA_RISK: { en: 'Data Risk', ar: 'خطر البيانات' },
+  SCALABILITY_RISK: { en: 'Scalability Risk', ar: 'خطر قابلية التوسع' },
+  AVAILABILITY_RISK: { en: 'Availability Risk', ar: 'خطر الإتاحة' },
+}
+// A risk's category is one of the codes above or, for risks derived from findings, an architecture domain.
+const riskCategoryLabel = (c: string, isAR: boolean) => RISK_CATEGORY_LABEL[c] ? enumLabel(c, isAR, RISK_CATEGORY_LABEL) : domainLabel(c, isAR)
+
+const FUTURE_AREA_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
+  ALIGNED: { en: 'Aligned', ar: 'متوائم' },
+  PARTIALLY_ALIGNED: { en: 'Partially Aligned', ar: 'متوائم جزئياً' },
+  GAP_IDENTIFIED: { en: 'Gap Identified', ar: 'فجوة محددة' },
+  NOT_ALIGNED: { en: 'Not Aligned', ar: 'غير متوائم' },
+  FUTURE_REQUIREMENT: { en: 'Future Requirement', ar: 'متطلب مستقبلي' },
+  NOT_APPLICABLE: { en: 'Not Applicable', ar: 'غير منطبق' },
+}
+
+const SAVING_TYPE_LABEL: Record<string, { en: string; ar: string }> = {
+  REUSE_OPPORTUNITY: { en: 'Reuse Opportunity', ar: 'فرصة إعادة استخدام' },
+  LICENSE_OPTIMIZATION: { en: 'License Optimization', ar: 'تحسين التراخيص' },
+  CLOUD_OPTIMIZATION: { en: 'Cloud Optimization', ar: 'تحسين الحوسبة السحابية' },
+  VENDOR_CONSOLIDATION: { en: 'Vendor Consolidation', ar: 'توحيد المورّدين' },
+  TECHNICAL_DEBT_REDUCTION: { en: 'Technical Debt Reduction', ar: 'خفض الدين التقني' },
+  PROCESS_AUTOMATION: { en: 'Process Automation', ar: 'أتمتة الإجراءات' },
+  OTHER: { en: 'Other', ar: 'أخرى' },
+}
+
+const VALIDATION_STATUS_LABEL: Record<string, { en: string; ar: string }> = {
+  VALIDATED: { en: 'Validated', ar: 'تم التحقق' },
+  REPAIRED: { en: 'Repaired', ar: 'تم التصحيح' },
+  REJECTED: { en: 'Rejected', ar: 'مرفوض' },
+}
+
+const BASIS_TYPE_LABEL: Record<string, { en: string; ar: string }> = {
+  TENANT_MISALIGNMENT: { en: 'Tenant Misalignment', ar: 'عدم مواءمة مع معايير الجهة' },
+  DOCUMENT_DEFECT: { en: 'Document Defect', ar: 'قصور في الوثيقة' },
+  MANDATORY_INFORMATION_MISSING: { en: 'Mandatory Information Missing', ar: 'معلومات إلزامية مفقودة' },
+  REGULATORY_NONCOMPLIANCE: { en: 'Regulatory Non-compliance', ar: 'عدم امتثال تنظيمي' },
+  MATERIAL_RISK: { en: 'Material Risk', ar: 'خطر جوهري' },
+  MATERIAL_ADVISORY: { en: 'Material Advisory', ar: 'ملاحظة استشارية جوهرية' },
+  HLD_REQUIRED_CONTENT_GAP: { en: 'Required HLD Content Gap', ar: 'نقص في محتوى التصميم رفيع المستوى المطلوب' },
+}
 
 const SEV_COLOR: Record<string, string> = {
   CRITICAL: '#e74c3c', HIGH: '#e67e22', MEDIUM: '#3498db', LOW: '#2ecc71',
@@ -104,12 +267,13 @@ const DECISION_COLOR: Record<string, string> = {
 
 // ── Score circle ──────────────────────────────────────────
 function ScoreCircle({ score, label, size = 72, help }: { score: number | null, label: string, size?: number, help?: string }) {
+  const { isAR } = useLang()
   // A null score is a dimension not assessed for this review (e.g. strategic alignment with no strategy objective).
   const color = score === null ? '#64748B' : score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
   return (
     <div style={{ textAlign: 'center' }}>
       <div style={{ width: 72, height: 72, borderRadius: '50%', border: `3px solid ${color}`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '0 auto 6px' }}>
-        <div style={{ fontSize: score === null ? 15 : 22, fontWeight: 700, color }}>{score === null ? 'N/A' : score}</div>
+        <div style={{ fontSize: score === null ? 15 : 22, fontWeight: 700, color }}>{score === null ? (isAR ? 'غير منطبق' : 'N/A') : score}</div>
         {score !== null && <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>}
       </div>
       <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}{help && <HelpTip text={help} />}</div>
@@ -118,18 +282,22 @@ function ScoreCircle({ score, label, size = 72, help }: { score: number | null, 
 }
 
 
-const DOMAIN_LABEL: Record<string, string> = {
-  BUSINESS_ARCHITECTURE: 'Business Architecture',
-  BENEFICIARY_EXPERIENCE: 'Beneficiary Experience',
-  APPLICATION_INTEGRATION: 'Application & Integration',
-  DATA_ARCHITECTURE: 'Data Architecture',
-  INFRASTRUCTURE: 'Infrastructure',
-  SECURITY_ARCHITECTURE: 'Security Architecture',
-  TOGAF_BUSINESS: 'TOGAF Business',
-  TOGAF_APPLICATION: 'TOGAF Application',
-  TOGAF_DATA: 'TOGAF Data',
-  TOGAF_TECHNOLOGY: 'TOGAF Technology',
-  TOGAF_GOVERNANCE: 'TOGAF Governance',
+const DOMAIN_LABEL: Record<string, { en: string; ar: string }> = {
+  BUSINESS_ARCHITECTURE: { en: 'Business Architecture', ar: 'معمارية الأعمال' },
+  BENEFICIARY_EXPERIENCE: { en: 'Beneficiary Experience', ar: 'تجربة المستفيد' },
+  APPLICATION_INTEGRATION: { en: 'Application & Integration', ar: 'التطبيقات والتكامل' },
+  DATA_ARCHITECTURE: { en: 'Data Architecture', ar: 'معمارية البيانات' },
+  INFRASTRUCTURE: { en: 'Infrastructure', ar: 'البنية التحتية' },
+  SECURITY_ARCHITECTURE: { en: 'Security Architecture', ar: 'معمارية الأمن' },
+  TOGAF_BUSINESS: { en: 'TOGAF Business', ar: 'الأعمال (TOGAF)' },
+  TOGAF_APPLICATION: { en: 'TOGAF Application', ar: 'التطبيقات (TOGAF)' },
+  TOGAF_DATA: { en: 'TOGAF Data', ar: 'البيانات (TOGAF)' },
+  TOGAF_TECHNOLOGY: { en: 'TOGAF Technology', ar: 'التقنية (TOGAF)' },
+  TOGAF_GOVERNANCE: { en: 'TOGAF Governance', ar: 'الحوكمة (TOGAF)' },
+}
+const domainLabel = (d: string, isAR: boolean) => {
+  const e = DOMAIN_LABEL[d]
+  return e ? (isAR ? e.ar : e.en) : (isAR ? d : humanizeCode(d))
 }
 
 function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onFindingUpdate, onFindingDelete, onRescore }: { findings: any[], report: any, isAR: boolean, resolveText: (s: string) => string, reviewId?: string, onFindingUpdate?: (id: string, data: any) => void, onFindingDelete?: (id: string) => void, onRescore?: () => void }) {
@@ -151,12 +319,13 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
     .filter(([k, v]) => !k.startsWith('_') && typeof v === 'object' && v !== null && 'score' in (v as any))
 
   const sevCount = (sev: string) => findings.filter(f => f.severity === sev).length
+  const L = (en: string, ar: string) => (isAR ? ar : en)
 
   return (
     <div>
       {/* Overview stats */}
       <div className="stat-grid-5" style={{ marginBottom: 14 }}>
-        {[['Total', findings.length, 'var(--text)'], ['Critical', sevCount('CRITICAL'), '#e74c3c'], ['High', sevCount('HIGH'), '#e67e22'], ['Medium', sevCount('MEDIUM'), '#f39c12'], ['Low', sevCount('LOW'), '#3498db']].map(([l,v,c]:any) => (
+        {[[L('Total', 'الإجمالي'), findings.length, 'var(--text)'], [enumLabel('CRITICAL', isAR), sevCount('CRITICAL'), '#e74c3c'], [enumLabel('HIGH', isAR), sevCount('HIGH'), '#e67e22'], [enumLabel('MEDIUM', isAR), sevCount('MEDIUM'), '#f39c12'], [enumLabel('LOW', isAR), sevCount('LOW'), '#3498db']].map(([l,v,c]:any) => (
           <div key={l} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
             <div style={{ fontSize: 20, fontWeight: 700, color: c }}>{v}</div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{l}</div>
@@ -176,13 +345,13 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
               border: '1px solid ' + SEV_COLOR[sev] + (active ? '' : '55'),
               background: active ? SEV_COLOR[sev] + '33' : 'transparent',
               color: SEV_COLOR[sev]
-            }}>{n} {sev}</button>
+            }}>{n} {enumLabel(sev, isAR)}</button>
           )
         })}
         {filterSev.length > 0 && (
-          <button onClick={() => setFilterSev([])} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>✕ Clear</button>
+          <button onClick={() => setFilterSev([])} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>✕ {isAR ? 'مسح' : 'Clear'}</button>
         )}
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{filteredFindings.length}/{findings.length} findings</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{filteredFindings.length}/{findings.length} {L('findings', 'ملاحظة')}</span>
       </div>
 
       {/* Domain groups */}
@@ -202,14 +371,14 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
             {/* Domain header — clickable to collapse */}
             <div onClick={() => toggleGroup(domain)} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', background: 'var(--navy-mid)', cursor: 'pointer', userSelect: 'none' }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{DOMAIN_LABEL[domain] || domain.replace(/_/g,' ')}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{domainLabel(domain, isAR)}</div>
                 {ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#e74c3c' }}>✗ {isAR ? resolveText(ds.keyWeaknesses) : ds.keyWeaknesses}</div>}
                 {ds.keyStrengths && !ds.keyWeaknesses && <div style={{ fontSize: 11, color: '#2ecc71' }}>✓ {isAR ? resolveText(ds.keyStrengths) : ds.keyStrengths}</div>}
               </div>
               {/* Sub-scores */}
               <div style={{ display: 'flex', gap: 6 }}>
-                {[['C', ds.complianceScore], ['R', ds.riskScore], ['S', ds.strategicScore]].map(([l,v]:any) => (
-                  <div key={l} style={{ textAlign: 'center', minWidth: 28 }}>
+                {[[L('C', 'امتثال'), ds.complianceScore, L('Compliance score', 'درجة الامتثال')], [L('R', 'مخاطر'), ds.riskScore, L('Risk score', 'درجة المخاطر')], [L('S', 'استراتيجي'), ds.strategicScore, L('Strategic score', 'الدرجة الاستراتيجية')]].map(([l,v,tip]:any) => (
+                  <div key={l} title={tip} style={{ textAlign: 'center', minWidth: 28 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: (v||0) >= 70 ? '#2ecc71' : (v||0) >= 55 ? '#f39c12' : '#e74c3c' }}>{Math.round(v||0)}</div>
                     <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{l}</div>
                   </div>
@@ -223,10 +392,10 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
               </div>
               {/* Severity badges */}
               <div style={{ display: 'flex', gap: 4 }}>
-                {crit > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#e74c3c33', color: '#e74c3c' }}>{crit}C</span>}
-                {high > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#e67e2233', color: '#e67e22' }}>{high}H</span>}
-                {med  > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#f39c1233', color: '#f39c12' }}>{med}M</span>}
-                {low  > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#3498db33', color: '#3498db' }}>{low}L</span>}
+                {crit > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#e74c3c33', color: '#e74c3c' }} title={enumLabel('CRITICAL', isAR)}>{crit}{L('C', ' حرج')}</span>}
+                {high > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#e67e2233', color: '#e67e22' }} title={enumLabel('HIGH', isAR)}>{high}{L('H', ' عالٍ')}</span>}
+                {med  > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#f39c1233', color: '#f39c12' }} title={enumLabel('MEDIUM', isAR)}>{med}{L('M', ' متوسط')}</span>}
+                {low  > 0 && <span style={{ padding: '1px 6px', borderRadius: 8, fontSize: 10, fontWeight: 700, background: '#3498db33', color: '#3498db' }} title={enumLabel('LOW', isAR)}>{low}{L('L', ' منخفض')}</span>}
               </div>
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>{isCollapsed ? '▶' : '▼'}</span>
             </div>
@@ -240,10 +409,10 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
 
                 {/* Filtered findings for this domain */}
                 {domainFindings.length === 0 && allDomainFindings.length === 0 && (
-                  <div style={{ fontSize: 12, color: '#2ecc71', padding: '6px 0 4px' }}>✓ No findings in this domain</div>
+                  <div style={{ fontSize: 12, color: '#2ecc71', padding: '6px 0 4px' }}>✓ {L('No findings in this domain', 'لا توجد ملاحظات في هذا المجال')}</div>
                 )}
                 {domainFindings.length === 0 && allDomainFindings.length > 0 && (
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0 4px', fontStyle: 'italic' }}>No findings match the active severity filter</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 0 4px', fontStyle: 'italic' }}>{L('No findings match the active severity filter', 'لا توجد ملاحظات تطابق تصفية الخطورة الحالية')}</div>
                 )}
                 {domainFindings.map((f, i) => <FindingCard key={i} f={f} reviewId={reviewId} onUpdate={onFindingUpdate} onDelete={onFindingDelete} onRescore={onRescore} />)}
               </div>
@@ -259,7 +428,7 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
         if (orphans.length === 0) return null
         return (
           <div style={{ marginBottom: 10, border: '1px solid var(--navy-light)', borderRadius: 10, overflow: 'hidden' }}>
-            <div style={{ padding: '10px 16px', background: 'var(--navy-mid)', fontSize: 13, fontWeight: 600 }}>⚙️ General / Other</div>
+            <div style={{ padding: '10px 16px', background: 'var(--navy-mid)', fontSize: 13, fontWeight: 600 }}>⚙️ {L('General / Other', 'عام / أخرى')}</div>
             <div style={{ padding: '8px 12px 4px' }}>
               {orphans.map((f, i) => <FindingCard key={i} f={f} reviewId={reviewId} onUpdate={onFindingUpdate} onDelete={onFindingDelete} onRescore={onRescore} />)}
             </div>
@@ -282,6 +451,8 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
   // block: a V1-engine finding never has criterionId set, so this section
   // simply doesn't render for it rather than showing empty placeholders.
   const isV2Finding = !!f.criterionId
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [evidenceOpen, setEvidenceOpen] = useState(false)
   const [evidence, setEvidence] = useState<any[] | null>(null)
   const [evidenceLoading, setEvidenceLoading] = useState(false)
@@ -338,40 +509,40 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
   return (
     <div style={{ border: '1px solid ' + (f.status === 'REJECTED' ? '#e74c3c33' : 'var(--navy-mid)'), borderRadius: 8, marginBottom: 8, overflow: 'hidden', opacity: f.status === 'REJECTED' ? 0.5 : 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: 'var(--navy-mid)' }} onClick={() => !editing && setOpen(o => !o)}>
-        <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[f.severity] + '33', color: SEV_COLOR[f.severity] }}>{f.severity}</span>
+        <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[f.severity] + '33', color: SEV_COLOR[f.severity] }}>{enumLabel(f.severity, isAR)}</span>
         <span style={{ fontSize: 13, flex: 1, color: 'var(--text)', textDecoration: f.status === 'REJECTED' ? 'line-through' : 'none' }}>{f.title}</span>
-        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>{f.category?.replace(/_/g, ' ')}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>{f.category ? enumLabel(f.category, isAR, FINDING_CATEGORY_LABEL) : ''}</span>
         {reviewId && !editing && (
           <>
-            <button onClick={startEdit} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, border: '1px solid var(--accent)44', background: 'none', color: 'var(--accent)', cursor: 'pointer' }}>✏</button>
-            <button onClick={handleDelete} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕</button>
+            <button onClick={startEdit} title={L('Edit finding', 'تعديل الملاحظة')} aria-label={L('Edit finding', 'تعديل الملاحظة')} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, border: '1px solid var(--accent)44', background: 'none', color: 'var(--accent)', cursor: 'pointer' }}>✏</button>
+            <button onClick={handleDelete} title={L('Reject finding', 'رفض الملاحظة')} aria-label={L('Reject finding', 'رفض الملاحظة')} style={{ fontSize: 10, padding: '2px 7px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕</button>
           </>
         )}
         {!editing && <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{open ? '▲' : '▼'}</span>}
       </div>
       {open && !editing && (
         <div style={{ padding: '12px 14px', fontSize: 13, lineHeight: 1.6 }}>
-          <div style={{ marginBottom: 8 }}><span style={{ color: 'var(--text-muted)' }}>Description: </span>{f.description}</div>
-          <div style={{ marginBottom: 8, color: 'var(--accent)' }}><span style={{ color: 'var(--text-muted)' }}>Recommendation: </span>{f.recommendation}</div>
-          {f.businessImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Business Impact: </span>{f.businessImpact}</div>}
-          {f.relatedStandard && <div><span style={{ color: 'var(--text-muted)' }}>Standard: </span>{f.relatedStandard}</div>}
+          <div style={{ marginBottom: 8 }}><span style={{ color: 'var(--text-muted)' }}>{L('Description: ', 'الوصف: ')}</span>{f.description}</div>
+          <div style={{ marginBottom: 8, color: 'var(--accent)' }}><span style={{ color: 'var(--text-muted)' }}>{L('Recommendation: ', 'التوصية: ')}</span>{f.recommendation}</div>
+          {f.businessImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>{L('Business Impact: ', 'الأثر على الأعمال: ')}</span>{f.businessImpact}</div>}
+          {f.relatedStandard && <div><span style={{ color: 'var(--text-muted)' }}>{L('Standard: ', 'المعيار: ')}</span>{f.relatedStandard}</div>}
           {isV2Finding && (
             <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--navy-mid)' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
-                {f.basisType && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>{f.basisType.replace(/_/g, ' ')}</span>}
-                {f.criterionId && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>Criterion: {f.criterionId}</span>}
-                {typeof f.confidenceScore === 'number' && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>Confidence: {Math.round(f.confidenceScore * 100)}%</span>}
-                {f.validationStatus && f.validationStatus !== 'PENDING' && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: f.validationStatus === 'REJECTED' ? '#e74c3c22' : 'var(--navy-mid)', color: f.validationStatus === 'REJECTED' ? '#e74c3c' : 'var(--text-dim)' }}>{f.validationStatus}</span>}
+                {f.basisType && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>{enumLabel(f.basisType, isAR, BASIS_TYPE_LABEL)}</span>}
+                {f.criterionId && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>{L('Criterion', 'المعيار')}: {f.criterionId}</span>}
+                {typeof f.confidenceScore === 'number' && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: 'var(--navy-mid)', color: 'var(--text-dim)' }}>{L('Confidence', 'الثقة')}: {Math.round(f.confidenceScore * 100)}%</span>}
+                {f.validationStatus && f.validationStatus !== 'PENDING' && <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: f.validationStatus === 'REJECTED' ? '#e74c3c22' : 'var(--navy-mid)', color: f.validationStatus === 'REJECTED' ? '#e74c3c' : 'var(--text-dim)' }}>{enumLabel(f.validationStatus, isAR, VALIDATION_STATUS_LABEL)}</span>}
               </div>
               {Array.isArray(f.crossDomainImpacts) && f.crossDomainImpacts.length > 0 && (
-                <div style={{ marginBottom: 8, fontSize: 12 }}><span style={{ color: 'var(--text-dim)' }}>Also affects: </span>{f.crossDomainImpacts.join(', ')}</div>
+                <div style={{ marginBottom: 8, fontSize: 12 }}><span style={{ color: 'var(--text-dim)' }}>{L('Also affects: ', 'يؤثر أيضاً في: ')}</span>{f.crossDomainImpacts.map((d: string) => domainLabel(d, isAR)).join(isAR ? '، ' : ', ')}</div>
               )}
               <button onClick={loadEvidence} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 6, border: '1px solid var(--accent)44', background: 'none', color: 'var(--accent)', cursor: 'pointer' }}>
-                {evidenceLoading ? 'Loading…' : evidenceOpen ? '▲ Hide evidence' : '📄 View evidence'}
+                {evidenceLoading ? L('Loading…', 'جارٍ التحميل…') : evidenceOpen ? L('▲ Hide evidence', '▲ إخفاء الأدلة') : L('📄 View evidence', '📄 عرض الأدلة')}
               </button>
               {evidenceOpen && evidence && (
                 <div style={{ marginTop: 8 }}>
-                  {evidence.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>No evidence records found — the underlying schema may not be synced yet, or this finding predates evidence tracking.</div>}
+                  {evidence.length === 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{L('No evidence records found — the underlying schema may not be synced yet, or this finding predates evidence tracking.', 'لا توجد سجلات أدلة — ربما لم تتم مزامنة البيانات بعد، أو أن هذه الملاحظة سابقة لتتبع الأدلة.')}</div>}
                   {evidence.map((ev: any) => {
                     // Validity/authority badge (product decision 2026-08-28,
                     // backend commit 03e681c) — only rendered when the
@@ -381,16 +552,16 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
                     // AUTHORITATIVE, which is the clean/common case that
                     // needs no caveat.
                     const validityBadge: Record<string, { text: string; color: string }> = {
-                      ADVISORY: { text: ev.validityClassification === 'FUTURE' ? 'NOT YET EFFECTIVE' : 'DRAFT', color: '#f39c12' },
-                      HISTORICAL: { text: ev.validityClassification === 'SUPERSEDED' ? 'SUPERSEDED' : 'EXPIRED/DEPRECATED', color: '#e74c3c' },
-                      UNVALIDATED: { text: 'VALIDITY UNKNOWN', color: '#7f8c8d' },
+                      ADVISORY: { text: ev.validityClassification === 'FUTURE' ? L('NOT YET EFFECTIVE', 'لم يسرِ بعد') : L('DRAFT', 'مسودة'), color: '#f39c12' },
+                      HISTORICAL: { text: ev.validityClassification === 'SUPERSEDED' ? L('SUPERSEDED', 'مستبدَل') : L('EXPIRED/DEPRECATED', 'منتهٍ / ملغى'), color: '#e74c3c' },
+                      UNVALIDATED: { text: L('VALIDITY UNKNOWN', 'السريان غير معروف'), color: '#7f8c8d' },
                     }
                     const badge = ev.sourceAuthorityLevel && ev.sourceAuthorityLevel !== 'AUTHORITATIVE' ? validityBadge[ev.sourceAuthorityLevel] : null
                     return (
                       <div key={ev.id} style={{ padding: '8px 10px', marginBottom: 6, borderRadius: 6, background: 'var(--navy-mid)', fontSize: 12 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{ev.sourceType === 'DOCUMENT' ? '📄 Document' : ev.sourceType === 'TENANT_REPOSITORY' ? '🏛 Tenant Repository' : '📋 Regulatory'}</span>
-                          {ev.sourceType === 'DOCUMENT' && ev.fileName && <span style={{ color: 'var(--text-muted)' }}>{ev.fileName}{ev.pageNumber ? ` (p.${ev.pageNumber})` : ''}</span>}
+                          <span style={{ fontWeight: 600, color: 'var(--text-muted)' }}>{ev.sourceType === 'DOCUMENT' ? L('📄 Document', '📄 الوثيقة') : ev.sourceType === 'TENANT_REPOSITORY' ? L('🏛 Tenant Repository', '🏛 مستودع الجهة') : L('📋 Regulatory', '📋 تنظيمي')}</span>
+                          {ev.sourceType === 'DOCUMENT' && ev.fileName && <span style={{ color: 'var(--text-muted)' }}>{ev.fileName}{ev.pageNumber ? (isAR ? ` (ص ${ev.pageNumber})` : ` (p.${ev.pageNumber})`) : ''}</span>}
                           {ev.sourceType === 'TENANT_REPOSITORY' && ev.tenantObjectName && <span style={{ color: 'var(--text-muted)' }}>{ev.tenantObjectName}{ev.tenantObjectVersion ? ` v${ev.tenantObjectVersion}` : ''}</span>}
                         </div>
                         {badge && (
@@ -398,7 +569,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
                             <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: `${badge.color}22`, color: badge.color, fontWeight: 600 }}>{badge.text}</span>
                           </div>
                         )}
-                        <div style={{ color: 'var(--text)' }}>{ev.extractedTextSnippet || ev.tenantObjectSnippet || ev.regulatorySource || '(no snippet available)'}</div>
+                        <div style={{ color: 'var(--text)' }}>{ev.extractedTextSnippet || ev.tenantObjectSnippet || ev.regulatorySource || L('(no snippet available)', '(لا يوجد مقتطف)')}</div>
                       </div>
                     )
                   })}
@@ -412,26 +583,23 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
         <div style={{ padding: '12px 14px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 4 }}>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Title</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{L('Title', 'العنوان')}</div>
               <input value={draft.title || ''} onChange={e => setDraft((d: any) => ({...d, title: e.target.value}))} style={fieldStyle} />
             </div>
             <div>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Severity</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{L('Severity', 'الخطورة')}</div>
               <select value={draft.severity || ''} onChange={e => setDraft((d: any) => ({...d, severity: e.target.value}))} style={fieldStyle}>
-                <option value='CRITICAL'>CRITICAL</option>
-                <option value='HIGH'>HIGH</option>
-                <option value='MEDIUM'>MEDIUM</option>
-                <option value='LOW'>LOW</option>
+                {['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map(sv => <option key={sv} value={sv}>{enumLabel(sv, isAR)}</option>)}
               </select>
             </div>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Description</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{L('Description', 'الوصف')}</div>
           <textarea value={draft.description || ''} onChange={e => setDraft((d: any) => ({...d, description: e.target.value}))} style={{ ...fieldStyle, minHeight: 60, resize: 'vertical' }} />
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>Recommendation</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>{L('Recommendation', 'التوصية')}</div>
           <textarea value={draft.recommendation || ''} onChange={e => setDraft((d: any) => ({...d, recommendation: e.target.value}))} style={{ ...fieldStyle, minHeight: 60, resize: 'vertical' }} />
           <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-            <button onClick={save} disabled={saving} style={{ padding: '5px 16px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'var(--accent)', border: 'none', color: '#fff' }}>{saving ? '...' : '✓ Save'}</button>
-            <button onClick={() => setEditing(false)} style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)' }}>Cancel</button>
+            <button onClick={save} disabled={saving} style={{ padding: '5px 16px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', background: 'var(--accent)', border: 'none', color: '#fff' }}>{saving ? '...' : L('✓ Save', '✓ حفظ')}</button>
+            <button onClick={() => setEditing(false)} style={{ padding: '5px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)' }}>{L('Cancel', 'إلغاء')}</button>
           </div>
         </div>
       )}
@@ -441,6 +609,8 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
 
 function IntelligenceAdvisor({ reviewType, onReady }: { reviewType: string; onReady?: () => void }) {
   const api = useApi()
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [availability, setAvailability] = useState<Record<string, any>>({})
   const [checked, setChecked] = useState(false)
   useEffect(() => {
@@ -458,15 +628,15 @@ function IntelligenceAdvisor({ reviewType, onReady }: { reviewType: string; onRe
 
   if (!checked) return (
     <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 20, marginTop: 20 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🧠 Review Intelligence Advisor</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Checking repository and knowledge base...</div>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🧠 {L('Review Intelligence Advisor', 'مستشار معلومات المراجعة')}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{L('Checking repository and knowledge base...', 'جارٍ فحص المستودع وقاعدة المعرفة...')}</div>
     </div>
   )
 
   return (
     <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 20, marginTop: 20 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🧠 Review Intelligence Advisor</div>
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>The following items will enrich your review. Items marked as missing should be added to improve review quality.</div>
+      <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>🧠 {L('Review Intelligence Advisor', 'مستشار معلومات المراجعة')}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>{L('The following items will enrich your review. Items marked as missing should be added to improve review quality.', 'العناصر التالية تُثري مراجعتك. يُستحسن إضافة العناصر المعلَّمة بأنها غير موجودة لتحسين جودة المراجعة.')}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
         {INTELLIGENCE_ITEMS.map(item => {
           const itemData = availability[item.key]; const available = item.source === 'auto' ? true : (itemData?.available === true || itemData === true)
@@ -474,13 +644,17 @@ function IntelligenceAdvisor({ reviewType, onReady }: { reviewType: string; onRe
             <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 8, background: available ? '#2ecc7111' : '#f39c1211', border: '1px solid ' + (available ? '#2ecc7133' : '#f39c1233') }}>
               <span style={{ fontSize: 16 }}>{item.icon}</span>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{item.label}</div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--text)' }}>{isAR ? item.labelAr : item.label}</div>
                 <div style={{ fontSize: 11, color: available ? '#2ecc71' : '#f39c12' }}>
-                  {available ? '✓ Available — will be used automatically' : '⚠ Not found — ' + (item.source === 'kb' ? 'upload to Knowledge Base' : 'add to Repository') + ' to enrich'}
+                  {available
+                    ? L('✓ Available — will be used automatically', '✓ متوفر — سيُستخدم تلقائياً')
+                    : item.source === 'kb'
+                      ? L('⚠ Not found — upload to Knowledge Base to enrich', '⚠ غير موجود — ارفعه إلى قاعدة المعرفة لإثراء المراجعة')
+                      : L('⚠ Not found — add to Repository to enrich', '⚠ غير موجود — أضفه إلى المستودع لإثراء المراجعة')}
                 </div>
               </div>
-              {!available && item.enrichUrl && (
-                <a href={item.enrichUrl} style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap', padding: '3px 8px', border: '1px solid var(--accent)', borderRadius: 6 }}>{item.enrichLabel}</a>
+              {!available && item.enrichUrl && item.enrich && (
+                <a href={item.enrichUrl} style={{ fontSize: 11, color: 'var(--accent)', textDecoration: 'none', whiteSpace: 'nowrap', padding: '3px 8px', border: '1px solid var(--accent)', borderRadius: 6 }}>{isAR ? item.enrich.ar : item.enrich.en}</a>
               )}
             </div>
           )
@@ -495,7 +669,9 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
   const { isAR } = useLang()
   const [stage, setStage] = useState<'gaps' | 'reviewing' | 'done'>('gaps')
   const [progress, setProgress] = useState(0)
-  const [statusMsg, setStatusMsg] = useState('Analyzing input documents...')
+  const L = (en: string, ar: string) => (isAR ? ar : en)
+  const [statusMsg, setStatusMsg] = useState(() => L('Analyzing input documents...', 'جارٍ تحليل وثائق المدخلات...'))
+  const [blockedByGaps, setBlockedByGaps] = useState(false)
   // The steps that apply to this review type, as the backend reports them (no simulated ticking).
   const [steps, setSteps] = useState<PipelineStep[] | null>(null)
   const pollRef = useRef<any>(null)
@@ -519,14 +695,15 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
       await api.post('/governance/reviews/' + review.id + '/run')
       return true
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Unknown error'
+      const msg = err?.response?.data?.message || err?.message || L('Unknown error', 'خطأ غير معروف')
       // Mandatory gaps blocking run — no point retrying
       if (msg.toLowerCase().includes('mandatory gap') || msg.toLowerCase().includes('cannot run')) {
-        setPipelineError('⚠️ Mandatory gaps are unresolved: ' + msg + '. Please go back and resolve them before running.')
+        setBlockedByGaps(true)
+        setPipelineError(L('⚠️ Mandatory gaps are unresolved: ' + msg + '. Please go back and resolve them before running.', '⚠️ توجد فجوات إلزامية لم تُعالج: ' + msg + '. يرجى الرجوع ومعالجتها قبل التشغيل.'))
         return false
       }
       if (attempt < 3) {
-        setStatusMsg('Pipeline start failed, retrying (' + attempt + '/3)...')
+        setStatusMsg(L('Pipeline start failed, retrying (' + attempt + '/3)...', 'تعذّر بدء المعالجة، جارٍ إعادة المحاولة (' + attempt + '/3)...'))
         await sleep(attempt * 3000)
         return attemptRun(attempt + 1)
       }
@@ -537,25 +714,26 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
 
   const runFlow = async () => {
     setPipelineError(null)
+    setBlockedByGaps(false)
     // Stage 1: Gap detection
     setStage('gaps')
-    setStatusMsg('Running gap detection...')
+    setStatusMsg(L('Running gap detection...', 'جارٍ فحص الفجوات...'))
     setProgress(10)
     try {
       await api.post('/governance/reviews/' + review.id + '/gaps/detect')
     } catch {}
     setProgress(25)
-    setStatusMsg('Gap detection complete. Starting AI review engines...')
+    setStatusMsg(L('Gap detection complete. Starting AI review engines...', 'اكتمل فحص الفجوات. جارٍ تشغيل محركات المراجعة بالذكاء الاصطناعي...'))
     await sleep(1000)
 
     // Stage 2: Run AI review — auto-retry up to 3 times
     setStage('reviewing')
     setProgress(30)
-    setStatusMsg('Starting AI review pipeline...')
+    setStatusMsg(L('Starting AI review pipeline...', 'جارٍ بدء مسار المراجعة بالذكاء الاصطناعي...'))
     const started = await attemptRun(1)
     if (!started) return  // error state already set
 
-    setStatusMsg('AI review pipeline running...')
+    setStatusMsg(L('AI review pipeline running...', 'مسار المراجعة بالذكاء الاصطناعي قيد التشغيل...'))
 
     // Progress comes from the pipeline itself: the steps it plans for this
     // review type and the ones it has finished.
@@ -582,13 +760,15 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
         setSteps(reported)
         setProgress(30 + Math.round(stepsRatio(reported) * 65))
         const running = reported.filter(s => s.state === 'pending').length
-        setStatusMsg(running > 0 ? `${reported.length - running} of ${reported.length} steps complete…` : 'Finalizing report...')
+        setStatusMsg(running > 0
+          ? L(`${reported.length - running} of ${reported.length} steps complete…`, `اكتملت ${reported.length - running} من ${reported.length} خطوات…`)
+          : L('Finalizing report...', 'جارٍ إنهاء التقرير...'))
       }
       if (r?.status === 'COMPLETED' || r?.status === 'READY_FOR_REVIEW') {
         clearInterval(pollRef.current)
         setSteps(prev => prev ? prev.map(st => st.state === 'pending' ? { ...st, state: 'done' } : st) : prev)
         setProgress(95)
-        setStatusMsg('Generating report...')
+        setStatusMsg(L('Generating report...', 'جارٍ إنشاء التقرير...'))
         await sleep(1500)
         setProgress(100)
         const [f, rpt] = await Promise.all([
@@ -597,7 +777,7 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
         ])
         // If report not ready yet, retry once after 3s
         if (!rpt || rpt.statusCode === 404) {
-          setStatusMsg('Finalizing report...')
+          setStatusMsg(L('Finalizing report...', 'جارٍ إنهاء التقرير...'))
           await sleep(3000)
           const rpt2 = await api.get('/governance/reviews/' + review.id + '/report').catch(() => null)
           setStage('done')
@@ -611,7 +791,7 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
         staleDraftCount++
         if (staleDraftCount >= 3) {
           clearInterval(pollRef.current)
-          setPipelineError('Pipeline crashed during execution. Check Cloud Run logs for details. You can retry below.')
+          setPipelineError(L('Pipeline crashed during execution. Check Cloud Run logs for details. You can retry below.', 'توقفت المعالجة أثناء التنفيذ. راجع سجلات Cloud Run للتفاصيل، ويمكنك إعادة المحاولة أدناه.'))
         }
       }
     }, 4000)
@@ -632,7 +812,7 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
   return (
     <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 28 }}>
       <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>
-        {stage === 'gaps' ? '🔍 Analyzing Inputs' : stage === 'reviewing' ? '⚙️ Running AI Review Engines' : '✅ Review Complete'}
+        {stage === 'gaps' ? L('🔍 Analyzing Inputs', '🔍 تحليل المدخلات') : stage === 'reviewing' ? L('⚙️ Running AI Review Engines', '⚙️ تشغيل محركات المراجعة بالذكاء الاصطناعي') : L('✅ Review Complete', '✅ اكتملت المراجعة')}
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>{statusMsg}</div>
 
@@ -655,15 +835,15 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
       {/* Pipeline error state */}
       {pipelineError && (
         <div style={{ marginTop: 16, padding: 14, borderRadius: 10, background: '#e74c3c18', border: '1px solid #e74c3c44' }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 6 }}>❌ Pipeline Error</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#e74c3c', marginBottom: 6 }}>❌ {L('Pipeline Error', 'خطأ في المعالجة')}</div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>{pipelineError}</div>
-          {!pipelineError.includes('mandatory gap') && (
+          {!blockedByGaps && (
             <button
               onClick={handleManualRetry}
               disabled={retrying}
               style={{ padding: '6px 16px', borderRadius: 8, background: '#e74c3c', color: '#fff', border: 'none', cursor: retrying ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600, opacity: retrying ? 0.6 : 1 }}
             >
-              {retrying ? '⏳ Retrying...' : '🔄 Retry Pipeline'}
+              {retrying ? L('⏳ Retrying...', '⏳ جارٍ إعادة المحاولة...') : L('🔄 Retry Pipeline', '🔄 إعادة تشغيل المعالجة')}
             </button>
           )}
         </div>
@@ -672,9 +852,9 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
       {stage === 'gaps' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>
-            📄 Extracting document content via Docling — this may take 10-30 seconds for large files...
+            📄 {L('Extracting document content via Docling — this may take 10-30 seconds for large files...', 'جارٍ استخراج محتوى الوثائق عبر Docling — قد يستغرق ذلك 10-30 ثانية للملفات الكبيرة...')}
           </div>
-          {['Extracting document content', 'Identifying missing artifacts', 'Checking completeness', 'Pulling repository context'].map((s, i) => (
+          {[L('Extracting document content', 'استخراج محتوى الوثائق'), L('Identifying missing artifacts', 'تحديد المخرجات الناقصة'), L('Checking completeness', 'فحص الاكتمال'), L('Pulling repository context', 'جلب سياق المستودع')].map((s, i) => (
             <div key={i} style={{ fontSize: 12, color: 'var(--text-muted)', padding: '6px 12px', borderRadius: 6, background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span> {s}
             </div>
@@ -686,19 +866,21 @@ function ProgressView({ review, onComplete }: { review: any, onComplete: (r: any
 }
 
 function MetadataPreview({ meta }: { meta: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   if (!meta || Object.keys(meta).length === 0) return null
   return (
     <div style={{ background: '#3498db0a', border: '1px solid #3498db33', borderRadius: 10, padding: 16, marginTop: 16 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>🤖 Auto-Detected from Documents</div>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>🤖 {L('Auto-Detected from Documents', 'مستخرج تلقائياً من الوثائق')}</div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        {meta.solutionName && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SOLUTION</div><div style={{ fontSize: 13, fontWeight: 600 }}>{meta.solutionName}</div></div>}
-        {meta.scope && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SCOPE</div><div style={{ fontSize: 12 }}>{meta.scope}</div></div>}
-        {meta.businessOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>BUSINESS OWNER</div><div style={{ fontSize: 12 }}>{meta.businessOwner}</div></div>}
-        {meta.technicalOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>TECH OWNER</div><div style={{ fontSize: 12 }}>{meta.technicalOwner}</div></div>}
+        {meta.solutionName && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('SOLUTION', 'الحل')}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{meta.solutionName}</div></div>}
+        {meta.scope && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('SCOPE', 'النطاق')}</div><div style={{ fontSize: 12 }}>{meta.scope}</div></div>}
+        {meta.businessOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('BUSINESS OWNER', 'مالك الأعمال')}</div><div style={{ fontSize: 12 }}>{meta.businessOwner}</div></div>}
+        {meta.technicalOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('TECH OWNER', 'المالك التقني')}</div><div style={{ fontSize: 12 }}>{meta.technicalOwner}</div></div>}
       </div>
       {meta.technologies?.length > 0 && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>TECHNOLOGIES DETECTED</div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{L('TECHNOLOGIES DETECTED', 'التقنيات المكتشفة')}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {meta.technologies.map((t: string, i: number) => <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#3498db22', color: '#3498db' }}>{t}</span>)}
           </div>
@@ -706,7 +888,7 @@ function MetadataPreview({ meta }: { meta: any }) {
       )}
       {meta.missingItems?.length > 0 && (
         <div style={{ marginTop: 10, background: '#e67e2218', border: '1px solid #e67e2244', borderRadius: 8, padding: '8px 12px' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#e67e22', marginBottom: 4 }}>⚠ Potentially Missing</div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#e67e22', marginBottom: 4 }}>⚠ {L('Potentially Missing', 'قد يكون ناقصاً')}</div>
           {meta.missingItems.map((m: string, i: number) => <div key={i} style={{ fontSize: 11, color: 'var(--text-muted)' }}>• {m}</div>)}
         </div>
       )}
@@ -717,6 +899,7 @@ function MetadataPreview({ meta }: { meta: any }) {
 export default function GovernancePage() {
   const api = useApi()
   const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
   const [reviews, setReviews] = useState<any[]>([])
   const [reviewsTotal, setReviewsTotal] = useState(0)
@@ -756,26 +939,28 @@ export default function GovernancePage() {
     const isArabic = langParam === 'ar'
     setExporting(true)
     setExportProgress(0)
-    setExportStep(isArabic ? 'جارٍ تحضير التقرير...' : 'Preparing report...')
+    // Progress text follows the UI language; the export language only decides
+    // whether the steps describe translating the report.
+    setExportStep(L('Preparing report...', 'جارٍ تحضير التقرير...'))
 
-    // Arabic steps shown as label milestones while smooth progress runs underneath
-    const arSteps = [
-      [8,  'جارٍ ترجمة الملخص التنفيذي...'],
-      [20, 'جارٍ ترجمة الملاحظات والنتائج...'],
-      [35, 'جارٍ ترجمة تقييم المجالات...'],
-      [50, 'جارٍ ترجمة تقييم الامتثال...'],
-      [63, 'جارٍ ترجمة سجل المخاطر...'],
-      [75, 'جارٍ ترجمة الفرص المالية والاستراتيجية...'],
-      [87, 'جارٍ بناء الوثيقة وتنسيقها...'],
-      [94, 'جارٍ تجميع الملف النهائي...'],
+    // Arabic-export steps shown as label milestones while smooth progress runs underneath
+    const translateSteps = [
+      [8,  L('Translating the executive summary...', 'جارٍ ترجمة الملخص التنفيذي...')],
+      [20, L('Translating findings and results...', 'جارٍ ترجمة الملاحظات والنتائج...')],
+      [35, L('Translating the domain assessment...', 'جارٍ ترجمة تقييم المجالات...')],
+      [50, L('Translating the compliance assessment...', 'جارٍ ترجمة تقييم الامتثال...')],
+      [63, L('Translating the risk register...', 'جارٍ ترجمة سجل المخاطر...')],
+      [75, L('Translating financial and strategic opportunities...', 'جارٍ ترجمة الفرص المالية والاستراتيجية...')],
+      [87, L('Building and formatting the document...', 'جارٍ بناء الوثيقة وتنسيقها...')],
+      [94, L('Assembling the final file...', 'جارٍ تجميع الملف النهائي...')],
     ]
-    const enSteps = [
-      [20, 'Loading report data...'],
-      [50, 'Generating tables and sections...'],
-      [80, 'Finalizing document...'],
-      [92, 'Packing file...'],
+    const plainSteps = [
+      [20, L('Loading report data...', 'جارٍ تحميل بيانات التقرير...')],
+      [50, L('Generating tables and sections...', 'جارٍ إنشاء الجداول والأقسام...')],
+      [80, L('Finalizing document...', 'جارٍ إنهاء الوثيقة...')],
+      [92, L('Packing file...', 'جارٍ تجهيز الملف...')],
     ]
-    const steps = format === 'powerpoint' ? [[0, isArabic ? 'جارٍ إعداد العرض والتحقق منه...' : 'Preparing and validating presentation...']] : isArabic ? arSteps : enSteps
+    const steps = format === 'powerpoint' ? [[0, L('Preparing and validating presentation...', 'جارٍ إعداد العرض والتحقق منه...')]] : isArabic ? translateSteps : plainSteps
 
     // Smooth continuous tick — increment slows near ceiling to avoid reaching 100 before done
     let currentPct = 0
@@ -800,13 +985,13 @@ export default function GovernancePage() {
       if (!res.ok) {
         const errText = await res.text().catch(() => res.status.toString())
         setExporting(false)
-        alert('Export failed: ' + errText.slice(0, 200))
+        alert(L('Export failed: ', 'فشل التصدير: ') + errText.slice(0, 200))
         return
       }
       const blob = await res.blob()
-      if (blob.size === 0) { setExporting(false); alert('Export failed: empty file received'); return }
+      if (blob.size === 0) { setExporting(false); alert(L('Export failed: empty file received', 'فشل التصدير: تم استلام ملف فارغ')); return }
       setExportProgress(100)
-      setExportStep(isArabic ? 'اكتمل التصدير!' : 'Complete!')
+      setExportStep(L('Complete!', 'اكتمل التصدير!'))
       await new Promise(r => setTimeout(r, 800))
       const objUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -817,7 +1002,7 @@ export default function GovernancePage() {
       setTimeout(() => { URL.revokeObjectURL(objUrl); document.body.removeChild(a) }, 2000)
     } catch (e: any) {
       clearInterval(progressTimer)
-      alert('Export failed: ' + (e?.message || 'Unknown error'))
+      alert(L('Export failed: ', 'فشل التصدير: ') + (e?.message || L('Unknown error', 'خطأ غير معروف')))
     } finally {
       setTimeout(() => { setExporting(false); setExportProgress(0); setExportStep('') }, 1500)
     }
@@ -831,7 +1016,7 @@ export default function GovernancePage() {
       const t = localStorage.getItem('ea_token') || ''
       await fetch(`${apiUrl}/governance/reviews/${review?.id}/run`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } })
       setView('progress')
-    } catch { alert('Failed to re-run review') }
+    } catch { alert(L('Failed to re-run review', 'تعذّرت إعادة تشغيل المراجعة')) }
   }
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -867,7 +1052,7 @@ export default function GovernancePage() {
       setReviews(res?.data || [])
       setReviewsTotal(res?.total ?? (res?.data || []).length)
     }
-    catch (e) { setError('Failed to load reviews') }
+    catch (e) { setError(L('Failed to load reviews', 'تعذّر تحميل المراجعات')) }
     finally { setLoading(false) }
   }
 
@@ -914,12 +1099,12 @@ export default function GovernancePage() {
 
   // ── Step 1: Create review ─────────────────────────────
   const createAndStart = async () => {
-    if (!form.title) { setError('Title is required'); return }
-    if (inputs.length === 0) { setError('Please upload at least one document'); return }
+    if (!form.title) { setError(L('Title is required', 'العنوان مطلوب')); return }
+    if (inputs.length === 0) { setError(L('Please upload at least one document', 'يرجى رفع وثيقة واحدة على الأقل')); return }
     setLoading(true); setError(''); setUploadStatus('')
     try {
       const r = await api.post('/governance/reviews', form)
-      if (!r.id) { setError(r.message || 'Failed to create review'); setLoading(false); return }
+      if (!r.id) { setError(r.message || L('Failed to create review', 'تعذّر إنشاء المراجعة')); setLoading(false); return }
       setReview(r)
       setLoading(false)
       // Upload files one by one — each triggers Docling extraction
@@ -930,7 +1115,7 @@ export default function GovernancePage() {
           const fd = new FormData()
           fd.append('file', inp._file)
           fd.append('label', inp._file.name)
-          setUploadStatus('📄 Uploading & extracting: ' + inp._file.name + ' (' + (i+1) + '/' + filesToUpload.length + ')...')
+          setUploadStatus(L('📄 Uploading & extracting: ', '📄 جارٍ الرفع والاستخراج: ') + inp._file.name + ' (' + (i+1) + '/' + filesToUpload.length + ')...')
           setUploadProgress({ current: i + 1, total: filesToUpload.length, fileName: inp._file.name, pct: 0 })
 
           // Simulate progress: tick up to 85% while waiting, jump to 100% when done
@@ -987,7 +1172,7 @@ export default function GovernancePage() {
         } catch { /* keep polling */ }
         if (attempts >= maxAttempts) clearInterval(pollMeta)
       }, 3000)
-    } catch (e) { setError('Failed to create review. Please try again.') }
+    } catch (e) { setError(L('Failed to create review. Please try again.', 'تعذّر إنشاء المراجعة. يرجى المحاولة مرة أخرى.')) }
     finally { setLoading(false) }
   }
 
@@ -1004,81 +1189,62 @@ export default function GovernancePage() {
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>Governance Reviews</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>EA Governance & Compliance Review Service</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--text)' }}>{L('Governance Reviews', 'مراجعات الحوكمة')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>{L('EA Governance & Compliance Review Service', 'خدمة مراجعة حوكمة البنية المؤسسية والامتثال')}</div>
         </div>
-        <button className='btn-primary' onClick={() => { setView('create'); setForm({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' }); setInputs([]); setWizardStep(1); setExtractedMeta(null); setShowMeta(false) }}>+ New Review</button>
+        <button className='btn-primary' onClick={() => { setView('create'); setForm({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' }); setInputs([]); setWizardStep(1); setExtractedMeta(null); setShowMeta(false) }}>{L('+ New Review', '+ مراجعة جديدة')}</button>
       </div>
-      {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Loading...</div>}
+      {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>{L('Loading...', 'جارٍ التحميل...')}</div>}
       {reviews.length === 0 && !loading && (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🏛️</div>
-          <div style={{ fontSize: 16, marginBottom: 8 }}>No reviews yet</div>
-          <div style={{ fontSize: 13 }}>Start your first EA governance review</div>
+          <div style={{ fontSize: 16, marginBottom: 8 }}>{L('No reviews yet', 'لا توجد مراجعات بعد')}</div>
+          <div style={{ fontSize: 13 }}>{L('Start your first EA governance review', 'ابدأ أول مراجعة حوكمة للبنية المؤسسية')}</div>
         </div>
       )}
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
         <input
           value={filterSearch} onChange={e => setFilterSearch(e.target.value)}
-          placeholder='Search reviews...'
+          placeholder={L('Search reviews...', 'ابحث في المراجعات...')}
           style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12, minWidth: 160 }}
         />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
-          <option value=''>All Statuses</option>
-          <option value='COMPLETED'>Completed</option>
-          <option value='IN_PROGRESS'>In Progress</option>
-          <option value='DRAFT'>Draft</option>
-          <option value='CANCELLED'>Cancelled</option>
+          <option value=''>{L('All Statuses', 'كل الحالات')}</option>
+          {['COMPLETED', 'IN_PROGRESS', 'DRAFT', 'CANCELLED'].map(st => <option key={st} value={st}>{enumLabel(st, isAR, REVIEW_STATUS_LABEL)}</option>)}
         </select>
         <select value={filterDecision} onChange={e => setFilterDecision(e.target.value)}
           style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
-          <option value=''>All Decisions</option>
-          <option value='APPROVED'>Approved</option>
-          <option value='APPROVED_WITH_CONDITIONS'>Approved with Conditions</option>
-          <option value='REQUIRES_CHANGES'>Requires Changes</option>
-          <option value='REJECTED'>Rejected</option>
-          <option value='PENDING'>Pending</option>
+          <option value=''>{L('All Decisions', 'كل القرارات')}</option>
+          {['APPROVED', 'APPROVED_WITH_CONDITIONS', 'REQUIRES_CHANGES', 'REJECTED', 'PENDING'].map(d => <option key={d} value={d}>{enumLabel(d, isAR, DECISION_LABEL)}</option>)}
         </select>
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
           style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
-          <option value=''>All Types</option>
-          <option value='HLD_REVIEW'>HLD Review</option>
-          <option value='LLD_REVIEW'>LLD Review</option>
-          <option value='SOLUTION_DESIGN'>Solution Design</option>
-          <option value='NEW_PROJECT'>New Project</option>
-          <option value='RFP_SOW'>RFP / SOW</option>
-          <option value='CHANGE_REQUEST'>Change Request</option>
-          <option value='CAB_REVIEW'>CAB Review</option>
-          <option value='DIGITAL_INITIATIVE'>Digital Initiative</option>
-          <option value='TECHNICAL_PROPOSAL'>Technical Proposal</option>
-          <option value='BUSINESS_DEMAND'>Business Demand</option>
+          <option value=''>{L('All Types', 'كل الأنواع')}</option>
+          {REVIEW_TYPES.map(rt => <option key={rt.value} value={rt.value}>{isAR ? rt.labelAr : rt.label}</option>)}
         </select>
         <select value={filterAgg} onChange={e => setFilterAgg(e.target.value)}
           style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
-          <option value=''>All Modes</option>
-          <option value='ADVISORY'>Advisory</option>
-          <option value='STANDARD'>Standard</option>
-          <option value='STRICT'>Strict</option>
-          <option value='EXECUTIVE'>Executive</option>
+          <option value=''>{L('All Modes', 'كل المستويات')}</option>
+          {AGGRESSIVENESS_CARDS.map(c => <option key={c.value} value={c.value}>{isAR ? c.labelAr : c.label}</option>)}
         </select>
         <select value={filterScoreMin} onChange={e => setFilterScoreMin(e.target.value)}
           style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12 }}>
-          <option value=''>Any Score</option>
-          <option value='75'>≥ 75 (Good)</option>
-          <option value='60'>≥ 60 (Acceptable)</option>
-          <option value='45'>≥ 45 (Needs Work)</option>
-          <option value='0'>≤ 44 (Critical)</option>
+          <option value=''>{L('Any Score', 'أي درجة')}</option>
+          <option value='75'>{L('≥ 75 (Good)', '≥ 75 (جيدة)')}</option>
+          <option value='60'>{L('≥ 60 (Acceptable)', '≥ 60 (مقبولة)')}</option>
+          <option value='45'>{L('≥ 45 (Needs Work)', '≥ 45 (تحتاج تحسيناً)')}</option>
+          <option value='0'>{L('≤ 44 (Critical)', '≤ 44 (حرجة)')}</option>
         </select>
         {(filterStatus || filterDecision || filterType || filterSearch || filterAgg || filterScoreMin) && (
           <button onClick={() => { setFilterStatus(''); setFilterDecision(''); setFilterType(''); setFilterSearch(''); setFilterAgg(''); setFilterScoreMin('') }}
             style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: 'var(--text-muted)', fontSize: 11, cursor: 'pointer' }}>
-            ✕ Clear
+            ✕ {L('Clear', 'مسح')}
           </button>
         )}
         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-          {filteredReviews.length}/{reviews.length}{reviewsTotal > reviews.length ? ` of ${reviewsTotal}` : ''} reviews{totalPages > 1 ? ` · page ${page}/${totalPages}` : ''}
+          {filteredReviews.length}/{reviews.length}{reviewsTotal > reviews.length ? L(` of ${reviewsTotal}`, ` من ${reviewsTotal}`) : ''} {L('reviews', 'مراجعة')}{totalPages > 1 ? L(` · page ${page}/${totalPages}`, ` · صفحة ${page}/${totalPages}`) : ''}
         </span>
       </div>
 
@@ -1087,11 +1253,11 @@ export default function GovernancePage() {
           <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{reviewTypeLabel(r.reviewType, isAR)} · {enumLabel(r.framework, isAR, FRAMEWORK_LABEL)} · {new Date(r.createdAt).toLocaleDateString(isAR ? 'ar' : 'en-US')}</div>
             </div>
-            {r.overallScore != null && <ScoreCircle score={Math.round(r.overallScore)} label='Score' />}
-            <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[r.decision] + '22', color: DECISION_COLOR[r.decision] }}>{r.decision?.replace(/_/g, ' ')}</div>
-            <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, background: 'var(--navy-light)', color: 'var(--text-muted)' }}>{r.status}</div>
+            {r.overallScore != null && <ScoreCircle score={Math.round(r.overallScore)} label={L('Score', 'الدرجة')} />}
+            <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[r.decision] + '22', color: DECISION_COLOR[r.decision] }}>{enumLabel(r.decision, isAR, DECISION_LABEL)}</div>
+            <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, background: 'var(--navy-light)', color: 'var(--text-muted)' }}>{enumLabel(r.status, isAR, REVIEW_STATUS_LABEL)}</div>
           </div>
         ))}
       </div>
@@ -1100,12 +1266,12 @@ export default function GovernancePage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 16 }}>
           <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}
             style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: page <= 1 ? 'var(--text-muted)' : 'var(--text)', cursor: page <= 1 ? 'default' : 'pointer', opacity: page <= 1 ? 0.5 : 1 }}>
-            ← Previous
+            {L('← Previous', 'السابق →')}
           </button>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Page {page} of {totalPages}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{L(`Page ${page} of ${totalPages}`, `صفحة ${page} من ${totalPages}`)}</span>
           <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}
             style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'transparent', color: page >= totalPages ? 'var(--text-muted)' : 'var(--text)', cursor: page >= totalPages ? 'default' : 'pointer', opacity: page >= totalPages ? 0.5 : 1 }}>
-            Next →
+            {L('Next →', '← التالي')}
           </button>
         </div>
       )}
@@ -1114,7 +1280,7 @@ export default function GovernancePage() {
         <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
           <button onClick={loadMoreReviews} disabled={loadingMore}
             style={{ padding: '8px 20px', borderRadius: 8, border: '1px solid var(--accent)', background: 'transparent', color: 'var(--accent)', cursor: loadingMore ? 'default' : 'pointer', fontSize: 12 }}>
-            {loadingMore ? 'Loading…' : `Load more (${reviewsTotal - reviews.length} remaining)`}
+            {loadingMore ? L('Loading…', 'جارٍ التحميل…') : L(`Load more (${reviewsTotal - reviews.length} remaining)`, `تحميل المزيد (متبقٍ ${reviewsTotal - reviews.length})`)}
           </button>
         </div>
       )}
@@ -1123,11 +1289,11 @@ export default function GovernancePage() {
 
   // ── Wizard helpers ──────────────────────────────────────────────────────────
   const WIZARD_STEPS = [
-    { n: 1, label: 'Identity',       icon: '📋' },
-    { n: 2, label: 'Documents',      icon: '📄' },
-    { n: 3, label: 'Intelligence',   icon: '🧠' },
-    { n: 4, label: 'Aggressiveness', icon: '⚖️' },
-    { n: 5, label: 'Confirm',        icon: '🚀' },
+    { n: 1, label: L('Identity', 'التعريف'),             icon: '📋' },
+    { n: 2, label: L('Documents', 'الوثائق'),            icon: '📄' },
+    { n: 3, label: L('Intelligence', 'المعلومات'),       icon: '🧠' },
+    { n: 4, label: L('Aggressiveness', 'مستوى الصرامة'), icon: '⚖️' },
+    { n: 5, label: L('Confirm', 'التأكيد'),              icon: '🚀' },
   ]
   const canNext1 = !!form.title
   const canNext2 = inputs.length > 0
@@ -1141,8 +1307,8 @@ export default function GovernancePage() {
     <div style={{ padding: '24px 32px', maxWidth: 780 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 28 }}>
-        <button onClick={() => { setView('list'); setWizardStep(1) }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
-        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>New Governance Review</div>
+        <button onClick={() => { setView('list'); setWizardStep(1) }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>{L('← Back', '→ رجوع')}</button>
+        <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{L('New Governance Review', 'مراجعة حوكمة جديدة')}</div>
       </div>
 
       {/* Step indicator */}
@@ -1176,19 +1342,19 @@ export default function GovernancePage() {
       {/* ── STEP 1: Identity ── */}
       {wizardStep === 1 && (
         <div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>📋 Review Identity</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Give your review a clear name and set the review type and framework.</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>📋 {L('Review Identity', 'تعريف المراجعة')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>{L('Give your review a clear name and set the review type and framework.', 'امنح مراجعتك اسماً واضحاً وحدّد نوع المراجعة والإطار.')}</div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Review Title *</label>
-              <input className='form-input' value={form.title} onChange={set('title')}
-                placeholder='e.g. Customer Portal HLD Review'
+              <label htmlFor='gov-review-title' style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{L('Review Title *', 'عنوان المراجعة *')}</label>
+              <input id='gov-review-title' className='form-input' value={form.title} onChange={set('title')}
+                placeholder={L('e.g. Customer Portal HLD Review', 'مثال: مراجعة التصميم رفيع المستوى لبوابة العملاء')}
                 style={{ fontSize: 15 }} />
             </div>
 
             <div>
-              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>Review Type</label>
+              <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 8 }}>{L('Review Type', 'نوع المراجعة')}</label>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {REVIEW_TYPES.map(rt => (
                   <div key={rt.value} onClick={() => setForm(f => ({ ...f, reviewType: rt.value }))}
@@ -1197,22 +1363,22 @@ export default function GovernancePage() {
                       background: form.reviewType === rt.value ? 'var(--accent)11' : 'var(--navy-mid)',
                       color: form.reviewType === rt.value ? 'var(--accent)' : 'var(--text)',
                       fontSize: 13, fontWeight: form.reviewType === rt.value ? 600 : 400
-                    }}>{rt.label}</div>
+                    }}>{isAR ? rt.labelAr : rt.label}</div>
                 ))}
               </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Framework</label>
-                <select className='form-input' value={form.framework} onChange={set('framework')}>
-                  <option value='NORA_2_0'>NORA 2.0</option>
-                  <option value='TOGAF_10'>TOGAF 10</option>
+                <label htmlFor='gov-review-framework' style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{L('Framework', 'الإطار')}</label>
+                <select id='gov-review-framework' className='form-input' value={form.framework} onChange={set('framework')}>
+                  <option value='NORA_2_0'>{enumLabel('NORA_2_0', isAR, FRAMEWORK_LABEL)}</option>
+                  <option value='TOGAF_10'>{enumLabel('TOGAF_10', isAR, FRAMEWORK_LABEL)}</option>
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>Project Name (optional)</label>
-                <input className='form-input' value={form.projectName} onChange={set('projectName')} placeholder='e.g. Customer Portal' />
+                <label htmlFor='gov-review-project' style={{ fontSize: 12, color: 'var(--text-muted)', display: 'block', marginBottom: 6 }}>{L('Project Name (optional)', 'اسم المشروع (اختياري)')}</label>
+                <input id='gov-review-project' className='form-input' value={form.projectName} onChange={set('projectName')} placeholder={L('e.g. Customer Portal', 'مثال: بوابة العملاء')} />
               </div>
             </div>
           </div>
@@ -1220,7 +1386,7 @@ export default function GovernancePage() {
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 32 }}>
             <button className='btn-primary' onClick={wizardNext} disabled={!canNext1}
               style={{ padding: '10px 28px', opacity: canNext1 ? 1 : 0.4 }}>
-              Next: Upload Documents →
+              {L('Next: Upload Documents →', 'التالي: رفع الوثائق ←')}
             </button>
           </div>
         </div>
@@ -1229,9 +1395,9 @@ export default function GovernancePage() {
       {/* ── STEP 2: Documents ── */}
       {wizardStep === 2 && (
         <div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>📄 Upload Architecture Documents</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>📄 {L('Upload Architecture Documents', 'رفع وثائق البنية')}</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
-            Upload your HLD, NFRs, diagrams, and integration specs. Docling will extract content automatically while you complete the setup.
+            {L('Upload your HLD, NFRs, diagrams, and integration specs. Docling will extract content automatically while you complete the setup.', 'ارفع وثيقة التصميم رفيع المستوى والمتطلبات غير الوظيفية والمخططات ومواصفات التكامل. سيستخرج Docling المحتوى تلقائياً أثناء إكمالك للإعداد.')}
           </div>
 
           <div style={{ border: '2px dashed var(--navy-light)', borderRadius: 12, padding: 36, textAlign: 'center', cursor: 'pointer', marginBottom: 16,
@@ -1243,7 +1409,7 @@ export default function GovernancePage() {
             onDrop={e => { e.preventDefault(); handleFileSelect(e.dataTransfer.files) }}>
             <div style={{ fontSize: 36, marginBottom: 10 }}>{inputs.length > 0 ? '✅' : '📂'}</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>
-              {inputs.length > 0 ? inputs.length + ' file' + (inputs.length > 1 ? 's' : '') + ' selected' : 'Click or drag files here'}
+              {inputs.length > 0 ? L(inputs.length + ' file' + (inputs.length > 1 ? 's' : '') + ' selected', `تم اختيار ${inputs.length} ملف`) : L('Click or drag files here', 'انقر أو اسحب الملفات إلى هنا')}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>PDF, DOCX, PPTX, XLSX, PNG, JPG, JSON, YAML</div>
             <input ref={fileRef} type='file' multiple style={{ display: 'none' }} onChange={e => handleFileSelect(e.target.files)} />
@@ -1260,31 +1426,31 @@ export default function GovernancePage() {
                 // still in flight, or timed out before resolving) rather
                 // than ever claiming a state that wasn't confirmed.
                 const stateLabel: Record<string, { text: string; color: string }> = {
-                  READY: { text: 'Ready', color: '#2ecc71' },
-                  PARTIAL: { text: 'Partial extraction', color: '#f39c12' },
-                  NEEDS_OCR: { text: 'Needs OCR', color: '#e74c3c' },
-                  FAILED: { text: 'Extraction failed', color: '#e74c3c' },
-                  UNSUPPORTED_STRUCTURE: { text: 'Unsupported format', color: '#e74c3c' },
+                  READY: { text: L('Ready', 'جاهز'), color: '#2ecc71' },
+                  PARTIAL: { text: L('Partial extraction', 'استخراج جزئي'), color: '#f39c12' },
+                  NEEDS_OCR: { text: L('Needs OCR', 'يحتاج إلى التعرف الضوئي (OCR)'), color: '#e74c3c' },
+                  FAILED: { text: L('Extraction failed', 'فشل الاستخراج'), color: '#e74c3c' },
+                  UNSUPPORTED_STRUCTURE: { text: L('Unsupported format', 'صيغة غير مدعومة'), color: '#e74c3c' },
                 }
                 const state = inp.extractionState ? stateLabel[inp.extractionState] : null
                 return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 14px', background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 8, marginBottom: 6 }} title={inp.extractionStateReason || undefined}>
                     <span style={{ fontSize: 18 }}>📄</span>
                     <span style={{ fontSize: 13, flex: 1, color: 'var(--text)' }}>{inp.label}</span>
-                    <span style={{ fontSize: 11, color: state ? state.color : '#2ecc71' }}>{state ? state.text : 'Ready'}</span>
-                    <button onClick={() => removeInput(i)} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
+                    <span style={{ fontSize: 11, color: state ? state.color : '#2ecc71' }}>{state ? state.text : L('Ready', 'جاهز')}</span>
+                    <button onClick={() => removeInput(i)} aria-label={L('Remove file', 'إزالة الملف')} title={L('Remove file', 'إزالة الملف')} style={{ background: 'none', border: 'none', color: '#e74c3c', cursor: 'pointer', fontSize: 18, lineHeight: 1 }}>×</button>
                   </div>
                 )
               })}
-              <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: '1px dashed var(--accent)55', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', marginTop: 4 }}>+ Add more files</button>
+              <button onClick={() => fileRef.current?.click()} style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: '1px dashed var(--accent)55', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', marginTop: 4 }}>{L('+ Add more files', '+ إضافة ملفات أخرى')}</button>
             </div>
           )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32 }}>
-            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
+            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>{L('← Back', '→ رجوع')}</button>
             <button className='btn-primary' onClick={wizardNext} disabled={!canNext2}
               style={{ padding: '10px 28px', opacity: canNext2 ? 1 : 0.4 }}>
-              Next: Review Intelligence →
+              {L('Next: Review Intelligence →', 'التالي: معلومات المراجعة ←')}
             </button>
           </div>
         </div>
@@ -1293,21 +1459,21 @@ export default function GovernancePage() {
       {/* ── STEP 3: Intelligence Advisor ── */}
       {wizardStep === 3 && (
         <div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>🧠 Review Intelligence</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>🧠 {L('Review Intelligence', 'معلومات المراجعة')}</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
-            These repository items will be used to enrich your review. Missing items reduce review quality — add them before starting if possible.
+            {L('These repository items will be used to enrich your review. Missing items reduce review quality — add them before starting if possible.', 'ستُستخدم عناصر المستودع هذه لإثراء مراجعتك. العناصر الناقصة تقلل جودة المراجعة — أضفها قبل البدء إن أمكن.')}
           </div>
           <IntelligenceAdvisor reviewType={form.reviewType} onReady={() => setAdvisorReady(true)} />
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 28 }}>
-            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
+            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>{L('← Back', '→ رجوع')}</button>
             <button
               className='btn-primary'
               onClick={wizardNext}
               disabled={!advisorReady}
               style={{ padding: '10px 28px', opacity: advisorReady ? 1 : 0.45, cursor: advisorReady ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 8 }}>
               {!advisorReady
-                ? <><span style={{ fontSize: 13 }}>⏳</span> Checking repository...</>
-                : 'Next: Set Aggressiveness →'
+                ? <><span style={{ fontSize: 13 }}>⏳</span> {L('Checking repository...', 'جارٍ فحص المستودع...')}</>
+                : L('Next: Set Aggressiveness →', 'التالي: تحديد مستوى الصرامة ←')
               }
             </button>
           </div>
@@ -1317,9 +1483,9 @@ export default function GovernancePage() {
       {/* ── STEP 4: Aggressiveness ── */}
       {wizardStep === 4 && (
         <div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>⚖️ Review Aggressiveness</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>⚖️ {L('Review Aggressiveness', 'مستوى صرامة المراجعة')}</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
-            Choose how rigorous the AI review should be. This affects finding thresholds, scoring penalties, and compliance strictness.
+            {L('Choose how rigorous the AI review should be. This affects finding thresholds, scoring penalties, and compliance strictness.', 'اختر مدى صرامة المراجعة بالذكاء الاصطناعي. يؤثر ذلك في حدود الملاحظات والخصم من الدرجة ودرجة التشدد في الامتثال.')}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             {AGGRESSIVENESS_CARDS.map(card => {
@@ -1333,15 +1499,16 @@ export default function GovernancePage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     <span style={{ fontSize: 26 }}>{card.icon}</span>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: active ? card.border : 'var(--text)' }}>{card.label}</div>
-                      {active && <div style={{ fontSize: 10, color: card.border, fontWeight: 600 }}>✓ Selected</div>}
+                      <div style={{ fontSize: 14, fontWeight: 700, color: active ? card.border : 'var(--text)' }}>{isAR ? card.labelAr : card.label}</div>
+                      {active && <div style={{ fontSize: 10, color: card.border, fontWeight: 600 }}>✓ {L('Selected', 'محدد')}</div>}
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 12 }}>{card.description}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 12 }}>{isAR ? card.descriptionAr : card.description}</div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    {(card as any).details.map((d: string, i: number) => {
-                      const isIdeal = d.startsWith('Ideal for:')
-                      const isOutcome = d.startsWith('Decision outcome:')
+                    {(isAR ? card.detailsAr : card.details).map((d: string, i: number) => {
+                      // Every card lists: two traits, then "Ideal for", then "Decision outcome".
+                      const isIdeal = i === 2
+                      const isOutcome = i === 3
                       return (
                         <div key={i} style={{ display: 'flex', gap: 7, fontSize: 11, lineHeight: 1.4,
                           color: isOutcome ? card.border : isIdeal ? 'var(--accent)' : 'var(--text-muted)' }}>
@@ -1356,8 +1523,8 @@ export default function GovernancePage() {
             })}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32 }}>
-            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>← Back</button>
-            <button className='btn-primary' onClick={wizardNext} style={{ padding: '10px 28px' }}>Next: Confirm & Launch →</button>
+            <button onClick={wizardBack} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>{L('← Back', '→ رجوع')}</button>
+            <button className='btn-primary' onClick={wizardNext} style={{ padding: '10px 28px' }}>{L('Next: Confirm & Launch →', 'التالي: التأكيد والبدء ←')}</button>
           </div>
         </div>
       )}
@@ -1365,28 +1532,28 @@ export default function GovernancePage() {
       {/* ── STEP 5: Confirm & Launch ── */}
       {wizardStep === 5 && (
         <div>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>🚀 Confirm & Launch</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>Review your configuration before starting the AI analysis.</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 4 }}>🚀 {L('Confirm & Launch', 'التأكيد والبدء')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>{L('Review your configuration before starting the AI analysis.', 'راجع إعداداتك قبل بدء التحليل بالذكاء الاصطناعي.')}</div>
 
           {/* Summary card */}
           <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 20, marginBottom: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>REVIEW TITLE</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{L('REVIEW TITLE', 'عنوان المراجعة')}</div>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{form.title}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>REVIEW TYPE</div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{REVIEW_TYPES.find(t => t.value === form.reviewType)?.label || form.reviewType}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{L('REVIEW TYPE', 'نوع المراجعة')}</div>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{reviewTypeLabel(form.reviewType, isAR)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>FRAMEWORK</div>
-                <div style={{ fontSize: 13 }}>{form.framework?.replace(/_/g, ' ')}</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{L('FRAMEWORK', 'الإطار')}</div>
+                <div style={{ fontSize: 13 }}>{enumLabel(form.framework, isAR, FRAMEWORK_LABEL)}</div>
               </div>
               <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>AGGRESSIVENESS</div>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{L('AGGRESSIVENESS', 'مستوى الصرامة')}</div>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>
-                  {AGGRESSIVENESS_CARDS.find(c => c.value === form.aggressiveness)?.icon} {form.aggressiveness}
+                  {AGGRESSIVENESS_CARDS.find(c => c.value === form.aggressiveness)?.icon} {aggressivenessLabel(form.aggressiveness, isAR)}
                 </div>
               </div>
             </div>
@@ -1394,7 +1561,7 @@ export default function GovernancePage() {
 
           {/* Files */}
           <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>DOCUMENTS ({inputs.length})</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 10 }}>{L('DOCUMENTS', 'الوثائق')} ({inputs.length})</div>
             {inputs.map((inp, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, marginBottom: 4 }}>
                 <span>📄</span><span style={{ color: 'var(--text)' }}>{inp.label}</span>
@@ -1405,16 +1572,16 @@ export default function GovernancePage() {
           {/* Extracted metadata if available */}
           {extractedMeta && (
             <div style={{ background: '#3498db0a', border: '1px solid #3498db33', borderRadius: 12, padding: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>🤖 AUTO-DETECTED FROM DOCUMENTS</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>🤖 {L('AUTO-DETECTED FROM DOCUMENTS', 'مستخرج تلقائياً من الوثائق')}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                {extractedMeta.solutionName && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SOLUTION</div><div style={{ fontSize: 13, fontWeight: 600 }}>{extractedMeta.solutionName}</div></div>}
-                {extractedMeta.scope && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>SCOPE</div><div style={{ fontSize: 13 }}>{extractedMeta.scope}</div></div>}
-                {extractedMeta.businessOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>BUSINESS OWNER</div><div style={{ fontSize: 13 }}>{extractedMeta.businessOwner}</div></div>}
-                {extractedMeta.technicalOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>TECH OWNER</div><div style={{ fontSize: 13 }}>{extractedMeta.technicalOwner}</div></div>}
+                {extractedMeta.solutionName && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('SOLUTION', 'الحل')}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{extractedMeta.solutionName}</div></div>}
+                {extractedMeta.scope && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('SCOPE', 'النطاق')}</div><div style={{ fontSize: 13 }}>{extractedMeta.scope}</div></div>}
+                {extractedMeta.businessOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('BUSINESS OWNER', 'مالك الأعمال')}</div><div style={{ fontSize: 13 }}>{extractedMeta.businessOwner}</div></div>}
+                {extractedMeta.technicalOwner && <div><div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('TECH OWNER', 'المالك التقني')}</div><div style={{ fontSize: 13 }}>{extractedMeta.technicalOwner}</div></div>}
               </div>
               {extractedMeta.technologies?.length > 0 && (
                 <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>TECHNOLOGIES DETECTED</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 6 }}>{L('TECHNOLOGIES DETECTED', 'التقنيات المكتشفة')}</div>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {extractedMeta.technologies.map((t: string, i: number) => <span key={i} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: '#3498db22', color: '#3498db' }}>{t}</span>)}
                   </div>
@@ -1427,7 +1594,7 @@ export default function GovernancePage() {
             <div style={{ marginBottom: 12, padding: '12px 14px', background: 'var(--navy-dark)', borderRadius: 10, border: '1px solid #3498db44' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                 <div style={{ fontSize: 12, color: '#3498db', fontWeight: 600 }}>
-                  📄 File {uploadProgress.current}/{uploadProgress.total}: {uploadProgress.fileName.length > 35 ? uploadProgress.fileName.slice(0,32)+'...' : uploadProgress.fileName}
+                  📄 {L('File', 'ملف')} {uploadProgress.current}/{uploadProgress.total}: {uploadProgress.fileName.length > 35 ? uploadProgress.fileName.slice(0,32)+'...' : uploadProgress.fileName}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{uploadProgress.pct}%</div>
               </div>
@@ -1441,7 +1608,7 @@ export default function GovernancePage() {
                   ))}
                 </div>
               )}
-              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>⏳ Docling extracting content — large files may take 30–60s</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>⏳ {L('Docling extracting content — large files may take 30–60s', 'يستخرج Docling المحتوى — قد تستغرق الملفات الكبيرة 30–60 ثانية')}</div>
             </div>
           )}
           {uploadStatus && !uploadProgress && (
@@ -1451,10 +1618,10 @@ export default function GovernancePage() {
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-            <button onClick={wizardBack} disabled={!!uploadStatus || loading} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: uploadStatus ? 'not-allowed' : 'pointer', fontSize: 13, opacity: uploadStatus ? 0.4 : 1 }}>← Back</button>
+            <button onClick={wizardBack} disabled={!!uploadStatus || loading} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '10px 20px', color: 'var(--text-muted)', cursor: uploadStatus ? 'not-allowed' : 'pointer', fontSize: 13, opacity: uploadStatus ? 0.4 : 1 }}>{L('← Back', '→ رجوع')}</button>
             <button className='btn-primary' onClick={createAndStart} disabled={loading || !!uploadStatus}
               style={{ fontSize: 15, padding: '12px 36px', opacity: loading || uploadStatus ? 0.7 : 1 }}>
-              {loading ? 'Creating review...' : uploadStatus ? 'Uploading...' : '▶ Launch Review'}
+              {loading ? L('Creating review...', 'جارٍ إنشاء المراجعة...') : uploadStatus ? L('Uploading...', 'جارٍ الرفع...') : L('▶ Launch Review', '▶ بدء المراجعة')}
             </button>
           </div>
         </div>
@@ -1478,11 +1645,11 @@ export default function GovernancePage() {
   if (view === 'report') return (
     <div style={{ padding: '24px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => { setView('list'); loadReviews() }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>← Back to reviews</button>
+        <button onClick={() => { setView('list'); loadReviews() }} style={{ background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13 }}>{L('← Back to reviews', '→ العودة إلى المراجعات')}</button>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', flex: 1 }}>{review?.title}</div>
-        <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[review?.decision] + '22', color: DECISION_COLOR[review?.decision] }}>{review?.decision?.replace(/_/g, ' ')}</div>
+        <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[review?.decision] + '22', color: DECISION_COLOR[review?.decision] }}>{enumLabel(review?.decision, isAR, DECISION_LABEL)}</div>
         <button onClick={() => { setExportLang(isAR ? 'ar' : 'en'); setShowExportModal(true) }} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>{isAR ? 'تصدير' : 'Export'}</button>
-        <button onClick={() => setShowRerunModal(true)} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
+        <button onClick={() => setShowRerunModal(true)} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 {L('Re-run', 'إعادة التشغيل')}</button>
       </div>
       {/* Export Progress Modal */}
       {exporting && (
@@ -1490,7 +1657,7 @@ export default function GovernancePage() {
           <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 16, padding: 36, maxWidth: 420, width: '100%', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', textAlign: 'center' }}>
             <div style={{ fontSize: 40, marginBottom: 16 }}>📄</div>
             <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>
-              {exportLang === 'ar' ? 'جارٍ تصدير التقرير بالعربية' : 'Exporting Report'}
+              {exportLang === 'ar' ? L('Exporting the Report in Arabic', 'جارٍ تصدير التقرير بالعربية') : L('Exporting Report', 'جارٍ تصدير التقرير')}
             </div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 24, minHeight: 18 }}>{exportStep}</div>
             {/* Progress bar */}
@@ -1500,7 +1667,7 @@ export default function GovernancePage() {
             <div style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>{exportProgress}%</div>
             {exportLang === 'ar' && exportProgress < 100 && (
               <div style={{ marginTop: 16, fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>
-                يتم ترجمة محتوى التقرير إلى العربية باستخدام الذكاء الاصطناعي.<br/>قد يستغرق هذا 30-60 ثانية.
+                {L('The report content is being translated into Arabic using AI.', 'يتم ترجمة محتوى التقرير إلى العربية باستخدام الذكاء الاصطناعي.')}<br/>{L('This may take 30-60 seconds.', 'قد يستغرق هذا 30-60 ثانية.')}
               </div>
             )}
           </div>
@@ -1518,13 +1685,13 @@ export default function GovernancePage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
               <div style={{ width: 44, height: 44, borderRadius: 12, background: '#e74c3c22', border: '1px solid #e74c3c44', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, flexShrink: 0 }}>⚠️</div>
               <div>
-                <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>Re-run AI Review</div>
-                <div style={{ fontSize: 12, color: '#e74c3c' }}>This action cannot be undone</div>
+                <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>{L('Re-run AI Review', 'إعادة تشغيل المراجعة بالذكاء الاصطناعي')}</div>
+                <div style={{ fontSize: 12, color: '#e74c3c' }}>{L('This action cannot be undone', 'لا يمكن التراجع عن هذا الإجراء')}</div>
               </div>
             </div>
             <div style={{ background: '#e74c3c0d', border: '1px solid #e74c3c33', borderRadius: 10, padding: '14px 16px', marginBottom: 20 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.6 }}>Re-running will regenerate all AI analysis. The following will be <strong style={{ color: '#e74c3c' }}>permanently overwritten</strong>:</div>
-              {[['All domain findings','Including any edits or deletions you made'],['Compliance matrix','All principle assessments and status changes'],['Risk register','All risks and severity adjustments'],['Financial opportunities','All saving estimates and edits'],['Scores & decision','Overall score, domain scores, and approval decision'],['Executive summary','The AI narrative will be replaced']].map(([title, desc]) => (
+              <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 10, lineHeight: 1.6 }}>{L('Re-running will regenerate all AI analysis. The following will be ', 'ستعيد إعادة التشغيل إنشاء كامل تحليل الذكاء الاصطناعي، وسيتم ')}<strong style={{ color: '#e74c3c' }}>{L('permanently overwritten', 'استبدال ما يلي نهائياً')}</strong>:</div>
+              {[[L('All domain findings', 'جميع ملاحظات المجالات'), L('Including any edits or deletions you made', 'بما في ذلك أي تعديلات أو حذف أجريته')], [L('Compliance matrix', 'مصفوفة الامتثال'), L('All principle assessments and status changes', 'جميع تقييمات المبادئ وتغييرات الحالة')], [L('Risk register', 'سجل المخاطر'), L('All risks and severity adjustments', 'جميع المخاطر وتعديلات الخطورة')], [L('Financial opportunities', 'الفرص المالية'), L('All saving estimates and edits', 'جميع تقديرات الوفورات والتعديلات')], [L('Scores & decision', 'الدرجات والقرار'), L('Overall score, domain scores, and approval decision', 'الدرجة الإجمالية ودرجات المجالات وقرار الاعتماد')], [L('Executive summary', 'الملخص التنفيذي'), L('The AI narrative will be replaced', 'سيُستبدل النص الذي أعده الذكاء الاصطناعي')]].map(([title, desc]) => (
                 <div key={title} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
                   <span style={{ color: '#e74c3c', fontSize: 14, marginTop: 1, flexShrink: 0 }}>✕</span>
                   <div><div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</div></div>
@@ -1532,17 +1699,17 @@ export default function GovernancePage() {
               ))}
             </div>
             <div style={{ background: '#3498db0d', border: '1px solid #3498db33', borderRadius: 8, padding: '10px 14px', marginBottom: 24, fontSize: 12, color: '#3498db', lineHeight: 1.6 }}>
-              💡 <strong>Tip:</strong> Only re-run if you uploaded new documents or changed the repository. For score adjustments, use inline editing instead.
+              💡 <strong>{L('Tip:', 'نصيحة:')}</strong> {L('Only re-run if you uploaded new documents or changed the repository. For score adjustments, use inline editing instead.', 'أعد التشغيل فقط إذا رفعت وثائق جديدة أو غيّرت المستودع. لتعديل الدرجات استخدم التعديل المباشر بدلاً من ذلك.')}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => setShowRerunModal(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Cancel</button>
-              <button onClick={handleRerunConfirm} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: '#e74c3c', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>Yes, Re-run Review</button>
+              <button onClick={() => setShowRerunModal(false)} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>{L('Cancel', 'إلغاء')}</button>
+              <button onClick={handleRerunConfirm} style={{ flex: 1, padding: '10px 0', borderRadius: 10, background: '#e74c3c', border: 'none', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>{L('Yes, Re-run Review', 'نعم، أعد تشغيل المراجعة')}</button>
             </div>
           </div>
         </div>
       )}
       {report && <ReportView review={review} report={report} findings={findings} tab={tab} setTab={setTab} />}
-      {!report && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Report not available yet</div>}
+      {!report && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>{L('Report not available yet', 'التقرير غير متاح بعد')}</div>}
     </div>
   )
 
@@ -1550,6 +1717,8 @@ export default function GovernancePage() {
 }
 
 function ReportView({ review, report, findings, tab, setTab }: { review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
+  const { t, isAR, resolveText } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [riskFilterSev, setRiskFilterSev] = React.useState<string[]>([])
   const [riskFilterCat, setRiskFilterCat] = React.useState<string>('')
   const [editingReport, setEditingReport] = React.useState<string | null>(null) // field name
@@ -1607,12 +1776,12 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       <button onClick={onSave} disabled={saving || !isDirty} style={{
         padding: '4px 14px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer',
         background: 'var(--accent)', border: 'none', color: '#fff', opacity: saving ? 0.6 : 1
-      }}>{saving ? '...' : '✓ Save'}</button>
-      <button onClick={onCancel} style={{ padding: '4px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)' }}>✕ Cancel</button>
+      }}>{saving ? '...' : L('✓ Save', '✓ حفظ')}</button>
+      <button onClick={onCancel} style={{ padding: '4px 12px', borderRadius: 8, fontSize: 11, cursor: 'pointer', background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)' }}>✕ {L('Cancel', 'إلغاء')}</button>
     </div>
   )
 
-  const { t, isAR, resolveText } = useLang()
+  const sar = (n: number) => (isAR ? `${(n || 0).toLocaleString('ar')} ريال` : `SAR ${(n || 0).toLocaleString('en-US')}`)
 
   // ── Rescore state ──────────────────────────────────────────────────────────
   const [rescoring, setRescoring] = React.useState(false)
@@ -1829,7 +1998,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   }
   const tabs = [
     { key: 'summary', label: t('gov.summary') },
-    { key: 'domains', label: 'Domains & Findings' },
+    { key: 'domains', label: L('Domains & Findings', 'المجالات والملاحظات') },
     { key: 'strategic', label: t('gov.strategic') },
     { key: 'compliance', label: t('gov.compliance') },
     { key: 'risk', label: t('gov.risk_register') },
@@ -1850,32 +2019,32 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     <div dir={isAR ? 'rtl' : 'ltr'}>
       {/* Review Header */}
       <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '12px 20px', marginBottom: 20, display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>REVIEW TYPE</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.reviewType?.replace(/_/g, ' ')}</div></div>
-        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>FRAMEWORK</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.framework?.replace(/_/g, ' ')}</div></div>
-        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>AGGRESSIVENESS</div><div style={{ fontSize: 13, fontWeight: 600 }}>{review?.aggressiveness || 'STANDARD'}</div></div>
-        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>METHODOLOGY</div><div style={{ fontSize: 13, fontWeight: 600 }}>{report.reviewMethodology?.split('.')[0]}</div></div>
-        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>DATE</div><div style={{ fontSize: 13, fontWeight: 600 }}>{new Date(review?.createdAt).toLocaleDateString()}</div></div>
-        {confScore > 0 && <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>CONFIDENCE</div><div style={{ fontSize: 13, fontWeight: 600, color: confScore >= 75 ? '#2ecc71' : confScore >= 50 ? '#f39c12' : '#e74c3c' }}>{confScore}%</div></div>}
+        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{L('REVIEW TYPE', 'نوع المراجعة')}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{reviewTypeLabel(review?.reviewType, isAR)}</div></div>
+        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{L('FRAMEWORK', 'الإطار')}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{enumLabel(review?.framework, isAR, FRAMEWORK_LABEL)}</div></div>
+        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{L('AGGRESSIVENESS', 'مستوى الصرامة')}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{aggressivenessLabel(review?.aggressiveness || 'STANDARD', isAR)}</div></div>
+        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{L('METHODOLOGY', 'المنهجية')}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{report.reviewMethodology?.split('.')[0]}</div></div>
+        <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{L('DATE', 'التاريخ')}</div><div style={{ fontSize: 13, fontWeight: 600 }}>{new Date(review?.createdAt).toLocaleDateString(isAR ? 'ar' : 'en-US')}</div></div>
+        {confScore > 0 && <div><div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{L('CONFIDENCE', 'الثقة')}</div><div style={{ fontSize: 13, fontWeight: 600, color: confScore >= 75 ? '#2ecc71' : confScore >= 50 ? '#f39c12' : '#e74c3c' }}>{confScore}%</div></div>}
       </div>
 
       {/* Rescore banner */}
       {rescoring && (
         <div style={{ background: '#f39c1215', border: '1px solid #f39c1244', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 12, color: '#f39c12', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span>⏳</span> Recalculating scores...
+          <span>⏳</span> {L('Recalculating scores...', 'جارٍ إعادة حساب الدرجات...')}
         </div>
       )}
       {rescoreResult && !rescoring && (
         <div style={{ background: '#2ecc7115', border: '1px solid #2ecc7144', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 12, color: '#2ecc71', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span>✓</span>
-          <span>Scores recalculated · Overall: <strong>{rescoreResult.overallScore}</strong> · Decision: <strong>{rescoreResult.decision?.replace(/_/g,' ')}</strong></span>
-          {rescoreResult.totalAnnualSaving > 0 && <span>· Annual savings: <strong>SAR {rescoreResult.totalAnnualSaving.toLocaleString()}</strong></span>}
-          <button onClick={() => setRescoreResult(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#2ecc71', cursor: 'pointer', fontSize: 14 }}>×</button>
+          <span>{L('Scores recalculated · Overall: ', 'أُعيد حساب الدرجات · الإجمالية: ')}<strong>{rescoreResult.overallScore}</strong>{L(' · Decision: ', ' · القرار: ')}<strong>{enumLabel(rescoreResult.decision, isAR, DECISION_LABEL)}</strong></span>
+          {rescoreResult.totalAnnualSaving > 0 && <span>{L('· Annual savings: ', '· الوفورات السنوية: ')}<strong>{L('SAR', 'ريال')} {rescoreResult.totalAnnualSaving.toLocaleString(isAR ? 'ar' : 'en-US')}</strong></span>}
+          <button onClick={() => setRescoreResult(null)} aria-label={L('Dismiss', 'إغلاق')} style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#2ecc71', cursor: 'pointer', fontSize: 14 }}>×</button>
         </div>
       )}
 
       {/* Score Row — use rescoreResult when available for live updates */}
       <div className="stat-grid-6" style={{ marginBottom: 24 }}>
-        <ScoreCircle score={uScores.overall} label='Overall' help="This is the big-picture health score for this review, combining everything below into one number. Green (75+) means things look solid; orange (60-74) means there are some things to fix; red (below 60) means significant issues need addressing before this can move forward." />
+        <ScoreCircle score={uScores.overall} label={L('Overall', 'الإجمالية')} help={L("This is the big-picture health score for this review, combining everything below into one number. Green (75+) means things look solid; orange (60-74) means there are some things to fix; red (below 60) means significant issues need addressing before this can move forward.", 'هذه درجة السلامة العامة للمراجعة، وتجمع كل ما يلي في رقم واحد. الأخضر (75 فأكثر) يعني أن الوضع جيد؛ والبرتقالي (60-74) يعني وجود أمور تحتاج إلى إصلاح؛ والأحمر (أقل من 60) يعني وجود مشكلات جوهرية يجب معالجتها قبل المضي قدماً.')} />
         {dimensionVisible('strategic') && (
         <ScoreCircle score={(() => {
             // Assessed against the strategy objectives: the backend's score, null when not considered.
@@ -1897,22 +2066,22 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               wSum += av * w; wTot += w
             }
             return wTot > 0 ? Math.round(wSum / wTot) : 0
-          })()} label='Strategic' help="How well this solution connects to your organization's stated goals and priorities. A low score means the proposal doesn't clearly explain how it supports where the organization is heading." />
+          })()} label={L('Strategic', 'الاستراتيجية')} help={L("How well this solution connects to your organization's stated goals and priorities. A low score means the proposal doesn't clearly explain how it supports where the organization is heading.", 'مدى ارتباط هذا الحل بأهداف الجهة وأولوياتها المعلنة. الدرجة المنخفضة تعني أن المقترح لا يوضح كيف يدعم توجه الجهة.')} />
         )}
         {dimensionVisible('compliance') && (
-        <ScoreCircle score={uScores.compliance} label='Compliance' help="How well this solution follows required standards, policies, and principles - both your organization's own rules and relevant national standards. A low score points to rules that may need to be addressed before approval." />
+        <ScoreCircle score={uScores.compliance} label={L('Compliance', 'الامتثال')} help={L("How well this solution follows required standards, policies, and principles - both your organization's own rules and relevant national standards. A low score points to rules that may need to be addressed before approval.", 'مدى التزام هذا الحل بالمعايير والسياسات والمبادئ المطلوبة، سواء قواعد الجهة نفسها أو المعايير الوطنية ذات الصلة. الدرجة المنخفضة تشير إلى قواعد قد تلزم معالجتها قبل الاعتماد.')} />
         )}
         {dimensionVisible('risk') && (
-        <ScoreCircle score={uScores.risk} label='Risk' help="How much this proposal could go wrong, and how well those risks have been thought through. A high score means risks are well understood and managed; a low score means there are unaddressed concerns." />
+        <ScoreCircle score={uScores.risk} label={L('Risk', 'المخاطر')} help={L('How much this proposal could go wrong, and how well those risks have been thought through. A high score means risks are well understood and managed; a low score means there are unaddressed concerns.', 'مدى احتمال تعثّر هذا المقترح، ومدى دراسة مخاطره. الدرجة المرتفعة تعني أن المخاطر مفهومة ومُدارة جيداً؛ والمنخفضة تعني وجود مخاوف لم تُعالج.')} />
         )}
         {dimensionVisible('futureState') && (
-        <ScoreCircle score={uScores.future} label='Future State' help="Whether this solution fits with the long-term technology direction the organization is heading toward, not just what works today." />
+        <ScoreCircle score={uScores.future} label={L('Future State', 'الحالة المستقبلية')} help={L('Whether this solution fits with the long-term technology direction the organization is heading toward, not just what works today.', 'مدى توافق هذا الحل مع التوجه التقني طويل المدى للجهة، وليس فقط مع ما يعمل حالياً.')} />
         )}
         {dimensionVisible('financial') && (
-        <ScoreCircle score={uScores.financial} label='Financial' help="Whether this proposal makes efficient use of money - for example, reusing something the organization already owns instead of buying something new and duplicating cost." />
+        <ScoreCircle score={uScores.financial} label={L('Financial', 'المالية')} help={L('Whether this proposal makes efficient use of money - for example, reusing something the organization already owns instead of buying something new and duplicating cost.', 'مدى كفاءة المقترح في استخدام الموارد المالية، مثل إعادة استخدام ما تملكه الجهة بدلاً من شراء شيء جديد ومضاعفة التكلفة.')} />
         )}
         {dimensionVisible('domainQuality') && (
-        <ScoreCircle score={uScores.domains} label='Domains' help="An average of how this solution scores across every architecture area it touches - things like security, data, business processes, and technology." />
+        <ScoreCircle score={uScores.domains} label={L('Domains', 'المجالات')} help={L('An average of how this solution scores across every architecture area it touches - things like security, data, business processes, and technology.', 'متوسط درجات هذا الحل في كل مجال معماري يمسّه، مثل الأمن والبيانات وإجراءات الأعمال والتقنية.')} />
         )}
       </div>
 
@@ -1949,22 +2118,22 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', marginBottom: 16 }}>
             {/* Formula row */}
             <div style={{ display: 'flex', justifyContent: 'center', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
-              <span style={{ color: 'var(--text-muted)' }}>Overall =</span>
-              <span style={{ color: '#9b59b6', fontWeight: 600 }}>Strategic 20%</span>
+              <span style={{ color: 'var(--text-muted)' }}>{L('Overall =', 'الإجمالية =')}</span>
+              <span style={{ color: '#9b59b6', fontWeight: 600 }}>{L('Strategic', 'الاستراتيجية')} 20%</span>
               <span>+</span>
-              <span style={{ color: '#1abc9c', fontWeight: 600 }}>Compliance 20%</span>
+              <span style={{ color: '#1abc9c', fontWeight: 600 }}>{L('Compliance', 'الامتثال')} 20%</span>
               <span>+</span>
-              <span style={{ color: '#e67e22', fontWeight: 600 }}>Risk 15%</span>
+              <span style={{ color: '#e67e22', fontWeight: 600 }}>{L('Risk', 'المخاطر')} 15%</span>
               <span>+</span>
-              <span style={{ color: '#3498db', fontWeight: 600 }}>Future State 10%</span>
+              <span style={{ color: '#3498db', fontWeight: 600 }}>{L('Future State', 'الحالة المستقبلية')} 10%</span>
               <span>+</span>
-              <span style={{ color: '#2ecc71', fontWeight: 600 }}>Financial 10%</span>
+              <span style={{ color: '#2ecc71', fontWeight: 600 }}>{L('Financial', 'المالية')} 10%</span>
               <span>+</span>
-              <span style={{ color: '#e74c3c', fontWeight: 600 }}>Domains 25%</span>
+              <span style={{ color: '#e74c3c', fontWeight: 600 }}>{L('Domains', 'المجالات')} 25%</span>
               {penalty > 0 && <>
-                <span style={{ color: '#e74c3c', fontWeight: 700 }}>− {penalty} pts</span>
+                <span style={{ color: '#e74c3c', fontWeight: 700 }}>− {penalty} {L('pts', 'نقطة')}</span>
                 <span style={{ color: '#e74c3c', fontSize: 10 }}>
-                  ({critCount} CRITICAL × {(review as any)?.aggressiveness === 'ADVISORY' ? 1 : (review as any)?.aggressiveness === 'STRICT' ? 5 : (review as any)?.aggressiveness === 'EXECUTIVE' ? 4 : 3}pt, max {maxPenalty})
+                  ({critCount} {L('CRITICAL', 'حرجة')} × {(review as any)?.aggressiveness === 'ADVISORY' ? 1 : (review as any)?.aggressiveness === 'STRICT' ? 5 : (review as any)?.aggressiveness === 'EXECUTIVE' ? 4 : 3}{L('pt, max ', ' نقطة، بحد أقصى ')}{maxPenalty})
                 </span>
               </>}
             </div>
@@ -1979,7 +2148,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               {penalty > 0 && <span style={{ color: '#e74c3c' }}>− {penalty}</span>}
               <span style={{ color: 'var(--text-muted)' }}>= {computedBase}{penalty > 0 ? ` − ${penalty}` : ''}</span>
               <span style={{ color: 'var(--accent)', fontWeight: 700, fontSize: 12 }}>= {computedOverall}</span>
-              {Math.abs(computedOverall - overallDisplay) > 1 && <span style={{ color: '#e74c3c', fontSize: 9 }}>⚠ stored:{overallDisplay}</span>}
+              {Math.abs(computedOverall - overallDisplay) > 1 && <span style={{ color: '#e74c3c', fontSize: 9 }}>⚠ {L('stored:', 'المحفوظة:')}{overallDisplay}</span>}
             </div>
           </div>
         )
@@ -1996,11 +2165,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {review?.status === 'READY_FOR_REVIEW' ? (
         <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: '#e74c3c', marginBottom: 4 }}>⚠ {t('gov.requires_manual_review')}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('gov.proposed_decision')}: {report.decision?.replace(/_/g, ' ')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('gov.proposed_decision')}: {enumLabel(report.decision, isAR, DECISION_LABEL)}</div>
         </div>
       ) : (
         <div style={{ background: (DECISION_COLOR[report.decision] || '#64748B') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#64748B'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#64748B', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#64748B', marginBottom: 4 }}>{enumLabel(report.decision, isAR, DECISION_LABEL)}</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{isAR ? resolveText(report.decisionRationale) : report.decisionRationale}</div>
         </div>
       )}
@@ -2015,13 +2184,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Contextual help for whichever tab is active */}
       {(() => {
         const TAB_HELP: Record<string, string> = {
-          summary: "A quick overview of the whole review: the decision, the key numbers, and a short written summary of what was found.",
-          domains: "Every specific issue found during the review, grouped by architecture area (like security or data). Click a finding to see more detail or mark it as resolved.",
-          strategic: "Shows how well this proposal connects to the organization's stated goals, and whether it clearly explains the value it will deliver.",
-          compliance: "Checks this proposal against required standards and policies - both your organization's own rules and relevant national standards - and flags anything that doesn't line up.",
-          risk: "Lists the things that could go wrong with this proposal, how serious each one is, and what's being done (or should be done) about it.",
-          future: "Checks whether this proposal fits with where the organization's technology is heading long-term, not just what works right now.",
-          financial: "Highlights ways this proposal could save money - for example, by reusing something the organization already owns instead of buying something new.",
+          summary: L('A quick overview of the whole review: the decision, the key numbers, and a short written summary of what was found.', 'نظرة سريعة على المراجعة كاملة: القرار، والأرقام الرئيسية، وملخص مكتوب قصير لما تم التوصل إليه.'),
+          domains: L('Every specific issue found during the review, grouped by architecture area (like security or data). Click a finding to see more detail or mark it as resolved.', 'كل ملاحظة محددة ظهرت في المراجعة، مجمّعة حسب المجال المعماري (مثل الأمن أو البيانات). انقر على الملاحظة لعرض تفاصيلها أو تعديلها.'),
+          strategic: L("Shows how well this proposal connects to the organization's stated goals, and whether it clearly explains the value it will deliver.", 'يوضح مدى ارتباط المقترح بأهداف الجهة المعلنة، وهل يشرح بوضوح القيمة التي سيحققها.'),
+          compliance: L("Checks this proposal against required standards and policies - both your organization's own rules and relevant national standards - and flags anything that doesn't line up.", 'يفحص المقترح مقابل المعايير والسياسات المطلوبة، سواء قواعد الجهة أو المعايير الوطنية ذات الصلة، ويُبرز كل ما لا يتوافق معها.'),
+          risk: L("Lists the things that could go wrong with this proposal, how serious each one is, and what's being done (or should be done) about it.", 'يسرد ما قد يتعثر في هذا المقترح، ومدى خطورة كل منها، وما يُتخذ (أو ينبغي اتخاذه) بشأنه.'),
+          future: L("Checks whether this proposal fits with where the organization's technology is heading long-term, not just what works right now.", 'يفحص مدى توافق المقترح مع التوجه التقني طويل المدى للجهة، وليس فقط مع ما يعمل حالياً.'),
+          financial: L('Highlights ways this proposal could save money - for example, by reusing something the organization already owns instead of buying something new.', 'يُبرز فرص التوفير في هذا المقترح، مثل إعادة استخدام ما تملكه الجهة بدلاً من شراء شيء جديد.'),
         }
         return TAB_HELP[tab] ? (
           <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16, display: 'flex', alignItems: 'center' }}>
@@ -2040,10 +2209,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               show this row rather than displaying misleading zeros. */}
           {review.rubricId && (
             <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 12, color: 'var(--text-dim)' }}>
-              <span>Rubric: {review.rubricId} v{review.rubricVersion || 1}</span>
+              <span>{L('Rubric', 'معايير التقييم')}: {review.rubricId} v{review.rubricVersion || 1}</span>
               {typeof review.evidenceCoverage === 'number' && (
                 <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  Evidence coverage:
+                  {L('Evidence coverage:', 'تغطية الأدلة:')}
                   <span style={{
                     fontWeight: 600,
                     color: review.evidenceCoverage >= 0.8 ? 'var(--success)' : review.evidenceCoverage >= 0.5 ? 'var(--warning)' : 'var(--danger)',
@@ -2059,7 +2228,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)', flex: 1 }}>{t('gov.executive_summary')}</div>
               {editingReport !== 'executiveSummary' && (
-                <button onClick={() => startEditReport('executiveSummary', report.executiveSummary)} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)44', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>✏ Edit</button>
+                <button onClick={() => startEditReport('executiveSummary', report.executiveSummary)} style={{ fontSize: 11, color: 'var(--accent)', background: 'none', border: '1px solid var(--accent)44', borderRadius: 6, padding: '2px 8px', cursor: 'pointer' }}>✏ {L('Edit', 'تعديل')}</button>
               )}
             </div>
             {editingReport === 'executiveSummary' ? (
@@ -2077,40 +2246,40 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           {(report as any).additionalSections && (() => {
             const sec = (report as any).additionalSections
             const sections = [
-              { key: 'businessCase',       label: '💼 Business Case Assessment',      color: '#2ecc71' },
-              { key: 'roadmapAssessment',  label: '🗺 Implementation Roadmap',        color: '#3498db' },
-              { key: 'proposalQuality',    label: '📋 Proposal Quality Assessment',   color: '#9b59b6' },
-              { key: 'evaluationSummary',  label: '⚖️ Evaluation Summary',           color: '#e67e22' },
-              { key: 'vendorRisk',         label: '🔒 Vendor & Technology Risk',      color: '#e74c3c' },
-              { key: 'apiAssessment',         label: '🔌 API & Integration Assessment',        color: '#1abc9c' },
-              { key: 'iamAssessment',         label: '🛡 Security & IAM Assessment',           color: '#e74c3c' },
-              { key: 'innovationAssessment',  label: '💡 Innovation & Technology Assessment',  color: '#f39c12' },
-              { key: 'changeReadiness',       label: '🔄 Change Readiness Assessment',         color: '#9b59b6' },
-              { key: 'dgaAlignment',          label: '🏛 DGA Interoperability Alignment',      color: '#3498db' },
-              { key: 'portfolioAnalysis',     label: '📊 Portfolio & Capability Analysis',     color: '#1abc9c' },
-              { key: 'feasibilityAssessment', label: '⚙️ Feasibility Assessment',             color: '#e67e22' },
-              { key: 'projectRecommendation', label: '✅ Project Recommendation',              color: '#2ecc71' },
-              { key: 'impactAssessment',      label: '💥 Change Impact Assessment',            color: '#e74c3c' },
-              { key: 'rollbackAssessment',    label: '↩️ Rollback Plan Assessment',           color: '#e67e22' },
-              { key: 'testCoverageAssessment',label: '🧪 Test Coverage Assessment',            color: '#3498db' },
-              { key: 'changeRecommendation',    label: '🎯 Change Recommendation',              color: '#2ecc71' },
+              { key: 'businessCase',       label: L('💼 Business Case Assessment', '💼 تقييم دراسة الجدوى'),      color: '#2ecc71' },
+              { key: 'roadmapAssessment',  label: L('🗺 Implementation Roadmap', '🗺 خارطة طريق التنفيذ'),        color: '#3498db' },
+              { key: 'proposalQuality',    label: L('📋 Proposal Quality Assessment', '📋 تقييم جودة المقترح'),   color: '#9b59b6' },
+              { key: 'evaluationSummary',  label: L('⚖️ Evaluation Summary', '⚖️ ملخص التقييم'),           color: '#e67e22' },
+              { key: 'vendorRisk',         label: L('🔒 Vendor & Technology Risk', '🔒 مخاطر المورّد والتقنية'),      color: '#e74c3c' },
+              { key: 'apiAssessment',         label: L('🔌 API & Integration Assessment', '🔌 تقييم واجهات البرمجة والتكامل'),        color: '#1abc9c' },
+              { key: 'iamAssessment',         label: L('🛡 Security & IAM Assessment', '🛡 تقييم الأمن وإدارة الهوية والصلاحيات'),           color: '#e74c3c' },
+              { key: 'innovationAssessment',  label: L('💡 Innovation & Technology Assessment', '💡 تقييم الابتكار والتقنية'),  color: '#f39c12' },
+              { key: 'changeReadiness',       label: L('🔄 Change Readiness Assessment', '🔄 تقييم الجاهزية للتغيير'),         color: '#9b59b6' },
+              { key: 'dgaAlignment',          label: L('🏛 DGA Interoperability Alignment', '🏛 المواءمة مع متطلبات التكامل لهيئة الحكومة الرقمية'),      color: '#3498db' },
+              { key: 'portfolioAnalysis',     label: L('📊 Portfolio & Capability Analysis', '📊 تحليل المحفظة والقدرات'),     color: '#1abc9c' },
+              { key: 'feasibilityAssessment', label: L('⚙️ Feasibility Assessment', '⚙️ تقييم الجدوى'),             color: '#e67e22' },
+              { key: 'projectRecommendation', label: L('✅ Project Recommendation', '✅ توصية المشروع'),              color: '#2ecc71' },
+              { key: 'impactAssessment',      label: L('💥 Change Impact Assessment', '💥 تقييم أثر التغيير'),            color: '#e74c3c' },
+              { key: 'rollbackAssessment',    label: L('↩️ Rollback Plan Assessment', '↩️ تقييم خطة التراجع'),           color: '#e67e22' },
+              { key: 'testCoverageAssessment',label: L('🧪 Test Coverage Assessment', '🧪 تقييم تغطية الاختبارات'),            color: '#3498db' },
+              { key: 'changeRecommendation',    label: L('🎯 Change Recommendation', '🎯 توصية التغيير'),              color: '#2ecc71' },
               // BUSINESS_DEMAND sections
-              { key: 'prioritizationRecommendation', label: '🏷 Prioritization Recommendation',     color: '#2ecc71' },
-              { key: 'duplicationCheck',             label: '🔍 Capability Duplication Check',      color: '#3498db' },
-              { key: 'feasibilitySnapshot',          label: '⚙️ Feasibility Snapshot',              color: '#e67e22' },
-              { key: 'demandStrength',               label: '💪 Business Case Strength',            color: '#9b59b6' },
+              { key: 'prioritizationRecommendation', label: L('🏷 Prioritization Recommendation', '🏷 توصية الأولوية'),     color: '#2ecc71' },
+              { key: 'duplicationCheck',             label: L('🔍 Capability Duplication Check', '🔍 فحص تكرار القدرات'),      color: '#3498db' },
+              { key: 'feasibilitySnapshot',          label: L('⚙️ Feasibility Snapshot', '⚙️ لمحة عن الجدوى'),              color: '#e67e22' },
+              { key: 'demandStrength',               label: L('💪 Business Case Strength', '💪 قوة دراسة الجدوى'),            color: '#9b59b6' },
               // RFP_SOW sections
-              { key: 'completenessAssessment',       label: '📋 Document Completeness Assessment',  color: '#3498db' },
-              { key: 'requirementsQuality',          label: '📐 Requirements Quality Assessment',   color: '#9b59b6' },
-              { key: 'securityComplianceCoverage',   label: '🛡 Security & Compliance Coverage',    color: '#e74c3c' },
-              { key: 'slaAssessment',                label: '⏱ SLA & Performance Requirements',    color: '#1abc9c' },
-              { key: 'procurementRisk',              label: '⚠️ Procurement Risk Assessment',       color: '#e74c3c' },
+              { key: 'completenessAssessment',       label: L('📋 Document Completeness Assessment', '📋 تقييم اكتمال الوثيقة'),  color: '#3498db' },
+              { key: 'requirementsQuality',          label: L('📐 Requirements Quality Assessment', '📐 تقييم جودة المتطلبات'),   color: '#9b59b6' },
+              { key: 'securityComplianceCoverage',   label: L('🛡 Security & Compliance Coverage', '🛡 تغطية الأمن والامتثال'),    color: '#e74c3c' },
+              { key: 'slaAssessment',                label: L('⏱ SLA & Performance Requirements', '⏱ متطلبات مستوى الخدمة والأداء'),    color: '#1abc9c' },
+              { key: 'procurementRisk',              label: L('⚠️ Procurement Risk Assessment', '⚠️ تقييم مخاطر الشراء'),       color: '#e74c3c' },
               // CAB_REVIEW sections
-              { key: 'cabDecision',                  label: '🚦 CAB Decision',                       color: '#2ecc71' },
-              { key: 'readinessChecklistDisplay',    label: '✅ Readiness Checklist',                color: '#3498db' },
-              { key: 'deploymentRiskAssessment',     label: '⚡ Deployment Risk Assessment',         color: '#e74c3c' },
-              { key: 'rollbackReadiness',            label: '↩️ Rollback Readiness',                color: '#e67e22' },
-              { key: 'outstandingConditions',        label: '📌 Outstanding Conditions',             color: '#f39c12' },
+              { key: 'cabDecision',                  label: L('🚦 CAB Decision', '🚦 قرار مجلس استشارات التغيير'),                       color: '#2ecc71' },
+              { key: 'readinessChecklistDisplay',    label: L('✅ Readiness Checklist', '✅ قائمة التحقق من الجاهزية'),                color: '#3498db' },
+              { key: 'deploymentRiskAssessment',     label: L('⚡ Deployment Risk Assessment', '⚡ تقييم مخاطر النشر'),         color: '#e74c3c' },
+              { key: 'rollbackReadiness',            label: L('↩️ Rollback Readiness', '↩️ الجاهزية للتراجع'),                color: '#e67e22' },
+              { key: 'outstandingConditions',        label: L('📌 Outstanding Conditions', '📌 الشروط القائمة'),             color: '#f39c12' },
             ].filter(s => sec[s.key])
             if (!sections.length) return null
             const cabDec = (sec.cabDecision || '').toUpperCase()
@@ -2120,11 +2289,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 {sections.map(s => {
                   // CAB Decision gets special prominent treatment
                   if (s.key === 'cabDecision' && sec[s.key]) {
-                    const dec = sec[s.key].split('—')[0].split('-')[0].trim()
+                    const rawDec = sec[s.key].split('—')[0].split('-')[0].trim()
+                    // The decision word is GO / NO-GO / CONDITIONAL GO (see cabColor); show it in the UI language.
+                    const dec = isAR ? (cabColor === '#2ecc71' ? 'موافقة' : cabColor === '#e74c3c' ? 'عدم الموافقة' : 'موافقة مشروطة') : rawDec
                     const reason = sec[s.key].includes('—') ? sec[s.key].split('—').slice(1).join('—').trim() : sec[s.key].includes(' - ') ? sec[s.key].split(' - ').slice(1).join(' - ').trim() : ''
                     return (
                       <div key={s.key} style={{ background: cabColor + '18', border: '2px solid ' + cabColor, borderRadius: 12, padding: 20, marginBottom: 12 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: cabColor, marginBottom: 8, letterSpacing: 1 }}>🚦 CAB DECISION</div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: cabColor, marginBottom: 8, letterSpacing: 1 }}>🚦 {L('CAB DECISION', 'قرار مجلس استشارات التغيير')}</div>
                         <div style={{ fontSize: 28, fontWeight: 800, color: cabColor, marginBottom: reason ? 8 : 0 }}>{dec}</div>
                         {reason && <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6 }}>{reason}</div>}
                       </div>
@@ -2135,7 +2306,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     const items = sec[s.key].split(' | ')
                     return (
                       <div key={s.key} style={{ background: 'var(--navy-mid)', border: '1px solid ' + s.color + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, color: s.color, marginBottom: 10 }}>✅ Readiness Checklist</div>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: s.color, marginBottom: 10 }}>✅ {L('Readiness Checklist', 'قائمة التحقق من الجاهزية')}</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                           {items.map((item: string) => {
                             const [label, status] = item.split(': ')
@@ -2144,8 +2315,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                               <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 10px', background: sc + '11', borderRadius: 6, border: '1px solid ' + sc + '33' }}>
                                 <span style={{ color: sc, fontSize: 14 }}>{(status||'').includes('PRESENT') ? '✅' : (status||'').includes('MISSING') ? '❌' : '⚠️'}</span>
                                 <div>
-                                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{label}</div>
-                                  <div style={{ fontSize: 10, color: sc }}>{status}</div>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>{checklistItemLabel(label, isAR)}</div>
+                                  <div style={{ fontSize: 10, color: sc }}>{checklistStatusLabel(status, isAR)}</div>
                                 </div>
                               </div>
                             )
@@ -2177,9 +2348,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             const hidden = (report as any).sectionDecisions.filter((d: any) => !d.show && d.basis !== 'excluded')
             if (hidden.length === 0) return null
             const SECTION_LABEL: Record<string, string> = {
-              strategicAlignment: 'Strategic Alignment', futureStateAlignment: 'Future-State Alignment',
-              financialAssessment: 'Financial Assessment', implementationRoadmap: 'Implementation Roadmap',
-              rfpRequirementQuality: 'RFP Requirement Quality',
+              strategicAlignment: L('Strategic Alignment', 'المواءمة الاستراتيجية'), futureStateAlignment: L('Future-State Alignment', 'المواءمة مع الحالة المستقبلية'),
+              financialAssessment: L('Financial Assessment', 'التقييم المالي'), implementationRoadmap: L('Implementation Roadmap', 'خارطة طريق التنفيذ'),
+              rfpRequirementQuality: L('RFP Requirement Quality', 'جودة متطلبات كراسة الشروط'),
             }
             return (
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16, padding: '8px 12px', background: 'var(--navy-mid)', borderRadius: 8 }}>
@@ -2199,7 +2370,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 {[['CRITICAL', crit.length, '#e74c3c'], ['HIGH', high.length, '#e67e22'], ['MEDIUM', med.length, '#f39c12'], ['LOW', low.length, '#3498db']].map(([l, n, c]: any) => (
                   <div key={l} style={{ background: c + '15', border: '1px solid ' + c + '44', borderRadius: 10, padding: '12px 16px', textAlign: 'center' }}>
                     <div style={{ fontSize: 28, fontWeight: 700, color: c }}>{n}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{l}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{enumLabel(l, isAR)}</div>
                   </div>
                 ))}
               </div>
@@ -2210,14 +2381,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           {findings.filter(f => f.severity === 'CRITICAL').length > 0 && (
             <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c55', borderRadius: 10, padding: 16, marginBottom: 16 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c', marginBottom: 10 }}>
-                🚨 IMMEDIATE BLOCKERS — {findings.filter(f => f.severity === 'CRITICAL').length} CRITICAL FINDINGS
+                🚨 {L('IMMEDIATE BLOCKERS', 'العوائق الفورية')} — {findings.filter(f => f.severity === 'CRITICAL').length} {L('CRITICAL FINDINGS', 'ملاحظات حرجة')}
               </div>
               {findings.filter(f => f.severity === 'CRITICAL').map((f: any, i: number) => (
                 <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderTop: i > 0 ? '1px solid #e74c3c22' : 'none', fontSize: 13 }}>
                   <span style={{ color: '#e74c3c', fontWeight: 700, minWidth: 22 }}>{i+1}.</span>
                   <div>
                     <div style={{ fontWeight: 600, color: 'var(--text)' }}>{isAR ? resolveText(f.title) : f.title}</div>
-                    <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>{f.domain?.replace(/_/g,' ')} · {f.category?.replace(/_/g,' ')}</div>
+                    <div style={{ color: 'var(--text-muted)', fontSize: 12, marginTop: 2 }}>{f.domain ? domainLabel(f.domain, isAR) : ''} · {f.category ? enumLabel(f.category, isAR, FINDING_CATEGORY_LABEL) : ''}</div>
                     {f.recommendation && <div style={{ color: '#e74c3c', fontSize: 12, marginTop: 4 }}>→ {f.recommendation}</div>}
                   </div>
                 </div>
@@ -2228,14 +2399,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           {/* 4. Score improvement tips */}
           {(() => {
             const tips: string[] = []
-            if (report.complianceScore < 60) tips.push('Compliance score is low — address EA principle violations to unlock significant score improvement')
-            if (report.strategicScore < 60) tips.push('Strategic alignment is weak — map solution capabilities to Business Strategy goals explicitly')
-            if ((extScores.securityScore || 0) < 50) tips.push('Security score is critical — resolve IAM and encryption findings before ARB approval')
-            if (findings.filter((f:any) => f.severity === 'CRITICAL').length >= 5) tips.push('5+ CRITICAL findings — resolve at least 3 before re-run to move decision to CONDITIONAL')
-            if (tips.length === 0 && report.overallScore >= 60) tips.push('Score is in acceptable range — address HIGH findings to move toward APPROVED status')
+            if (report.complianceScore < 60) tips.push(L('Compliance score is low — address EA principle violations to unlock significant score improvement', 'درجة الامتثال منخفضة — عالج مخالفات مبادئ البنية المؤسسية لتحقيق تحسن كبير في الدرجة'))
+            if (report.strategicScore < 60) tips.push(L('Strategic alignment is weak — map solution capabilities to Business Strategy goals explicitly', 'المواءمة الاستراتيجية ضعيفة — اربط قدرات الحل بأهداف استراتيجية الأعمال بشكل صريح'))
+            if ((extScores.securityScore || 0) < 50) tips.push(L('Security score is critical — resolve IAM and encryption findings before ARB approval', 'درجة الأمن حرجة — عالج ملاحظات إدارة الهوية والصلاحيات والتشفير قبل اعتماد مجلس مراجعة البنية'))
+            if (findings.filter((f:any) => f.severity === 'CRITICAL').length >= 5) tips.push(L('5+ CRITICAL findings — resolve at least 3 before re-run to move decision to CONDITIONAL', '5 ملاحظات حرجة أو أكثر — عالج 3 منها على الأقل قبل إعادة التشغيل لنقل القرار إلى معتمد بشروط'))
+            if (tips.length === 0 && report.overallScore >= 60) tips.push(L('Score is in acceptable range — address HIGH findings to move toward APPROVED status', 'الدرجة ضمن النطاق المقبول — عالج الملاحظات عالية الخطورة للاقتراب من حالة الاعتماد'))
             return tips.length > 0 ? (
               <div style={{ background: '#3498db11', border: '1px solid #3498db33', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>💡 SCORE IMPROVEMENT TIPS</div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>💡 {L('SCORE IMPROVEMENT TIPS', 'نصائح لتحسين الدرجة')}</div>
                 {tips.map((t, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
                     <span style={{ color: '#3498db' }}>→</span>
@@ -2249,7 +2420,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           {/* 5. Scope & Methodology */}
           {report.scopeDescription && (
             <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>REVIEW SCOPE & METHODOLOGY</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>{L('REVIEW SCOPE & METHODOLOGY', 'نطاق المراجعة ومنهجيتها')}</div>
               <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 4 }}>{report.scopeDescription}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{report.reviewMethodology}</div>
             </div>
@@ -2333,7 +2504,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             if (excludedDomains.length === 0) return null
             return (
               <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12, padding: '8px 12px', background: 'var(--navy-mid)', borderRadius: 8 }}>
-                {assessedDomains.length} of {rubricDomains.length} applicable domain(s) assessed. Excluded for this document: {excludedDomains.map(d => DOMAIN_LABEL[d] || d).join(', ')}.
+                {assessedDomains.length} of {rubricDomains.length} applicable domain(s) assessed. Excluded for this document: {excludedDomains.map(d => domainLabel(d, isAR)).join(', ')}.
               </div>
             )
           })()}
@@ -2389,7 +2560,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     {low > 0  && <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: '#3498db33', color: '#3498db' }}>{low} LOW</span>}
                   </div>
                 )}
-                {domainFindings.length === 0 && <div style={{ fontSize: 12, color: '#2ecc71' }}>✓ No findings in this domain</div>}
+                {domainFindings.length === 0 && <div style={{ fontSize: 12, color: '#2ecc71' }}>✓ {L('No findings in this domain', 'لا توجد ملاحظات في هذا المجال')}</div>}
               </div>
             )
           })}
@@ -2405,13 +2576,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
         // Strategy type weights and colors — declared FIRST (used in sort below)
         const STRAT_META: Record<string, { weight: number; label: string; color: string }> = {
-          BUSINESS_STRATEGY: { weight: 40, label: 'Business Strategy', color: '#e74c3c' },
-          DT_STRATEGY:       { weight: 35, label: 'Digital Transformation', color: '#9b59b6' },
-          EA_STRATEGY:       { weight: 25, label: 'EA Strategy', color: '#3498db' },
-          IT_STRATEGY:       { weight: 0,  label: 'IT Strategy', color: '#1abc9c' },
-          DATA_STRATEGY:     { weight: 0,  label: 'Data Strategy', color: '#e67e22' },
-          SECURITY_STRATEGY: { weight: 0,  label: 'Security Strategy', color: '#e74c3c' },
-          VISION_2030:       { weight: 0,  label: 'Vision 2030', color: '#f39c12' },
+          BUSINESS_STRATEGY: { weight: 40, label: L('Business Strategy', 'استراتيجية الأعمال'), color: '#e74c3c' },
+          DT_STRATEGY:       { weight: 35, label: L('Digital Transformation', 'التحول الرقمي'), color: '#9b59b6' },
+          EA_STRATEGY:       { weight: 25, label: L('EA Strategy', 'استراتيجية البنية المؤسسية'), color: '#3498db' },
+          IT_STRATEGY:       { weight: 0,  label: L('IT Strategy', 'استراتيجية تقنية المعلومات'), color: '#1abc9c' },
+          DATA_STRATEGY:     { weight: 0,  label: L('Data Strategy', 'استراتيجية البيانات'), color: '#e67e22' },
+          SECURITY_STRATEGY: { weight: 0,  label: L('Security Strategy', 'الاستراتيجية الأمنية'), color: '#e74c3c' },
+          VISION_2030:       { weight: 0,  label: L('Vision 2030', 'رؤية 2030'), color: '#f39c12' },
         }
 
         // Split tenant strategies (scored) from national/common (recommendations only)
@@ -2445,8 +2616,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         if (objectives.length === 0) return (
           <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 48 }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>🎯</div>
-            <div style={{ fontSize: 15, marginBottom: 6 }}>No strategic objectives assessed</div>
-            <div style={{ fontSize: 12 }}>Add strategy documents to the repository to enable strategic alignment analysis</div>
+            <div style={{ fontSize: 15, marginBottom: 6 }}>{L('No strategic objectives assessed', 'لم تُقيَّم أي أهداف استراتيجية')}</div>
+            <div style={{ fontSize: 12 }}>{L('Add strategy documents to the repository to enable strategic alignment analysis', 'أضف وثائق الاستراتيجية إلى المستودع لتفعيل تحليل المواءمة الاستراتيجية')}</div>
           </div>
         )
 
@@ -2469,7 +2640,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 12 }}>
                 <div style={{ textAlign: 'center', minWidth: 72 }}>
                   <div style={{ fontSize: 36, fontWeight: 700, color: overallColor }}>{overallPct}%</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Overall Alignment</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('Overall Alignment', 'المواءمة الإجمالية')}</div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ height: 10, background: 'var(--navy-dark)', borderRadius: 5, overflow: 'hidden', marginBottom: 8 }}>
@@ -2486,8 +2657,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                       return (
                         <div key={t} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 12, border: '1px solid ' + meta.color + '44', background: meta.color + '15' }}>
                           <span style={{ color: meta.color, fontWeight: 600 }}>{meta.label}</span>
-                          <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{meta.weight}% weight</span>
-                          <span style={{ color: c, fontWeight: 700, marginLeft: 6 }}>{avg}% aligned</span>
+                          <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>{L(`${meta.weight}% weight`, `وزن ${meta.weight}%`)}</span>
+                          <span style={{ color: c, fontWeight: 700, marginLeft: 6 }}>{L(`${avg}% aligned`, `مواءمة ${avg}%`)}</span>
                         </div>
                       )
                     })}
@@ -2516,16 +2687,16 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 13, fontWeight: 700, color: meta?.color || '#64748B' }}>
-                          {meta?.label || stratType.replace(/_/g,' ')}
-                          {meta?.weight > 0 && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>[{meta.weight}% weight]</span>}
+                          {meta?.label || (isAR ? stratType : humanizeCode(stratType))}
+                          {meta?.weight > 0 && <span style={{ fontSize: 11, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>[{L(`${meta.weight}% weight`, `وزن ${meta.weight}%`)}]</span>}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                          {objs.length} goals · {fullyAligned > 0 && <span style={{color:'#2ecc71'}}>{fullyAligned} aligned</span>}{fullyAligned > 0 && ' · '}{partialAligned > 0 && <span style={{color:'#f39c12'}}>{partialAligned} partial</span>}{partialAligned > 0 && ' · '}{notAligned > 0 && <span style={{color:'#e74c3c'}}>{notAligned} not aligned</span>}{notApplicable > 0 && ' · '}{notApplicable > 0 && <span style={{color:'#64748B'}}>{notApplicable} N/A</span>}
+                          {objs.length} {L('goals', 'هدف')} · {fullyAligned > 0 && <span style={{color:'#2ecc71'}}>{fullyAligned} {L('aligned', 'متوائم')}</span>}{fullyAligned > 0 && ' · '}{partialAligned > 0 && <span style={{color:'#f39c12'}}>{partialAligned} {L('partial', 'جزئي')}</span>}{partialAligned > 0 && ' · '}{notAligned > 0 && <span style={{color:'#e74c3c'}}>{notAligned} {L('not aligned', 'غير متوائم')}</span>}{notApplicable > 0 && ' · '}{notApplicable > 0 && <span style={{color:'#64748B'}}>{notApplicable} {L('N/A', 'غير منطبق')}</span>}
                         </div>
                       </div>
                       <div style={{ textAlign: 'center', minWidth: 52 }}>
                         <div style={{ fontSize: 22, fontWeight: 700, color: avgColor }}>{avgAlign}%</div>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>avg</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{L('avg', 'المتوسط')}</div>
                       </div>
                     </div>
                     {/* Mini alignment bar */}
@@ -2547,20 +2718,20 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                             <div style={{ flex: 1 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', flex: 1 }}>{isAR ? resolveText(obj.objectiveName) : obj.objectiveName}</div>
-                                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#64748B22', color: '#64748B', fontWeight: 600, whiteSpace: 'nowrap' }}>No Direct Impact</span>
+                                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#64748B22', color: '#64748B', fontWeight: 600, whiteSpace: 'nowrap' }}>{L('No Direct Impact', 'لا أثر مباشر')}</span>
                               </div>
                               <div style={{ fontSize: 12, color: '#64748B', lineHeight: 1.6, fontStyle: 'italic' }}>
                                 {obj.contributionDescription && obj.contributionDescription !== 'N/A' && obj.contributionDescription !== 'n/a'
                                   ? (isAR ? resolveText(obj.contributionDescription) : obj.contributionDescription)
-                                  : `This solution operates in a different functional domain and does not directly address "${obj.objectiveName}". The solution's scope, objectives, and technical design have no direct bearing on this strategic pillar. This does not constitute a gap — it reflects the solution's intended purpose and boundary.`
+                                  : L(`This solution operates in a different functional domain and does not directly address "${obj.objectiveName}". The solution's scope, objectives, and technical design have no direct bearing on this strategic pillar. This does not constitute a gap — it reflects the solution's intended purpose and boundary.`, `يعمل هذا الحل في مجال وظيفي مختلف ولا يتناول "${obj.objectiveName}" بشكل مباشر. ليس لنطاق الحل وأهدافه وتصميمه التقني أثر مباشر على هذه الركيزة الاستراتيجية. ولا يُعد ذلك فجوة، بل يعكس الغرض المقصود من الحل وحدوده.`)
                                 }
                               </div>
                               <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--navy-dark)', display: 'flex', gap: 6 }}>
                                 <select value={obj.alignmentStatus} onChange={async e => { await updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: e.target.value === 'NOT_APPLICABLE' ? 0 : obj.alignmentPercentage }) }}
                                   style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #64748B44', background: '#64748B18', color: '#64748B', cursor: 'pointer' }}>
-                                  {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                                  {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{enumLabel(s, isAR, ALIGNMENT_STATUS_LABEL)}</option>)}
                                 </select>
-                                <button onClick={async () => { await removeObjective(localObjectives.indexOf(obj)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                                <button onClick={async () => { await removeObjective(localObjectives.indexOf(obj)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ {L('Remove', 'إزالة')}</button>
                               </div>
                             </div>
                           </div>
@@ -2586,11 +2757,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>📋 {obj.evidence}</div>
                               )}
                               {obj.relatedKPIs?.length > 0 && obj.relatedKPIs.some((k:string) => k !== 'N/A') && (
-                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📊 KPIs: {obj.relatedKPIs.filter((k:string) => k !== 'N/A').join(', ')}</div>
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>📊 {L('KPIs', 'مؤشرات الأداء')}: {obj.relatedKPIs.filter((k:string) => k !== 'N/A').join(', ')}</div>
                               )}
                               {obj.alignmentStatus === 'NOT_ALIGNED' && (
                                 <div style={{ fontSize: 11, color: '#e74c3c', fontStyle: 'italic', marginTop: 4 }}>
-                                  This strategic goal is relevant to this solution type but is not addressed in the submitted design. Consider adding a specific design element or roadmap item to close this gap.
+                                  {L('This strategic goal is relevant to this solution type but is not addressed in the submitted design. Consider adding a specific design element or roadmap item to close this gap.', 'هذا الهدف الاستراتيجي ذو صلة بهذا النوع من الحلول لكنه غير متناول في التصميم المقدم. يُستحسن إضافة عنصر تصميم أو بند في خارطة الطريق لسد هذه الفجوة.')}
                                 </div>
                               )}
                               {/* Edit controls */}
@@ -2599,13 +2770,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                                   const newPct = e.target.value === 'FULLY_ALIGNED' ? 100 : e.target.value === 'PARTIALLY_ALIGNED' ? 65 : e.target.value === 'WEAKLY_ALIGNED' ? 35 : 0
                                   await updateObjective(localObjectives.indexOf(obj), { alignmentStatus: e.target.value, alignmentPercentage: newPct })
                                 }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (STATUS_COLOR[obj.alignmentStatus]||'#64748B') + '44', background: (STATUS_COLOR[obj.alignmentStatus]||'#64748B') + '18', color: STATUS_COLOR[obj.alignmentStatus]||'#64748B', cursor: 'pointer' }}>
-                                  {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                                  {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{enumLabel(s, isAR, ALIGNMENT_STATUS_LABEL)}</option>)}
                                 </select>
                                 <input type='number' min={0} max={100} value={obj.alignmentPercentage || 0}
                                   onChange={async e => { await updateObjective(localObjectives.indexOf(obj), { alignmentPercentage: Math.min(100, Math.max(0, Number(e.target.value))) }) }}
                                   style={{ width: 64, fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid var(--navy-light)', background: 'var(--navy-dark)', color: 'var(--text-primary)', textAlign: 'center' }} />
                                 <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>%</span>
-                                <button onClick={async () => { await removeObjective(localObjectives.indexOf(obj)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: 'auto' }}>✕ Remove</button>
+                                <button onClick={async () => { await removeObjective(localObjectives.indexOf(obj)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: 'auto' }}>✕ {L('Remove', 'إزالة')}</button>
                               </div>
                             </div>
                           </div>
@@ -2624,8 +2795,8 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 <div style={{ padding: '12px 16px', background: '#f39c1215', borderBottom: '1px solid #f39c1225', display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 18 }}>🌐</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#f39c12' }}>National Strategy Context</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>These national strategies provide context and direction. They are not scored — alignment is advisory and informational only.</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#f39c12' }}>{L('National Strategy Context', 'سياق الاستراتيجيات الوطنية')}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{L('These national strategies provide context and direction. They are not scored — alignment is advisory and informational only.', 'توفر هذه الاستراتيجيات الوطنية السياق والتوجه، ولا تُحتسب في الدرجة — فالمواءمة معها استشارية وللاطلاع فقط.')}</div>
                   </div>
                 </div>
                 {/* Objectives */}
@@ -2637,10 +2808,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     const contextStatement = o.contributionDescription && o.contributionDescription !== 'N/A' && o.contributionDescription.length > 10
                       ? o.contributionDescription
                       : o.alignmentStatus === 'NOT_APPLICABLE'
-                        ? `This solution operates within a specific functional boundary and does not directly contribute to "${o.objectiveName}". This is expected for solutions of this type and does not indicate a gap or misalignment with national direction.`
+                        ? L(`This solution operates within a specific functional boundary and does not directly contribute to "${o.objectiveName}". This is expected for solutions of this type and does not indicate a gap or misalignment with national direction.`, `يعمل هذا الحل ضمن حدود وظيفية محددة ولا يُسهم مباشرة في "${o.objectiveName}". وهذا متوقع لهذا النوع من الحلول ولا يدل على فجوة أو عدم مواءمة مع التوجه الوطني.`)
                         : o.alignmentStatus === 'FULLY_ALIGNED'
-                          ? `This solution directly supports "${o.objectiveName}" as a core contributor to the national agenda.`
-                          : `This solution has indirect relevance to "${o.objectiveName}". While not a primary contributor, it supports the broader national direction through its digital and governance capabilities.`
+                          ? L(`This solution directly supports "${o.objectiveName}" as a core contributor to the national agenda.`, `يدعم هذا الحل "${o.objectiveName}" مباشرةً بوصفه مساهماً أساسياً في الأجندة الوطنية.`)
+                          : L(`This solution has indirect relevance to "${o.objectiveName}". While not a primary contributor, it supports the broader national direction through its digital and governance capabilities.`, `لهذا الحل صلة غير مباشرة بـ "${o.objectiveName}". ومع أنه ليس مساهماً رئيسياً، فإنه يدعم التوجه الوطني الأشمل من خلال قدراته الرقمية والحوكمية.`)
                     return (
                       <div key={i} style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--navy-dark)', border: '1px solid ' + natColor + '33', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         <span style={{ fontSize: 14, marginTop: 2, color: natColor }}>{natIcon}</span>
@@ -2651,11 +2822,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                               <div style={{ fontSize: 12, fontWeight: 700, color: natColor }}>{o.alignmentPercentage || 0}%</div>
                             )}
                             {o.alignmentStatus === 'NOT_APPLICABLE' && (
-                              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#64748B22', color: '#64748B', fontWeight: 600 }}>No Direct Impact</span>
+                              <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 10, background: '#64748B22', color: '#64748B', fontWeight: 600 }}>{L('No Direct Impact', 'لا أثر مباشر')}</span>
                             )}
                           </div>
                           <div style={{ fontSize: 11, color: '#f39c12', marginBottom: 6 }}>
-                            {o.strategyName || (o.strategyType||'').replace(/_/g,' ')}
+                            {o.strategyName || (STRAT_META[o.strategyType]?.label ?? (isAR ? (o.strategyType || '') : humanizeCode(o.strategyType || '')))}
                           </div>
                           <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6, fontStyle: o.alignmentStatus === 'NOT_APPLICABLE' ? 'italic' : 'normal' }}>
                             {contextStatement}
@@ -2669,9 +2840,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                               const newPct = e.target.value === 'FULLY_ALIGNED' ? 100 : e.target.value === 'PARTIALLY_ALIGNED' ? 65 : e.target.value === 'WEAKLY_ALIGNED' ? 35 : 0
                               await updateObjective(localObjectives.indexOf(o), { alignmentStatus: e.target.value, alignmentPercentage: e.target.value === 'NOT_APPLICABLE' ? 0 : newPct })
                             }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + natColor + '44', background: natColor + '18', color: natColor, cursor: 'pointer' }}>
-                              {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                              {['FULLY_ALIGNED','PARTIALLY_ALIGNED','WEAKLY_ALIGNED','NOT_ALIGNED','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{enumLabel(s, isAR, ALIGNMENT_STATUS_LABEL)}</option>)}
                             </select>
-                            <button onClick={async () => { await removeObjective(localObjectives.indexOf(o)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: 'auto' }}>✕ Remove</button>
+                            <button onClick={async () => { await removeObjective(localObjectives.indexOf(o)) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer', marginLeft: 'auto' }}>✕ {L('Remove', 'إزالة')}</button>
                           </div>
                         </div>
                       </div>
@@ -2689,9 +2860,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         const items = report.complianceMatrix?.items || []
         const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE']
         const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#64748B', RECOMMENDED:'#3498db' }
-        const statusLabel: Record<string,string> = { COMPLIANT:'✓ Compliant', PARTIALLY_COMPLIANT:'⚠ Partial', NON_COMPLIANT:'✗ Non-Compliant', REQUIRES_EXCEPTION:'⚡ Exception', NOT_APPLICABLE:'— N/A', RECOMMENDED:'💡 Recommended' }
+        const statusLabel: Record<string,string> = { COMPLIANT: L('✓ Compliant', '✓ ممتثل'), PARTIALLY_COMPLIANT: L('⚠ Partial', '⚠ جزئي'), NON_COMPLIANT: L('✗ Non-Compliant', '✗ غير ممتثل'), REQUIRES_EXCEPTION: L('⚡ Exception', '⚡ استثناء'), NOT_APPLICABLE: L('— N/A', '— غير منطبق'), RECOMMENDED: L('💡 Recommended', '💡 موصى به') }
         const catColor: Record<string,string> = { TENANT_PRINCIPLE:'#e74c3c', TENANT_STANDARD:'#e67e22', NCA_STANDARD:'#1abc9c', NDMO_STANDARD:'#9b59b6', SDAIA_STANDARD:'#3498db', DGA_STANDARD:'#f39c12' }
-        const catLabel: Record<string,string> = { TENANT_PRINCIPLE:'Tenant EA Principles', TENANT_STANDARD:'Tenant EA Standards', NCA_STANDARD:'NCA ECC Controls', NDMO_STANDARD:'NDMO Data Standards', SDAIA_STANDARD:'SDAIA Standards', DGA_STANDARD:'DGA Standards' }
+        const catLabel: Record<string,string> = { TENANT_PRINCIPLE: L('Tenant EA Principles', 'مبادئ البنية المؤسسية للجهة'), TENANT_STANDARD: L('Tenant EA Standards', 'معايير البنية المؤسسية للجهة'), NCA_STANDARD: L('NCA ECC Controls', 'الضوابط الأساسية للأمن السيبراني (NCA)'), NDMO_STANDARD: L('NDMO Data Standards', 'معايير البيانات (مكتب إدارة البيانات الوطنية)'), SDAIA_STANDARD: L('SDAIA Standards', 'معايير سدايا'), DGA_STANDARD: L('DGA Standards', 'معايير هيئة الحكومة الرقمية') }
 
         // For national standards: filter out NOT_APPLICABLE rows (only show actionable statuses)
         const nationalCats = ['NCA_STANDARD','NDMO_STANDARD','SDAIA_STANDARD','DGA_STANDARD']
@@ -2720,7 +2891,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 <div style={{ height: 12, borderRadius: 6, overflow: 'hidden', display: 'flex', marginBottom: 10 }}>
                   {statuses.map(s => {
                     const pct = (countBy(s) / total) * 100
-                    return pct > 0 ? <div key={s} title={s} style={{ width: pct + '%', background: statusColor[s] }} /> : null
+                    return pct > 0 ? <div key={s} title={statusLabel[s]} style={{ width: pct + '%', background: statusColor[s] }} /> : null
                   })}
                 </div>
                 {/* Legend */}
@@ -2737,7 +2908,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     )
                   })}
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                    {displayItems.length} assessed · <span style={{ color: report.complianceMatrix?.complianceRate >= 70 ? '#2ecc71' : '#f39c12', fontWeight: 600 }}>{report.complianceMatrix?.complianceRate || 0}% compliance rate</span>
+                    {displayItems.length} {L('assessed', 'عنصر مُقيَّم')} · <span style={{ color: report.complianceMatrix?.complianceRate >= 70 ? '#2ecc71' : '#f39c12', fontWeight: 600 }}>{L(`${report.complianceMatrix?.complianceRate || 0}% compliance rate`, `نسبة الامتثال ${report.complianceMatrix?.complianceRate || 0}%`)}</span>
                   </span>
                 </div>
 
@@ -2749,7 +2920,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     const comp = citems.filter((i:any) => i.complianceStatus === 'COMPLIANT').length
                     return (
                       <div key={c} style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '8px 12px' }}>
-                        <div style={{ fontSize: 10, color: catColor[c] || 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>{catLabel[c] || c.replace(/_/g,' ')}</div>
+                        <div style={{ fontSize: 10, color: catColor[c] || 'var(--text-muted)', fontWeight: 600, marginBottom: 4 }}>{catLabel[c] || (isAR ? c : humanizeCode(c))}</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                           {comp > 0 && <span style={{ color: '#2ecc71' }}>✓{comp} </span>}
                           {nonComp > 0 && <span style={{ color: '#e74c3c' }}>✗{nonComp} </span>}
@@ -2767,7 +2938,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               <div key={cat} style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: catColor[cat] || 'var(--text-muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 3, height: 14, background: catColor[cat] || '#64748B', borderRadius: 2 }} />
-                  {catLabel[cat] || cat.replace(/_/g,' ')}
+                  {catLabel[cat] || (isAR ? cat : humanizeCode(cat))}
                   <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({grouped[cat].length})</span>
                   {(() => {
                     const scorable = grouped[cat].filter((i:any) => i.complianceStatus !== 'NOT_APPLICABLE' && i.complianceStatus !== 'RECOMMENDED')
@@ -2804,7 +2975,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                           {item.complianceStatus === 'RECOMMENDED' ? (
                             <div style={{ fontSize: 11, color: '#3498db', marginTop: 4, display: 'flex', gap: 6 }}>
                               <span style={{ flexShrink: 0 }}>💡</span>
-                              <span>{isAR ? resolveText(item.recommendation || 'Consider addressing this principle in the solution design.') : (item.recommendation || 'Consider addressing this principle in the solution design.')}</span>
+                              <span>{item.recommendation ? (isAR ? resolveText(item.recommendation) : item.recommendation) : L('Consider addressing this principle in the solution design.', 'يُستحسن تناول هذا المبدأ في تصميم الحل.')}</span>
                             </div>
                           ) : (
                             <>
@@ -2838,14 +3009,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                         {/* Score chip */}
                         <div style={{ textAlign: 'center', minWidth: 44, flexShrink: 0 }}>
                           {item.complianceStatus === 'RECOMMENDED' ? (
-                            <div style={{ fontSize: 9, color: '#3498db', fontWeight: 600, lineHeight: 1.3 }}>Advisory<br/>No penalty</div>
+                            <div style={{ fontSize: 9, color: '#3498db', fontWeight: 600, lineHeight: 1.3 }}>{L('Advisory', 'استشاري')}<br/>{L('No penalty', 'دون خصم')}</div>
                           ) : itemScore !== null ? (
                             <>
                               <div style={{ fontSize: 16, fontWeight: 700, color: scoreColor }}>{itemScore}</div>
                               <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>/100</div>
                             </>
                           ) : (
-                            <div style={{ fontSize: 10, color: '#64748B' }}>N/A</div>
+                            <div style={{ fontSize: 10, color: '#64748B' }}>{L('N/A', 'غير منطبق')}</div>
                           )}
                         </div>
                       </div>
@@ -2856,13 +3027,13 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                           onChange={async e => { await updateComplianceItem(localCompliance.indexOf(item), { complianceStatus: e.target.value }) }}
                           style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (statusColor[item.complianceStatus] || '#64748B') + '44', background: (statusColor[item.complianceStatus] || '#64748B') + '18', color: statusColor[item.complianceStatus] || '#64748B', cursor: 'pointer' }}>
                           {['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE'].map(s => (
-                            <option key={s} value={s}>{s.replace(/_/g,' ')}</option>
+                            <option key={s} value={s}>{statusLabel[s]}</option>
                           ))}
                         </select>
                         <button
                           onClick={async () => { await removeComplianceItem(localCompliance.indexOf(item)) }}
                           style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>
-                          ✕ Remove
+                          ✕ {L('Remove', 'إزالة')}
                         </button>
                       </div>
                     </div>
@@ -2871,7 +3042,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               </div>
             ))}
 
-            {total === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No compliance matrix available</div>}
+            {total === 0 && <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>{L('No compliance matrix available', 'لا تتوفر مصفوفة امتثال')}</div>}
           </div>
         )
       })()}
@@ -2892,7 +3063,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           <div>
             {/* Severity summary cards */}
             <div className="stat-grid-5" style={{ marginBottom: 16 }}>
-              {[['Total', allRisks.length, '#64748B'], ['Critical', sevCount('CRITICAL'), '#e74c3c'], ['High', sevCount('HIGH'), '#e67e22'], ['Medium', sevCount('MEDIUM'), '#f39c12'], ['Low', sevCount('LOW'), '#3498db']].map(([l, v, c]: any) => (
+              {[[L('Total', 'الإجمالي'), allRisks.length, '#64748B'], [enumLabel('CRITICAL', isAR), sevCount('CRITICAL'), '#e74c3c'], [enumLabel('HIGH', isAR), sevCount('HIGH'), '#e67e22'], [enumLabel('MEDIUM', isAR), sevCount('MEDIUM'), '#f39c12'], [enumLabel('LOW', isAR), sevCount('LOW'), '#3498db']].map(([l, v, c]: any) => (
                 <div key={l} style={{ background: c + '18', border: '1px solid ' + c + '44', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
                   <div style={{ fontSize: 22, fontWeight: 700, color: c }}>{v}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{l}</div>
@@ -2912,18 +3083,18 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     border: '1px solid ' + SEV_COLOR[sev] + (active ? '' : '55'),
                     background: active ? SEV_COLOR[sev] + '33' : 'transparent',
                     color: SEV_COLOR[sev]
-                  }}>{n} {sev}</button>
+                  }}>{n} {enumLabel(sev, isAR)}</button>
                 )
               })}
               <select value={riskFilterCat} onChange={e => setRiskFilterCat(e.target.value)}
                 style={{ padding: '4px 10px', borderRadius: 8, border: '1px solid var(--navy-light)', background: 'var(--navy-mid)', color: 'var(--text)', fontSize: 12, marginLeft: 4 }}>
-                <option value=''>All Categories</option>
-                {allCats.map((c: string) => <option key={c} value={c}>{c.replace(/_/g,' ')}</option>)}
+                <option value=''>{L('All Categories', 'كل الفئات')}</option>
+                {allCats.map((c: string) => <option key={c} value={c}>{riskCategoryLabel(c, isAR)}</option>)}
               </select>
               {(riskFilterSev.length > 0 || riskFilterCat) && (
-                <button onClick={() => { setRiskFilterSev([]); setRiskFilterCat('') }} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>✕ Clear</button>
+                <button onClick={() => { setRiskFilterSev([]); setRiskFilterCat('') }} style={{ fontSize: 11, color: 'var(--text-muted)', background: 'transparent', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '3px 8px', cursor: 'pointer' }}>✕ {isAR ? 'مسح' : 'Clear'}</button>
               )}
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{filteredRisks.length}/{allRisks.length} risks</span>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>{filteredRisks.length}/{allRisks.length} {L('risks', 'خطر')}</span>
             </div>
 
             {/* Risk cards */}
@@ -2932,32 +3103,32 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               return (
               <div key={riskIdx} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                  <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[risk.severity] + '33', color: SEV_COLOR[risk.severity] }}>{risk.severity}</span>
+                  <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[risk.severity] + '33', color: SEV_COLOR[risk.severity] }}>{enumLabel(risk.severity, isAR)}</span>
                   <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{risk.riskTitle}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{risk.riskCategory?.replace(/_/g, ' ')}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{risk.riskCategory ? riskCategoryLabel(risk.riskCategory, isAR) : ''}</div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Probability: </span>{risk.probability}</div>
-                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Owner: </span>{risk.owner}</div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>{L('Probability: ', 'الاحتمالية: ')}</span>{enumLabel(risk.probability, isAR)}</div>
+                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>{L('Owner: ', 'المالك: ')}</span>{risk.owner}</div>
                 </div>
-                {risk.impact && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Impact: {risk.impact}</div>}
-                {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
-                {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
+                {risk.impact && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{L('Impact: ', 'الأثر: ')}{risk.impact}</div>}
+                {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>{L('Mitigation: ', 'المعالجة: ')}{risk.mitigation}</div>}
+                {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{L('Evidence: ', 'الدليل: ')}{risk.evidence}</div>}
                 <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
                   <select value={risk.severity} onChange={async e => { await updateRisk(riskIdx, { severity: e.target.value }) }}
                     style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (SEV_COLOR[risk.severity] || '#64748B') + '44', background: (SEV_COLOR[risk.severity] || '#64748B') + '18', color: SEV_COLOR[risk.severity] || '#64748B', cursor: 'pointer' }}>
-                    {['CRITICAL','HIGH','MEDIUM','LOW'].map(s => <option key={s} value={s}>{s}</option>)}
+                    {['CRITICAL','HIGH','MEDIUM','LOW'].map(s => <option key={s} value={s}>{enumLabel(s, isAR)}</option>)}
                   </select>
-                  <button onClick={async () => { await removeRisk(riskIdx) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                  <button onClick={async () => { await removeRisk(riskIdx) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ {L('Remove', 'إزالة')}</button>
                 </div>
               </div>
               )
             })}
             {allRisks.length === 0 && (
-              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No risk register available</div>
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>{L('No risk register available', 'لا يتوفر سجل مخاطر')}</div>
             )}
             {allRisks.length > 0 && filteredRisks.length === 0 && (
-              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No risks match the selected filters</div>
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>{L('No risks match the selected filters', 'لا توجد مخاطر تطابق التصفية المحددة')}</div>
             )}
           </div>
         )
@@ -2966,7 +3137,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {/* Future State Tab */}
       {tab === 'future' && (() => {
         const fs = report.futureStateAlignment
-        if (!fs) return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>Future-state alignment not available</div>
+        if (!fs) return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>{L('Future-state alignment not available', 'المواءمة مع الحالة المستقبلية غير متاحة')}</div>
         const pct = fs.alignmentPercentage || 0
         const pctColor = pct >= 75 ? '#2ecc71' : pct >= 50 ? '#f39c12' : '#e74c3c'
         const AREA_STATUS_COLOR: Record<string,string> = {
@@ -2989,7 +3160,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginBottom: 10 }}>
                 <div style={{ textAlign: 'center', minWidth: 72 }}>
                   <div style={{ fontSize: 36, fontWeight: 700, color: pctColor }}>{pct}%</div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fs.overallAlignment?.replace(/_/g,' ') || 'Alignment'}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{fs.overallAlignment ? enumLabel(fs.overallAlignment, isAR, ALIGNMENT_STATUS_LABEL) : L('Alignment', 'المواءمة')}</div>
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 8, lineHeight: 1.5 }}>{isAR ? resolveText(fs.summary) : fs.summary}</div>
@@ -3001,9 +3172,9 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
               {/* Area status summary */}
               {areas.length > 0 && (
                 <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
-                  {alignedCount > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#2ecc7122', color: '#2ecc71' }}>✅ {alignedCount} Aligned</span>}
-                  {gapCount > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#e74c3c22', color: '#e74c3c' }}>❌ {gapCount} Gaps</span>}
-                  {futureReqs > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#3498db22', color: '#3498db' }}>🔵 {futureReqs} Future Requirements</span>}
+                  {alignedCount > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#2ecc7122', color: '#2ecc71' }}>✅ {alignedCount} {L('Aligned', 'متوائم')}</span>}
+                  {gapCount > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#e74c3c22', color: '#e74c3c' }}>❌ {gapCount} {L('Gaps', 'فجوات')}</span>}
+                  {futureReqs > 0 && <span style={{ fontSize: 12, padding: '2px 10px', borderRadius: 12, background: '#3498db22', color: '#3498db' }}>🔵 {futureReqs} {L('Future Requirements', 'متطلبات مستقبلية')}</span>}
                 </div>
               )}
             </div>
@@ -3018,7 +3189,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                   <div key={status} style={{ marginBottom: 16 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: c, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span>{AREA_ICON[status]}</span>
-                      <span>{status.replace(/_/g,' ')}</span>
+                      <span>{enumLabel(status, isAR, FUTURE_AREA_STATUS_LABEL)}</span>
                       <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>({statusAreas.length})</span>
                     </div>
                     {statusAreas.map((area: any) => {
@@ -3026,16 +3197,16 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                       return (
                       <div key={areaIdx} style={{ background: 'var(--navy-mid)', border: '1px solid ' + c + '33', borderRadius: 10, padding: 12, marginBottom: 8 }}>
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4, color: 'var(--text)' }}>{isAR ? resolveText(area.area) : area.area}</div>
-                        {area.currentState && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>📍 Current: {isAR ? resolveText(area.currentState) : area.currentState}</div>}
-                        {area.targetState && <div style={{ fontSize: 12, color: '#3498db', marginBottom: 4 }}>🎯 Target: {isAR ? resolveText(area.targetState) : area.targetState}</div>}
-                        {area.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>⚠ Gap: {isAR ? resolveText(area.gap) : area.gap}</div>}
+                        {area.currentState && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>📍 {L('Current: ', 'الحالي: ')}{isAR ? resolveText(area.currentState) : area.currentState}</div>}
+                        {area.targetState && <div style={{ fontSize: 12, color: '#3498db', marginBottom: 4 }}>🎯 {L('Target: ', 'المستهدف: ')}{isAR ? resolveText(area.targetState) : area.targetState}</div>}
+                        {area.gap && <div style={{ fontSize: 12, color: '#e74c3c', marginBottom: 4 }}>⚠ {L('Gap: ', 'الفجوة: ')}{isAR ? resolveText(area.gap) : area.gap}</div>}
                         {area.recommendation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 6 }}>→ {isAR ? resolveText(area.recommendation) : area.recommendation}</div>}
                         <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
                           <select value={area.status} onChange={async e => { await updateFutureArea(areaIdx, { status: e.target.value }) }}
                             style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + c + '44', background: c + '18', color: c, cursor: 'pointer' }}>
-                            {['ALIGNED','PARTIALLY_ALIGNED','GAP_IDENTIFIED','NOT_ALIGNED','FUTURE_REQUIREMENT','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{s.replace(/_/g,' ')}</option>)}
+                            {['ALIGNED','PARTIALLY_ALIGNED','GAP_IDENTIFIED','NOT_ALIGNED','FUTURE_REQUIREMENT','NOT_APPLICABLE'].map(s => <option key={s} value={s}>{enumLabel(s, isAR, FUTURE_AREA_STATUS_LABEL)}</option>)}
                           </select>
-                          <button onClick={async () => { await removeFutureArea(areaIdx) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ Remove</button>
+                          <button onClick={async () => { await removeFutureArea(areaIdx) }} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid #e74c3c44', background: 'none', color: '#e74c3c', cursor: 'pointer' }}>✕ {L('Remove', 'إزالة')}</button>
                         </div>
                       </div>
                       )
@@ -3048,7 +3219,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             {/* Key gaps */}
             {fs.keyGaps?.length > 0 && (
               <div style={{ background: '#e74c3c11', border: '1px solid #e74c3c33', borderRadius: 10, padding: 16, marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c', marginBottom: 10 }}>🚨 KEY GAPS TO ADDRESS</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#e74c3c', marginBottom: 10 }}>🚨 {L('KEY GAPS TO ADDRESS', 'الفجوات الرئيسية الواجب معالجتها')}</div>
                 {fs.keyGaps.map((g: string, i: number) => (
                   <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
                     <span style={{ color: '#e74c3c', minWidth: 20, fontWeight: 700 }}>{i+1}.</span>
@@ -3061,7 +3232,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             {/* Recommendations roadmap */}
             {fs.recommendations?.length > 0 && (
               <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>🗺 ROADMAP TO TARGET STATE</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--accent)', marginBottom: 12 }}>🗺 {L('ROADMAP TO TARGET STATE', 'خارطة الطريق إلى الحالة المستهدفة')}</div>
                 {fs.recommendations.map((r: string, i: number) => (
                   <div key={i} style={{ display: 'flex', gap: 12, marginBottom: 10, alignItems: 'flex-start' }}>
                     <div style={{ minWidth: 24, height: 24, borderRadius: '50%', background: 'var(--accent)22', border: '1px solid var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--accent)', flexShrink: 0 }}>{i+1}</div>
@@ -3103,28 +3274,28 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             {totalSaving > 0 ? (
               <div style={{ background: '#2ecc7118', border: '1px solid #2ecc7144', borderRadius: 12, padding: 20, marginBottom: 16 }}>
                 <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 4 }}>TOTAL FINANCIAL OPPORTUNITY</div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', letterSpacing: 1, marginBottom: 4 }}>{L('TOTAL FINANCIAL OPPORTUNITY', 'إجمالي الفرصة المالية')}</div>
                   <div style={{ fontSize: 36, fontWeight: 700, color: '#2ecc71' }}>
-                    SAR {totalSaving.toLocaleString()}
+                    {sar(totalSaving)}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{opps.length} opportunities identified</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>{L(`${opps.length} opportunities identified`, `تم تحديد ${opps.length} فرصة`)}</div>
                   {totalMin > 0 && totalMax > 0 && (
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                      Range: <span style={{ color: '#e74c3c' }}>SAR {totalMin.toLocaleString()}</span> – <span style={{ color: '#2ecc71' }}>SAR {totalMax.toLocaleString()}</span>
+                      {L('Range: ', 'النطاق: ')}<span style={{ color: '#e74c3c' }}>{sar(totalMin)}</span> – <span style={{ color: '#2ecc71' }}>{sar(totalMax)}</span>
                     </div>
                   )}
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                   {totalAnnual > 0 && (
                     <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>💰 Annual Savings</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: '#2ecc71' }}>SAR {totalAnnual.toLocaleString()}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>💰 {L('Annual Savings', 'الوفورات السنوية')}</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#2ecc71' }}>{sar(totalAnnual)}</div>
                     </div>
                   )}
                   {totalOneTime > 0 && (
                     <div style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '10px 14px', textAlign: 'center' }}>
-                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>🏦 One-time Saving</div>
-                      <div style={{ fontSize: 20, fontWeight: 700, color: '#3498db' }}>SAR {totalOneTime.toLocaleString()}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>🏦 {L('One-time Saving', 'وفر لمرة واحدة')}</div>
+                      <div style={{ fontSize: 20, fontWeight: 700, color: '#3498db' }}>{sar(totalOneTime)}</div>
                     </div>
                   )}
                 </div>
@@ -3135,14 +3306,14 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                       opps.reduce((acc:any,o:any)=>{ const t=o.type||'OTHER'; acc[t]=(acc[t]||0)+(o.annualSaving||o.estimatedSaving||0); return acc },{})
                     ).sort((a:any,b:any)=>b[1]-a[1]).map(([type,val]:any) => (
                       <div key={type} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 10, background: (TYPE_COLOR[type]||'#64748B')+'22', color: TYPE_COLOR[type]||'#64748B' }}>
-                        {TYPE_ICON[type]||'•'} {type.replace(/_/g,' ')}: SAR {val.toLocaleString()}
+                        {TYPE_ICON[type]||'•'} {enumLabel(type, isAR, SAVING_TYPE_LABEL)}: {sar(val)}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
             ) : (
-              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>No financial opportunities detected</div>
+              <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>{L('No financial opportunities detected', 'لم تُرصد فرص مالية')}</div>
             )}
 
             {/* Opportunity cards — sorted by saving desc */}
@@ -3155,18 +3326,18 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                 <div key={i} style={{ background: 'var(--navy-mid)', border: '1px solid ' + oColor + '33', borderRadius: 10, padding: 16, marginBottom: 10 }}>
                   {isEditing ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>✏ Edit Saving Opportunity</div>
-                      <input value={oppDraft.title ?? o.title ?? ''} onChange={e => setOppDraft((d:any) => ({...d, title: e.target.value}))} placeholder='Title' style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-                      <textarea value={oppDraft.description ?? o.description ?? ''} onChange={e => setOppDraft((d:any) => ({...d, description: e.target.value}))} placeholder='Description' rows={2} style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 12, resize: 'vertical' }} />
-                      <input value={oppDraft.existingAlternative ?? o.existingAlternative ?? ''} onChange={e => setOppDraft((d:any) => ({...d, existingAlternative: e.target.value}))} placeholder='Existing alternative (tool/platform name)' style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
-                      <textarea value={oppDraft.savingRationale ?? o.savingRationale ?? ''} onChange={e => setOppDraft((d:any) => ({...d, savingRationale: e.target.value}))} placeholder='Saving rationale (step-by-step derivation)' rows={2} style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 12, resize: 'vertical' }} />
+                      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)', marginBottom: 4 }}>✏ {L('Edit Saving Opportunity', 'تعديل فرصة التوفير')}</div>
+                      <input value={oppDraft.title ?? o.title ?? ''} onChange={e => setOppDraft((d:any) => ({...d, title: e.target.value}))} placeholder={L('Title', 'العنوان')} style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                      <textarea value={oppDraft.description ?? o.description ?? ''} onChange={e => setOppDraft((d:any) => ({...d, description: e.target.value}))} placeholder={L('Description', 'الوصف')} rows={2} style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 12, resize: 'vertical' }} />
+                      <input value={oppDraft.existingAlternative ?? o.existingAlternative ?? ''} onChange={e => setOppDraft((d:any) => ({...d, existingAlternative: e.target.value}))} placeholder={L('Existing alternative (tool/platform name)', 'البديل القائم (اسم الأداة/المنصة)')} style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 13 }} />
+                      <textarea value={oppDraft.savingRationale ?? o.savingRationale ?? ''} onChange={e => setOppDraft((d:any) => ({...d, savingRationale: e.target.value}))} placeholder={L('Saving rationale (step-by-step derivation)', 'مبرر التوفير (طريقة الاحتساب خطوة بخطوة)')} rows={2} style={{ background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: 'var(--text-primary)', fontSize: 12, resize: 'vertical' }} />
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>One-time Saving (SAR)</div><input type='number' value={oppDraft.estimatedSaving ?? o.estimatedSaving ?? 0} onChange={e => setOppDraft((d:any) => ({...d, estimatedSaving: Number(e.target.value)}))} style={{ width: '100%', background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: '#3498db', fontSize: 14, fontWeight: 700 }} /></div>
-                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>Annual Saving (SAR)</div><input type='number' value={oppDraft.annualSaving ?? o.annualSaving ?? 0} onChange={e => setOppDraft((d:any) => ({...d, annualSaving: Number(e.target.value)}))} style={{ width: '100%', background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: '#2ecc71', fontSize: 14, fontWeight: 700 }} /></div>
+                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{L('One-time Saving (SAR)', 'وفر لمرة واحدة (ريال)')}</div><input type='number' value={oppDraft.estimatedSaving ?? o.estimatedSaving ?? 0} onChange={e => setOppDraft((d:any) => ({...d, estimatedSaving: Number(e.target.value)}))} style={{ width: '100%', background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: '#3498db', fontSize: 14, fontWeight: 700 }} /></div>
+                        <div><div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 3 }}>{L('Annual Saving (SAR)', 'الوفر السنوي (ريال)')}</div><input type='number' value={oppDraft.annualSaving ?? o.annualSaving ?? 0} onChange={e => setOppDraft((d:any) => ({...d, annualSaving: Number(e.target.value)}))} style={{ width: '100%', background: 'var(--navy-dark)', border: '1px solid var(--navy-light)', borderRadius: 6, padding: '6px 10px', color: '#2ecc71', fontSize: 14, fontWeight: 700 }} /></div>
                       </div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                        <button onClick={saveOppEdit} style={{ flex: 1, padding: '7px 0', borderRadius: 8, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>💾 Save</button>
-                        <button onClick={() => { setEditingOppIdx(null); setOppDraft({}) }} style={{ padding: '7px 16px', borderRadius: 8, background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>Cancel</button>
+                        <button onClick={saveOppEdit} style={{ flex: 1, padding: '7px 0', borderRadius: 8, background: 'var(--accent)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>💾 {L('Save', 'حفظ')}</button>
+                        <button onClick={() => { setEditingOppIdx(null); setOppDraft({}) }} style={{ padding: '7px 16px', borderRadius: 8, background: 'none', border: '1px solid var(--navy-light)', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 13 }}>{L('Cancel', 'إلغاء')}</button>
                       </div>
                     </div>
                   ) : (
@@ -3175,15 +3346,15 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                     <span style={{ fontSize: 20, minWidth: 28 }}>{oIcon}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>{isAR ? resolveText(o.title||o.type?.replace(/_/g,' ')) : (o.title||o.type?.replace(/_/g,' '))}</div>
+                        <div style={{ fontSize: 14, fontWeight: 600 }}>{o.title ? (isAR ? resolveText(o.title) : o.title) : enumLabel(o.type, isAR, SAVING_TYPE_LABEL)}</div>
                         {o.confidenceLevel && (
                           <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: (CONF_COLOR[o.confidenceLevel]||'#64748B')+'22', color: CONF_COLOR[o.confidenceLevel]||'#64748B', fontWeight: 600 }}>
-                            {o.confidenceLevel} confidence
+                            {L(`${enumLabel(o.confidenceLevel, false)} confidence`, `ثقة ${enumLabel(o.confidenceLevel, true)}`)}
                           </span>
                         )}
-                        {oTotal > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: '#2ecc71', marginLeft: 'auto' }}>SAR {oTotal.toLocaleString()}</span>}
-                        <button onClick={() => { setEditingOppIdx(i); setOppDraft({}) }} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'none', border: '1px solid var(--accent)55', color: 'var(--accent)', cursor: 'pointer' }}>✏ Edit</button>
-                        <button onClick={() => removeOpp(i)} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'none', border: '1px solid #e74c3c55', color: '#e74c3c', cursor: 'pointer' }}>🗑</button>
+                        {oTotal > 0 && <span style={{ fontSize: 12, fontWeight: 700, color: '#2ecc71', marginLeft: 'auto' }}>{sar(oTotal)}</span>}
+                        <button onClick={() => { setEditingOppIdx(i); setOppDraft({}) }} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'none', border: '1px solid var(--accent)55', color: 'var(--accent)', cursor: 'pointer' }}>✏ {L('Edit', 'تعديل')}</button>
+                        <button onClick={() => removeOpp(i)} aria-label={L('Remove opportunity', 'إزالة الفرصة')} title={L('Remove opportunity', 'إزالة الفرصة')} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: 'none', border: '1px solid #e74c3c55', color: '#e74c3c', cursor: 'pointer' }}>🗑</button>
                       </div>
                       {o.description && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.5 }}>{isAR ? resolveText(o.description) : o.description}</div>}
                     </div>
@@ -3192,7 +3363,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                   {/* Source citation — where in the document this was found */}
                   {o.sourceReference && (
                     <div style={{ background: '#3498db11', border: '1px solid #3498db33', borderRadius: 8, padding: '8px 12px', marginBottom: 8 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#3498db', marginBottom: 4, letterSpacing: 0.5 }}>📍 FOUND IN DOCUMENT</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#3498db', marginBottom: 4, letterSpacing: 0.5 }}>📍 {L('FOUND IN DOCUMENT', 'ورد في الوثيقة')}</div>
                       <div style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500 }}>{o.sourceReference}</div>
                       {o.sourceQuote && (
                         <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6, paddingLeft: 8, borderLeft: '2px solid #3498db44', fontStyle: 'italic', lineHeight: 1.5 }}>
@@ -3204,33 +3375,33 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
 
                   {o.existingAlternative && (
                     <div style={{ background: '#2ecc7115', border: '1px solid #2ecc7133', borderRadius: 6, padding: '6px 10px', marginBottom: 8, fontSize: 12, color: '#2ecc71' }}>
-                      ♻️ Reuse existing: {isAR ? resolveText(o.existingAlternative) : o.existingAlternative}
+                      ♻️ {L('Reuse existing: ', 'إعادة استخدام القائم: ')}{isAR ? resolveText(o.existingAlternative) : o.existingAlternative}
                     </div>
                   )}
 
                   <div style={{ display: 'grid', gridTemplateColumns: o.estimatedSaving > 0 && o.annualSaving > 0 ? '1fr 1fr' : '1fr', gap: 8, marginBottom: 8 }}>
                     {o.estimatedSaving > 0 && (
                       <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>One-time Saving</div>
-                        <div style={{ fontSize: 17, fontWeight: 700, color: '#3498db' }}>SAR {o.estimatedSaving.toLocaleString()}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{L('One-time Saving', 'وفر لمرة واحدة')}</div>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: '#3498db' }}>{sar(o.estimatedSaving)}</div>
                         {(o.estimatedSavingMin || o.estimatedSavingMax) && (
                           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
-                            <span style={{ color: '#e74c3c' }}>Min SAR {(o.estimatedSavingMin||0).toLocaleString()}</span>
+                            <span style={{ color: '#e74c3c' }}>{L('Min', 'الأدنى')} {sar(o.estimatedSavingMin||0)}</span>
                             <span style={{ margin: '0 6px', color: 'var(--navy-light)' }}>·</span>
-                            <span style={{ color: '#2ecc71' }}>Max SAR {(o.estimatedSavingMax||0).toLocaleString()}</span>
+                            <span style={{ color: '#2ecc71' }}>{L('Max', 'الأعلى')} {sar(o.estimatedSavingMax||0)}</span>
                           </div>
                         )}
                       </div>
                     )}
                     {o.annualSaving > 0 && (
                       <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '10px 12px' }}>
-                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>Annual Saving (avg)</div>
-                        <div style={{ fontSize: 17, fontWeight: 700, color: '#2ecc71' }}>SAR {o.annualSaving.toLocaleString()}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text-muted)', marginBottom: 4 }}>{L('Annual Saving (avg)', 'الوفر السنوي (متوسط)')}</div>
+                        <div style={{ fontSize: 17, fontWeight: 700, color: '#2ecc71' }}>{sar(o.annualSaving)}</div>
                         {(o.annualSavingMin || o.annualSavingMax) && (
                           <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>
-                            <span style={{ color: '#e74c3c' }}>Min SAR {(o.annualSavingMin||0).toLocaleString()}</span>
+                            <span style={{ color: '#e74c3c' }}>{L('Min', 'الأدنى')} {sar(o.annualSavingMin||0)}</span>
                             <span style={{ margin: '0 6px', color: 'var(--navy-light)' }}>·</span>
-                            <span style={{ color: '#2ecc71' }}>Max SAR {(o.annualSavingMax||0).toLocaleString()}</span>
+                            <span style={{ color: '#2ecc71' }}>{L('Max', 'الأعلى')} {sar(o.annualSavingMax||0)}</span>
                           </div>
                         )}
                       </div>
@@ -3240,7 +3411,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
                   {/* Saving rationale — step-by-step derivation */}
                   {o.savingRationale && (
                     <div style={{ background: 'var(--navy-dark)', borderRadius: 6, padding: '8px 12px', marginBottom: 8 }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4, letterSpacing: 0.5 }}>📊 SAVING RATIONALE</div>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 4, letterSpacing: 0.5 }}>📊 {L('SAVING RATIONALE', 'مبرر التوفير')}</div>
                       <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.6 }}>{isAR ? resolveText(o.savingRationale) : o.savingRationale}</div>
                     </div>
                   )}
