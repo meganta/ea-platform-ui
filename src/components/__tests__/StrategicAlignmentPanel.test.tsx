@@ -5,7 +5,7 @@ import { alignmentApi } from '../../lib/strategy-alignment'
 
 jest.mock('../../lib/strategy-alignment', () => ({
   ...jest.requireActual('../../lib/strategy-alignment'),
-  alignmentApi: { latest: jest.fn(), start: jest.fn(), decide: jest.fn(), addLink: jest.fn(), setValue: jest.fn(), export: jest.fn(), units: jest.fn(), kpis: jest.fn(), tracking: jest.fn(), measure: jest.fn(), report: jest.fn(), exportReport: jest.fn(), setStrategyType: jest.fn() },
+  alignmentApi: { latest: jest.fn(), start: jest.fn(), decide: jest.fn(), addLink: jest.fn(), setValue: jest.fn(), export: jest.fn(), units: jest.fn(), kpis: jest.fn(), tracking: jest.fn(), measure: jest.fn(), comment: jest.fn(), addEvidenceLink: jest.fn(), addEvidenceFile: jest.fn(), downloadEvidence: jest.fn(), removeEvidence: jest.fn(), report: jest.fn(), exportReport: jest.fn(), setStrategyType: jest.fn() },
 }))
 const api = alignmentApi as jest.Mocked<typeof alignmentApi>
 const t = (key: string) => key
@@ -138,5 +138,77 @@ describe('KPI measurement panel', () => {
   it('is read-only without review rights', async () => {
     render(<KpiMeasurementPanel t={t} canEdit={false} />)
     expect(await screen.findByLabelText('KPI k1 strategy.align.period.Q2')).toBeDisabled()
+  })
+
+  describe('comment and evidence', () => {
+    const withEvidence = () => api.kpis.mockResolvedValue([kpi('k1', { measures: { Q1: { value: '70', note: 'Two reviews late', evidence: [{ id: 'e1', kind: 'LINK', url: 'https://intranet.example/log' }, { id: 'e2', kind: 'FILE', fileName: 'minutes.pdf', size: 10 }] } } })] as any)
+    beforeEach(() => { api.comment.mockResolvedValue({}); api.addEvidenceLink.mockResolvedValue({} as any); api.addEvidenceFile.mockResolvedValue({} as any); api.removeEvidence.mockResolvedValue({}); api.downloadEvidence.mockResolvedValue(undefined) })
+
+    it('shows how much is attached to a measure and opens its comment and evidence', async () => {
+      withEvidence()
+      render(<KpiMeasurementPanel t={t} canEdit />)
+      const row = await screen.findByTestId('kpi-k1')
+      const buttons = within(row).getAllByTitle('strategy.kpi.evidence.title')
+      expect(buttons[0]).toHaveTextContent('3')
+      fireEvent.click(buttons[0])
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByLabelText('strategy.kpi.evidence.comment')).toHaveValue('Two reviews late')
+      expect(within(dialog).getByRole('link', { name: 'https://intranet.example/log' })).toHaveAttribute('rel', 'noopener noreferrer')
+      fireEvent.click(within(dialog).getByRole('button', { name: 'minutes.pdf' }))
+      await waitFor(() => expect(api.downloadEvidence).toHaveBeenCalledWith('k1', expect.any(Number), 'Q1', expect.objectContaining({ id: 'e2' })))
+      const remove = within(dialog).getByRole('button', { name: 'strategy.kpi.evidence.remove https://intranet.example/log' })
+      await waitFor(() => expect(remove).not.toBeDisabled())
+      fireEvent.click(remove)
+      await waitFor(() => expect(api.removeEvidence).toHaveBeenCalledWith('k1', expect.any(Number), 'Q1', 'e1'))
+    })
+
+    it('saves a comment, adds a link (web addresses only) and uploads a file', async () => {
+      render(<KpiMeasurementPanel t={t} canEdit />)
+      const row = await screen.findByTestId('kpi-k1')
+      fireEvent.click(within(row).getAllByTitle('strategy.kpi.evidence.title')[1])
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByText('strategy.kpi.evidence.none')).toBeInTheDocument()
+      fireEvent.change(within(dialog).getByLabelText('strategy.kpi.evidence.comment'), { target: { value: 'Collected from the tracker' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'strategy.kpi.evidence.save_comment' }))
+      await waitFor(() => expect(api.comment).toHaveBeenCalledWith('k1', expect.any(Number), 'Q2', 'Collected from the tracker'))
+      const url = within(dialog).getByLabelText('strategy.kpi.evidence.link')
+      fireEvent.change(url, { target: { value: 'javascript:alert(1)' } })
+      expect(within(dialog).getByRole('button', { name: 'strategy.kpi.evidence.add_link' })).toBeDisabled()
+      expect(within(dialog).getByText('strategy.kpi.evidence.link_invalid')).toBeInTheDocument()
+      fireEvent.change(url, { target: { value: 'https://example.org/q2' } })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'strategy.kpi.evidence.add_link' }))
+      await waitFor(() => expect(api.addEvidenceLink).toHaveBeenCalledWith('k1', expect.any(Number), 'Q2', 'https://example.org/q2'))
+      const file = new File(['x'], 'proof.xlsx')
+      fireEvent.change(within(dialog).getByLabelText('strategy.kpi.evidence.file'), { target: { files: [file] } })
+      await waitFor(() => expect(api.addEvidenceFile).toHaveBeenCalledWith('k1', expect.any(Number), 'Q2', file))
+      fireEvent.keyDown(dialog, { key: 'Escape' })
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    })
+
+    it('lets readers see evidence but not change it', async () => {
+      withEvidence()
+      render(<KpiMeasurementPanel t={t} canEdit={false} />)
+      const row = await screen.findByTestId('kpi-k1')
+      expect(within(row).getAllByTitle('strategy.kpi.evidence.title')).toHaveLength(1)
+      fireEvent.click(within(row).getByTitle('strategy.kpi.evidence.title'))
+      const dialog = await screen.findByRole('dialog')
+      expect(within(dialog).getByLabelText('strategy.kpi.evidence.comment')).toBeDisabled()
+      expect(within(dialog).queryByRole('button', { name: /strategy.kpi.evidence.remove/ })).toBeNull()
+      expect(within(dialog).queryByLabelText('strategy.kpi.evidence.link')).toBeNull()
+    })
+
+    it('shows comments and evidence in the period report', async () => {
+      api.report.mockResolvedValue({ year: 2026, period: 'Q1', measured: 1, missing: 0, rows: [{ id: 'k1', name: 'KPI k1', formula: '', frequency: 'QUARTERLY', target: '80', unit: '%', value: '70', derived: false, previous: '', trend: '', onTarget: false, status: 'MEASURED',
+        comments: [{ period: 'Q1', text: 'Two reviews late' }, { period: 'M02', text: 'Feb dip' }], evidence: [{ id: 'e1', period: 'Q1', kind: 'LINK', name: 'https://intranet.example/log', url: 'https://intranet.example/log' }, { id: 'e2', period: 'Q1', kind: 'FILE', name: 'minutes.pdf' }] }] })
+      render(<KpiMeasurementPanel t={t} canEdit />)
+      await screen.findByTestId('kpi-k1')
+      fireEvent.change(screen.getByLabelText('strategy.kpi.period'), { target: { value: 'Q1' } })
+      fireEvent.click(screen.getByRole('button', { name: 'strategy.kpi.show_report' }))
+      expect(await screen.findByText('Two reviews late')).toBeInTheDocument()
+      expect(screen.getByText('Feb dip').firstChild).toHaveTextContent('strategy.align.period.M02')
+      expect(screen.getByRole('link', { name: 'https://intranet.example/log' })).toHaveAttribute('target', '_blank')
+      fireEvent.click(screen.getByRole('button', { name: 'minutes.pdf' }))
+      await waitFor(() => expect(api.downloadEvidence).toHaveBeenCalledWith('k1', 2026, 'Q1', expect.objectContaining({ id: 'e2' })))
+    })
   })
 })

@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useState } from 'react'
 import HelpTip from './HelpTip'
+import KpiEvidenceDialog from './KpiEvidenceDialog'
 import { KpiFrequency, KpiReport, KpiUnit, TrackedKpi, alignmentApi } from '../lib/strategy-alignment'
 
 type T = (key: string) => string
@@ -27,6 +28,7 @@ export default function KpiMeasurementPanel({ t, canEdit }: { t: T; canEdit: boo
   const [report, setReport] = useState<KpiReport | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const [evidenceFor, setEvidenceFor] = useState<{ kpiId: string; period: string } | null>(null)
   useEffect(() => { alignmentApi.units().then(list => { setUnits(list); if (list.length) setUnitId(list[0].id) }).catch((e: any) => setError(e.message)) }, [])
   const load = useCallback(() => unitId ? alignmentApi.kpis(unitId, year).then(setKpis).catch((e: any) => setError(e.message)) : Promise.resolve(), [unitId, year])
   useEffect(() => { load(); setReport(null) }, [load])
@@ -34,6 +36,20 @@ export default function KpiMeasurementPanel({ t, canEdit }: { t: T; canEdit: boo
   const due = kpis.filter(k => k.reported).flatMap(k => k.schedule.filter(s => s.status === 'DUE'))
   const overdue = kpis.filter(k => k.reported).flatMap(k => k.schedule.filter(s => s.status === 'OVERDUE'))
   const save = (k: TrackedKpi, p: string, value: string) => { if ((k.measures[p]?.value || '') !== value) act(() => alignmentApi.measure(k.id, year, p, value)) }
+  const evidenceKpi = evidenceFor && kpis.find(k => k.id === evidenceFor.kpiId)
+  /** A measure field with its comment/evidence button (the count shows what is attached). */
+  const measureField = (k: TrackedKpi, p: string, status?: string, dueDate?: string) => {
+    const m = k.measures[p]
+    const count = (m?.evidence?.length || 0) + (m?.note ? 1 : 0)
+    const id = `kpi-${k.id}-${p}`
+    return <div key={p} className={`kpi-period${status ? ` kpi-${status}` : ''}`} title={dueDate ? fill(t('strategy.kpi.due_on'), { date: dueDate }) : undefined}>
+      <label htmlFor={id}>{t(`strategy.align.period.${p}`)}{status ? ` · ${t(`strategy.kpi.status.${status}`)}` : ''}</label>
+      <div className="kpi-period-row">
+        <input id={id} aria-label={`${k.name} ${t(`strategy.align.period.${p}`)}`} defaultValue={m?.value || ''} disabled={!canEdit} onBlur={e => save(k, p, e.target.value)} />
+        {(canEdit || count > 0) && <button className={`kpi-evidence-button${count ? ' has-evidence' : ''}`} aria-label={fill(t('strategy.kpi.evidence.open'), { name: k.name, period: t(`strategy.align.period.${p}`), count })} title={t('strategy.kpi.evidence.title')} onClick={() => setEvidenceFor({ kpiId: k.id, period: p })}>📎{count ? ` ${count}` : '+'}</button>}
+      </div>
+    </div>
+  }
 
   return <section className="kpi-panel">
     <div className="panel-head">
@@ -60,12 +76,9 @@ export default function KpiMeasurementPanel({ t, canEdit }: { t: T; canEdit: boo
             <td><input type="checkbox" aria-label={fill(t('strategy.kpi.reported_label'), { name: k.name })} checked={k.reported} disabled={!canEdit || busy} onChange={e => act(() => alignmentApi.tracking(k.id, { reported: e.target.checked }))} /></td>
             <td><select aria-label={fill(t('strategy.kpi.frequency_label'), { name: k.name })} value={k.frequency} disabled={!canEdit || busy} onChange={e => act(() => alignmentApi.tracking(k.id, { frequency: e.target.value as KpiFrequency }))}>{FREQUENCIES.map(f => <option key={f} value={f}>{t(`strategy.kpi.frequency.${f}`)}</option>)}</select></td>
             <td><input aria-label={fill(t('strategy.kpi.target_label'), { name: k.name })} defaultValue={k.target || ''} disabled={!canEdit} onBlur={e => { if (e.target.value !== (k.target || '')) act(() => alignmentApi.tracking(k.id, { target: e.target.value || null })) }} /></td>
-            <td><div className="kpi-periods">{k.schedule.map(s => <label key={s.period} className={`kpi-period kpi-${s.status}`} title={fill(t('strategy.kpi.due_on'), { date: s.dueDate })}>
-              <span>{t(`strategy.align.period.${s.period}`)} · {t(`strategy.kpi.status.${s.status}`)}</span>
-              <input aria-label={`${k.name} ${t(`strategy.align.period.${s.period}`)}`} defaultValue={k.measures[s.period]?.value || ''} disabled={!canEdit} onBlur={e => save(k, s.period, e.target.value)} />
-            </label>)}{k.frequency !== 'MONTHLY' && <button className="kpi-monthly-toggle" aria-expanded={monthly === k.id} onClick={() => setMonthly(monthly === k.id ? null : k.id)}>{t('strategy.kpi.monthly')}</button>}</div></td>
+            <td><div className="kpi-periods">{k.schedule.map(s => measureField(k, s.period, s.status, s.dueDate))}{k.frequency !== 'MONTHLY' && <button className="kpi-monthly-toggle" aria-expanded={monthly === k.id} onClick={() => setMonthly(monthly === k.id ? null : k.id)}>{t('strategy.kpi.monthly')}</button>}</div></td>
           </tr>
-          {monthly === k.id && <tr className="kpi-monthly-row"><td colSpan={5}><div className="kpi-periods">{MONTHS.map(m => <label key={m} className="kpi-period"><span>{t(`strategy.align.period.${m}`)}</span><input aria-label={`${k.name} ${t(`strategy.align.period.${m}`)}`} defaultValue={k.measures[m]?.value || ''} disabled={!canEdit} onBlur={e => save(k, m, e.target.value)} /></label>)}</div></td></tr>}
+          {monthly === k.id && <tr className="kpi-monthly-row"><td colSpan={5}><div className="kpi-periods">{MONTHS.map(m => measureField(k, m))}</div></td></tr>}
         </Fragment>)}</tbody>
       </table></div>
       {!kpis.length && <p className="impact-note">{t('strategy.kpi.no_kpis')}</p>}
@@ -80,16 +93,21 @@ export default function KpiMeasurementPanel({ t, canEdit }: { t: T; canEdit: boo
         {report && <>
           <p className="impact-note" role="status">{fill(t('strategy.kpi.report_summary'), { measured: report.measured, missing: report.missing })}</p>
           <div className="impact-table-wrap"><table>
-            <thead><tr><th scope="col">{t('strategy.kpi.col.kpi')}</th><th scope="col">{t('strategy.kpi.col.target')}</th><th scope="col">{t('strategy.kpi.col.value')}</th><th scope="col">{t('strategy.kpi.col.previous')}</th><th scope="col">{t('strategy.kpi.col.trend')}</th><th scope="col">{t('strategy.kpi.col.on_target')}</th></tr></thead>
+            <thead><tr><th scope="col">{t('strategy.kpi.col.kpi')}</th><th scope="col">{t('strategy.kpi.col.target')}</th><th scope="col">{t('strategy.kpi.col.value')}</th><th scope="col">{t('strategy.kpi.col.previous')}</th><th scope="col">{t('strategy.kpi.col.trend')}</th><th scope="col">{t('strategy.kpi.col.on_target')}</th><th scope="col">{t('strategy.kpi.col.comments')}</th><th scope="col">{t('strategy.kpi.col.evidence')}</th></tr></thead>
             <tbody>{report.rows.map(r => <tr key={r.id} className={r.status === 'MISSING' ? 'kpi-missing' : ''}>
               <td>{r.name}</td><td>{r.target}{r.unit ? ` ${r.unit}` : ''}</td>
               <td>{r.value || t('strategy.kpi.not_measured')}{r.derived && <small> {t('strategy.kpi.from_monthly')}</small>}</td>
               <td>{r.previous}</td><td>{r.trend ? t(`strategy.kpi.trend.${r.trend}`) : ''}</td>
               <td>{r.onTarget === null ? '' : t(r.onTarget ? 'strategy.kpi.on_target' : 'strategy.kpi.off_target')}</td>
+              <td className="kpi-report-notes">{(r.comments || []).map((c, i) => <p key={i}>{c.period !== report.period && <small>{t(`strategy.align.period.${c.period}`)}: </small>}{c.text}</p>)}</td>
+              <td className="kpi-report-notes">{(r.evidence || []).map(e => <p key={e.id}>{e.period !== report.period && <small>{t(`strategy.align.period.${e.period}`)}: </small>}{e.kind === 'LINK'
+                ? <a href={e.url} target="_blank" rel="noopener noreferrer">{e.name}</a>
+                : <button className="link-button" disabled={busy} onClick={() => act(() => alignmentApi.downloadEvidence(r.id, report.year, e.period, e), false)}>{e.name}</button>}</p>)}</td>
             </tr>)}</tbody>
           </table></div>
         </>}
       </div>
     </>}
+    {evidenceKpi && <KpiEvidenceDialog t={t} kpi={evidenceKpi} period={evidenceFor!.period} year={year} canEdit={canEdit} onClose={() => setEvidenceFor(null)} onChanged={async () => { await load(); if (report) setReport(await alignmentApi.report(unitId, year, report.period)) }} />}
   </section>
 }
