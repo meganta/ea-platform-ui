@@ -72,6 +72,7 @@ function evidenceSourceUrl(item: EvidenceItem): string | null {
   if (item.sourceType === 'GOVERNANCE_REVIEW' || item.sourceType === 'GOVERNANCE_FINDING' || item.sourceType === 'GOVERNANCE_DECISION') return '/governance'
   if (item.sourceType.startsWith('ADM_')) return '/adm'
   if (item.sourceType === 'EA_PLAN') return '/ea-planning'
+  if (item.sourceType === 'STRATEGY_REFRESH') return `/strategy?refreshId=${encodeURIComponent(item.targetRef?.id || item.sourceId)}`
   return null
 }
 
@@ -92,6 +93,7 @@ function evidenceTypeLabel(item: EvidenceItem): string {
   if (item.sourceType === 'SCENARIO_DELTA') return 'Scenario change'
   if (item.sourceType === 'TENANT_VIEW') return 'EA View'
   if (item.sourceType === 'EA_PLAN') return 'EA plan'
+  if (item.sourceType === 'STRATEGY_REFRESH') return 'Strategy Refresh Analysis'
   if (item.sourceType === 'ARCH_DECISION') return 'Architecture decision'
   return `EA Repository · ${item.assetType || 'Asset'}`
 }

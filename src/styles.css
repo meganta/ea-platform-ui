@@ -286,6 +286,15 @@ button.insight-tile:hover, button.insight-tile:focus-visible { border-color:var(
 .svb-sentence { font-size:13px; margin:0 }
 @media (max-width: 900px) { .svb-grid { grid-template-columns:1fr } .svb-summary { position:static } }
 
+/* EA Views heatmap */
+.eav-heatmap-bar { display: flex; gap: 10px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
+.eav-heatmap-legend { display: flex; gap: 10px; margin-inline-start: auto; flex-wrap: wrap; max-width: 60%; }
+.eav-heatmap-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+@media (max-width: 700px) {
+  .eav-heatmap-legend { margin-inline-start: 0; max-width: 100%; }
+  .eav-heatmap-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+}
+
 /* ── Innovation idea assessment ── the scorecard row (name | bar | score),
    the overview (scores beside the matrix) and the filter bar reflow to one
    column on a phone. */

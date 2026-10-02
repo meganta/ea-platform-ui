@@ -72,18 +72,25 @@ export default function OrganizationSettingsPage() {
     industry: '', organizationSize: '', primaryMandate: '', orgDescriptionShort: '', constraints: '',
   })
 
+  // One source for everything on this tab: Tenant Settings
+  // (GET/PUT /config/organization) returns the organization profile, the
+  // platform language (the tenant's locale) and the EA framework with its
+  // domains in scope - each stored once, read by every module from there.
   useEffect(() => {
-    Promise.all([authFetch('/setup/profile'), authFetch('/ea-repository/framework-config')])
-      .then(([p, rc]) => {
+    Promise.all([authFetch('/config/organization'), authFetch('/ea-repository/framework-config')])
+      .then(([org, rc]) => {
         setRepoConfig(rc)
-        const liveDomains = rc?.metaModelDriven ? Object.keys(rc?.allDomains || {}) : (FALLBACK_DOMAINS[p?.preferredFramework || 'NORA'] || FALLBACK_DOMAINS.NORA)
+        const p = org?.profile || {}
+        const framework = org?.framework || {}
+        const frameworkType = framework.frameworkType || 'NORA'
+        const liveDomains = rc?.metaModelDriven ? Object.keys(rc?.allDomains || {}) : (FALLBACK_DOMAINS[frameworkType] || FALLBACK_DOMAINS.NORA)
         setForm(f => ({
           ...f,
           entityType: p?.entityType || 'AUTHORITY',
-          language: p?.language || 'AR',
+          language: org?.locale || 'AR',
           eaMaturityLevel: p?.eaMaturityLevel || 1,
-          preferredFramework: p?.preferredFramework || 'NORA',
-          domainsInScope: p?.domainsInScope?.length ? p.domainsInScope : liveDomains,
+          preferredFramework: frameworkType,
+          domainsInScope: framework.enabledDomains?.length ? framework.enabledDomains : liveDomains,
           industry: p?.industry || '',
           organizationSize: p?.organizationSize || '',
           primaryMandate: p?.primaryMandate || '',
@@ -108,18 +115,17 @@ export default function OrganizationSettingsPage() {
         const idx = line.indexOf(':')
         if (idx > 0) constraintsObj[line.slice(0, idx).trim()] = line.slice(idx + 1).trim()
       })
-      const r1 = await authFetch('/setup/profile', {
+      const saved = await authFetch('/config/organization', {
         method: 'PUT',
         body: JSON.stringify({
-          entityType: form.entityType, language: form.language, eaMaturityLevel: form.eaMaturityLevel,
-          preferredFramework: form.preferredFramework, domainsInScope: form.domainsInScope,
+          entityType: form.entityType, locale: form.language, eaMaturityLevel: form.eaMaturityLevel,
+          frameworkType: form.preferredFramework, domainsInScope: form.domainsInScope,
           industry: form.industry || undefined, organizationSize: form.organizationSize || undefined,
           primaryMandate: form.primaryMandate || undefined, orgDescriptionShort: form.orgDescriptionShort || undefined,
           constraints: constraintsObj,
         }),
       })
-      const r2 = await authFetch('/config/framework', { method: 'PUT', body: JSON.stringify({ frameworkType: form.preferredFramework, enabledDomains: form.domainsInScope }) })
-      if ((r1.id || r1.tenantId) && r2) setMsg({ type: 'success', text: isAR ? '✓ تم الحفظ بنجاح' : '✓ Saved successfully' })
+      if (saved?.profile && saved?.framework) setMsg({ type: 'success', text: isAR ? '✓ تم الحفظ بنجاح' : '✓ Saved successfully' })
       else setMsg({ type: 'error', text: isAR ? 'حدث خطأ أثناء الحفظ' : 'Something went wrong while saving' })
     } catch (e: any) {
       setMsg({ type: 'error', text: e.message || 'Failed to save' })
@@ -183,8 +189,8 @@ export default function OrganizationSettingsPage() {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">{isAR ? 'لغة المنصة' : 'Platform Language'}</label>
-              <select className="form-input" value={form.language} onChange={e => { const lang = e.target.value as 'AR' | 'EN'; setForm(f => ({ ...f, language: lang })); setLocale(lang) }}>
+              <label className="form-label" htmlFor="org-platform-language" style={{ display: 'flex', alignItems: 'center' }}>{isAR ? 'لغة المنصة' : 'Platform Language'}<HelpTip text={isAR ? 'اللغة الافتراضية لمنظمتك على مستوى المنصة، وتُستخدم في المحتوى المُولَّد للجهة بأكملها. لغة ردود الذكاء الاصطناعي تُضبط بشكل منفصل في إعدادات الذكاء الاصطناعي.' : 'Your organization\'s default language across the platform, used for content generated for the whole tenant. The language of AI answers is set separately under AI settings.'} /></label>
+              <select id="org-platform-language" className="form-input" value={form.language} onChange={e => { const lang = e.target.value as 'AR' | 'EN'; setForm(f => ({ ...f, language: lang })); setLocale(lang) }}>
                 <option value="AR">العربية</option>
                 <option value="EN">English</option>
               </select>
