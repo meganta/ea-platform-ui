@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import DemoRequestsPage from '../DemoRequestsPage';
 
 jest.mock('../../contexts/LangContext', () => ({
-  useLang: () => ({ t: (key: string) => key }),
+  useLang: () => ({ t: (key: string) => key, isAR: false }),
 }));
 
 const mockListDemoRequests = jest.fn();
@@ -25,7 +25,7 @@ describe('DemoRequestsPage', () => {
   it('shows the empty state when there are no demo requests', async () => {
     mockListDemoRequests.mockResolvedValue([]);
     render(<DemoRequestsPage />);
-    expect(await screen.findByText('demoRequests.empty')).toBeInTheDocument();
+    expect(await screen.findByText('No demo requests yet.')).toBeInTheDocument();
   });
 
   it('renders requests in the order the backend returns them (newest first, per its own orderBy)', async () => {

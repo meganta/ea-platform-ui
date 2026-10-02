@@ -1,3 +1,4 @@
+import { useLang } from '../contexts/LangContext'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -36,6 +37,8 @@ const DOMAIN_COLOR: Record<string, string> = {
 const domainColor = (d?: string) => DOMAIN_COLOR[d || 'GENERAL'] || '#7f8c8d'
 
 export default function GlossaryPage() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const api = useApi()
   const [terms, setTerms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -54,7 +57,7 @@ export default function GlossaryPage() {
   const startEdit = (t: any) => setEditing({ ...t })
 
   const save = async () => {
-    if (!editing.termEn || !editing.termAr) return alert('English and Arabic terms are both required')
+    if (!editing.termEn || !editing.termAr) return alert(L('English and Arabic terms are both required', 'المصطلح بالإنجليزية والعربية مطلوبان'))
     setSaving(true)
     try {
       const payload = { termEn: editing.termEn, termAr: editing.termAr, definition: editing.definition || undefined, domain: editing.domain || undefined }
@@ -65,7 +68,7 @@ export default function GlossaryPage() {
   }
 
   const remove = async (id: string) => {
-    if (!window.confirm('Delete this glossary term?')) return
+    if (!window.confirm(L('Delete this glossary term?', 'حذف هذا المصطلح من المسرد؟'))) return
     await api.del(`/glossary/${id}`); load()
   }
 
@@ -82,46 +85,46 @@ export default function GlossaryPage() {
     <div style={S.page}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>📖 Glossary</div>
-          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Bilingual EA terminology definitions for this tenant</div>
+          <div style={{ fontSize: 20, fontWeight: 700 }}>{L('📖 Glossary', '📖 المسرد')}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('Bilingual EA terminology definitions for this tenant', 'تعريفات مصطلحات البنية المؤسسية بلغتين لهذه الجهة')}</div>
         </div>
-        <button style={S.btn('primary')} onClick={startNew}>+ New Term</button>
+        <button style={S.btn('primary')} onClick={startNew}>{L('+ New Term', '+ مصطلح جديد')}</button>
       </div>
       <div style={S.content}>
         {editing && (
           <div style={S.card}>
-            <div style={{ fontWeight: 600, marginBottom: 12 }}>{editing.id ? 'Edit Term' : 'New Term'}</div>
+            <div style={{ fontWeight: 600, marginBottom: 12 }}>{editing.id ? L('Edit Term', 'تعديل المصطلح') : L('New Term', 'مصطلح جديد')}</div>
             <div style={S.grid2}>
-              <div><div style={S.label}>Term (EN) *</div><input style={S.input} value={editing.termEn} onChange={e => setEditing((v: any) => ({ ...v, termEn: e.target.value }))} /></div>
-              <div><div style={S.label}>Term (AR) *</div><input style={S.input} dir="rtl" value={editing.termAr} onChange={e => setEditing((v: any) => ({ ...v, termAr: e.target.value }))} /></div>
+              <div><div style={S.label}>{L('Term (EN) *', 'المصطلح (بالإنجليزية) *')}</div><input style={S.input} value={editing.termEn} onChange={e => setEditing((v: any) => ({ ...v, termEn: e.target.value }))} /></div>
+              <div><div style={S.label}>{L('Term (AR) *', 'المصطلح (بالعربية) *')}</div><input style={S.input} dir="rtl" value={editing.termAr} onChange={e => setEditing((v: any) => ({ ...v, termAr: e.target.value }))} /></div>
             </div>
-            <div style={S.label}>Domain</div>
+            <div style={S.label}>{L('Domain', 'المجال')}</div>
             <select style={S.input} value={editing.domain || ''} onChange={e => setEditing((v: any) => ({ ...v, domain: e.target.value }))}>
-              <option value="">General / Unspecified</option>
+              <option value="">{L('General / Unspecified', 'عام / غير محدد')}</option>
               {DOMAINS.filter(d => d !== 'GENERAL').map(d => <option key={d} value={d}>{d.replace('_', ' ')}</option>)}
             </select>
-            <div style={S.label}>Definition</div>
+            <div style={S.label}>{L('Definition', 'التعريف')}</div>
             <textarea style={{ ...S.input, minHeight: 70 }} value={editing.definition || ''} onChange={e => setEditing((v: any) => ({ ...v, definition: e.target.value }))} />
             <div style={S.row}>
-              <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? 'Saving…' : '💾 Save'}</button>
-              <button style={S.btn()} onClick={() => setEditing(null)}>Cancel</button>
+              <button style={S.btn('primary')} onClick={save} disabled={saving}>{saving ? L('Saving…', 'جارٍ الحفظ…') : L('💾 Save', '💾 حفظ')}</button>
+              <button style={S.btn()} onClick={() => setEditing(null)}>{L('Cancel', 'إلغاء')}</button>
             </div>
           </div>
         )}
 
         <div style={{ ...S.row, marginBottom: 16 }}>
-          <input style={{ ...S.input, marginBottom: 0, flex: 1 }} placeholder="Search terms or definitions…" value={search} onChange={e => setSearch(e.target.value)} />
+          <input style={{ ...S.input, marginBottom: 0, flex: 1 }} placeholder={L('Search terms or definitions…', 'ابحث في المصطلحات أو التعريفات…')} value={search} onChange={e => setSearch(e.target.value)} />
           <select style={{ ...S.input, marginBottom: 0, width: 200 }} value={domainFilter} onChange={e => setDomainFilter(e.target.value)}>
-            <option value="">All Domains</option>
+            <option value="">{L('All Domains', 'كل المجالات')}</option>
             {DOMAINS.map(d => <option key={d} value={d}>{d.replace('_', ' ')}</option>)}
           </select>
         </div>
 
         {loading ? (
-          <div style={{ color: 'var(--text-dim)' }}>Loading…</div>
+          <div style={{ color: 'var(--text-dim)' }}>{L('Loading…', 'جارٍ التحميل…')}</div>
         ) : filtered.length === 0 ? (
           <div style={{ ...S.card, textAlign: 'center', color: 'var(--text-dim)', padding: 40 }}>
-            {terms.length === 0 ? 'No glossary terms yet. Add the first one to start building your tenant vocabulary.' : 'No terms match your search.'}
+            {terms.length === 0 ? L('No glossary terms yet. Add the first one to start building your tenant vocabulary.', 'لا توجد مصطلحات في المسرد بعد. أضف أول مصطلح لبدء بناء مفردات جهتك.') : L('No terms match your search.', 'لا توجد مصطلحات تطابق بحثك.')}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -136,8 +139,8 @@ export default function GlossaryPage() {
                     {t.definition && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 4 }}>{t.definition}</div>}
                   </div>
                   {t.domain && <span style={S.badge(domainColor(t.domain))}>{t.domain.replace('_', ' ')}</span>}
-                  <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => startEdit(t)}>Edit</button>
-                  <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => remove(t.id)}>Delete</button>
+                  <button style={{ ...S.btn(), fontSize: 11 }} onClick={() => startEdit(t)}>{L('Edit', 'تعديل')}</button>
+                  <button style={{ ...S.btn('danger'), fontSize: 11 }} onClick={() => remove(t.id)}>{L('Delete', 'حذف')}</button>
                 </div>
               </div>
             ))}

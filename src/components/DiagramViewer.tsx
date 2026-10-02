@@ -19,7 +19,8 @@ interface DiagramViewerProps {
 }
 
 export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps) {
-  const { t } = useLang()
+  const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [diagrams, setDiagrams] = useState<Diagram[]>([])
   const [selected, setSelected] = useState<Diagram | null>(null)
   const [mode, setMode] = useState<'visual' | 'source'>('visual')
@@ -65,7 +66,7 @@ export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps)
       {/* Header */}
       <div style={{ background: 'var(--navy-mid)', padding: '8px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>📊 Diagrams ({diagrams.length})</span>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>{L('📊 Diagrams (', '📊 المخططات (')}{diagrams.length})</span>
           {diagrams.length > 1 && diagrams.map((d, i) => (
             <button key={d.id} onClick={() => setSelected(d)}
               style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: `1px solid ${selected?.id === d.id ? 'var(--accent)' : 'var(--border)'}`, background: selected?.id === d.id ? 'rgba(3,105,161,0.15)' : 'transparent', color: selected?.id === d.id ? 'var(--accent)' : 'var(--text-dim)' }}>
@@ -89,7 +90,7 @@ export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps)
             </button>
             <button onClick={() => downloadSource(selected)}
               style={{ fontSize: 10, padding: '2px 8px', borderRadius: 3, cursor: 'pointer', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-dim)' }}>
-              ↓ Source
+              {L('↓ Source', '↓ المصدر')}
             </button>
           </>}
           <button onClick={() => setFullscreen(f => !f)}
@@ -102,7 +103,7 @@ export function DiagramViewer({ cycleId, phase, outputKey }: DiagramViewerProps)
       {/* Content */}
       {selected && !collapsed && (
         <div style={{ position: fullscreen ? 'fixed' : 'relative', top: fullscreen ? 0 : undefined, left: fullscreen ? 0 : undefined, width: fullscreen ? '100vw' : '100%', height: fullscreen ? '100vh' : undefined, background: 'var(--navy)', zIndex: fullscreen ? 9999 : undefined, overflow: 'auto', padding: 12 }}>
-          {fullscreen && <button onClick={() => setFullscreen(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'var(--danger)', border: 'none', color: 'white', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>✕ Close</button>}
+          {fullscreen && <button onClick={() => setFullscreen(false)} style={{ position: 'absolute', top: 12, right: 12, background: 'var(--danger)', border: 'none', color: 'white', padding: '4px 10px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>{L('✕ Close', '✕ إغلاق')}</button>}
           {mode === 'visual' ? (
             <div dangerouslySetInnerHTML={{ __html: selected.svgContent }}
               style={{ width: '100%', overflow: 'auto', textAlign: 'center' }} />

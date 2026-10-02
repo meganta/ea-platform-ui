@@ -1,3 +1,4 @@
+import { useLang } from '../../contexts/LangContext'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { OPERATOR_LABELS, VALUELESS_OPERATORS, RANGE_OPERATORS, MULTI_VALUE_OPERATORS, inputTypeForDataType } from './filterBuilderHelpers'
 
@@ -289,6 +290,8 @@ function ValueInput({ field, operator, value, onChange }: { field: FilterAttribu
 }
 
 function AssetAutocompleteInput({ assetType, api, value, onChange, placeholder }: { assetType: string; api: { get: (path: string) => Promise<any> }; value: string; onChange: (v: string) => void; placeholder?: string }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [query, setQuery] = useState(value || '')
   const [options, setOptions] = useState<string[]>([])
   const [open, setOpen] = useState(false)
@@ -331,11 +334,11 @@ function AssetAutocompleteInput({ assetType, api, value, onChange, placeholder }
       />
       {open && (loading || options.length > 0) && (
         <div style={{ position: 'absolute', zIndex: 20, top: '100%', insetInlineStart: 0, minWidth: 220, maxHeight: 220, overflowY: 'auto', background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', marginTop: 2 }}>
-          {loading && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>Searching…</div>}
+          {loading && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>{L('Searching…', 'جارٍ البحث…')}</div>}
           {!loading && options.map(name => (
             <div key={name} onMouseDown={() => { onChange(name); setQuery(name); setOpen(false) }} style={{ padding: '6px 10px', fontSize: 13, cursor: 'pointer' }}>{name}</div>
           ))}
-          {!loading && options.length === 0 && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>No matches</div>}
+          {!loading && options.length === 0 && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>{L('No matches', 'لا توجد نتائج مطابقة')}</div>}
         </div>
       )}
     </div>
@@ -343,6 +346,8 @@ function AssetAutocompleteInput({ assetType, api, value, onChange, placeholder }
 }
 
 function AssetMultiAutocompleteInput({ assetType, api, value, onChange, placeholder, locale }: { assetType: string; api: { get: (path: string) => Promise<any> }; value: string[]; onChange: (v: string[]) => void; placeholder?: string; locale: 'EN' | 'AR' }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const selected: string[] = Array.isArray(value) ? value : []
   const [query, setQuery] = useState('')
   const [options, setOptions] = useState<string[]>([])
@@ -393,11 +398,11 @@ function AssetMultiAutocompleteInput({ assetType, api, value, onChange, placehol
       </div>
       {open && (loading || options.length > 0) && (
         <div style={{ position: 'absolute', zIndex: 20, top: '100%', insetInlineStart: 0, minWidth: 220, maxHeight: 220, overflowY: 'auto', background: 'var(--navy-light)', border: '1px solid var(--border)', borderRadius: 6, boxShadow: '0 4px 12px rgba(0,0,0,0.15)', marginTop: 2 }}>
-          {loading && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>Searching…</div>}
+          {loading && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>{L('Searching…', 'جارٍ البحث…')}</div>}
           {!loading && options.map(name => (
             <div key={name} onMouseDown={() => addChip(name)} style={{ padding: '6px 10px', fontSize: 13, cursor: 'pointer' }}>{name}</div>
           ))}
-          {!loading && options.length === 0 && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>No matches</div>}
+          {!loading && options.length === 0 && <div style={{ padding: '6px 10px', fontSize: 12, color: 'var(--text-dim)' }}>{L('No matches', 'لا توجد نتائج مطابقة')}</div>}
         </div>
       )}
     </div>

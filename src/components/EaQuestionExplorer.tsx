@@ -1,3 +1,4 @@
+import { useLang } from '../contexts/LangContext'
 import { useState, CSSProperties } from 'react'
 import HelpTip from './HelpTip'
 import { EA_QUESTION_LIBRARY, ALL_EA_QUESTIONS, FEATURED_EA_QUESTIONS } from '../lib/eaQuestionLibrary'
@@ -26,6 +27,8 @@ function QuestionButton({ text, onSelect }: { text: string; onSelect: (text: str
 }
 
 export default function EaQuestionExplorer({ onSelect }: { onSelect: (text: string) => void }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [open, setOpen] = useState(false)
   const [categoryId, setCategoryId] = useState(EA_QUESTION_LIBRARY[0].id)
   const category = EA_QUESTION_LIBRARY.find(c => c.id === categoryId) || EA_QUESTION_LIBRARY[0]
@@ -41,14 +44,14 @@ export default function EaQuestionExplorer({ onSelect }: { onSelect: (text: stri
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 2 }}>
         <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} aria-controls="ea-question-library"
           style={{ background: 'transparent', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontSize: 13, fontWeight: 600, padding: '4px 6px' }}>
-          {open ? '← Back to suggested questions' : `Explore EA Questions (${ALL_EA_QUESTIONS.length})`}
+          {open ? L('← Back to suggested questions', '→ العودة إلى الأسئلة المقترحة') : L(`Explore EA Questions (${ALL_EA_QUESTIONS.length})`, `استكشف أسئلة البنية المؤسسية (${ALL_EA_QUESTIONS.length})`)}
         </button>
-        <HelpTip text="A library of common Enterprise Architecture business questions, grouped by category. Choosing one puts it in the message box - review or adjust it, then press Send. Copilot answers it from your organization's data like any other question." />
+        <HelpTip text={L('A library of common Enterprise Architecture business questions, grouped by category. Choosing one puts it in the message box - review or adjust it, then press Send. Copilot answers it from your organization\'s data like any other question.', 'مكتبة لأسئلة الأعمال الشائعة في البنية المؤسسية مصنّفة حسب الفئة. اختيار سؤال يضعه في مربع الرسالة؛ راجعه أو عدّله ثم اضغط إرسال، ويجيب عنه المساعد من بيانات جهتك كأي سؤال آخر.')} />
       </div>
 
       {open && (
         <div id="ea-question-library" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div role="group" aria-label="EA question categories" style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+          <div role="group" aria-label={L('EA question categories', 'فئات أسئلة البنية المؤسسية')} style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
             {EA_QUESTION_LIBRARY.map(c => {
               const active = c.id === category.id
               return (

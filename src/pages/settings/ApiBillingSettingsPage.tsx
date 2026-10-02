@@ -1,3 +1,4 @@
+import { useLang } from '../../contexts/LangContext'
 import { useState, useEffect } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { authFetch, useSettingsApi } from './shared'
@@ -9,6 +10,8 @@ const METRIC_LABEL: Record<string, string> = {
 const STATUS_COLOR: Record<string, string> = { OK: 'var(--success)', WARNING: '#f39c12', EXCEEDED: 'var(--danger)' }
 
 export default function ApiBillingSettingsPage() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [subTab, setSubTab] = useState<'apikeys' | 'billing'>('apikeys')
   const api = useSettingsApi()
   const [tenant, setTenant] = useState<any>(null)
@@ -16,8 +19,8 @@ export default function ApiBillingSettingsPage() {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">API & Billing</div>
-        <div className="page-subtitle">AI PROVIDER KEYS, SUBSCRIPTION & USAGE</div>
+        <div className="page-title">{L('API & Billing', 'واجهات البرمجة والفوترة')}</div>
+        <div className="page-subtitle">{L('AI PROVIDER KEYS, SUBSCRIPTION & USAGE', 'مفاتيح مزوّدي الذكاء الاصطناعي والاشتراك والاستخدام')}</div>
         <div className="page-tabs">
           {[['apikeys', 'API Keys'], ['billing', 'Billing']].map(([k, l]) => (
             <button key={k} className={`tab-btn${subTab === k ? ' active' : ''}`} onClick={() => setSubTab(k as any)}>{l}</button>
@@ -34,6 +37,8 @@ export default function ApiBillingSettingsPage() {
 }
 
 function ApiKeysSection() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [status, setStatus] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [openaiKey, setOpenaiKey] = useState('')
@@ -49,44 +54,44 @@ function ApiKeysSection() {
   useEffect(() => { load() }, [])
 
   const saveKey = async (provider: string, key: string) => {
-    if (!key.trim()) { setMsg({ type: 'error', text: 'Please enter an API key' }); return }
+    if (!key.trim()) { setMsg({ type: 'error', text: L('Please enter an API key', 'يرجى إدخال مفتاح API') }); return }
     setSaving(provider); setMsg(null)
     try {
       const res = await authFetch(`/config/api-keys/${provider}`, { method: 'POST', body: JSON.stringify({ apiKey: key }) })
       if (res.success) {
-        setMsg({ type: 'success', text: `${provider === 'openai' ? 'OpenAI' : 'Anthropic'} key saved — ${res.masked}` })
+        setMsg({ type: 'success', text: L(`${provider === 'openai' ? 'OpenAI' : 'Anthropic'} key saved — ${res.masked}`, `تم حفظ مفتاح ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} — ${res.masked}`) })
         if (provider === 'openai') setOpenaiKey('')
         else setAnthropicKey('')
         load()
-      } else setMsg({ type: 'error', text: res.message || 'Failed to save' })
+      } else setMsg({ type: 'error', text: res.message || L('Failed to save', 'تعذّر الحفظ') })
     } finally { setSaving(null) }
   }
 
   const deleteKey = async (provider: string) => {
-    if (!window.confirm(`Remove ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key?`)) return
+    if (!window.confirm(L(`Remove ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} API key?`, `إزالة مفتاح API الخاص بـ ${provider === 'openai' ? 'OpenAI' : 'Anthropic'}؟`))) return
     setSaving(provider); setMsg(null)
     try {
       await authFetch(`/config/api-keys/${provider}`, { method: 'DELETE' })
-      setMsg({ type: 'success', text: `${provider} key removed — platform default will be used` })
+      setMsg({ type: 'success', text: L(`${provider} key removed — platform default will be used`, `تمت إزالة مفتاح ${provider} — سيُستخدم الإعداد الافتراضي للمنصة`) })
       load()
     } finally { setSaving(null) }
   }
 
   const providers = [
-    { id: 'openai', name: 'OpenAI', icon: '⬡', desc: 'GPT-4o and other OpenAI models', keyState: openaiKey, setKey: setOpenaiKey, placeholder: 'sk-...' },
-    { id: 'anthropic', name: 'Anthropic', icon: '◈', desc: 'Claude Sonnet and other Anthropic models', keyState: anthropicKey, setKey: setAnthropicKey, placeholder: 'sk-ant-...' },
+    { id: 'openai', name: 'OpenAI', icon: '⬡', desc: L('GPT-4o and other OpenAI models', 'GPT-4o ونماذج OpenAI الأخرى'), keyState: openaiKey, setKey: setOpenaiKey, placeholder: 'sk-...' },
+    { id: 'anthropic', name: 'Anthropic', icon: '◈', desc: L('Claude Sonnet and other Anthropic models', 'Claude Sonnet ونماذج Anthropic الأخرى'), keyState: anthropicKey, setKey: setAnthropicKey, placeholder: 'sk-ant-...' },
   ]
 
   return (
     <div>
-      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>🔑 AI Provider API Keys</div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>{L('🔑 AI Provider API Keys', '🔑 مفاتيح API لمزوّدي الذكاء الاصطناعي')}</div>
       <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>
-        Configure your own API keys for AI providers. When set, your tenant's key is used instead of the platform default. Keys are stored encrypted and never returned in full.
+        {L('Configure your own API keys for AI providers. When set, your tenant\'s key is used instead of the platform default. Keys are stored encrypted and never returned in full.', 'اضبط مفاتيح API الخاصة بجهتك لمزوّدي الذكاء الاصطناعي. عند تعيينها يُستخدم مفتاح جهتك بدلاً من الإعداد الافتراضي للمنصة. تُخزَّن المفاتيح مشفّرة ولا تُعاد كاملة أبداً.')}
       </div>
 
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
 
-      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Loading...</div> : (
+      {loading ? <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('Loading...', 'جارٍ التحميل...')}</div> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {providers.map(p => (
             <div key={p.id} style={{ padding: 16, background: 'var(--navy)', border: `1px solid ${status?.[p.id]?.configured ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius)' }}>
@@ -98,17 +103,17 @@ function ApiKeysSection() {
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 2, background: status?.[p.id]?.configured ? 'rgba(22,163,74,0.15)' : 'rgba(100,100,100,0.15)', color: status?.[p.id]?.configured ? '#2ecc71' : 'var(--text-dim)', border: `1px solid ${status?.[p.id]?.configured ? 'rgba(22,163,74,0.3)' : 'var(--border)'}` }}>
-                    {status?.[p.id]?.configured ? '✓ Configured' : 'Using Platform Default'}
+                    {status?.[p.id]?.configured ? L('✓ Configured', '✓ مُعدّ') : L('Using Platform Default', 'يستخدم الإعداد الافتراضي للمنصة')}
                   </span>
                 </div>
               </div>
 
               {status?.[p.id]?.configured && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, padding: '6px 10px', background: 'rgba(3,105,161,0.06)', borderRadius: 4, fontSize: 11 }}>
-                  <span style={{ color: 'var(--text-dim)' }}>Current key:</span>
+                  <span style={{ color: 'var(--text-dim)' }}>{L('Current key:', 'المفتاح الحالي:')}</span>
                   <code style={{ fontFamily: 'var(--font-mono)', color: 'var(--accent)' }}>{status[p.id].maskedKey}</code>
                   <button onClick={() => deleteKey(p.id)} disabled={saving === p.id} style={{ marginLeft: 'auto', fontSize: 10, padding: '2px 8px', background: 'rgba(220,38,38,0.1)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 2, color: '#e74c3c', cursor: 'pointer' }}>
-                    {saving === p.id ? '...' : '🗑 Remove'}
+                    {saving === p.id ? '...' : L('🗑 Remove', '🗑 إزالة')}
                   </button>
                 </div>
               )}
@@ -118,7 +123,7 @@ function ApiKeysSection() {
                   <input
                     className="form-input"
                     type={showKey[p.id] ? 'text' : 'password'}
-                    placeholder={status?.[p.id]?.configured ? 'Enter new key to replace...' : p.placeholder}
+                    placeholder={status?.[p.id]?.configured ? L('Enter new key to replace...', 'أدخل مفتاحاً جديداً للاستبدال...') : p.placeholder}
                     value={p.keyState}
                     onChange={e => p.setKey(e.target.value)}
                     style={{ width: '100%', fontSize: 11, fontFamily: 'var(--font-mono)', paddingRight: 32 }}
@@ -129,7 +134,7 @@ function ApiKeysSection() {
                   </button>
                 </div>
                 <button className="btn btn-primary btn-sm" style={{ fontSize: 11, whiteSpace: 'nowrap' }} disabled={!p.keyState || saving === p.id} onClick={() => saveKey(p.id, p.keyState)}>
-                  {saving === p.id ? 'Saving...' : status?.[p.id]?.configured ? 'Update Key' : 'Save Key'}
+                  {saving === p.id ? L('Saving...', 'جارٍ الحفظ...') : status?.[p.id]?.configured ? L('Update Key', 'تحديث المفتاح') : L('Save Key', 'حفظ المفتاح')}
                 </button>
               </div>
             </div>
@@ -138,13 +143,15 @@ function ApiKeysSection() {
       )}
 
       <div style={{ marginTop: 16, padding: 12, background: 'rgba(217,119,6,0.06)', border: '1px solid rgba(217,119,6,0.2)', borderRadius: 'var(--radius)', fontSize: 11, color: 'var(--text-dim)' }}>
-        <strong style={{ color: 'var(--gold)' }}>⚠ Security note:</strong> API keys are encrypted with AES-256-GCM before storage. They are never returned in API responses or logs. Only the masked preview is shown after saving.
+        <strong style={{ color: 'var(--gold)' }}>{L('⚠ Security note:', '⚠ ملاحظة أمنية:')}</strong> {L('API keys are encrypted with AES-256-GCM before storage. They are never returned in API responses or logs. Only the masked preview is shown after saving.', 'تُشفَّر مفاتيح API بخوارزمية AES-256-GCM قبل تخزينها، ولا تُعاد أبداً في استجابات API أو السجلات. يُعرض فقط جزء مُقنَّع منها بعد الحفظ.')}
       </div>
     </div>
   )
 }
 
 function BillingSection({ api, tenant }: { api: any, tenant: any }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [usage, setUsage] = useState<any>(null)
   const [tiers, setTiers] = useState<any>(null)
   const [history, setHistory] = useState<any[]>([])
@@ -155,34 +162,34 @@ function BillingSection({ api, tenant }: { api: any, tenant: any }) {
     api.get('/billing/history?months=6').then((d: any) => setHistory(Array.isArray(d) ? d : []))
   }, [api])
 
-  if (!usage || !tiers) return <div className="card"><div style={{ color: 'var(--text-dim)' }}>Loading usage data…</div></div>
+  if (!usage || !tiers) return <div className="card"><div style={{ color: 'var(--text-dim)' }}>{L('Loading usage data…', 'جارٍ تحميل بيانات الاستخدام…')}</div></div>
 
   return (
     <div>
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="section-title" style={{ display: 'flex', alignItems: 'center' }}>💳 Subscription & Usage<HelpTip text="Your subscription tier sets monthly limits on things like AI requests and document uploads. If you're getting close to a limit, you'll see it below - contact your administrator if you need a higher tier." /></div>
+        <div className="section-title" style={{ display: 'flex', alignItems: 'center' }}>{L('💳 Subscription & Usage', '💳 الاشتراك والاستخدام')}<HelpTip text={L('Your subscription tier sets monthly limits on things like AI requests and document uploads. If you\'re getting close to a limit, you\'ll see it below - contact your administrator if you need a higher tier.', 'تحدد فئة اشتراكك حدوداً شهرية لأمور مثل طلبات الذكاء الاصطناعي ورفع الوثائق. إذا اقتربت من أحد الحدود فسيظهر ذلك أدناه — تواصل مع مسؤول النظام إذا احتجت إلى فئة أعلى.')} /></div>
         <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
           {tiers.tiers.map((t: any) => (
             <div key={t.name} className="card" style={{ flex: 1, padding: 20, border: `1px solid ${tenant?.subscriptionTier === t.name ? 'var(--accent)' : 'var(--border)'}`, position: 'relative' }}>
-              {tenant?.subscriptionTier === t.name && <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: 'var(--accent)', color: 'var(--navy)', fontSize: 10, padding: '2px 8px', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>CURRENT</div>}
+              {tenant?.subscriptionTier === t.name && <div style={{ position: 'absolute', top: -8, left: '50%', transform: 'translateX(-50%)', background: 'var(--accent)', color: 'var(--navy)', fontSize: 10, padding: '2px 8px', borderRadius: 2, fontFamily: 'var(--font-mono)' }}>{L('CURRENT', 'الحالي')}</div>}
               <div style={{ fontFamily: 'var(--font-display)', fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{t.name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', lineHeight: 1.8 }}>
                 {Object.entries(t.limits).map(([metric, limit]: any) => (
-                  <div key={metric}>{limit >= 99999 ? 'Unlimited' : limit.toLocaleString()} {METRIC_LABEL[metric] || metric}</div>
+                  <div key={metric}>{limit >= 99999 ? L('Unlimited', 'غير محدود') : limit.toLocaleString()} {METRIC_LABEL[metric] || metric}</div>
                 ))}
               </div>
             </div>
           ))}
         </div>
         <div className="alert alert-info">
-          To upgrade your subscription, contact your EA Platform administrator or reach out to support.
+          {L('To upgrade your subscription, contact your EA Platform administrator or reach out to support.', 'لترقية اشتراكك، تواصل مع مسؤول منصة البنية المؤسسية أو مع الدعم.')}
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
-        <div className="section-title">📊 Current Month Usage ({usage.period?.start} – {usage.period?.end})</div>
+        <div className="section-title">{L('📊 Current Month Usage (', '📊 استخدام الشهر الحالي (')}{usage.period?.start} – {usage.period?.end})</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>Overall status:</span>
+          <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('Overall status:', 'الحالة العامة:')}</span>
           <span style={{ fontSize: 12, fontWeight: 700, color: STATUS_COLOR[usage.overallStatus] }}>{usage.overallStatus}</span>
         </div>
         {usage.usage.map((u: any) => (
@@ -200,12 +207,12 @@ function BillingSection({ api, tenant }: { api: any, tenant: any }) {
 
       {history.length > 0 && (
         <div className="card">
-          <div className="section-title">📈 Usage History</div>
+          <div className="section-title">{L('📈 Usage History', '📈 سجل الاستخدام')}</div>
           <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-dim)' }}>Month</th>
+                <th style={{ textAlign: 'left', padding: '6px 8px', color: 'var(--text-dim)' }}>{L('Month', 'الشهر')}</th>
                 {Object.keys(METRIC_LABEL).map(m => <th key={m} style={{ textAlign: 'right', padding: '6px 8px', color: 'var(--text-dim)' }}>{METRIC_LABEL[m]}</th>)}
               </tr>
             </thead>

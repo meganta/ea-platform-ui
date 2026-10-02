@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import InviteAcceptPage from '../InviteAcceptPage'
 
+jest.mock('../../contexts/LangContext', () => ({
+  useLang: () => ({ isAR: false, locale: 'EN', setLocale: jest.fn(), t: (key: string) => key }),
+}));
+
 const mockAccept = jest.fn()
 jest.mock('react-router-dom', () => ({ useParams: () => ({ token: 'tok-1' }), useNavigate: () => jest.fn() }), { virtual: true })
 jest.mock('../../lib/api', () => ({ api: { acceptInvitation: (...args: any[]) => mockAccept(...args), login: jest.fn() }, setToken: jest.fn() }))

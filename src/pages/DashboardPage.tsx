@@ -4,6 +4,7 @@ import { useLang } from '../contexts/LangContext'
 import { useAuth } from '../contexts/AuthContext'
 import { api, getToken } from '../lib/api'
 import HelpTip from '../components/HelpTip'
+import { enumLabel } from '../lib/enumLabels'
 
 const GOV_API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -255,7 +256,7 @@ export default function DashboardPage() {
             {/* Monthly trend */}
             {monthlyTrend.length > 0 && monthlyTrend.some((m: any) => m.count > 0) && (
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>Monthly Reviews & Avg Score</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('dashboard.monthly_reviews')}</div>
                 <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 64 }}>
                   {monthlyTrend.map((m: any, i: number) => {
                     const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any)=>x.count), 1)) * 48))
@@ -283,7 +284,7 @@ export default function DashboardPage() {
                       background: (DECISION_COLOR[d] || '#64748B') + '22',
                       color: DECISION_COLOR[d] || '#64748B',
                       border: '1px solid ' + (DECISION_COLOR[d] || '#64748B') + '44'
-                    }}>{n} {d.replace(/_/g, ' ')}</div>
+                    }}>{n} {enumLabel(d, isAR)}</div>
                   ))}
                 </div>
               </div>
@@ -320,7 +321,7 @@ export default function DashboardPage() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 500 }}>{r.title}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                      {r.reviewType?.replace(/_/g, ' ')} · {new Date(r.createdAt).toLocaleDateString(isAR ? 'ar-SA' : 'en-US')}
+                      {enumLabel(r.reviewType, isAR)} · {new Date(r.createdAt).toLocaleDateString(isAR ? 'ar-SA' : 'en-US')}
                     </div>
                   </div>
                   {r.overallScore != null && r.status === 'COMPLETED' && (
@@ -332,7 +333,7 @@ export default function DashboardPage() {
                     padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
                     background: (r.status === 'COMPLETED' ? (DECISION_COLOR[r.decision] || '#2ecc71') : '#f39c12') + '22',
                     color: r.status === 'COMPLETED' ? (DECISION_COLOR[r.decision] || '#2ecc71') : '#f39c12',
-                  }}>{r.status === 'COMPLETED' ? (r.decision?.replace(/_/g, ' ') || 'COMPLETED') : r.status}</div>
+                  }}>{r.status === 'COMPLETED' ? enumLabel(r.decision || 'COMPLETED', isAR) : enumLabel(r.status, isAR)}</div>
                 </div>
               ))}
             </div>
@@ -359,7 +360,7 @@ export default function DashboardPage() {
                 ? <div className="empty" style={{ padding: '24px 0' }}><div className="empty-title">{t('dash.no_cycles')}</div><button className="btn btn-primary btn-sm mt-4" onClick={() => nav('/adm')}>{t('dash.create_cycle')}</button></div>
                 : cycles.slice(0, 4).map(c => (
                   <div key={c.id} className="flex items-center justify-between" style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div><div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>Phase {c.currentPhase} · {c.frameworkType}</div></div>
+                    <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div><div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>{isAR ? 'المرحلة' : 'Phase'} {c.currentPhase} · {enumLabel(c.frameworkType, isAR)}</div></div>
                     <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
                   </div>
                 ))

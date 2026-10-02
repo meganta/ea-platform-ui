@@ -1,6 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import GlossaryPage from '../GlossaryPage';
 
+jest.mock('../../contexts/LangContext', () => ({
+  useLang: () => ({ isAR: false, locale: 'EN', setLocale: jest.fn(), t: (key: string) => key }),
+}));
+
 const SAMPLE_TERMS = [
   { id: 't1', termEn: 'Enterprise Architecture', termAr: 'هندسة المؤسسة', definition: 'The overall structure and design of an organization\'s IT systems.', domain: 'GOVERNANCE' },
   { id: 't2', termEn: 'API Gateway', termAr: 'بوابة API', definition: 'A single entry point for managing API traffic.', domain: 'TECHNOLOGY' },

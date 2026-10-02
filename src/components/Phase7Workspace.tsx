@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useLang } from '../contexts/LangContext'
+import { enumLabel } from '../lib/enumLabels'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 const token = () => localStorage.getItem('ea_token')
@@ -62,6 +63,7 @@ function RequirementModal({ admCycleId, initial, onSave, onClose }: {
   onClose: () => void
 }) {
   const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [form, setForm] = useState({
     title: initial?.title || '',
     titleAr: initial?.titleAr || '',
@@ -129,24 +131,24 @@ function RequirementModal({ admCycleId, initial, onSave, onClose }: {
           <div>
             <label style={labelStyle}>{isAR ? 'نوع المتطلب' : 'Requirement Type'}</label>
             <select style={inputStyle} value={form.requirementType} onChange={set('requirementType')}>
-              {REQUIREMENT_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+              {REQUIREMENT_TYPES.map(t => <option key={t} value={t}>{enumLabel(t, isAR)}</option>)}
             </select>
           </div>
           <div>
             <label style={labelStyle}>{isAR ? 'الأولوية' : 'Priority'}</label>
             <select style={inputStyle} value={form.priority} onChange={set('priority')}>
-              {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+              {PRIORITIES.map(p => <option key={p} value={p}>{enumLabel(p, isAR)}</option>)}
             </select>
           </div>
           <div>
             <label style={labelStyle}>{isAR ? 'الحالة' : 'Status'}</label>
             <select style={inputStyle} value={form.status} onChange={set('status')}>
-              {REQUIREMENT_STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+              {REQUIREMENT_STATUSES.map(s => <option key={s} value={s}>{enumLabel(s, isAR)}</option>)}
             </select>
           </div>
           <div>
             <label style={labelStyle}>{isAR ? 'التصنيف' : 'Category'}</label>
-            <input style={inputStyle} value={form.category} onChange={set('category')} placeholder="e.g. Performance, Security..." />
+            <input style={inputStyle} value={form.category} onChange={set('category')} placeholder={L('e.g. Performance, Security...', 'مثال: الأداء، الأمن...')} />
           </div>
           <div>
             <label style={labelStyle}>{isAR ? 'المرحلة المصدر' : 'Source Phase'}</label>
@@ -170,7 +172,7 @@ function RequirementModal({ admCycleId, initial, onSave, onClose }: {
           </div>
           <div style={{ gridColumn: '1/-1' }}>
             <label style={labelStyle}>{isAR ? 'مرجع الامتثال' : 'Compliance Reference'}</label>
-            <input style={inputStyle} value={form.complianceReference} onChange={set('complianceReference')} placeholder="e.g. NORA 2.0 Sec 4.3, ISO 27001..." />
+            <input style={inputStyle} value={form.complianceReference} onChange={set('complianceReference')} placeholder={L('e.g. NORA 2.0 Sec 4.3, ISO 27001...', 'مثال: نورة 2.0 القسم 4.3، ISO 27001...')} />
           </div>
           <div style={{ gridColumn: '1/-1' }}>
             <label style={labelStyle}>{isAR ? 'ملاحظات الحوكمة' : 'Governance Notes'}</label>
@@ -200,6 +202,7 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
   showApprovalActions?: boolean
 }) {
   const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [expanded, setExpanded] = useState(false)
   const [actioning, setActioning] = useState(false)
 
@@ -230,9 +233,9 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
           )}
         </div>
         <div style={{ display: 'flex', gap: 4, flexShrink: 0, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: `${typeColor}20`, color: typeColor, border: `1px solid ${typeColor}40` }}>{req.requirementType.replace(/_/g, ' ')}</span>
-          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: `${priorityColor}20`, color: priorityColor, border: `1px solid ${priorityColor}40` }}>{req.priority}</span>
-          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40` }}>{req.status.replace(/_/g, ' ')}</span>
+          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: `${typeColor}20`, color: typeColor, border: `1px solid ${typeColor}40` }}>{enumLabel(req.requirementType, isAR)}</span>
+          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: `${priorityColor}20`, color: priorityColor, border: `1px solid ${priorityColor}40` }}>{enumLabel(req.priority, isAR)}</span>
+          <span style={{ fontSize: 9, padding: '2px 6px', borderRadius: 2, background: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40` }}>{enumLabel(req.status, isAR)}</span>
         </div>
       </div>
 
@@ -243,13 +246,13 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
             <div style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.6, margin: '10px 0 8px' }}>{req.description}</div>
           )}
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 10, color: 'var(--text-dim)', marginBottom: 8 }}>
-            {req.sourcePhase && <span>Phase {req.sourcePhase}{req.sourceStep ? `.${req.sourceStep}` : ''}</span>}
-            {req.sourceOutputKey && <span>← {req.sourceOutputKey.replace(/_/g, ' ')}</span>}
-            {req.affectedDomains?.length > 0 && <span>Domains: {req.affectedDomains.join(', ')}</span>}
-            {req.complianceReference && <span>Ref: {req.complianceReference}</span>}
+            {req.sourcePhase && <span>{L('Phase', 'المرحلة')} {req.sourcePhase}{req.sourceStep ? `.${req.sourceStep}` : ''}</span>}
+            {req.sourceOutputKey && <span>← {enumLabel(req.sourceOutputKey, isAR)}</span>}
+            {req.affectedDomains?.length > 0 && <span>{L('Domains:', 'المجالات:')} {req.affectedDomains.join(', ')}</span>}
+            {req.complianceReference && <span>{L('Ref:', 'المرجع:')} {req.complianceReference}</span>}
           </div>
-          {req.rationale && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>Rationale:</strong> {req.rationale}</div>}
-          {req.governanceNotes && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>Notes:</strong> {req.governanceNotes}</div>}
+          {req.rationale && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>{L('Rationale:', 'التبرير:')}</strong> {req.rationale}</div>}
+          {req.governanceNotes && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 4 }}><strong>{L('Notes:', 'ملاحظات:')}</strong> {req.governanceNotes}</div>}
 
           {/* Actions */}
           <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
@@ -274,7 +277,7 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
             {onStatusChange && (
               <select value={req.status} onChange={e => onStatusChange(req.id, e.target.value)}
                 style={{ fontSize: 10, padding: '3px 6px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--navy-mid)', color: 'var(--text)', cursor: 'pointer' }}>
-                {REQUIREMENT_STATUSES.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+                {REQUIREMENT_STATUSES.map(s => <option key={s} value={s}>{enumLabel(s, isAR)}</option>)}
               </select>
             )}
           </div>
@@ -288,6 +291,7 @@ function RequirementCard({ req, onApprove, onReject, onEdit, onStatusChange, sho
 
 function Step71({ admCycleId }: { admCycleId: string }) {
   const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showAdd, setShowAdd] = useState(false)
@@ -356,12 +360,12 @@ function Step71({ admCycleId }: { admCycleId: string }) {
         <select value={filterType} onChange={e => setFilterType(e.target.value)}
           style={{ fontSize: 11, padding: '4px 8px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--navy)', color: 'var(--text)' }}>
           <option value="ALL">{isAR ? 'كل الأنواع' : 'All Types'}</option>
-          {REQUIREMENT_TYPES.map(t => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+          {REQUIREMENT_TYPES.map(t => <option key={t} value={t}>{enumLabel(t, isAR)}</option>)}
         </select>
         <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
           style={{ fontSize: 11, padding: '4px 8px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--navy)', color: 'var(--text)' }}>
           <option value="ALL">{isAR ? 'كل الأولويات' : 'All Priorities'}</option>
-          {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
+          {PRIORITIES.map(p => <option key={p} value={p}>{enumLabel(p, isAR)}</option>)}
         </select>
         <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', marginLeft: 'auto' }}>
           {displayed.length} {isAR ? 'متطلب' : 'requirements'}
@@ -370,7 +374,7 @@ function Step71({ admCycleId }: { admCycleId: string }) {
 
       {/* List */}
       {loading ? (
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: 16 }}>Loading...</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: 16 }}>{L('Loading...', 'جارٍ التحميل...')}</div>
       ) : displayed.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--text-dim)' }}>
           {isAR ? 'لا توجد متطلبات مقترحة. أضف متطلباً يدوياً أو انتظر حتى يقترح الذكاء الاصطناعي متطلبات من مخرجات ADM.' : 'No proposed requirements. Add one manually or wait for AI to suggest requirements from ADM outputs.'}
@@ -402,6 +406,7 @@ function Step71({ admCycleId }: { admCycleId: string }) {
 
 function Step72({ admCycleId }: { admCycleId: string }) {
   const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [items, setItems] = useState<any[]>([])
   const [allItems, setAllItems] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
@@ -472,7 +477,7 @@ function Step72({ admCycleId }: { admCycleId: string }) {
           </div>
           {(stats.byStatus || []).map((s: any) => (
             <div key={s.status} style={{ padding: '4px 12px', background: 'var(--navy)', border: `1px solid ${STATUS_COLOR[s.status] || 'var(--border)'}44`, borderRadius: 4, fontSize: 11 }}>
-              <span style={{ color: STATUS_COLOR[s.status] || 'var(--text-dim)' }}>{s.status.replace(/_/g, ' ')} </span><strong>{s._count}</strong>
+              <span style={{ color: STATUS_COLOR[s.status] || 'var(--text-dim)' }}>{enumLabel(s.status, isAR)} </span><strong>{s._count}</strong>
             </div>
           ))}
         </div>
@@ -495,7 +500,7 @@ function Step72({ admCycleId }: { admCycleId: string }) {
           <select key={f.label} value={f.val} onChange={e => f.set(e.target.value)}
             style={{ fontSize: 11, padding: '4px 8px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', background: 'var(--navy)', color: 'var(--text)' }}>
             <option value="ALL">{f.label}: {isAR ? 'الكل' : 'All'}</option>
-            {f.opts.slice(1).map((o: string) => <option key={o} value={o}>{o.replace(/_/g, ' ')}</option>)}
+            {f.opts.slice(1).map((o: string) => <option key={o} value={o}>{enumLabel(o, isAR)}</option>)}
           </select>
         ))}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
@@ -523,7 +528,7 @@ function Step72({ admCycleId }: { admCycleId: string }) {
 
       {/* List */}
       {loading ? (
-        <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: 16 }}>Loading...</div>
+        <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: 16 }}>{L('Loading...', 'جارٍ التحميل...')}</div>
       ) : items.length === 0 ? (
         <div style={{ padding: 32, textAlign: 'center', border: '1px dashed var(--border)', borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--text-dim)' }}>
           {filterApproval === 'APPROVED' ? (isAR ? 'لا توجد متطلبات معتمدة بعد. اعتمد المتطلبات المقترحة في الخطوة 7.1.' : 'No approved requirements yet. Approve proposed requirements in Step 7.1.') : (isAR ? 'لا توجد متطلبات.' : 'No requirements found.')}
@@ -555,6 +560,7 @@ const IMPACT_COLOR: Record<string, string> = { HIGH: '#e74c3c', MEDIUM: '#f39c12
 
 function Step73({ admCycleId }: { admCycleId: string }) {
   const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [requirements, setRequirements] = useState<any[]>([])
   const [selected, setSelected] = useState('')
   const [selectedReq, setSelectedReq] = useState<any>(null)
@@ -628,7 +634,7 @@ function Step73({ admCycleId }: { admCycleId: string }) {
             <select value={selected} onChange={e => selectReq(e.target.value)} style={inputStyle}>
               <option value="">{isAR ? '-- اختر متطلباً --' : '-- Select --'}</option>
               {requirements.map(r => (
-                <option key={r.id} value={r.id}>{r.title} [{r.requirementType}]</option>
+                <option key={r.id} value={r.id}>{r.title} [{enumLabel(r.requirementType, isAR)}]</option>
               ))}
             </select>
             {requirements.length === 0 && (
@@ -689,12 +695,12 @@ function Step73({ admCycleId }: { admCycleId: string }) {
             {activeTab === 'traceability' && (
               <div>
                 {loadingTrace ? (
-                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>Loading traceability...</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{L('Loading traceability...', 'جارٍ تحميل التتبع...')}</div>
                 ) : traceability ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {[
                       { label: isAR ? 'المرحلة المصدر' : 'Source Phase', value: traceability.traceability.sourcePhase ? `Phase ${traceability.traceability.sourcePhase}` : '—' },
-                      { label: isAR ? 'مخرج المصدر' : 'Source Output', value: traceability.traceability.sourceOutput?.replace(/_/g, ' ') || '—' },
+                      { label: isAR ? 'مخرج المصدر' : 'Source Output', value: (traceability.traceability.sourceOutput ? enumLabel(traceability.traceability.sourceOutput, isAR) : '—') },
                       { label: isAR ? 'المجالات المتأثرة' : 'Affected Domains', value: traceability.traceability.affectedDomains?.join(', ') || '—' },
                       { label: isAR ? 'مرجع الامتثال' : 'Compliance Ref', value: traceability.traceability.complianceReference || '—' },
                     ].map(row => (
@@ -709,7 +715,7 @@ function Step73({ admCycleId }: { admCycleId: string }) {
                         {traceability.relatedRequirements.map((r: any) => (
                           <div key={r.id} style={{ fontSize: 11, padding: '4px 0', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between' }}>
                             <span>{r.title}</span>
-                            <span style={{ color: STATUS_COLOR[r.status] || 'var(--text-dim)', fontSize: 10 }}>{r.status}</span>
+                            <span style={{ color: STATUS_COLOR[r.status] || 'var(--text-dim)', fontSize: 10 }}>{enumLabel(r.status, isAR)}</span>
                           </div>
                         ))}
                       </div>
@@ -731,7 +737,7 @@ function Step73({ admCycleId }: { admCycleId: string }) {
                   <div style={{ fontSize: 12, color: 'var(--text-dim)', padding: '12px 0' }}>⟳ {isAR ? 'يحلل الذكاء الاصطناعي الأثر...' : 'AI is analyzing the impact...'}</div>
                 )}
                 {result?.error && (
-                  <div style={{ fontSize: 12, color: '#e74c3c', padding: 12, background: 'rgba(220,38,38,0.08)', borderRadius: 'var(--radius)' }}>Error: {result.error}</div>
+                  <div style={{ fontSize: 12, color: '#e74c3c', padding: 12, background: 'rgba(220,38,38,0.08)', borderRadius: 'var(--radius)' }}>{L('Error:', 'خطأ:')} {result.error}</div>
                 )}
                 {result?.analysis && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -739,7 +745,7 @@ function Step73({ admCycleId }: { admCycleId: string }) {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{isAR ? 'مستوى الأثر' : 'Impact Level'}</span>
                       <span style={{ fontSize: 13, fontWeight: 700, color: IMPACT_COLOR[result.analysis.impactLevel] || 'var(--accent)' }}>
-                        {result.analysis.impactLevel}
+                        {enumLabel(result.analysis.impactLevel, isAR)}
                       </span>
                     </div>
                     {/* Summary */}
@@ -782,6 +788,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
   onClose: () => void
 }) {
   const { isAR, t } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [activeStep, setActiveStep] = useState('7.1')
 
   const STEP_META: Record<string, { label: string; labelAr: string; desc: string; descAr: string }> = {
@@ -817,7 +824,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
                 {t('adm.phase')} 7 — {isAR ? 'إدارة المتطلبات' : 'Requirements Management'}
               </div>
               <span style={{ fontSize: 9, padding: '2px 8px', borderRadius: 2, background: 'rgba(3,105,161,0.15)', color: 'var(--accent)', border: '1px solid rgba(3,105,161,0.3)', fontFamily: 'var(--font-mono)' }}>
-                CONTINUOUS
+                {L('CONTINUOUS', 'مستمرة')}
               </span>
             </div>
             <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>
@@ -832,7 +839,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           {/* Step sidebar */}
           <div style={{ width: 210, borderRight: '1px solid var(--border)', padding: '16px 12px', overflowY: 'auto', flexShrink: 0 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, letterSpacing: '0.08em' }}>WORKSPACES</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, letterSpacing: '0.08em' }}>{L('WORKSPACES', 'مساحات العمل')}</div>
             {['7.1', '7.2', '7.3'].map(key => {
               const meta = STEP_META[key]
               return (
@@ -847,7 +854,7 @@ export function Phase7Workspace({ cycle, steps, onClose }: {
             })}
 
             <div style={{ marginTop: 16, padding: '10px 10px', background: 'rgba(3,105,161,0.05)', border: '1px solid rgba(3,105,161,0.15)', borderRadius: 'var(--radius)' }}>
-              <div style={{ fontSize: 9, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>NORA 2.0</div>
+              <div style={{ fontSize: 9, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{L('NORA 2.0', 'نورة 2.0')}</div>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', lineHeight: 1.5 }}>
                 {isAR ? 'إدارة المتطلبات كطبقة حوكمة مستمرة لدورة تطوير البنية المؤسسية' : 'Requirements managed as a continuous governance layer per NORA ADM methodology'}
               </div>

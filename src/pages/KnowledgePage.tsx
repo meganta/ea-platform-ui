@@ -6,7 +6,8 @@ import HelpTip from '../components/HelpTip'
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
 export default function KnowledgePage() {
-  const { t } = useLang()
+  const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [docs, setDocs] = useState<any[]>([])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<any[]>([])
@@ -32,7 +33,7 @@ export default function KnowledgePage() {
     fd.append('type', docType)
     try {
       const token = localStorage.getItem('ea_token')
-      if (!token) throw new Error('Not authenticated — please log in again')
+      if (!token) throw new Error(L('Not authenticated — please log in again', 'لم يتم التحقق من الهوية — يرجى تسجيل الدخول مرة أخرى'))
       const res = await fetch(`${API_URL}/knowledge/documents/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
@@ -40,10 +41,10 @@ export default function KnowledgePage() {
       })
       if (!res.ok) {
         const err = await res.json().catch(()=>({}))
-        throw new Error(err.message || `Upload failed (${res.status})`)
+        throw new Error(err.message || L(`Upload failed (${res.status})`, `فشل الرفع (${res.status})`))
       }
       const data = await res.json()
-      setUploadMsg({ type: 'success', text: `✓ Uploaded — ${data.chunkCount || 1} chunk(s) indexed` })
+      setUploadMsg({ type: 'success', text: L(`✓ Uploaded — ${data.chunkCount || 1} chunk(s) indexed`, `✓ تم الرفع — فُهرس ${data.chunkCount || 1} جزء`) })
       await load()
     } catch (err: any) {
       setUploadMsg({ type: 'error', text: `✗ ${err.message}` })
@@ -54,7 +55,7 @@ export default function KnowledgePage() {
   }
 
   const deleteDoc = async (id: string, name: string) => {
-    if (!window.confirm(`Delete "${name}"?`)) return
+    if (!window.confirm(L(`Delete "${name}"?`, `حذف "${name}"؟`))) return
     setDeleting(id)
     try {
       const token = localStorage.getItem('ea_token')
@@ -64,7 +65,7 @@ export default function KnowledgePage() {
       })
       await load()
     } catch (err: any) {
-      alert(`Delete failed: ${err.message}`)
+      alert(L(`Delete failed: ${err.message}`, `فشل الحذف: ${err.message}`))
     } finally {
       setDeleting(null)
     }
@@ -87,7 +88,7 @@ export default function KnowledgePage() {
     <div>
       <div className="page-header">
         <div className="flex items-center justify-between">
-          <div><div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>{t('know.title')}<HelpTip text="Upload documents here (like policies, past reviews, or strategy papers) so the AI can reference them when answering questions or reviewing new proposals - instead of only relying on general knowledge." /></div><div className="page-subtitle">{t('know.subtitle')}</div></div>
+          <div><div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>{t('know.title')}<HelpTip text={L('Upload documents here (like policies, past reviews, or strategy papers) so the AI can reference them when answering questions or reviewing new proposals - instead of only relying on general knowledge.', 'ارفع الوثائق هنا (مثل السياسات أو المراجعات السابقة أو أوراق الاستراتيجية) ليستند إليها الذكاء الاصطناعي عند الإجابة عن الأسئلة أو مراجعة المقترحات الجديدة، بدلاً من الاعتماد على المعرفة العامة فقط.')} /></div><div className="page-subtitle">{t('know.subtitle')}</div></div>
           <div style={{position:'relative',display:'inline-block'}}>
             <button className="btn btn-primary" disabled={uploading} onClick={()=>setShowTypeSelect(s=>!s)}>
               ⬆ {uploading ? t('know.uploading') : t('know.upload')} ▾

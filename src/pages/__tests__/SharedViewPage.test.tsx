@@ -1,6 +1,10 @@
 import { render, screen, waitFor, act } from '@testing-library/react';
 import SharedViewPage from '../SharedViewPage';
 
+jest.mock('../../contexts/LangContext', () => ({
+  useLang: () => ({ isAR: false, locale: 'EN', setLocale: jest.fn(), t: (key: string) => key }),
+}));
+
 let mockToken: string | undefined = 'abc123token';
 jest.mock('react-router-dom', () => ({
   useParams: () => ({ token: mockToken }),
@@ -35,7 +39,7 @@ describe('SharedViewPage', () => {
   it('formats the visualization type by replacing underscores with spaces', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(SAMPLE_VIEW) });
     render(<SharedViewPage />);
-    expect(await screen.findByText(/GRAPH LAYOUT/)).toBeInTheDocument();
+    expect(await screen.findByText(/Graph Layout/)).toBeInTheDocument();
   });
 
   it('shows the organization name from branding', async () => {

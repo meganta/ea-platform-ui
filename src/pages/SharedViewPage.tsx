@@ -1,6 +1,8 @@
+import { useLang } from '../contexts/LangContext'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { API_BASE } from '../lib/api'
+import { enumLabel } from '../lib/enumLabels'
 import BrandLogo from '../brand/BrandLogo'
 import BrandPattern from '../brand/BrandPattern'
 import '../brand/brand.css'
@@ -23,6 +25,8 @@ interface SharedViewSummary {
 }
 
 export default function SharedViewPage() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const { token } = useParams<{ token: string }>()
   const [view, setView] = useState<SharedViewSummary | null>(null)
   const [error, setError] = useState('')
@@ -53,7 +57,7 @@ export default function SharedViewPage() {
         {view?.tenantSlug && view.branding?.hasLogo && !logoFailed ? (
           <img
             src={`${API_BASE}/public/branding/${encodeURIComponent(view.tenantSlug)}/logo`}
-            alt={orgName || 'Logo'}
+            alt={orgName || L('Logo', 'الشعار')}
             style={{ maxHeight: 32, maxWidth: 180, objectFit: 'contain', marginBottom: 8 }}
             onError={() => setLogoFailed(true)}
           />
@@ -63,22 +67,22 @@ export default function SharedViewPage() {
 
         {error ? (
           <>
-            <div className="login-title" style={{ marginTop: 8 }}>Link unavailable</div>
+            <div className="login-title" style={{ marginTop: 8 }}>{L('Link unavailable', 'الرابط غير متاح')}</div>
             <div className="login-error" style={{ marginTop: 8 }}>{error}</div>
           </>
         ) : view ? (
           <>
-            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4 }}>{view.category} · {view.visualization.replace(/_/g, ' ')}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 4 }}>{enumLabel(view.category, isAR)} · {enumLabel(view.visualization, isAR)}</div>
             <div className="login-title" style={{ marginTop: 4 }}>{view.name}</div>
             {view.description && <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 8, lineHeight: 1.6 }}>{view.description}</div>}
 
             <div style={{ marginTop: 20, padding: 14, background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 12, color: 'var(--text-dim)' }}>
-              This is a shared view from {orgName || 'an ArchMind workspace'}. Sign in to explore the live architecture data.
+              {L(`This is a shared view from ${orgName || 'an ArchMind workspace'}. Sign in to explore the live architecture data.`, `هذا عرض مشترك من ${orgName || 'مساحة عمل ArchMind'}. سجّل الدخول لاستكشاف بيانات البنية المباشرة.`)}
             </div>
 
             <Link to={`/login${view.tenantSlug ? `?org=${encodeURIComponent(view.tenantSlug)}` : ''}`}>
               <button className="btn btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: 16, ...(accentColor ? { background: accentColor, borderColor: accentColor } : {}) }}>
-                Sign in to view
+                {L('Sign in to view', 'سجّل الدخول للعرض')}
               </button>
             </Link>
           </>

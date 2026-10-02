@@ -19,7 +19,8 @@ const th: CSSProperties = { padding: '10px 14px', textAlign: 'left', fontWeight:
 const td: CSSProperties = { padding: '10px 14px', verticalAlign: 'top' }
 
 export default function DemoRequestsPage() {
-  const { t } = useLang()
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [requests, setRequests] = useState<DemoRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,14 +42,14 @@ export default function DemoRequestsPage() {
 
   useEffect(() => { load() }, [load])
 
-  const formatDate = (iso: string) => new Date(iso).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  const formatDate = (iso: string) => new Date(iso).toLocaleString(isAR ? 'ar' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
   return (
     <div style={{ padding: '20px 28px', height: '100%', overflow: 'auto' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>📨 {t('demoRequests.title') || 'Demo Requests'} ({requests.length})</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700 }}>📨 {L('Demo Requests', 'طلبات العرض التوضيحي')} ({requests.length})</h1>
         <button onClick={load} style={{ padding: '8px 16px', background: 'var(--navy-mid)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', fontSize: 13, cursor: 'pointer' }}>
-          ↻ {t('demoRequests.refresh') || 'Refresh'}
+          ↻ {L('Refresh', 'تحديث')}
         </button>
       </div>
 
@@ -60,22 +61,22 @@ export default function DemoRequestsPage() {
 
       {loading ? <div className="spinner" style={{ margin: '40px auto' }} /> : requests.length === 0 ? (
         <div style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>
-          {t('demoRequests.empty') || 'No demo requests yet.'}
+          {L('No demo requests yet.', 'لا توجد طلبات عرض توضيحي بعد.')}
         </div>
       ) : (
         <div style={{ background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)' }}>
-                <th style={th}>{t('demoRequests.date') || 'Submitted'}</th>
-                <th style={th}>{t('demoRequests.name') || 'Name'}</th>
-                <th style={th}>{t('demoRequests.organization') || 'Organization'}</th>
-                <th style={th}>{t('demoRequests.jobTitle') || 'Job Title'}</th>
-                <th style={th}>{t('demoRequests.email') || 'Email'}</th>
-                <th style={th}>{t('demoRequests.phone') || 'Phone'}</th>
-                <th style={th}>{t('demoRequests.country') || 'Country'}</th>
-                <th style={th}>{t('demoRequests.language') || 'Language'}</th>
-                <th style={th}>{t('demoRequests.message') || 'Message'}</th>
+                <th style={th}>{L('Submitted', 'تاريخ الإرسال')}</th>
+                <th style={th}>{L('Name', 'الاسم')}</th>
+                <th style={th}>{L('Organization', 'الجهة')}</th>
+                <th style={th}>{L('Job Title', 'المسمى الوظيفي')}</th>
+                <th style={th}>{L('Email', 'البريد الإلكتروني')}</th>
+                <th style={th}>{L('Phone', 'الهاتف')}</th>
+                <th style={th}>{L('Country', 'الدولة')}</th>
+                <th style={th}>{L('Language', 'اللغة')}</th>
+                <th style={th}>{L('Message', 'الرسالة')}</th>
               </tr>
             </thead>
             <tbody>
@@ -88,7 +89,7 @@ export default function DemoRequestsPage() {
                   <td style={td}><a href={`mailto:${r.email}`} style={{ color: 'var(--accent)' }}>{r.email}</a></td>
                   <td style={td}>{r.phone || '—'}</td>
                   <td style={td}>{r.country}</td>
-                  <td style={td}>{r.preferredLanguage}</td>
+                  <td style={td}>{/^ar/i.test(r.preferredLanguage) ? L('Arabic', 'العربية') : /^en/i.test(r.preferredLanguage) ? L('English', 'الإنجليزية') : r.preferredLanguage}</td>
                   <td style={{ ...td, maxWidth: 320, whiteSpace: 'pre-wrap' }}>{r.message}</td>
                 </tr>
               ))}

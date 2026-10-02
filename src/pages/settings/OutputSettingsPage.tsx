@@ -1,13 +1,16 @@
+import { useLang } from '../../contexts/LangContext'
 import { useState, useEffect } from 'react'
 import { authFetch, SETTINGS_API_URL } from './shared'
 
 export default function OutputSettingsPage() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [subTab, setSubTab] = useState<'diagrams' | 'export' | 'templates'>('diagrams')
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">Output Preferences</div>
-        <div className="page-subtitle">HOW DIAGRAMS AND DOCUMENTS ARE PRODUCED</div>
+        <div className="page-title">{L('Output Preferences', 'تفضيلات المخرجات')}</div>
+        <div className="page-subtitle">{L('HOW DIAGRAMS AND DOCUMENTS ARE PRODUCED', 'كيفية إنتاج المخططات والوثائق')}</div>
         <div className="page-tabs">
           {[['diagrams', 'Diagrams'], ['export', 'Export'], ['templates', 'Document & Presentation Templates']].map(([k, l]) => (
             <button key={k} className={`tab-btn${subTab === k ? ' active' : ''}`} onClick={() => setSubTab(k as any)}>{l}</button>
@@ -24,6 +27,8 @@ export default function OutputSettingsPage() {
 }
 
 function TemplateSection() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [data, setData] = useState<any>(null)
   const [format, setFormat] = useState<'PPTX' | 'DOCX'>('PPTX')
   const [file, setFile] = useState<File | null>(null)
@@ -38,8 +43,8 @@ function TemplateSection() {
     try {
       const body = new FormData(); body.append('file', file); body.append('format', format); body.append('name', file.name.replace(/\.(pptx|docx)$/i, ''))
       const res = await fetch(`${SETTINGS_API_URL}/output-studio/templates/upload`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }, body })
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message || 'Upload failed')
-      setFile(null); setMsg('Template uploaded and set as the tenant default.'); await load()
+      if (!res.ok) throw new Error((await res.json().catch(() => null))?.message || L('Upload failed', 'فشل الرفع'))
+      setFile(null); setMsg(L('Template uploaded and set as the tenant default.', 'تم رفع القالب وتعيينه افتراضياً للجهة.')); await load()
     } catch (e: any) { setMsg(e.message) } finally { setBusy(false) }
   }
   const setDefault = async (targetFormat: string, kind: 'TENANT' | 'GALLERY', id: string) => {
@@ -51,35 +56,37 @@ function TemplateSection() {
     return value?.kind === kind && (value.templateId === id || value.galleryId === id)
   }
   return <div>
-    <div className="section-title" style={{ fontSize: 15 }}>Document & Presentation Templates</div>
-    <div style={{ fontSize: 12, color: 'var(--text-dim)', margin: '4px 0 16px' }}>Tenant-scoped Office templates are validated, versioned and profiled. ArchMind gallery templates remain available as fallback.</div>
+    <div className="section-title" style={{ fontSize: 15 }}>{L('Document & Presentation Templates', 'قوالب الوثائق والعروض')}</div>
+    <div style={{ fontSize: 12, color: 'var(--text-dim)', margin: '4px 0 16px' }}>{L('Tenant-scoped Office templates are validated, versioned and profiled. ArchMind gallery templates remain available as fallback.', 'يتم التحقق من قوالب Office الخاصة بالجهة وإصدارها وتحليلها، وتبقى قوالب معرض ArchMind متاحة كبديل.')}</div>
     {msg && <div className="alert" style={{ marginBottom: 10 }}>{msg}</div>}
     <div style={{ display: 'flex', gap: 8, alignItems: 'end', padding: 12, border: '1px solid var(--border)', borderRadius: 5 }}>
-      <label style={{ fontSize: 11 }}>Type<select className="form-input" value={format} onChange={e => { setFormat(e.target.value as any); setFile(null) }} style={{ display: 'block', marginTop: 4 }}><option value="PPTX">PowerPoint (.pptx)</option><option value="DOCX">Word (.docx)</option></select></label>
-      <label style={{ fontSize: 11, flex: 1 }}>Template<input type="file" accept={format === 'PPTX' ? '.pptx' : '.docx'} onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'block', marginTop: 7 }} /></label>
-      <button className="btn btn-primary btn-sm" disabled={!file || busy} onClick={upload}>{busy ? 'Validating…' : 'Upload'}</button>
+      <label style={{ fontSize: 11 }}>{L('Type', 'النوع')}<select className="form-input" value={format} onChange={e => { setFormat(e.target.value as any); setFile(null) }} style={{ display: 'block', marginTop: 4 }}><option value="PPTX">PowerPoint (.pptx)</option><option value="DOCX">Word (.docx)</option></select></label>
+      <label style={{ fontSize: 11, flex: 1 }}>{L('Template', 'القالب')}<input type="file" accept={format === 'PPTX' ? '.pptx' : '.docx'} onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'block', marginTop: 7 }} /></label>
+      <button className="btn btn-primary btn-sm" disabled={!file || busy} onClick={upload}>{busy ? L('Validating…', 'جارٍ التحقق…') : L('Upload', 'رفع')}</button>
     </div>
     {(['PPTX', 'DOCX'] as const).map(targetFormat => <div key={targetFormat} style={{ marginTop: 18 }}>
       <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 7 }}>{targetFormat === 'PPTX' ? 'PowerPoint' : 'Word'}</div>
       {(data?.templates || []).filter((item: any) => item.format === targetFormat).map((item: any) => <div key={item.id} style={{ padding: 9, border: `1px solid ${selected(targetFormat, 'TENANT', item.id) ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 4, marginBottom: 5, fontSize: 11 }}>
         <strong>{item.name}</strong> · v{item.version} · {(item.sizeBytes / 1024).toFixed(0)} KB
-        <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>Fonts: {item.profile?.fonts?.slice(0, 4).join(', ') || 'not declared'} · Layouts/styles: {item.profile?.layouts?.length || 0} · Media: {item.profile?.media?.length || 0}</div>
-        <div className="flex gap-2" style={{ marginTop: 5 }}><button className="btn btn-secondary btn-sm" onClick={() => setDefault(targetFormat, 'TENANT', item.id)}>{selected(targetFormat, 'TENANT', item.id) ? 'Default' : 'Set Default'}</button><button className="btn btn-secondary btn-sm" onClick={() => remove(item.id)}>Remove</button></div>
+        <div style={{ color: 'var(--text-dim)', marginTop: 3 }}>{L('Fonts:', 'الخطوط:')} {item.profile?.fonts?.slice(0, 4).join(', ') || L('not declared', 'غير محددة')} {L('· Layouts/styles:', '· التخطيطات/الأنماط:')} {item.profile?.layouts?.length || 0} {L('· Media:', '· الوسائط:')} {item.profile?.media?.length || 0}</div>
+        <div className="flex gap-2" style={{ marginTop: 5 }}><button className="btn btn-secondary btn-sm" onClick={() => setDefault(targetFormat, 'TENANT', item.id)}>{selected(targetFormat, 'TENANT', item.id) ? L('Default', 'افتراضي') : L('Set Default', 'تعيين كافتراضي')}</button><button className="btn btn-secondary btn-sm" onClick={() => remove(item.id)}>{L('Remove', 'إزالة')}</button></div>
       </div>)}
-      <div style={{ fontSize: 10, color: 'var(--text-dim)', margin: '9px 0 5px' }}>ArchMind Template Gallery</div>
+      <div style={{ fontSize: 10, color: 'var(--text-dim)', margin: '9px 0 5px' }}>{L('ArchMind Template Gallery', 'معرض قوالب ArchMind')}</div>
       <div style={{ display: 'grid', gridTemplateColumns: targetFormat === 'PPTX' ? 'repeat(3, minmax(0, 1fr))' : '1fr', gap: 8 }}>{(data?.gallery || []).filter((item: any) => item.formats.includes(targetFormat)).map((item: any) => <button key={item.id} className="btn btn-secondary" onClick={() => setDefault(targetFormat, 'GALLERY', item.id)} style={{ textAlign: 'left', padding: 0, overflow: 'hidden', borderColor: selected(targetFormat, 'GALLERY', item.id) ? 'var(--accent)' : undefined }}>{targetFormat === 'PPTX' && <DesignSystemPreview id={item.id} />}<div style={{ padding: 9 }}><strong>{item.name}</strong><div style={{ fontSize: 9, color: 'var(--text-dim)', marginTop: 3, whiteSpace: 'normal' }}>{item.description}</div></div></button>)}</div>
     </div>)}
   </div>
 }
 
 function DesignSystemPreview({ id }: { id: string }) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const designs: Record<string, { bg: string; ink: string; accent: string; mode: 'editorial' | 'institutional' | 'technical' }> = {
     'executive-consulting': { bg: '#f7f5f0', ink: '#152a3a', accent: '#e05a47', mode: 'editorial' },
     'government-executive': { bg: '#f4f7f5', ink: '#153f36', accent: '#b69a5b', mode: 'institutional' },
     'architecture-professional': { bg: '#f3f7fa', ink: '#102a43', accent: '#00a6c8', mode: 'technical' },
   }
   const d = designs[id] || designs['architecture-professional']
-  return <div aria-label={`${id} representative slide preview`} style={{ height: 112, background: d.bg, position: 'relative', borderBottom: '1px solid var(--border)', overflow: 'hidden' }}>
+  return <div aria-label={L(`${id} representative slide preview`, `معاينة شريحة تمثيلية لـ ${id}`)} style={{ height: 112, background: d.bg, position: 'relative', borderBottom: '1px solid var(--border)', overflow: 'hidden' }}>
     {d.mode === 'editorial' && <><div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '31%', background: d.accent }} /><div style={{ position: 'absolute', left: '39%', top: 20, width: '48%', height: 7, background: d.ink }} /><div style={{ position: 'absolute', left: '39%', top: 34, width: '36%', height: 4, background: '#89959d' }} /><div style={{ position: 'absolute', left: '39%', top: 58, display: 'flex', gap: 5 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 31, height: 31, background: i === 0 ? d.ink : '#fff', border: '1px solid #e7e2d9' }} />)}</div></>}
     {d.mode === 'institutional' && <><div style={{ height: 8, background: d.accent }} /><div style={{ position: 'absolute', right: 0, top: 8, bottom: 0, width: 10, background: d.ink }} /><div style={{ position: 'absolute', right: 22, top: 23, width: '62%', height: 7, background: d.ink }} /><div style={{ position: 'absolute', right: 22, top: 43, width: '75%', height: 1, background: '#dce6e1' }} /><div style={{ position: 'absolute', right: 22, top: 58, display: 'flex', gap: 5 }}>{[0, 1, 2].map(i => <div key={i} style={{ width: 34, height: 30, background: '#fff', borderTop: `3px solid ${d.accent}`, borderInlineEnd: '1px solid #dce6e1' }} />)}</div></>}
     {d.mode === 'technical' && <><div style={{ height: 5, background: d.accent }} />{[1, 2, 3, 4].map(i => <div key={i} style={{ position: 'absolute', left: 8 + i * 29, top: 12, bottom: 8, borderLeft: '1px solid #d9eaf0' }} />)}<div style={{ position: 'absolute', left: 14, top: 20, width: '68%', height: 7, background: d.ink }} /><div style={{ position: 'absolute', left: 18, top: 51, display: 'flex', gap: 12 }}>{[0, 1, 2].map((i) => <div key={i} style={{ width: 31, height: 25, background: '#fff', border: `1px solid ${d.accent}`, borderRadius: 2 }} />)}</div><div style={{ position: 'absolute', left: 48, top: 62, width: 12, borderTop: `2px solid ${d.accent}` }} /><div style={{ position: 'absolute', left: 91, top: 62, width: 12, borderTop: `2px solid ${d.accent}` }} /></>}
@@ -87,6 +94,8 @@ function DesignSystemPreview({ id }: { id: string }) {
 }
 
 function DiagramSection() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [form, setForm] = useState({ defaultStyle: 'PROFESSIONAL', colorScheme: 'BLUE', autoGenerateDiagrams: true, diagramDensity: 'MEDIUM', showLegend: true, showRelationships: true, arabicLabels: true })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -99,15 +108,15 @@ function DiagramSection() {
     setSaving(true); setMsg(null)
     try {
       const res = await authFetch('/config/diagram-settings', { method: 'PUT', body: JSON.stringify(form) })
-      if (res.message) setMsg({ type: 'success', text: 'Diagram settings saved' })
-      else setMsg({ type: 'error', text: 'Failed to save' })
+      if (res.message) setMsg({ type: 'success', text: L('Diagram settings saved', 'تم حفظ إعدادات المخططات') })
+      else setMsg({ type: 'error', text: L('Failed to save', 'تعذّر الحفظ') })
     } finally { setSaving(false) }
   }
 
   return (
     <div>
-      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>📐 Diagram Settings</div>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Configure architecture diagram generation preferences</div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>{L('📐 Diagram Settings', '📐 إعدادات المخططات')}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>{L('Configure architecture diagram generation preferences', 'تكوين تفضيلات إنشاء مخططات البنية')}</div>
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -128,13 +137,15 @@ function DiagramSection() {
             </label>
           ))}
         </div>
-        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Diagram Settings'}</button>
+        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? L('Saving...', 'جارٍ الحفظ...') : L('💾 Save Diagram Settings', '💾 حفظ إعدادات المخططات')}</button>
       </div>
     </div>
   )
 }
 
 function ExportSection() {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [form, setForm] = useState({ defaultLanguage: 'AR', includeCharts: true, includeTableOfContents: true, includePageNumbers: true, templateStyle: 'PROFESSIONAL', footerText: '', headerLogoEnabled: true })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -147,36 +158,36 @@ function ExportSection() {
     setSaving(true); setMsg(null)
     try {
       const res = await authFetch('/config/export-settings', { method: 'PUT', body: JSON.stringify(form) })
-      if (res.message) setMsg({ type: 'success', text: 'Export settings saved' })
-      else setMsg({ type: 'error', text: 'Failed to save' })
+      if (res.message) setMsg({ type: 'success', text: L('Export settings saved', 'تم حفظ إعدادات التصدير') })
+      else setMsg({ type: 'error', text: L('Failed to save', 'تعذّر الحفظ') })
     } finally { setSaving(false) }
   }
 
   return (
     <div>
-      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>📤 Export Settings</div>
-      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>Configure default behavior for Word and PowerPoint exports</div>
+      <div className="section-title" style={{ fontSize: 15, marginBottom: 4 }}>{L('📤 Export Settings', '📤 إعدادات التصدير')}</div>
+      <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 16 }}>{L('Configure default behavior for Word and PowerPoint exports', 'تكوين السلوك الافتراضي لتصدير Word وPowerPoint')}</div>
       {msg && <div className={`alert alert-${msg.type === 'success' ? 'success' : 'error'}`} style={{ marginBottom: 12 }}>{msg.text}</div>}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div>
-            <div style={{ fontSize: 11, marginBottom: 3 }}>Default Export Language</div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Default Export Language', 'لغة التصدير الافتراضية')}</div>
             <select className="form-input" value={form.defaultLanguage} onChange={e => setForm(f => ({ ...f, defaultLanguage: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
-              <option value="AR">Arabic (العربية)</option>
-              <option value="EN">English</option>
+              <option value="AR">{L('Arabic', 'العربية')}</option>
+              <option value="EN">{L('English', 'الإنجليزية')}</option>
             </select>
           </div>
           <div>
-            <div style={{ fontSize: 11, marginBottom: 3 }}>Template Style</div>
+            <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Template Style', 'نمط القالب')}</div>
             <select className="form-input" value={form.templateStyle} onChange={e => setForm(f => ({ ...f, templateStyle: e.target.value }))} style={{ fontSize: 11, width: '100%' }}>
-              <option value="PROFESSIONAL">Professional</option>
-              <option value="GOVERNMENT">Government</option>
-              <option value="MINIMAL">Minimal</option>
+              <option value="PROFESSIONAL">{L('Professional', 'احترافي')}</option>
+              <option value="GOVERNMENT">{L('Government', 'حكومي')}</option>
+              <option value="MINIMAL">{L('Minimal', 'بسيط')}</option>
             </select>
           </div>
           <div style={{ gridColumn: '1 / -1' }}>
-            <div style={{ fontSize: 11, marginBottom: 3 }}>Footer Text</div>
-            <input className="form-input" value={form.footerText} onChange={e => setForm(f => ({ ...f, footerText: e.target.value }))} placeholder="e.g. Confidential — For internal use only" style={{ fontSize: 11, width: '100%' }} />
+            <div style={{ fontSize: 11, marginBottom: 3 }}>{L('Footer Text', 'نص التذييل')}</div>
+            <input className="form-input" value={form.footerText} onChange={e => setForm(f => ({ ...f, footerText: e.target.value }))} placeholder={L('e.g. Confidential — For internal use only', 'مثال: سري — للاستخدام الداخلي فقط')} style={{ fontSize: 11, width: '100%' }} />
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -187,7 +198,7 @@ function ExportSection() {
             </label>
           ))}
         </div>
-        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? 'Saving...' : '💾 Save Export Settings'}</button>
+        <button className="btn btn-primary" style={{ fontSize: 12, alignSelf: 'flex-start' }} disabled={saving} onClick={save}>{saving ? L('Saving...', 'جارٍ الحفظ...') : L('💾 Save Export Settings', '💾 حفظ إعدادات التصدير')}</button>
       </div>
     </div>
   )

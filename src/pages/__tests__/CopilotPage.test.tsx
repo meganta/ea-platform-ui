@@ -1,6 +1,11 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CopilotPage from '../CopilotPage';
 
+let mockIsAR = false;
+jest.mock('../../contexts/LangContext', () => ({
+  useLang: () => ({ isAR: mockIsAR, locale: mockIsAR ? 'AR' : 'EN', setLocale: jest.fn(), t: (key: string) => key, resolveText: (s: string) => s }),
+}));
+
 // jsdom doesn't implement scrollIntoView - CopilotPage calls it on every
 // messages update to auto-scroll the chat, which throws without this.
 window.HTMLElement.prototype.scrollIntoView = jest.fn();

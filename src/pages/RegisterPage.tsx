@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const { locale, setLocale } = useLang()
   const nav = useNavigate()
   const isAR = locale === 'AR'
+  const L = (en: string, ar: string) => (isAR ? ar : en)
 
   const [step, setStep] = useState<Step>('org')
   const [loading, setLoading] = useState(false)
@@ -86,7 +87,7 @@ export default function RegisterPage() {
         }),
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.message || 'Registration failed')
+      if (!res.ok) throw new Error(data.message || L('Registration failed', 'فشل التسجيل'))
       setResult(data)
       setStep('done')
     } catch (err: any) {
@@ -142,7 +143,7 @@ export default function RegisterPage() {
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="org-name-ar">{isAR?'الاسم بالعربية':'Arabic Name'}</label>
-              <input id="org-name-ar" className="form-input" value={org.nameAr} onChange={setO('nameAr')} dir="rtl" placeholder="وزارة الصحة"/>
+              <input id="org-name-ar" className="form-input" value={org.nameAr} onChange={setO('nameAr')} dir="rtl" placeholder={L('Organization name in Arabic', 'وزارة الصحة')}/>
             </div>
             <div className="form-group">
               <label className="form-label" htmlFor="org-slug">{isAR?'معرف المنظمة':'Organization ID'} *</label>
@@ -161,14 +162,14 @@ export default function RegisterPage() {
               <div className="form-group">
                 <label className="form-label" htmlFor="org-locale">{isAR?'اللغة الافتراضية':'Default Language'}</label>
                 <select id="org-locale" className="form-input" value={org.locale} onChange={setO('locale')}>
-                  <option value="EN">English</option>
-                  <option value="AR">العربية</option>
+                  <option value="EN">{L('English', 'الإنجليزية')}</option>
+                  <option value="AR">{L('Arabic', 'العربية')}</option>
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="org-framework">{isAR?'الإطار المرجعي':'EA Framework'}</label>
                 <select id="org-framework" className="form-input" value={org.frameworkType} onChange={setO('frameworkType')}>
-                  <option value="NORA">NORA</option>
+                  <option value="NORA">{L('NORA', 'نورة')}</option>
                   <option value="CUSTOM">{isAR?'مخصص':'Custom'}</option>
                 </select>
               </div>
@@ -192,11 +193,11 @@ export default function RegisterPage() {
             <div className="grid-2" style={{gap:12}}>
               <div className="form-group">
                 <label className="form-label" htmlFor="admin-fullname">{isAR?'الاسم الكامل':'Full Name'} *</label>
-                <input id="admin-fullname" className="form-input" value={admin.fullName} onChange={setA('fullName')} placeholder="Ahmed Al-Rashid" required/>
+                <input id="admin-fullname" className="form-input" value={admin.fullName} onChange={setA('fullName')} placeholder={L('Ahmed Al-Rashid', 'أحمد الراشد')} required/>
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="admin-fullname-ar">{isAR?'الاسم بالعربية':'Arabic Name'}</label>
-                <input id="admin-fullname-ar" className="form-input" value={admin.fullNameAr} onChange={setA('fullNameAr')} dir="rtl" placeholder="أحمد الراشد"/>
+                <input id="admin-fullname-ar" className="form-input" value={admin.fullNameAr} onChange={setA('fullNameAr')} dir="rtl" placeholder={L('Full name in Arabic', 'أحمد الراشد')}/>
               </div>
             </div>
             <div className="form-group">
@@ -238,9 +239,9 @@ export default function RegisterPage() {
               <div style={{fontSize:11,color:'var(--text-dim)',fontFamily:'var(--font-mono)',marginBottom:8}}>
                 {isAR?'بيانات تسجيل الدخول':'YOUR LOGIN DETAILS'}
               </div>
-              <div style={{fontSize:13,marginBottom:6}}><span style={{color:'var(--text-dim)'}}>Organization: </span><span style={{fontFamily:'var(--font-mono)',color:'var(--accent)'}}>{result.tenant.slug}</span></div>
-              <div style={{fontSize:13,marginBottom:6}}><span style={{color:'var(--text-dim)'}}>Email: </span><span>{result.admin.email}</span></div>
-              <div style={{fontSize:13}}><span style={{color:'var(--text-dim)'}}>Role: </span><span style={{fontFamily:'var(--font-mono)'}}>{result.admin.role}</span></div>
+              <div style={{fontSize:13,marginBottom:6}}><span style={{color:'var(--text-dim)'}}>{L('Organization:', 'الجهة:')} </span><span style={{fontFamily:'var(--font-mono)',color:'var(--accent)'}}>{result.tenant.slug}</span></div>
+              <div style={{fontSize:13,marginBottom:6}}><span style={{color:'var(--text-dim)'}}>{L('Email:', 'البريد الإلكتروني:')} </span><span>{result.admin.email}</span></div>
+              <div style={{fontSize:13}}><span style={{color:'var(--text-dim)'}}>{L('Role:', 'الدور:')} </span><span style={{fontFamily:'var(--font-mono)'}}>{result.admin.role}</span></div>
             </div>
             <button className="btn btn-primary" style={{width:'100%',justifyContent:'center'}} onClick={()=>nav('/login')}>
               {isAR?'تسجيل الدخول الآن':'Sign In Now →'}

@@ -5,12 +5,14 @@ import { useLang } from '../contexts/LangContext'
 import { useBranding } from '../contexts/BrandingContext'
 import SetupAssistantPage from '../pages/SetupAssistantPage'
 import NotificationBell from './NotificationBell'
+import { enumLabel } from '../lib/enumLabels'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
 interface NavItem {
   to: string
   label: string
+  labelAr?: string
   icon: string
   permission: string | null
   adminOnly?: boolean
@@ -19,14 +21,14 @@ interface NavItem {
 }
 
 const SETTINGS_CHILDREN: NavItem[] = [
-  { to: '/settings/organization', label: 'Organization', icon: '🏢', permission: null },
-  { to: '/settings/ai', label: 'AI & Copilot', icon: '🤖', permission: null },
-  { to: '/settings/knowledge-base', label: 'Knowledge Base', icon: '📚', permission: null },
-  { to: '/settings/governance', label: 'Governance', icon: '🏛', permission: null },
-  { to: '/settings/output', label: 'Output Preferences', icon: '🖼', permission: null },
-  { to: '/settings/notifications', label: 'Notifications', icon: '🔔', permission: null },
-  { to: '/settings/users', label: 'Users & Access', icon: '👥', permission: null },
-  { to: '/settings/api-billing', label: 'API & Billing', icon: '🔑', permission: null },
+  { to: '/settings/organization', label: 'Organization', labelAr: 'الجهة', icon: '🏢', permission: null },
+  { to: '/settings/ai', label: 'AI & Copilot', labelAr: 'الذكاء الاصطناعي والمساعد', icon: '🤖', permission: null },
+  { to: '/settings/knowledge-base', label: 'Knowledge Base', labelAr: 'قاعدة المعرفة', icon: '📚', permission: null },
+  { to: '/settings/governance', label: 'Governance', labelAr: 'الحوكمة', icon: '🏛', permission: null },
+  { to: '/settings/output', label: 'Output Preferences', labelAr: 'تفضيلات المخرجات', icon: '🖼', permission: null },
+  { to: '/settings/notifications', label: 'Notifications', labelAr: 'الإشعارات', icon: '🔔', permission: null },
+  { to: '/settings/users', label: 'Users & Access', labelAr: 'المستخدمون والصلاحيات', icon: '👥', permission: null },
+  { to: '/settings/api-billing', label: 'API & Billing', labelAr: 'واجهات البرمجة والفوترة', icon: '🔑', permission: null },
 ]
 
 export default function Layout() {
@@ -44,6 +46,7 @@ export default function Layout() {
   const [settingsExpanded, setSettingsExpanded] = useState(false)
   const nav = useNavigate()
   const location = useLocation()
+  const L = (en: string, ar: string) => (locale === 'AR' ? ar : en)
   const orgName = locale === 'AR' ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
 
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
@@ -66,22 +69,22 @@ export default function Layout() {
     { to: '/app', label: t('nav.dashboard'), icon: '⬛', permission: null },
     { to: '/adm', label: t('nav.adm'), icon: '⚙', permission: 'Repository.View' },
     { to: '/copilot', label: t('nav.copilot'), icon: '💬', permission: 'AIArchitect.Use' },
-    { to: '/governance', label: '🏛 Governance', icon: '', permission: 'Reviews.View' },
+    { to: '/governance', label: '🏛 ' + L('Governance', 'الحوكمة'), icon: '', permission: 'Reviews.View' },
     { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'Reviews.View', superadminOnly: true },
     { to: '/my-surveys', label: '📝 ' + (locale === 'AR' ? 'استبياناتي' : 'My Surveys'), icon: '', permission: 'Surveys.Respond' },
     { to: '/business-capabilities', label: '🧱 ' + (locale === 'AR' ? 'قدرات الأعمال' : 'Business Capabilities'), icon: '', permission: 'BusinessCapability.View' },
     { to: '/strategy', label: '🎯 ' + t('strategy.refresh.heading'), icon: '', permission: 'Strategy.View' },
-    { to: '/ea-planning', label: '🗓 EA Planning', icon: '', permission: 'Repository.View' },
+    { to: '/ea-planning', label: '🗓 ' + L('EA Planning', 'تخطيط البنية المؤسسية'), icon: '', permission: 'Repository.View' },
     { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Repository.View' },
     { to: '/notifications', label: '🔔 ' + t('nav.notifications'), icon: '', permission: null },
-    { to: '/meta-model', label: '🧩 Meta-Model', icon: '', permission: 'MetaModel.View' },
-    { to: '/ea-views', label: '🗺 EA Views', icon: '', permission: 'Views.View' },
-    { to: '/connector-hub', label: '🔌 Connectors', icon: '', permission: 'Repository.View', superadminOnly: true },
+    { to: '/meta-model', label: '🧩 ' + L('Meta-Model', 'النموذج الوصفي'), icon: '', permission: 'MetaModel.View' },
+    { to: '/ea-views', label: '🗺 ' + L('EA Views', 'عروض البنية المؤسسية'), icon: '', permission: 'Views.View' },
+    { to: '/connector-hub', label: '🔌 ' + L('Connectors', 'الموصلات'), icon: '', permission: 'Repository.View', superadminOnly: true },
     { to: '/reports', label: '📊 ' + (locale === 'AR' ? 'التقارير' : 'Reports'), icon: '', permission: 'Repository.View' },
     { to: '/repository', label: '🗄 ' + t('nav.repository'), icon: '', permission: 'Repository.View' },
     { to: '/knowledge', label: '📚 ' + t('nav.knowledge'), icon: '', permission: 'Repository.View' },
-    { to: '/glossary', label: '📖 Glossary', icon: '', permission: 'Repository.View', superadminOnly: true },
-    { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View', superadminOnly: true },
+    { to: '/glossary', label: '📖 ' + L('Glossary', 'المسرد'), icon: '', permission: 'Repository.View', superadminOnly: true },
+    { to: '/access-governance', label: '🔐 ' + L('Access Governance', 'حوكمة الوصول'), icon: '', permission: 'Roles.View', superadminOnly: true },
     // Settings category (restructured, explicit direction): a single
     // expandable nav group replacing the old flat, crowded /settings
     // (11 tabs in one page) and the Setup Assistant's Profile &
@@ -89,9 +92,9 @@ export default function Layout() {
     // domains-in-scope setting). Users & Access and API & Billing reuse
     // the existing, fuller standalone UsersPage/BillingPage content
     // rather than duplicating it under a second, thinner implementation.
-    { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Users.View', superadminOnly: true, children: SETTINGS_CHILDREN },
-    { to: '/getting-started', label: '🏛 Getting Started', icon: '', permission: null, superadminOnly: true },
-    { to: '/demo-requests', label: '📨 Demo Requests', icon: '', permission: null, superadminOnly: true },
+    { to: '/settings', label: '⚙ ' + L('Settings', 'الإعدادات'), icon: '', permission: 'Users.View', superadminOnly: true, children: SETTINGS_CHILDREN },
+    { to: '/getting-started', label: '🏛 ' + L('Getting Started', 'البدء'), icon: '', permission: null, superadminOnly: true },
+    { to: '/demo-requests', label: '📨 ' + L('Demo Requests', 'طلبات العرض التوضيحي'), icon: '', permission: null, superadminOnly: true },
   ]
 
   const visibleNav = navItems.filter(item => {
@@ -106,13 +109,13 @@ export default function Layout() {
 
   return (
     <div className="layout">
-      <button className="mobile-menu-btn" aria-label="Open menu" onClick={() => setSidebarOpen(o => !o)}>☰</button>
+      <button className="mobile-menu-btn" aria-label={L('Open menu', 'فتح القائمة')} onClick={() => setSidebarOpen(o => !o)}>☰</button>
       <div className={`sidebar-backdrop${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
       <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="sidebar-logo">
           {logoUrl && !logoFailed
-            ? <img src={logoUrl} alt={orgName || 'Logo'} style={{ maxHeight: 32, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />
-            : <div className="logo-text">{orgName || 'EA Platform'}</div>}
+            ? <img src={logoUrl} alt={orgName || L('Logo', 'الشعار')} style={{ maxHeight: 32, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />
+            : <div className="logo-text">{orgName || L('EA Platform', 'منصة البنية المؤسسية')}</div>}
           <div className="logo-sub">{locale === 'AR' ? 'هندسة المؤسسات' : 'Enterprise Architecture'}</div>
         </div>
         <nav className="sidebar-nav">
@@ -134,7 +137,7 @@ export default function Layout() {
           )}
           {adminNav.length > 0 && (
             <>
-              <div className="nav-label" style={{marginTop:8}}>Admin</div>
+              <div className="nav-label" style={{marginTop:8}}>{L('Admin', 'الإدارة')}</div>
               {adminNav.map(item => item.children ? (
                 <div key={item.to}>
                   <button
@@ -151,7 +154,7 @@ export default function Layout() {
                     <div style={{ paddingInlineStart: 14, borderInlineStart: '1px solid var(--border)', marginInlineStart: 14 }}>
                       {item.children.map(child => (
                         <NavLink key={child.to} to={child.to} className={({isActive})=>`nav-item${isActive?' active':''}`} style={{ fontSize: 12.5 }}>
-                          {child.icon ? child.icon + ' ' : ''}{child.label}
+                          {child.icon ? child.icon + ' ' : ''}{locale === 'AR' && child.labelAr ? child.labelAr : child.label}
                         </NavLink>
                       ))}
                     </div>
@@ -170,7 +173,7 @@ export default function Layout() {
             <div className="user-avatar">{user?.email?.[0]?.toUpperCase()}</div>
             <div>
               <div className="user-name truncate" style={{maxWidth:140}}>{user?.email}</div>
-              <div className="user-role">{user?.role}</div>
+              <div className="user-role">{enumLabel(user?.role, locale === 'AR')}</div>
             </div>
           </div>
           <button onClick={()=>setLocale(locale==='EN'?'AR':'EN')} style={{width:'100%',padding:'6px',background:'rgba(3,105,161,0.1)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--accent)',fontSize:12,marginBottom:6,cursor:'pointer'}}>
