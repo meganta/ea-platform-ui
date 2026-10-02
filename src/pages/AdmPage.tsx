@@ -2,19 +2,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import ReactMarkdown from 'react-markdown'
-import { DiagramViewer } from '../components/DiagramViewer'
+import AdmOutputViews from '../components/AdmOutputViews'
+import { stripDiagramBlocks } from '../lib/diagramBlocks'
 import { Phase7Workspace } from '../components/Phase7Workspace'
 import HelpTip from '../components/HelpTip'
 import DesignPicker from '../components/DesignPicker'
-function DiagramBlock({ chart }: { chart: string }) {
-  // Parse mermaid-style text into a readable styled block
-  return (
-    <div style={{ background: 'var(--navy-mid)', border: '1px solid var(--accent)', borderRadius: 'var(--radius)', padding: '12px 16px', margin: '8px 0', overflowX: 'auto' }}>
-      <div style={{ fontSize: 10, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 8, letterSpacing: '0.08em' }}>📊 DIAGRAM</div>
-      <pre style={{ margin: 0, fontSize: 11, color: 'var(--text)', fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{chart}</pre>
-    </div>
-  )
-}
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
@@ -604,30 +596,6 @@ function ScopeSelector({ cycle, onScopeSet }: any) {
 
 
 
-function extractDiagrams(text: string): Array<{type: 'text'|'diagram', content: string}> {
-  const parts: Array<{type: 'text'|'diagram', content: string}> = []
-  // Split on code fences
-  const segments = text.split(/(```[\s\S]*?```)/g)
-  for (const seg of segments) {
-    if (!seg) continue
-    if (seg.startsWith('```')) {
-      // Extract language and content
-      const firstNewline = seg.indexOf('\n')
-      const lang = firstNewline > 0 ? seg.slice(3, firstNewline).trim().toLowerCase() : ''
-      const body = firstNewline > 0 ? seg.slice(firstNewline + 1).replace(/```\s*$/, '').trim() : seg.slice(3).replace(/```\s*$/, '').trim()
-      const isDiagram = lang === 'mermaid' || lang === 'flowchart' || lang === 'graph' ||
-        body.match(/^(flowchart|graph|sequenceDiagram|classDiagram|quadrantChart|mindmap|gitGraph|timeline)/)
-      if (isDiagram) {
-        parts.push({ type: 'diagram', content: (lang && !body.startsWith(lang) ? lang + '\n' + body : body) })
-      } else {
-        parts.push({ type: 'text', content: seg })
-      }
-    } else {
-      parts.push({ type: 'text', content: seg })
-    }
-  }
-  return parts.length ? parts : [{ type: 'text', content: text }]
-}
 
 
 // Section Progress Component
@@ -690,57 +658,6 @@ function SectionProgress({ outputId }: { outputId: string }) {
 }
 
 
-// Diagram Generation Status
-function DiagramStatus({ outputId, onDone, outputStatus }: { outputId: string, onDone: () => void, outputStatus: string }) {
-  const [status, setStatus] = useState<{status: string, count: number}>({ status: 'pending', count: 0 })
-  const [checked, setChecked] = useState(false)
-  const token = () => localStorage.getItem('ea_token')
-  const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
-
-  useEffect(() => {
-    let triggered = false
-    const load = async () => {
-      try {
-        const res = await fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/diagram-status`, {
-          headers: { Authorization: `Bearer ${token()}` }
-        })
-        if (res.status === 401) {
-          clearInterval(interval)
-          setChecked(true)
-          return
-        }
-        const data = await res.json()
-        setStatus(data)
-        setChecked(true)
-        if (data.count > 0) {
-          onDone()
-        } else if (!triggered && outputStatus === 'AI_DRAFT') {
-          triggered = true
-          fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/generate-diagrams`, {
-            method: 'POST',
-            headers: { Authorization: `Bearer ${token()}` }
-          }).catch(() => {})
-        }
-      } catch(e) {}
-    }
-    load()
-    const interval = setInterval(load, 4000)
-    return () => clearInterval(interval)
-  }, [outputId, outputStatus])  // eslint-disable-line
-
-  if (!checked) return null
-  if (status.count > 0) return (
-    <div style={{ fontSize: 10, color: 'var(--accent)', padding: '4px 8px', fontFamily: 'var(--font-mono)' }}>
-      ✅ {status.count} diagrams ready
-    </div>
-  )
-  return (
-    <div style={{ fontSize: 10, color: 'var(--accent)', padding: '4px 8px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: 6 }}>
-      <span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⟳</span>
-      Generating architecture diagrams...
-    </div>
-  )
-}
 
 // ── Input Source Panel ────────────────────────────────────
 function InputSourcePanel({ inp, cycleId, onUpdated, onEdit, initialMode }: any) {
@@ -1876,8 +1793,8 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, focus
                         <ScopeAlignment alignment={out.scopeAlignment} />
 
                         {(out.status === 'AI_DRAFT' || out.status === 'APPROVED') && out.content && out.content.length > 100 && <TemplatePanel phase={phase} outputKey={out.outputKey} outputId={out.id} cycle={cycle} />}
-                        {out.status !== 'PENDING' && <DiagramViewer cycleId={cycle.id} phase={phase} outputKey={out.outputKey} />}
-                        {out.content && out.content.length > 100 && <DiagramStatus outputId={out.id} outputStatus={out.status} onDone={() => setPhaseOutputs(prev => [...prev])} />}
+                        {/* ADM draws no diagrams: its pictures are the EA Views linked to the output. */}
+                        {out.status !== 'PENDING' && out.content && <AdmOutputViews outputId={out.id} />}
 
 
                         {/* Tracability */}
@@ -1890,10 +1807,8 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, focus
                         {/* Content view */}
                         {expandedOutput === out.id && out.content && !editingOutput && (
                           <div style={{ marginTop: 8, padding: '12px 16px', background: 'rgba(0,0,0,0.15)', borderRadius: 'var(--radius)', fontSize: 12, lineHeight: 1.8, maxHeight: 'none', color: 'var(--text)' }}>
-                            {extractDiagrams(resolveText(out.content)).map((part, idx) =>
-                              part.type === 'diagram'
-                                ? <DiagramBlock key={idx} chart={part.content} />
-                                : <ReactMarkdown key={idx} components={{
+                            {[stripDiagramBlocks(resolveText(out.content))].map((text, idx) =>
+                                <ReactMarkdown key={idx} components={{
                                     h1: ({children}) => <h1 style={{fontSize:16,fontWeight:700,color:'var(--accent)',borderBottom:'1px solid var(--border)',paddingBottom:4,marginBottom:8,marginTop:12}}>{children}</h1>,
                                     h2: ({children}) => <h2 style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:6,marginTop:10}}>{children}</h2>,
                                     h3: ({children}) => <h3 style={{fontSize:13,fontWeight:600,color:'var(--gold)',marginBottom:4,marginTop:8}}>{children}</h3>,
@@ -1910,13 +1825,12 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, focus
                                     code: ({className, children}: any) => {
                                       const lang = (className || '').replace('language-', '')
                                       const text = String(children || '').trim()
-                                      if (lang === 'mermaid' || text.match(/^(graph|flowchart|sequenceDiagram|classDiagram|quadrantChart|mindmap|gitGraph|timeline)/)) {
-                                        return <DiagramBlock chart={text} />
-                                      }
+                                      // Diagram code is never shown: ADM pictures come from linked EA Views.
+                                      if (lang === 'mermaid' || lang === 'ea-diagram' || text.match(/^(graph|flowchart|sequenceDiagram|classDiagram|quadrantChart|mindmap|gitGraph|timeline)/)) return null
                                       return <code style={{background:'rgba(3,105,161,0.1)',padding:'1px 5px',borderRadius:3,fontSize:11,fontFamily:'var(--font-mono)',color:'var(--accent)'}}>{children}</code>
                                     },
                                     blockquote: ({children}) => <blockquote style={{borderLeft:'3px solid var(--accent)',paddingLeft:12,marginLeft:0,color:'var(--text-dim)',fontStyle:'italic'}}>{children}</blockquote>,
-                                  }}>{part.content}</ReactMarkdown>
+                                  }}>{text}</ReactMarkdown>
                             )}
                           </div>
                         )}
