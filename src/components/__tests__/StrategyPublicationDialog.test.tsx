@@ -3,7 +3,7 @@ import { StrategyPublicationDialog } from '../StrategyPublicationDialog'
 import { strategyRefreshApi } from '../../lib/strategy-refresh'
 
 jest.mock('../../contexts/LangContext', () => ({ useLang: () => ({ t: (key: string) => key }) }))
-jest.mock('../../lib/strategy-refresh', () => ({ strategyRefreshApi: { publicationOptions: jest.fn(), publish: jest.fn() } }))
+jest.mock('../../lib/strategy-refresh', () => ({ strategyRefreshApi: { publicationOptions: jest.fn(), propertyOptions: jest.fn(), publish: jest.fn() } }))
 const api = strategyRefreshApi as jest.Mocked<typeof strategyRefreshApi>
 const finding: any = { id: 'finding-a', title: 'Reassess initiative', revision: 2, authority: 'AI_INFERENCE' }
 const options: any = { revision: 2, actions: ['PLAN_REVIEW_ACTION'], plans: [{ id: 'plan-a', name: 'Existing reviewed plan' }], cycles: [], assets: [], objectTypes: [], relationships: [], views: [] }
@@ -45,4 +45,21 @@ it('shows a controlled publication failure without reporting success or closing 
   expect(completed).not.toHaveBeenCalled()
   expect(closed).not.toHaveBeenCalled()
   expect(screen.getByRole('button', { name: 'strategy.refresh.cancel' })).not.toBeDisabled()
+})
+
+it('publishes only explicitly selected canonical properties with typed values', async () => {
+  api.publicationOptions.mockResolvedValue({ ...options, actions: ['SCENARIO_DELTA'], assets: [{ id: 'asset-a', name: 'Application A' }], views: [{ id: 'view-a', scenarioId: 'target-a', name: 'Target view' }] })
+  api.propertyOptions.mockResolvedValue({ versionId: 'published-a', properties: [{ code: 'count', name: 'Count', attributeType: 'INTEGER', isRequired: false, values: [] }, { code: 'owner', name: 'Owner', attributeType: 'REFERENCE', isRequired: false, values: [] }] })
+  render(<StrategyPublicationDialog refreshId="refresh-a" finding={finding} onClose={jest.fn()} onPublished={jest.fn().mockResolvedValue(undefined)} />)
+  await screen.findByLabelText('strategy.refresh.destination')
+  fireEvent.change(screen.getByLabelText('strategy.refresh.destination'), { target: { value: 'SCENARIO_DELTA' } })
+  fireEvent.change(screen.getByLabelText('strategy.refresh.publication.viewId'), { target: { value: 'view-a:target-a' } })
+  fireEvent.change(screen.getByLabelText('strategy.refresh.publication.assetId'), { target: { value: 'asset-a' } })
+  fireEvent.change(screen.getByLabelText('strategy.refresh.publication.operation'), { target: { value: 'UPDATE' } })
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'Count' }))
+  expect(screen.queryByRole('checkbox', { name: 'Owner' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'strategy.refresh.publication.authorize' })).toBeDisabled()
+  fireEvent.change(screen.getByRole('spinbutton', { name: 'Count' }), { target: { value: '3' } })
+  fireEvent.click(screen.getByRole('button', { name: 'strategy.refresh.publication.authorize' }))
+  await waitFor(() => expect(api.publish).toHaveBeenCalledWith('refresh-a', finding, { action: 'SCENARIO_DELTA', viewId: 'view-a', scenarioId: 'target-a', assetId: 'asset-a', operation: 'UPDATE', overrides: { count: 3 } }))
 })
