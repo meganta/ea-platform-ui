@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
+import { enumLabel } from '../lib/enumLabels'
 import HelpTip from '../components/HelpTip'
 import DynamicFilterBuilder, { ConditionGroup } from '../components/filterBuilder/DynamicFilterBuilder'
 
@@ -38,17 +39,17 @@ const FINDING_SEVERITY_COLORS: Record<string, string> = {
 // to show a real, human-readable connector name in a demo; not a
 // substitute for a genuine traceability feature if that's ever needed
 // beyond display purposes.
-function getSourceLabel(asset: any): { label: string; detail?: string } {
+function getSourceLabel(asset: any, isAR = false): { label: string; detail?: string } {
   if (asset.source === 'INTEGRATION') {
     if (typeof asset.sourceRef === 'string') {
       if (asset.sourceRef.startsWith('OPM-')) return { label: 'ManageEngine OpManager', detail: asset.sourceRef }
       if (asset.sourceRef.startsWith('AXON-')) return { label: 'Informatica Axon', detail: asset.sourceRef }
     }
-    return { label: 'Integration', detail: asset.sourceRef }
+    return { label: isAR ? 'تكامل' : 'Integration', detail: asset.sourceRef }
   }
-  if (asset.source === 'ADM_OUTPUT') return { label: 'ADM Output', detail: asset.sourceRef ? `Cycle ${asset.sourceRef.slice(0, 8)}` : undefined }
-  if (asset.source === 'UPLOAD') return { label: 'Upload' }
-  return { label: 'Manual' }
+  if (asset.source === 'ADM_OUTPUT') return { label: isAR ? 'مخرج ADM' : 'ADM Output', detail: asset.sourceRef ? (isAR ? `الدورة ${asset.sourceRef.slice(0, 8)}` : `Cycle ${asset.sourceRef.slice(0, 8)}`) : undefined }
+  if (asset.source === 'UPLOAD') return { label: isAR ? 'رفع' : 'Upload' }
+  return { label: isAR ? 'يدوي' : 'Manual' }
 }
 
 // Object-type-specific attributes a connector field mapping might target
@@ -126,6 +127,8 @@ function useApi() {
 }
 
 function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const [form, setForm] = useState(() => {
     const initialForm = asset || { name: '', nameAr: '', description: '', domain: '', assetType: '', status: 'DRAFT', owner: '', tags: [], metadata: {} }
     return { ...initialForm, domain: normalizeRepositoryDomain(initialForm.domain) }
@@ -161,37 +164,37 @@ function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
         style={{ width: 560, maxHeight: 'calc(100vh - 32px)', overflowY: 'auto', boxSizing: 'border-box' }}
         onClick={e => e.stopPropagation()}
       >
-        <div className="modal-title">{asset ? 'Edit Asset' : 'New EA Asset'}</div>
+        <div className="modal-title">{asset ? L('Edit Asset', 'تعديل الأصل') : L('New EA Asset', 'أصل بنية مؤسسية جديد')}</div>
         <form onSubmit={submit}>
           <div className="grid-2" style={{ gap: 12 }}>
-            <div className="form-group"><label className="form-label" htmlFor="asset-name">Name (English) *</label><input id="asset-name" className="form-input" value={form.name} onChange={set('name')} required /></div>
-            <div className="form-group"><label className="form-label" htmlFor="asset-name-ar">Name (Arabic)</label><input id="asset-name-ar" className="form-input" value={form.nameAr || ''} onChange={set('nameAr')} dir="rtl" /></div>
+            <div className="form-group"><label className="form-label" htmlFor="asset-name">{L('Name (English) *', 'الاسم (بالإنجليزية) *')}</label><input id="asset-name" className="form-input" value={form.name} onChange={set('name')} required /></div>
+            <div className="form-group"><label className="form-label" htmlFor="asset-name-ar">{L('Name (Arabic)', 'الاسم (بالعربية)')}</label><input id="asset-name-ar" className="form-input" value={form.nameAr || ''} onChange={set('nameAr')} dir="rtl" /></div>
           </div>
-          <div className="form-group"><label className="form-label" htmlFor="asset-description">Description</label><textarea id="asset-description" className="form-input" value={form.description || ''} onChange={set('description')} rows={2} /></div>
+          <div className="form-group"><label className="form-label" htmlFor="asset-description">{L('Description', 'الوصف')}</label><textarea id="asset-description" className="form-input" value={form.description || ''} onChange={set('description')} rows={2} /></div>
           <div className="grid-2" style={{ gap: 12 }}>
             <div className="form-group">
-              <label className="form-label" htmlFor="asset-domain">Domain *</label>
+              <label className="form-label" htmlFor="asset-domain">{L('Domain *', 'المجال *')}</label>
               <select id="asset-domain" className="form-input" value={form.domain} onChange={e => setForm((f: any) => ({ ...f, domain: e.target.value, assetType: '' }))} required>
-                <option value="">Select domain...</option>
-                {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
+                <option value="">{L('Select domain...', 'اختر المجال...')}</option>
+                {domains.map((d: string) => <option key={d} value={d}>{enumLabel(d, isAR)}</option>)}
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label" htmlFor="asset-type">Asset Type *</label>
+              <label className="form-label" htmlFor="asset-type">{L('Asset Type *', 'نوع الأصل *')}</label>
               <select id="asset-type" className="form-input" value={form.assetType} onChange={set('assetType')} required disabled={!form.domain}>
-                <option value="">Select type...</option>
-                {assetTypes.map((t: string) => <option key={t} value={t}>{t.replace(/_/g, ' ')}</option>)}
+                <option value="">{L('Select type...', 'اختر النوع...')}</option>
+                {assetTypes.map((t: string) => <option key={t} value={t}>{enumLabel(t, isAR)}</option>)}
               </select>
             </div>
           </div>
           <div className="grid-2" style={{ gap: 12 }}>
             <div className="form-group">
-              <label className="form-label" htmlFor="asset-status">Status</label>
+              <label className="form-label" htmlFor="asset-status">{L('Status', 'الحالة')}</label>
               <select id="asset-status" className="form-input" value={form.status} onChange={set('status')}>
-                {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+                {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{enumLabel(s, isAR)}</option>)}
               </select>
             </div>
-            <div className="form-group"><label className="form-label" htmlFor="asset-owner">Owner</label><input id="asset-owner" className="form-input" value={form.owner || ''} onChange={set('owner')} /></div>
+            <div className="form-group"><label className="form-label" htmlFor="asset-owner">{L('Owner', 'المالك')}</label><input id="asset-owner" className="form-input" value={form.owner || ''} onChange={set('owner')} /></div>
           </div>
 
           {/* EA Repository Production Readiness, item 5: dynamic Meta
@@ -202,14 +205,14 @@ function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
           {metaAttributes.length > 0 && (
             <>
               <div className="divider" />
-              <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>META MODEL ATTRIBUTES</div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>{L('META MODEL ATTRIBUTES', 'سمات النموذج الوصفي')}</div>
               <div className="grid-2" style={{ gap: 12 }}>
                 {metaAttributes.map((attr: any) => (
                   <div className="form-group" key={attr.code}>
                     <label className="form-label" htmlFor={`asset-attr-${attr.code}`}>{attr.name}{attr.isRequired ? ' *' : ''}</label>
                     {attr.enumValues?.length > 0 ? (
                       <select id={`asset-attr-${attr.code}`} className="form-input" value={form.metadata?.[attr.code] || ''} onChange={setMeta(attr.code)} required={attr.isRequired} disabled={attr.isReadOnly}>
-                        <option value="">Select...</option>
+                        <option value="">{L('Select...', 'اختر...')}</option>
                         {attr.enumValues.map((ev: any) => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
                       </select>
                     ) : (
@@ -222,8 +225,8 @@ function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
           )}
 
           <div className="modal-actions">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Saving...' : 'Save Asset'}</button>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>{L('Cancel', 'إلغاء')}</button>
+            <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? L('Saving...', 'جارٍ الحفظ...') : L('Save Asset', 'حفظ الأصل')}</button>
           </div>
         </form>
       </div>
@@ -232,6 +235,8 @@ function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
 }
 
 function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
+  const { isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const navigate = useNavigate()
   const [asset, setAsset] = useState(initialAsset)
   const [attachments, setAttachments] = useState(initialAsset.attachments || [])
@@ -274,7 +279,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
   }
 
   const deleteAttachment = async (attachmentId: string) => {
-    if (!window.confirm('Delete this attachment?')) return
+    if (!window.confirm(L('Delete this attachment?', 'حذف هذا المرفق؟'))) return
     await api.del(`/ea-repository/assets/${asset.id}/attachments/${attachmentId}`)
     setAttachments((a: any[]) => a.filter((x: any) => x.id !== attachmentId))
   }
@@ -295,25 +300,24 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
       <div className="modal" style={{ width: 600, maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <div className="modal-title" style={{ marginBottom: 4 }}>{asset.name}</div>
-            {asset.nameAr && <div style={{ fontSize: 14, color: 'var(--text-dim)', direction: 'rtl' }}>{asset.nameAr}</div>}
+            <div className="modal-title" style={{ marginBottom: 4 }}>{isAR ? (asset.nameAr || asset.name) : asset.name}</div>
           </div>
           <div className="flex gap-2">
-            <span className={`badge ${STATUS_COLORS[asset.status] || 'badge-draft'}`}>{asset.status}</span>
-            <span className={`badge ${SOURCE_COLORS[asset.source] || 'badge-draft'}`} title={getSourceLabel(asset).detail}>{getSourceLabel(asset).label}</span>
+            <span className={`badge ${STATUS_COLORS[asset.status] || 'badge-draft'}`}>{enumLabel(asset.status, isAR)}</span>
+            <span className={`badge ${SOURCE_COLORS[asset.source] || 'badge-draft'}`} title={getSourceLabel(asset, isAR).detail}>{getSourceLabel(asset, isAR).label}</span>
           </div>
         </div>
 
         <div className="grid-2" style={{ gap: 12, marginBottom: 16 }}>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>DOMAIN</div><div style={{ fontSize: 13 }}>{asset.operatingDomainDisplayName || asset.domain}{asset.operatingDomainDisplayName && asset.operatingDomainDisplayName !== asset.domain && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}> ({asset.domain})</span>}</div></div>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>ASSET TYPE</div><div style={{ fontSize: 13 }}>{asset.canonicalDisplayLabel || asset.assetType?.replace(/_/g, ' ')}</div></div>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>OWNER</div><div style={{ fontSize: 13 }}>{asset.owner || '—'}</div></div>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>VERSION</div><div style={{ fontSize: 13, fontFamily: 'var(--font-mono)' }}>{asset.version}</div></div>
+          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{L('DOMAIN', 'المجال')}</div><div style={{ fontSize: 13 }}>{asset.operatingDomainDisplayName || asset.domain}{asset.operatingDomainDisplayName && asset.operatingDomainDisplayName !== asset.domain && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}> ({asset.domain})</span>}</div></div>
+          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{L('ASSET TYPE', 'نوع الأصل')}</div><div style={{ fontSize: 13 }}>{asset.canonicalDisplayLabel || enumLabel(asset.assetType, isAR)}</div></div>
+          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{L('OWNER', 'المالك')}</div><div style={{ fontSize: 13 }}>{asset.owner || '—'}</div></div>
+          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{L('VERSION', 'الإصدار')}</div><div style={{ fontSize: 13, fontFamily: 'var(--font-mono)' }}>{asset.version}</div></div>
         </div>
 
         {asset.description && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>DESCRIPTION</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>{L('DESCRIPTION', 'الوصف')}</div>
             <div style={{ fontSize: 13, lineHeight: 1.6 }}>{asset.description}</div>
           </div>
         )}
@@ -325,7 +329,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
             value is shown cleanly as "—", never invented. */}
         {asset.metaModelAttributes?.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>META MODEL ATTRIBUTES</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>{L('META MODEL ATTRIBUTES', 'سمات النموذج الوصفي')}</div>
             <div className="grid-2" style={{ gap: 8 }}>
               {asset.metaModelAttributes.map((attr: any) => (
                 <div key={attr.code}>
@@ -345,7 +349,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
             legacy relationship, never hides it. */}
         {asset.relationships?.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>RELATIONSHIPS ({asset.relationships.length})</div>
+            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>{L('RELATIONSHIPS (', 'العلاقات (')}{asset.relationships.length})</div>
             {asset.relationships.map((rel: any) => (
               <div key={rel.id} style={{ fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{rel.direction === 'OUTGOING' ? '→' : '←'}</span>
@@ -419,11 +423,11 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
           const synced = Object.entries(SYNCED_ATTRIBUTE_LABELS)
             .filter(([key]) => asset.metadata && asset.metadata[key] !== undefined && asset.metadata[key] !== null && asset.metadata[key] !== '')
           if (synced.length === 0) return null
-          const sourceInfo = getSourceLabel(asset)
+          const sourceInfo = getSourceLabel(asset, isAR)
           return (
             <div style={{ marginBottom: 16, padding: 12, background: 'rgba(3,105,161,0.05)', border: '1px solid rgba(3,105,161,0.15)', borderRadius: 'var(--radius)' }}>
               <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>
-                🔗 SYNCED FROM {sourceInfo.label.toUpperCase()}{sourceInfo.detail ? ` (${sourceInfo.detail})` : ''}
+                {L('🔗 SYNCED FROM', '🔗 مُزامَن من')} {isAR ? sourceInfo.label : sourceInfo.label.toUpperCase()}{sourceInfo.detail ? ` (${sourceInfo.detail})` : ''}
               </div>
               <div className="grid-2" style={{ gap: 8 }}>
                 {synced.map(([key, label]) => (
@@ -440,27 +444,27 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
         <div className="divider" />
 
         <div className="flex items-center justify-between mb-3">
-          <div style={{ fontSize: 13, fontWeight: 600 }}>📎 Attachments ({attachments.length})</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{L('📎 Attachments (', '📎 المرفقات (')}{attachments.length})</div>
           <button className="btn btn-secondary btn-sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
-            ⬆ {uploading ? 'Uploading...' : 'Upload File'}
+            ⬆ {uploading ? L('Uploading...', 'جارٍ الرفع...') : L('Upload File', 'رفع ملف')}
           </button>
           <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={uploadFile} />
         </div>
 
         {attachments.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: '16px 0' }}>No attachments yet</div>
+          <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: '16px 0' }}>{L('No attachments yet', 'لا توجد مرفقات بعد')}</div>
         ) : attachments.map((a: any) => (
           <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
             <div className="flex items-center justify-between">
               <div>
                 <div style={{ fontSize: 13 }}>📄 {a.name}</div>
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-                  {(a.sizeBytes / 1024).toFixed(1)} KB · {a.mimeType}
+                  {(a.sizeBytes / 1024).toFixed(1)} {L('KB ·', 'كيلوبايت ·')} {a.mimeType}
                 </div>
               </div>
               <div className="flex gap-2 items-center">
                 <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: a.inKnowledgeBase ? 'rgba(22,163,74,0.15)' : 'rgba(100,116,139,0.1)', color: a.inKnowledgeBase ? 'var(--success)' : 'var(--text-dim)', border: `1px solid ${a.inKnowledgeBase ? 'rgba(22,163,74,0.3)' : 'var(--border)'}` }}>
-                  {a.inKnowledgeBase ? '📚 IN KB' : '📚 NOT IN KB'}
+                  {a.inKnowledgeBase ? L('📚 IN KB', '📚 في قاعدة المعرفة') : L('📚 NOT IN KB', '📚 ليس في قاعدة المعرفة')}
                 </span>
                 <button
                   className="btn btn-secondary btn-sm"
@@ -477,7 +481,7 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
                     }
                   }}
                 >
-                  {a.inKnowledgeBase ? '− Remove from KB' : '+ Add to KB'}
+                  {a.inKnowledgeBase ? L('− Remove from KB', '− إزالة من قاعدة المعرفة') : L('+ Add to KB', '+ إضافة إلى قاعدة المعرفة')}
                 </button>
                 <button className="btn btn-secondary btn-sm" onClick={() => downloadAttachment(a.id, a.name)}>⬇</button>
                 <button onClick={() => deleteAttachment(a.id)} style={{ background: 'none', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
@@ -487,9 +491,9 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
         ))}
 
         <div className="flex gap-2 mt-4">
-          <button className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Close</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/ea-views?objectContext=${asset.id}`)} title="Explore this object's relationships and dependencies in EA Views">🕸 Explore Dependencies</button>
-          <button className="btn btn-danger btn-sm" onClick={() => { onDelete(asset.id); onClose() }}>Delete Asset</button>
+          <button className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>{L('Close', 'إغلاق')}</button>
+          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/ea-views?objectContext=${asset.id}`)} title={L('Explore this object\'s relationships and dependencies in EA Views', 'استكشف علاقات هذا العنصر واعتمادياته في عروض البنية المؤسسية')}>{L('🕸 Explore Dependencies', '🕸 استكشاف الاعتماديات')}</button>
+          <button className="btn btn-danger btn-sm" onClick={() => { onDelete(asset.id); onClose() }}>{L('Delete Asset', 'حذف الأصل')}</button>
         </div>
       </div>
     </div>
@@ -497,7 +501,8 @@ function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
 }
 
 export default function RepositoryPage() {
-  const { t } = useLang()
+  const { t, isAR } = useLang()
+  const L = (en: string, ar: string) => (isAR ? ar : en)
   const api = useApi()
   const [searchParams, setSearchParams] = useSearchParams()
   const [config, setConfig] = useState<any>(null)
@@ -637,7 +642,7 @@ export default function RepositoryPage() {
   }
 
   const deleteAsset = async (id: string) => {
-    if (!window.confirm('Delete this asset?')) return
+    if (!window.confirm(L('Delete this asset?', 'حذف هذا الأصل؟'))) return
     await api.del(`/ea-repository/assets/${id}`)
     await load()
   }
@@ -678,18 +683,18 @@ export default function RepositoryPage() {
       <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
-            <div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>{t('repo.title')}<HelpTip text="This is the master list of everything in your architecture - applications, business capabilities, data, technology, and how they connect. Other parts of the platform (like reviews and diagrams) pull from what's stored here." /></div>
+            <div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>{t('repo.title')}<HelpTip text={L('This is the master list of everything in your architecture - applications, business capabilities, data, technology, and how they connect. Other parts of the platform (like reviews and diagrams) pull from what\'s stored here.', 'هذه هي القائمة الرئيسية لكل ما في بنيتك: التطبيقات وقدرات الأعمال والبيانات والتقنية وكيفية ارتباطها. وتستمد أجزاء المنصة الأخرى (مثل المراجعات والمخططات) بياناتها مما هو مخزن هنا.')} /></div>
             <div className="page-subtitle">
-              {config?.frameworkType} FRAMEWORK · {summary?.total || 0} ASSETS
+              {enumLabel(config?.frameworkType, isAR)} {L('FRAMEWORK ·', 'الإطار ·')} {summary?.total || 0} {L('ASSETS', 'أصل')}
             </div>
           </div>
-          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ New Asset</button>
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>{L('+ New Asset', '+ أصل جديد')}</button>
         </div>
         {!!summary?.needsReclassificationCount && (
           <div style={{ marginTop: 10, padding: '8px 14px', background: 'rgba(180,83,9,0.1)', border: '1px solid rgba(180,83,9,0.3)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span>⚠ {summary.needsReclassificationCount} asset{summary.needsReclassificationCount === 1 ? '' : 's'} could not be automatically matched to the current Meta Model and need manual reclassification.</span>
+            <span>⚠ {summary.needsReclassificationCount} {summary.needsReclassificationCount === 1 ? L('asset', 'أصل') : L('assets', 'أصول')} {L('could not be automatically matched to the current Meta Model and need manual reclassification.', 'تعذّرت مطابقته تلقائياً مع النموذج الوصفي الحالي ويحتاج إلى إعادة تصنيف يدوية.')}</span>
             <button type="button" onClick={() => setShowNeedsReclassification(s => !s)} style={{ marginInlineStart: 'auto', fontSize: 12, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: showNeedsReclassification ? 'var(--accent)' : 'transparent', color: showNeedsReclassification ? '#fff' : 'var(--text)' }}>
-              {showNeedsReclassification ? 'Show Normal List' : 'Review These Assets'}
+              {showNeedsReclassification ? L('Show Normal List', 'عرض القائمة العادية') : L('Review These Assets', 'مراجعة هذه الأصول')}
             </button>
           </div>
         )}
@@ -708,7 +713,7 @@ export default function RepositoryPage() {
             data that ADM Output assets use the exact same status enum
             as everything else, no separate status list needed. */}
         <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
-          <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder={L('Search assets...', 'ابحث في الأصول...')} value={search} onChange={e => setSearch(e.target.value)} />
           <select className="form-input" style={{ width: 150 }} value={selectedSource} onChange={e => {
             const nextSource = e.target.value
             changeFilter(setSelectedSource)(nextSource)
@@ -729,41 +734,41 @@ export default function RepositoryPage() {
               setSelectedAssetType('ALL')
             }
           }}>
-            <option value="ALL">All Sources</option>
-            <option value="ADM_OUTPUT">ADM Output</option>
-            <option value="MANUAL">Manual</option>
-            <option value="UPLOAD">Upload</option>
-            <option value="INTEGRATION">Integration</option>
-            <option value="AI_GENERATED">AI Generated</option>
+            <option value="ALL">{L('All Sources', 'كل المصادر')}</option>
+            <option value="ADM_OUTPUT">{L('ADM Output', 'مخرج ADM')}</option>
+            <option value="MANUAL">{L('Manual', 'يدوي')}</option>
+            <option value="UPLOAD">{L('Upload', 'رفع')}</option>
+            <option value="INTEGRATION">{L('Integration', 'تكامل')}</option>
+            <option value="AI_GENERATED">{L('AI Generated', 'مُنشأ بالذكاء الاصطناعي')}</option>
           </select>
           {selectedSource === 'ADM_OUTPUT' ? (
             <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
               <input type="checkbox" checked={groupByCycle} onChange={e => setGroupByCycle(e.target.checked)} />
-              Group by Cycle
+              {L('Group by Cycle', 'تجميع حسب الدورة')}
             </label>
           ) : (
             <>
               <select className="form-input" style={{ width: 140 }} value={selectedDomain} onChange={e => { changeFilter(setSelectedDomain)(e.target.value); setSelectedAssetType('ALL') }}>
-                <option value="ALL">All Domains</option>
-                {domains.map((d: string) => <option key={d} value={d}>{d.replace(/_/g, ' ')}</option>)}
+                <option value="ALL">{L('All Domains', 'كل المجالات')}</option>
+                {domains.map((d: string) => <option key={d} value={d}>{enumLabel(d, isAR)}</option>)}
               </select>
               <select className="form-input" style={{ width: 140 }} value={selectedAssetType} onChange={e => changeFilter(setSelectedAssetType)(e.target.value)}>
-                <option value="ALL">All Types</option>
-                {repoAssetTypes.map((t:any) => <option key={t} value={t}>{t.replace(/_/g,' ')}</option>)}
+                <option value="ALL">{L('All Types', 'كل الأنواع')}</option>
+                {repoAssetTypes.map((t:any) => <option key={t} value={t}>{enumLabel(t, isAR)}</option>)}
               </select>
             </>
           )}
           <select className="form-input" style={{ width: 160 }} value={selectedStatus} onChange={e => changeFilter(setSelectedStatus)(e.target.value)}>
-            <option value="ALL">All Statuses</option>
-            {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
+            <option value="ALL">{L('All Statuses', 'كل الحالات')}</option>
+            {['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED'].map(s => <option key={s} value={s}>{enumLabel(s, isAR)}</option>)}
           </select>
           {selectedSource !== 'ADM_OUTPUT' && selectedAssetType !== 'ALL' && (
             <button type="button" onClick={toggleFilterBuilder} style={{ fontSize: 12, padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: structuredQuery ? 'var(--accent)' : 'var(--navy-mid)', color: structuredQuery ? '#fff' : 'var(--text)' }}>
-              ⚙ {showFilterBuilder ? 'Hide' : 'Advanced'} Filters{structuredQuery ? ` (${structuredQuery.conditions.length})` : ''}
+              ⚙ {showFilterBuilder ? L('Hide', 'إخفاء') : L('Advanced', 'متقدمة')} {L('Filters', 'عوامل التصفية')}{structuredQuery ? ` (${structuredQuery.conditions.length})` : ''}
             </button>
           )}
           <div style={{ fontSize: 11, color: 'var(--text-dim)', alignSelf: 'center', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
-            {total > 0 ? `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}` : '0 of 0'}
+            {total > 0 ? L(`${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} of ${total}`, `${(page - 1) * pageSize + 1}-${Math.min(page * pageSize, total)} من ${total}`) : '0 of 0'}
           </div>
         </div>
 
@@ -787,22 +792,22 @@ export default function RepositoryPage() {
             {Object.entries(groupedAssets).map(([group, items]) => (
               <div key={group} style={{ marginBottom: 24 }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent)', fontFamily: 'var(--font-mono)', marginBottom: 8, padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
-                  📁 {group} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} assets)</span>
+                  📁 {group} <span style={{ color: 'var(--text-dim)', fontWeight: 400 }}>({items.length} {L('assets)', 'أصل)')}</span>
                 </div>
                 <div style={{ overflowX: 'auto' }}>
                 <table>
                   <thead><tr>
                     <th>{t('repo.col_name')}</th>
-                    <th>Domain</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>{L('Domain', 'المجال')}</th>
+                    <th>{L('Type', 'النوع')}</th>
+                    <th>{L('Status', 'الحالة')}</th>
+                    <th>{L('Actions', 'الإجراءات')}</th>
                   </tr></thead>
                   <tbody>{items.map((a:any) => (
                     <tr key={a.id} onClick={() => setSelectedAsset(a)} style={{ cursor: 'pointer' }}>
-                      <td><div style={{ fontWeight: 500 }}>{a.name}</div>{a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}</td>
-                      <td style={{ fontSize: 11 }}>{(a.domain||'').replace(/_/g,' ')}</td>
-                      <td style={{ fontSize: 11 }}>{a.canonicalDisplayLabel || (a.assetType||'').replace(/_/g,' ')}</td>
+                      <td><div style={{ fontWeight: 500 }}>{isAR ? (a.nameAr || a.name) : a.name}</div></td>
+                      <td style={{ fontSize: 11 }}>{enumLabel(a.domain, isAR)}</td>
+                      <td style={{ fontSize: 11 }}>{a.canonicalDisplayLabel || enumLabel(a.assetType, isAR)}</td>
                       <td><span className={`badge ${STATUS_COLORS[a.status]||''}`}>{a.status}</span></td>
                       <td><button className="btn btn-secondary btn-sm" style={{ fontSize: 10 }} onClick={e => { e.stopPropagation(); deleteAsset(a.id) }}>🗑</button></td>
                     </tr>
@@ -815,22 +820,22 @@ export default function RepositoryPage() {
         ) : filtered.length === 0 ? (
           <div className="empty">
             <div style={{ fontSize: 40 }}>🗄</div>
-            <div className="empty-title">No assets found</div>
-            <div className="empty-sub">Create your first EA asset or adjust the filters</div>
-            <button className="btn btn-primary mt-4" onClick={() => setShowAdd(true)}>+ New Asset</button>
+            <div className="empty-title">{L('No assets found', 'لا توجد أصول')}</div>
+            <div className="empty-sub">{L('Create your first EA asset or adjust the filters', 'أنشئ أول أصل للبنية المؤسسية أو عدّل عوامل التصفية')}</div>
+            <button className="btn btn-primary mt-4" onClick={() => setShowAdd(true)}>{L('+ New Asset', '+ أصل جديد')}</button>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Domain</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Source</th>
-                <th>Owner</th>
-                <th>Files</th>
+                <th>{L('Name', 'الاسم')}</th>
+                <th>{L('Domain', 'المجال')}</th>
+                <th>{L('Type', 'النوع')}</th>
+                <th>{L('Status', 'الحالة')}</th>
+                <th>{L('Source', 'المصدر')}</th>
+                <th>{L('Owner', 'المالك')}</th>
+                <th>{L('Files', 'الملفات')}</th>
                 <th></th>
               </tr>
             </thead>
@@ -838,13 +843,12 @@ export default function RepositoryPage() {
               {filtered.map(a => (
                 <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedAsset(a)}>
                   <td>
-                    <div style={{ fontWeight: 500 }}>{a.name}</div>
-                    {a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}
+                    <div style={{ fontWeight: 500 }}>{isAR ? (a.nameAr || a.name) : a.name}</div>
                   </td>
-                  <td><span style={{ fontSize: 11, padding: '2px 8px', background: 'rgba(3,105,161,0.08)', borderRadius: 2, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{a.domain}</span></td>
-                  <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.canonicalDisplayLabel || a.assetType?.replace(/_/g, ' ')}</td>
-                  <td><span className={`badge ${STATUS_COLORS[a.status] || 'badge-draft'}`}>{a.status.replace(/_/g, ' ')}</span></td>
-                  <td><span className={`badge ${SOURCE_COLORS[a.source] || 'badge-draft'}`} title={getSourceLabel(a).detail}>{getSourceLabel(a).label}</span></td>
+                  <td><span style={{ fontSize: 11, padding: '2px 8px', background: 'rgba(3,105,161,0.08)', borderRadius: 2, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{enumLabel(a.domain, isAR)}</span></td>
+                  <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.canonicalDisplayLabel || enumLabel(a.assetType, isAR)}</td>
+                  <td><span className={`badge ${STATUS_COLORS[a.status] || 'badge-draft'}`}>{enumLabel(a.status, isAR)}</span></td>
+                  <td><span className={`badge ${SOURCE_COLORS[a.source] || 'badge-draft'}`} title={getSourceLabel(a, isAR).detail}>{getSourceLabel(a, isAR).label}</span></td>
                   <td style={{ fontSize: 12 }}>{a.owner || '—'}</td>
                   <td style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{a._count?.attachments || 0}</td>
                   <td onClick={e => e.stopPropagation()}>
@@ -866,9 +870,9 @@ export default function RepositoryPage() {
             operating on the current page's results. */}
         {!groupByCycle && total > pageSize && (
           <div className="flex items-center justify-center gap-2 mt-4" style={{ fontSize: 12 }}>
-            <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>‹ Prev</button>
-            <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>Page {page} of {Math.max(1, Math.ceil(total / pageSize))}</span>
-            <button className="btn btn-secondary btn-sm" disabled={page * pageSize >= total} onClick={() => setPage(p => p + 1)}>Next ›</button>
+            <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>{L('‹ Prev', '› السابق')}</button>
+            <span style={{ color: 'var(--text-dim)', fontFamily: 'var(--font-mono)' }}>{L('Page', 'صفحة')} {page} {L('of', 'من')} {Math.max(1, Math.ceil(total / pageSize))}</span>
+            <button className="btn btn-secondary btn-sm" disabled={page * pageSize >= total} onClick={() => setPage(p => p + 1)}>{L('Next ›', 'التالي ‹')}</button>
           </div>
         )}
       </div>
