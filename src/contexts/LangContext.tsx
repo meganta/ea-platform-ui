@@ -72,6 +72,7 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'strategy.refresh.failed': { EN: 'Analysis could not be completed', AR: 'تعذر إكمال التحليل' },
   'strategy.refresh.failed_hint': { EN: 'Your documents and completed analysis checkpoints are preserved. Retry to continue from the last completed checkpoint.', AR: 'تم الاحتفاظ بوثائقك ونقاط التحليل المكتملة. أعد المحاولة للمتابعة من آخر نقطة مكتملة.' },
   'strategy.refresh.invalid_hint': { EN: 'The AI response did not meet the evidence format requirements. No unvalidated conclusions were accepted.', AR: 'لم تستوفِ استجابة الذكاء الاصطناعي متطلبات صيغة الأدلة. لم يتم قبول أي استنتاجات غير متحقق منها.' },
+  'strategy.refresh.citation_hint': { EN: 'The AI response referenced evidence that was not supplied for this analysis. Unsupported conclusions were not accepted. Your completed work is preserved.', AR: 'أشارت استجابة الذكاء الاصطناعي إلى أدلة لم تُقدَّم لهذا التحليل. لم يتم قبول الاستنتاجات غير المدعومة، وتم الاحتفاظ بالعمل المكتمل.' },
   'strategy.refresh.retry': { EN: 'Retry analysis', AR: 'إعادة محاولة التحليل' },
   'strategy.refresh.technical_details': { EN: 'Technical details', AR: 'التفاصيل التقنية' },
   'strategy.refresh.provisional': { EN: 'Extracted facts and AI conclusions remain provisional until reviewed. Missing evidence is not proof of no impact.', AR: 'تبقى الحقائق المستخرجة واستنتاجات الذكاء الاصطناعي مبدئية حتى مراجعتها. غياب الأدلة لا يعني غياب الأثر.' },

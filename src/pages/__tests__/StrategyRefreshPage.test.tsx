@@ -97,6 +97,20 @@ it('uses RTL for the Arabic workspace and keeps failed analysis documents locked
   expect(screen.queryByLabelText('strategy.refresh.documents')).not.toBeInTheDocument()
 })
 
+it.each([false, true])('explains citation failure without auto-retry or accepting unsupported conclusions (Arabic: %s)', async isAR => {
+  mockIsAR = isAR
+  api.get.mockResolvedValue({ ...ready, analysisStatus: 'FAILED', failureCode: 'AI_CITATION_INVALID' })
+  render(<StrategyRefreshPage />)
+  fireEvent.click(await screen.findByRole('button', { name: /Strategy 2027/ }))
+  expect(await screen.findByText('strategy.refresh.citation_hint')).toBeInTheDocument()
+  expect(screen.getByRole('main')).toHaveAttribute('dir', isAR ? 'rtl' : 'ltr')
+  expect(screen.getByRole('button', { name: 'strategy.refresh.retry' })).toBeEnabled()
+  expect(screen.queryByLabelText('strategy.refresh.documents')).not.toBeInTheDocument()
+  expect(api.analyze).not.toHaveBeenCalled()
+  expect(api.decide).not.toHaveBeenCalled()
+  expect(api.publish).not.toHaveBeenCalled()
+})
+
 it('does not offer in-place amendment of active strategic facts', async () => {
   api.get.mockResolvedValue({ ...ready, strategyStatus: 'ACTIVE', findings: [{ ...finding, decision: 'APPROVED' }] })
   render(<StrategyRefreshPage />)
