@@ -324,8 +324,8 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   {r.overallScore != null && r.status === 'COMPLETED' && (
-                    <div style={{ fontSize: 13, fontWeight: 700, color: r.overallScore >= 70 ? '#2ecc71' : r.overallScore >= 50 ? '#f39c12' : '#e74c3c', minWidth: 30, textAlign: 'right' }}>
-                      {r.overallScore}
+                    <div style={{ fontSize: 13, fontWeight: 700, color: r.overallScore >= 75 ? '#2ecc71' : r.overallScore >= 60 ? '#f39c12' : '#e74c3c', minWidth: 30, textAlign: 'right' }}>
+                      {Math.round(r.overallScore)}
                     </div>
                   )}
                   <div style={{
