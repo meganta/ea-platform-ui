@@ -1200,7 +1200,7 @@ export default function CopilotPage() {
                 <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left' }}>
                   {m.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </div>
-                {m.role === 'architect' && <CopilotViewAttachments attachments={m.attachments} question={messages.slice(0, mi).reverse().find(p => p.role === 'user')?.content} />}
+                {m.role === 'architect' && <CopilotViewAttachments attachments={m.attachments} conversationId={activeConvId} question={messages.slice(0, mi).reverse().find(p => p.role === 'user')?.content} />}
                 {m.role === 'architect' && <CopilotProvenance evidence={m.evidence} trace={m.trace} />}
                 {m.role === 'architect' && <EvidenceDrawer evidence={m.evidence} />}
                 {m.role === 'architect' && m.remainingSpeech && (
