@@ -1,8 +1,11 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import DynamicFilterBuilder, { ConditionGroup } from '../components/filterBuilder/DynamicFilterBuilder'
+import AssetProfileScreen from './repository/AssetProfileScreen'
+import AttributeField from './repository/AttributeField'
+import { fromInputValue, toInputValue } from './repository/assetProfile'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -18,13 +21,6 @@ const SOURCE_COLORS: Record<string, string> = {
   ADM_OUTPUT: 'badge-progress',
   UPLOAD: 'badge-active',
   INTEGRATION: 'badge-ai-draft',
-}
-
-const FINDING_SEVERITY_COLORS: Record<string, string> = {
-  CRITICAL: '#dc2626',
-  HIGH: '#e74c3c',
-  MEDIUM: '#f39c12',
-  LOW: '#2ecc71',
 }
 
 // Demo/display heuristic, not a true foreign-key trace: EaAsset has no
@@ -112,17 +108,25 @@ function getRepositoryAssetTypes(config: any, domain: string): string[] {
   return allDomains[domain] || []
 }
 
+// Memoized (CLAUDE.md convention): an unmemoized object re-fires every effect that depends on it on each render.
 function useApi() {
-  const token = () => localStorage.getItem('ea_token')
-  const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
-  const post = (path: string, body: any) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
-  const put = (path: string, body: any) => fetch(`${API_URL}${path}`, { method: 'PUT', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
-  const del = (path: string) => fetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
-  const upload = (path: string, file: File) => {
-    const fd = new FormData(); fd.append('file', file)
-    return fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).then(r => r.json())
-  }
-  return { get, post, put, del, upload }
+  return useMemo(() => {
+    const token = () => localStorage.getItem('ea_token')
+    const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
+    const post = (path: string, body: any) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
+    const put = (path: string, body: any) => fetch(`${API_URL}${path}`, { method: 'PUT', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
+    const del = (path: string) => fetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
+    const upload = (path: string, file: File) => {
+      const fd = new FormData(); fd.append('file', file)
+      return fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).then(r => r.json())
+    }
+    const download = (path: string, name: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.blob()).then(blob => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = name; a.click()
+      URL.revokeObjectURL(url)
+    })
+    return { get, post, put, del, upload, download }
+  }, [])
 }
 
 function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
@@ -132,7 +136,6 @@ function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
   })
   const [loading, setLoading] = useState(false)
   const set = (k: string) => (e: any) => setForm((f: any) => ({ ...f, [k]: e.target.value }))
-  const setMeta = (code: string) => (e: any) => setForm((f: any) => ({ ...f, metadata: { ...(f.metadata || {}), [code]: e.target.value } }))
   const domains = getRepositoryDomains(config)
   const assetTypes = getRepositoryAssetTypes(config, form.domain)
 
@@ -205,17 +208,9 @@ function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
               <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>META MODEL ATTRIBUTES</div>
               <div className="grid-2" style={{ gap: 12 }}>
                 {metaAttributes.map((attr: any) => (
-                  <div className="form-group" key={attr.code}>
-                    <label className="form-label" htmlFor={`asset-attr-${attr.code}`}>{attr.name}{attr.isRequired ? ' *' : ''}</label>
-                    {attr.enumValues?.length > 0 ? (
-                      <select id={`asset-attr-${attr.code}`} className="form-input" value={form.metadata?.[attr.code] || ''} onChange={setMeta(attr.code)} required={attr.isRequired} disabled={attr.isReadOnly}>
-                        <option value="">Select...</option>
-                        {attr.enumValues.map((ev: any) => <option key={ev.value} value={ev.value}>{ev.label}</option>)}
-                      </select>
-                    ) : (
-                      <input id={`asset-attr-${attr.code}`} className="form-input" value={form.metadata?.[attr.code] || ''} onChange={setMeta(attr.code)} required={attr.isRequired} disabled={attr.isReadOnly} />
-                    )}
-                  </div>
+                  <AttributeField key={attr.code} def={attr} idPrefix="asset-attr" isAR={false} t={t}
+                    value={toInputValue(attr.attributeType, form.metadata?.[attr.code])}
+                    onChange={v => setForm((f: any) => ({ ...f, metadata: { ...(f.metadata || {}), [attr.code]: fromInputValue(attr.attributeType, v) } }))} />
                 ))}
               </div>
             </>
@@ -231,274 +226,10 @@ function AssetModal({ asset, config, onClose, onSave, t, api }: any) {
   )
 }
 
-function AssetDetail({ asset: initialAsset, onClose, onDelete, api, t }: any) {
-  const navigate = useNavigate()
-  const [asset, setAsset] = useState(initialAsset)
-  const [attachments, setAttachments] = useState(initialAsset.attachments || [])
-  // Governance findings and roadmap items that reference this asset -
-  // both read via the real join services added on the backend
-  // (GovernanceFindingsAssetLinkService / EAPlanningService.getRoadmapForAsset),
-  // not fabricated here. Loaded alongside the asset refetch below so a
-  // slow/failed lookup never blocks the rest of the panel from rendering.
-  const [findings, setFindings] = useState<any[]>([])
-  const [findingsLoading, setFindingsLoading] = useState(true)
-  const [roadmapItems, setRoadmapItems] = useState<any[]>([])
-  const [roadmapLoading, setRoadmapLoading] = useState(true)
-
-  // Fetch fresh data on mount to get latest attachments
-  useEffect(() => {
-    api.get(`/ea-repository/assets/${initialAsset.id}`).then((fresh: any) => {
-      setAsset(fresh)
-      setAttachments(fresh.attachments || [])
-    }).catch(() => {})
-    api.get(`/governance/findings/by-asset/${initialAsset.id}`)
-      .then((r: any) => setFindings(Array.isArray(r?.findings) ? r.findings : []))
-      .catch(() => setFindings([]))
-      .finally(() => setFindingsLoading(false))
-    api.get(`/ea-planning/roadmap/by-asset/${initialAsset.id}`)
-      .then((r: any) => setRoadmapItems(Array.isArray(r?.items) ? r.items : []))
-      .catch(() => setRoadmapItems([]))
-      .finally(() => setRoadmapLoading(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialAsset.id])
-  const [uploading, setUploading] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  const uploadFile = async (e: any) => {
-    const file = e.target.files?.[0]; if (!file) return
-    setUploading(true)
-    try {
-      const result = await api.upload(`/ea-repository/assets/${asset.id}/attachments`, file)
-      setAttachments((a: any[]) => [...a, result])
-    } finally { setUploading(false); e.target.value = '' }
-  }
-
-  const deleteAttachment = async (attachmentId: string) => {
-    if (!window.confirm('Delete this attachment?')) return
-    await api.del(`/ea-repository/assets/${asset.id}/attachments/${attachmentId}`)
-    setAttachments((a: any[]) => a.filter((x: any) => x.id !== attachmentId))
-  }
-
-  const downloadAttachment = (attachmentId: string, name: string) => {
-    const token = localStorage.getItem('ea_token')
-    fetch(`${API_URL}/ea-repository/assets/${asset.id}/attachments/${attachmentId}/download`, {
-      headers: { Authorization: `Bearer ${token}` }
-    }).then(r => r.blob()).then(blob => {
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a'); a.href = url; a.download = name; a.click()
-      URL.revokeObjectURL(url)
-    })
-  }
-
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" style={{ width: 600, maxHeight: '80vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <div className="modal-title" style={{ marginBottom: 4 }}>{asset.name}</div>
-            {asset.nameAr && <div style={{ fontSize: 14, color: 'var(--text-dim)', direction: 'rtl' }}>{asset.nameAr}</div>}
-          </div>
-          <div className="flex gap-2">
-            <span className={`badge ${STATUS_COLORS[asset.status] || 'badge-draft'}`}>{asset.status}</span>
-            <span className={`badge ${SOURCE_COLORS[asset.source] || 'badge-draft'}`} title={getSourceLabel(asset).detail}>{getSourceLabel(asset).label}</span>
-          </div>
-        </div>
-
-        <div className="grid-2" style={{ gap: 12, marginBottom: 16 }}>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>DOMAIN</div><div style={{ fontSize: 13 }}>{asset.operatingDomainDisplayName || asset.domain}{asset.operatingDomainDisplayName && asset.operatingDomainDisplayName !== asset.domain && <span style={{ fontSize: 10, color: 'var(--text-dim)' }}> ({asset.domain})</span>}</div></div>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>ASSET TYPE</div><div style={{ fontSize: 13 }}>{asset.canonicalDisplayLabel || asset.assetType?.replace(/_/g, ' ')}</div></div>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>OWNER</div><div style={{ fontSize: 13 }}>{asset.owner || '—'}</div></div>
-          <div><div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>VERSION</div><div style={{ fontSize: 13, fontFamily: 'var(--font-mono)' }}>{asset.version}</div></div>
-        </div>
-
-        {asset.description && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 4 }}>DESCRIPTION</div>
-            <div style={{ fontSize: 13, lineHeight: 1.6 }}>{asset.description}</div>
-          </div>
-        )}
-
-        {/* EA Repository Production Readiness, item 4: Meta Model
-            Attributes - driven entirely by the real Meta Model attribute
-            definitions (asset.metaModelAttributes, from getAsset), never
-            a per-object-type hardcoded form. An attribute with no stored
-            value is shown cleanly as "—", never invented. */}
-        {asset.metaModelAttributes?.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>META MODEL ATTRIBUTES</div>
-            <div className="grid-2" style={{ gap: 8 }}>
-              {asset.metaModelAttributes.map((attr: any) => (
-                <div key={attr.code}>
-                  <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{attr.name}</div>
-                  <div style={{ fontSize: 13, color: attr.hasValue ? 'var(--text)' : 'var(--text-dim)' }}>{attr.hasValue ? String(attr.value) : '—'}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Item 4: Relationships - real Repository relationships, using
-            the canonical relationship definition's directional label
-            where resolvable (asset.relationships, from getAsset),
-            falling back to the legacy relationshipType string
-            otherwise - stays fully compatible with an unresolved
-            legacy relationship, never hides it. */}
-        {asset.relationships?.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>RELATIONSHIPS ({asset.relationships.length})</div>
-            {asset.relationships.map((rel: any) => (
-              <div key={rel.id} style={{ fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: 'var(--text-dim)', fontSize: 11 }}>{rel.direction === 'OUTGOING' ? '→' : '←'}</span>
-                <span style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>{rel.displayLabel}</span>
-                <span>{rel.relatedAsset?.canonicalDisplayLabel ? `${rel.relatedAsset.name} (${rel.relatedAsset.canonicalDisplayLabel})` : rel.relatedAsset?.name}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Governance findings referencing this asset - via the real
-            ReviewFinding -> ReviewFindingEvidence -> ReviewEvidence
-            (TENANT_REPOSITORY) chain (GovernanceFindingsAssetLinkService).
-            Loading state shown briefly rather than nothing, and the
-            section stays hidden once loaded if there's genuinely
-            nothing to show - an asset with zero findings is the normal
-            case, not an error state worth a permanent empty-state box. */}
-        {findingsLoading ? (
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{t('repository.findings_loading')}</div>
-        ) : findings.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, display: 'flex', alignItems: 'center' }}>
-              🏛 {t('repository.findings_title')} ({findings.length})
-              <HelpTip text={t('repository.findings_help')} />
-            </div>
-            {findings.map((f: any) => (
-              <div key={f.id} style={{ fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ padding: '1px 8px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', background: FINDING_SEVERITY_COLORS[f.severity] ? `${FINDING_SEVERITY_COLORS[f.severity]}22` : 'rgba(100,116,139,0.1)', color: FINDING_SEVERITY_COLORS[f.severity] || 'var(--text-dim)' }}>{f.severity || '—'}</span>
-                  <span style={{ flex: 1 }}>{f.title}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{f.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Roadmap items linked to this asset - via
-            EAPlanningService.getRoadmapForAsset(), the real assetId
-            link on plan activities/deliverables (never AI-guessed - see
-            that service's own doc comment). */}
-        {roadmapLoading ? (
-          <div style={{ fontSize: 11, color: 'var(--text-dim)', marginBottom: 8 }}>{t('repository.roadmap_loading')}</div>
-        ) : roadmapItems.length > 0 && (
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8, display: 'flex', alignItems: 'center' }}>
-              🗓 {t('repository.roadmap_title')} ({roadmapItems.length})
-              <HelpTip text={t('repository.roadmap_help')} />
-            </div>
-            {roadmapItems.map((item: any, i: number) => (
-              <div key={i} style={{ fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ padding: '1px 8px', borderRadius: 2, fontSize: 10, fontFamily: 'var(--font-mono)', background: 'rgba(3,105,161,0.1)', color: 'var(--accent)' }}>{item.itemType === 'activity' ? t('repository.roadmap_activity') : t('repository.roadmap_deliverable')}</span>
-                  <span style={{ flex: 1 }}>{item.name}</span>
-                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>{item.planName}{item.periodLabel ? ` · ${item.periodLabel}` : ''}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {asset.tags?.length > 0 && (
-          <div style={{ marginBottom: 16, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {asset.tags.map((tag: string) => (
-              <span key={tag} style={{ padding: '2px 8px', background: 'rgba(3,105,161,0.1)', border: '1px solid rgba(3,105,161,0.2)', borderRadius: 2, fontSize: 11, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{tag}</span>
-            ))}
-          </div>
-        )}
-
-        {asset.source === 'INTEGRATION' && (() => {
-          const synced = Object.entries(SYNCED_ATTRIBUTE_LABELS)
-            .filter(([key]) => asset.metadata && asset.metadata[key] !== undefined && asset.metadata[key] !== null && asset.metadata[key] !== '')
-          if (synced.length === 0) return null
-          const sourceInfo = getSourceLabel(asset)
-          return (
-            <div style={{ marginBottom: 16, padding: 12, background: 'rgba(3,105,161,0.05)', border: '1px solid rgba(3,105,161,0.15)', borderRadius: 'var(--radius)' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginBottom: 8 }}>
-                🔗 SYNCED FROM {sourceInfo.label.toUpperCase()}{sourceInfo.detail ? ` (${sourceInfo.detail})` : ''}
-              </div>
-              <div className="grid-2" style={{ gap: 8 }}>
-                {synced.map(([key, label]) => (
-                  <div key={key}>
-                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>{label}</div>
-                    <div style={{ fontSize: 13 }}>{String(asset.metadata[key])}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })()}
-
-        <div className="divider" />
-
-        <div className="flex items-center justify-between mb-3">
-          <div style={{ fontSize: 13, fontWeight: 600 }}>📎 Attachments ({attachments.length})</div>
-          <button className="btn btn-secondary btn-sm" disabled={uploading} onClick={() => fileRef.current?.click()}>
-            ⬆ {uploading ? 'Uploading...' : 'Upload File'}
-          </button>
-          <input ref={fileRef} type="file" style={{ display: 'none' }} onChange={uploadFile} />
-        </div>
-
-        {attachments.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--text-dim)', textAlign: 'center', padding: '16px 0' }}>No attachments yet</div>
-        ) : attachments.map((a: any) => (
-          <div key={a.id} style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <div style={{ fontSize: 13 }}>📄 {a.name}</div>
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>
-                  {(a.sizeBytes / 1024).toFixed(1)} KB · {a.mimeType}
-                </div>
-              </div>
-              <div className="flex gap-2 items-center">
-                <span style={{ fontSize: 10, padding: '2px 6px', borderRadius: 2, fontFamily: 'var(--font-mono)', background: a.inKnowledgeBase ? 'rgba(22,163,74,0.15)' : 'rgba(100,116,139,0.1)', color: a.inKnowledgeBase ? 'var(--success)' : 'var(--text-dim)', border: `1px solid ${a.inKnowledgeBase ? 'rgba(22,163,74,0.3)' : 'var(--border)'}` }}>
-                  {a.inKnowledgeBase ? '📚 IN KB' : '📚 NOT IN KB'}
-                </span>
-                <button
-                  className="btn btn-secondary btn-sm"
-                  onClick={async () => {
-                    const token = localStorage.getItem('ea_token')
-                    const res = await fetch(`${API_URL}/ea-repository/assets/${asset.id}/attachments/${a.id}/knowledge-base`, {
-                      method: 'PUT',
-                      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ include: !a.inKnowledgeBase })
-                    })
-                    if (res.ok) {
-                      const updated = await res.json()
-                      setAttachments((prev: any[]) => prev.map((x: any) => x.id === a.id ? { ...x, ...updated } : x))
-                    }
-                  }}
-                >
-                  {a.inKnowledgeBase ? '− Remove from KB' : '+ Add to KB'}
-                </button>
-                <button className="btn btn-secondary btn-sm" onClick={() => downloadAttachment(a.id, a.name)}>⬇</button>
-                <button onClick={() => deleteAttachment(a.id)} style={{ background: 'none', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
-              </div>
-            </div>
-          </div>
-        ))}
-
-        <div className="flex gap-2 mt-4">
-          <button className="btn btn-secondary" style={{ flex: 1, justifyContent: 'center' }} onClick={onClose}>Close</button>
-          <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/ea-views?objectContext=${asset.id}`)} title="Explore this object's relationships and dependencies in EA Views">🕸 Explore Dependencies</button>
-          <button className="btn btn-danger btn-sm" onClick={() => { onDelete(asset.id); onClose() }}>Delete Asset</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function RepositoryPage() {
-  const { t } = useLang()
+  const { t, isAR } = useLang() as any
   const api = useApi()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const [config, setConfig] = useState<any>(null)
   const [assets, setAssets] = useState<any[]>([])
@@ -516,7 +247,9 @@ export default function RepositoryPage() {
   const [groupByCycle, setGroupByCycle] = useState<boolean>(false)
   const [showAdd, setShowAdd] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<any>(null)
-  const [editAsset, setEditAsset] = useState<any>(null)
+  // An opened object is shown as its own page (view or edit) in place of the list; the URL
+  // (?asset=<id>[&mode=edit]) follows it, so the browser's Back returns to the list.
+  const [startInEdit, setStartInEdit] = useState(false)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   // EA Repository Production Readiness, item 2: server-side pagination -
@@ -613,13 +346,17 @@ export default function RepositoryPage() {
   // query param once handled so it doesn't re-trigger on an unrelated
   // re-render or linger in the URL after the modal is closed.
   useEffect(() => {
+    const opened = searchParams.get('asset')
+    if (opened && !searchParams.get('assetId')) { setSelectedAsset({ id: opened, name: '' }); setStartInEdit(searchParams.get('mode') === 'edit'); return }
     const assetId = searchParams.get('assetId')
     if (!assetId) return
+    let found = false
     api.get(`/ea-repository/assets/${assetId}`)
-      .then((fresh: any) => { if (fresh) setSelectedAsset(fresh) })
-      .catch(() => {}) // asset may have been deleted, or id is stale/invalid - fail silently, no modal opens
+      .then((fresh: any) => { if (fresh && fresh.id) { found = true; setSelectedAsset(fresh) } })
+      .catch(() => {}) // asset may have been deleted, or id is stale/invalid - fail silently, nothing opens
       .finally(() => {
         searchParams.delete('assetId')
+        if (found) searchParams.set('asset', assetId)
         setSearchParams(searchParams, { replace: true })
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -630,15 +367,32 @@ export default function RepositoryPage() {
     await load()
   }
 
-  const updateAsset = async (form: any) => {
-    await api.put(`/ea-repository/assets/${editAsset.id}`, form)
-    setEditAsset(null)
-    await load()
+  const openAsset = (a: any, edit = false) => {
+    setSelectedAsset(a); setStartInEdit(edit)
+    const next = new URLSearchParams(searchParams)
+    next.delete('assetId'); next.set('asset', a.id)
+    if (edit) next.set('mode', 'edit'); else next.delete('mode')
+    setSearchParams(next)
+    window.scrollTo?.(0, 0)
   }
+  const closeAsset = () => {
+    setSelectedAsset(null); setStartInEdit(false)
+    const next = new URLSearchParams(searchParams)
+    next.delete('asset'); next.delete('mode')
+    setSearchParams(next)
+  }
+  // Back / forward in the browser: the list or the object follows the URL.
+  const urlAsset = searchParams.get('asset')
+  useEffect(() => {
+    if (!urlAsset && selectedAsset && !searchParams.get('assetId')) { setSelectedAsset(null); setStartInEdit(false) }
+    else if (urlAsset && selectedAsset && urlAsset !== selectedAsset.id) { setSelectedAsset({ id: urlAsset, name: '' }) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlAsset])
 
   const deleteAsset = async (id: string) => {
     if (!window.confirm('Delete this asset?')) return
     await api.del(`/ea-repository/assets/${id}`)
+    if (selectedAsset?.id === id) closeAsset()
     await load()
   }
 
@@ -671,6 +425,19 @@ export default function RepositoryPage() {
       if (!groupedAssets[key]) groupedAssets[key] = []
       groupedAssets[key].push(a)
     })
+  }
+
+  if (selectedAsset) {
+    return (
+      <div className="page-body">
+        <AssetProfileScreen key={selectedAsset.id} asset={selectedAsset} startInEdit={startInEdit} t={t} isAR={!!isAR} api={api}
+          domains={domains} typesFor={(d: string) => getRepositoryAssetTypes(config, d)}
+          sourceLabel={getSourceLabel} statusClass={(st: string) => STATUS_COLORS[st] || 'badge-draft'} sourceClass={(src: string) => SOURCE_COLORS[src] || 'badge-draft'} syncedLabels={SYNCED_ATTRIBUTE_LABELS}
+          onBack={closeAsset} onOpenAsset={(id: string, name: string) => openAsset({ id, name })} onDelete={deleteAsset}
+          onModeChange={(edit: boolean) => { const next = new URLSearchParams(searchParams); next.set('asset', selectedAsset.id); if (edit) next.set('mode', 'edit'); else next.delete('mode'); setSearchParams(next, { replace: true }) }}
+          onChanged={() => { load() }} onExplore={(id: string) => navigate(`/ea-views?objectContext=${id}`)} />
+      </div>
+    )
   }
 
   return (
@@ -799,7 +566,7 @@ export default function RepositoryPage() {
                     <th>Actions</th>
                   </tr></thead>
                   <tbody>{items.map((a:any) => (
-                    <tr key={a.id} onClick={() => setSelectedAsset(a)} style={{ cursor: 'pointer' }}>
+                    <tr key={a.id} onClick={() => openAsset(a)} style={{ cursor: 'pointer' }}>
                       <td><div style={{ fontWeight: 500 }}>{a.name}</div>{a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}</td>
                       <td style={{ fontSize: 11 }}>{(a.domain||'').replace(/_/g,' ')}</td>
                       <td style={{ fontSize: 11 }}>{a.canonicalDisplayLabel || (a.assetType||'').replace(/_/g,' ')}</td>
@@ -836,7 +603,7 @@ export default function RepositoryPage() {
             </thead>
             <tbody>
               {filtered.map(a => (
-                <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedAsset(a)}>
+                <tr key={a.id} style={{ cursor: 'pointer' }} onClick={() => openAsset(a)}>
                   <td>
                     <div style={{ fontWeight: 500 }}>{a.name}</div>
                     {a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}
@@ -849,7 +616,7 @@ export default function RepositoryPage() {
                   <td style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{a._count?.attachments || 0}</td>
                   <td onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
-                      <button className="btn btn-secondary btn-sm" onClick={() => setEditAsset(a)}>✏</button>
+                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openAsset(a, true) }} aria-label={`${t('repository.profile.edit')} ${a.name}`}>✏</button>
                       <button onClick={() => deleteAsset(a.id)} style={{ background: 'none', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
                     </div>
                   </td>
@@ -874,8 +641,6 @@ export default function RepositoryPage() {
       </div>
 
       {showAdd && <AssetModal config={config} onClose={() => setShowAdd(false)} onSave={createAsset} t={t} api={api} />}
-      {editAsset && <AssetModal asset={editAsset} config={config} onClose={() => setEditAsset(null)} onSave={updateAsset} t={t} api={api} />}
-      {selectedAsset && <AssetDetail asset={selectedAsset} onClose={() => setSelectedAsset(null)} onDelete={deleteAsset} api={api} t={t} />}
     </div>
   )
 }

@@ -244,28 +244,25 @@ describe('RepositoryPage - CRUD', () => {
     });
   });
 
-  it('normalizes legacy APPLICATIONS in the edit modal and preserves its Application object type', async () => {
+  it('✏ opens the object as a page in edit mode; a legacy APPLICATIONS domain is normalised and its Application type kept', async () => {
+    const legacy = asset({ domain: 'APPLICATIONS', assetType: 'Application', metadata: {} });
     mockFetch({
       '/ea-repository/framework-config': LEGACY_APPLICATIONS_CONFIG,
-      '/ea-repository/assets': [asset({ domain: 'APPLICATIONS', assetType: 'Application' })],
+      '/ea-repository/assets/a1/profile': { asset: legacy, objectType: null, resolution: 'RESOLVED', attributeGroups: [], otherAttributes: [], completeness: { filled: 0, total: 0, requiredMissing: [] }, relationshipSlots: [], otherRelationships: [], relationshipTotals: { linked: 0, truncated: false } },
+      '/ea-repository/assets': [legacy],
       '/ea-repository/summary': {},
-      '/ea-repository/object-types/Application/attributes': { attributes: [] },
     });
     render(<RepositoryPage />);
     await screen.findByText('Core Banking');
     fireEvent.click(screen.getByText('✏'));
 
-    expect(screen.getByText('Edit Asset').closest('.modal')).toHaveStyle({
-      maxHeight: 'calc(100vh - 32px)',
-      overflowY: 'auto',
-      boxSizing: 'border-box',
-    });
-    const domainSelect = screen.getByLabelText('Domain *') as HTMLSelectElement;
+    const domainSelect = await screen.findByLabelText('repository.profile.domain') as HTMLSelectElement;
     expect(domainSelect.value).toBe('APPLICATION');
     expect(domainSelect.querySelector('option[value="APPLICATIONS"]')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Asset Type *')).toHaveValue('Application');
+    expect(screen.getByLabelText('repository.profile.type')).toHaveValue('Application');
+    expect(mockSetSearchParams.mock.calls[0][0].toString()).toBe('asset=a1&mode=edit');
 
-    fireEvent.click(screen.getByText('Save Asset'));
+    fireEvent.click(screen.getByText('repository.profile.save'));
     await waitFor(() => {
       const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT');
       expect(putCall).toBeDefined();
