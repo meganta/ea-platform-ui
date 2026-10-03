@@ -1,0 +1,53 @@
+.dc-workspace { display:grid; gap:18px; min-width:0; color:var(--text); }
+.dc-panel { background:var(--navy-light); border:1px solid var(--border); border-radius:12px; padding:22px; min-width:0; }
+.dc-panel h2 { font-size:19px; margin:6px 0 12px; }
+.dc-panel h3 { font-size:15px; margin:8px 0; overflow-wrap:anywhere; }
+.dc-panel p { line-height:1.65; overflow-wrap:anywhere; }
+.dc-decision { border-inline-start:4px solid var(--accent); }
+.dc-eyebrow { color:var(--accent); font-size:11px; font-weight:700; letter-spacing:.06em; }
+.dc-muted, .dc-panel small { color:var(--text-dim); font-size:12px; }
+.dc-scorecards { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; }
+.dc-total { font-size:36px; font-weight:750; margin:14px 0; }
+.dc-total small { font-size:14px; font-weight:400; }
+.dc-status { font-size:12px; padding:7px 0; font-weight:600; }
+.dc-pass { color:var(--accent); }
+.dc-fail { color:var(--text); border-inline-start:3px solid var(--accent); padding-inline-start:8px; }
+.dc-coverage { display:flex; justify-content:space-between; gap:10px; font-size:12px; margin-top:14px; }
+.dc-panel progress { width:100%; height:6px; accent-color:var(--accent); }
+.dc-controls { display:flex; flex-wrap:wrap; gap:14px; align-items:flex-end; margin:18px 0; }
+.dc-controls label { display:grid; gap:7px; font-size:12px; flex:1 1 160px; }
+.dc-workspace input, .dc-workspace select, .dc-workspace button { font:inherit; color:var(--text); background:var(--navy); border:1px solid var(--border); border-radius:7px; padding:10px 12px; min-height:42px; }
+.dc-workspace button { cursor:pointer; }
+.dc-workspace button:disabled { opacity:.6; cursor:wait; }
+.dc-workspace button:hover { border-color:var(--accent); }
+.dc-workspace :focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.dc-scroll { overflow-x:auto; }
+.dc-workspace table { width:100%; border-collapse:collapse; text-align:start; font-size:13px; }
+.dc-workspace th, .dc-workspace td { text-align:start; padding:12px; border-bottom:1px solid var(--border); vertical-align:top; min-width:145px; }
+.dc-workspace th:first-child { min-width:210px; }
+.dc-workspace th small { display:block; margin-top:7px; font-weight:400; }
+.dc-workspace thead th { color:var(--text-dim); font-size:12px; }
+.dc-workspace .dc-cell { width:100%; display:grid; gap:6px; text-align:start; background:var(--navy); }
+.dc-cell strong { font-size:18px; }
+.dc-cell span { font-size:11px; }
+.dc-cell.dc-pass { border-inline-start:3px solid var(--accent); }
+.dc-cell.dc-missing_evidence, .dc-cell.dc-not_assessed { border-style:dashed; }
+.dc-detail { border-color:var(--accent); }
+.dc-close { float:inline-end; margin-inline-start:15px; }
+.dc-detail-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:20px; }
+.dc-detail li { margin-block:8px; line-height:1.6; }
+.dc-evidence, .dc-scenario { border-top:1px solid var(--border); padding-block:16px; }
+.dc-evidence blockquote { margin:12px 0; padding-inline-start:16px; border-inline-start:3px solid var(--border); white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.65; }
+.dc-evidence a { color:var(--accent); }
+@media(max-width:600px) { .dc-panel { padding:15px; } .dc-scorecards { grid-template-columns:1fr; } .dc-controls { align-items:stretch; } .dc-controls label { flex-basis:100%; } .dc-total { font-size:30px; } }
+
+.dc-workspace[dir="rtl"] { font-family:'IBM Plex Sans Arabic',Tahoma,Arial,sans-serif; }
+.dc-workspace th { font-family:inherit; text-transform:none; letter-spacing:normal; }
+.dc-workspace tbody th { font-size:13px; color:var(--text); }
+.dc-status.dc-pass { color:var(--success); }
+.dc-status.dc-fail { color:var(--danger); border-inline-start-color:var(--danger); }
+.dc-cell.dc-pass { border-inline-start-color:var(--success); }
+.dc-cell.dc-fail { border-inline-start:3px solid var(--danger); }
+.dc-cell.dc-partial { border-inline-start:3px solid var(--warning); }
+.dc-gap { font-size:18px; font-weight:650; padding-block:12px; }
+.dc-detail ul, .dc-scenario ol { padding-inline-start:22px; }

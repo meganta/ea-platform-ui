@@ -1,3 +1,4 @@
+import CompareTab from './decision/DecisionComparisonWorkspace'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useLang } from '../contexts/LangContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -297,7 +298,7 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
         {tab === 'overview' && <OverviewTab assessment={assessment} isAR={isAR} />}
         {tab === 'criteria' && <CriteriaTab id={id} groups={groups} criteria={criteria} status={status} api={api} isAR={isAR} onChanged={load} />}
         {tab === 'candidates' && <CandidatesTab id={id} candidates={candidates} status={status} api={api} isAR={isAR} onChanged={load} />}
-        {tab === 'compare' && <CompareTab id={id} candidates={candidates} scores={scores} assessment={assessment} api={api} isAR={isAR} />}
+        {tab === 'compare' && <CompareTab id={id} criteria={criteria} groups={groups} candidates={candidates} scores={scores} assessment={assessment} api={api} isAR={isAR} />}
         {tab === 'decision' && <DecisionTab id={id} assessment={assessment} api={api} isAR={isAR} onChanged={load} />}
       </div>
     </div>
@@ -440,77 +441,6 @@ function CandidatesTab({ id, candidates, status, api, isAR, onChanged }: any) {
         ))}
       </div>
       {(!candidates || candidates.length < 2) && <div style={{ fontSize: 12, color: 'var(--text-dim)', marginTop: 8 }}>{isAR ? 'يلزم مرشّحان على الأقل للمقارنة' : 'At least 2 candidates are required to freeze the baseline'}</div>}
-    </div>
-  )
-}
-
-function CompareTab({ id, candidates, scores, assessment, api, isAR }: any) {
-  const [sensitivity, setSensitivity] = useState<any>(null)
-  const [runningSensitivity, setRunningSensitivity] = useState(false)
-
-  const runSensitivity = async () => {
-    setRunningSensitivity(true)
-    try { setSensitivity(await api.post(`/decision-evaluation/${id}/sensitivity`, { variationPercent: 10 })) }
-    catch (e: any) { alert(e.message) } finally { setRunningSensitivity(false) }
-  }
-
-  if (!scores || scores.length === 0) {
-    return <div style={{ ...S.card, color: 'var(--text-dim)' }}>{isAR ? 'لم يتم احتساب المقارنة بعد. شغّل التقييم ثم اضغط "احتساب المقارنة".' : 'Comparison not computed yet. Run the assessment, then click "Compute Comparison".'}</div>
-  }
-  const candidateById = new Map<string, any>((candidates || []).map((c: any) => [c.id, c]))
-  const sorted = [...scores].sort((a: any, b: any) => (a.rank ?? 999) - (b.rank ?? 999))
-
-  return (
-    <div>
-      {assessment.outcome && (
-        <div style={S.card}>
-          <div style={S.row}>
-            <span style={S.badge(OUTCOME_COLORS[assessment.outcome] || '#94a3b8')}>{assessment.outcome.replace(/_/g, ' ')}</span>
-            {assessment.recommendedCandidateId && <span style={{ fontWeight: 700 }}>{candidateById.get(assessment.recommendedCandidateId)?.name}</span>}
-          </div>
-          {assessment.executiveRationale && <div style={{ marginTop: 10, fontSize: 13 }}>{assessment.executiveRationale}</div>}
-        </div>
-      )}
-      <div style={S.card}>
-        <table style={S.table}>
-          <thead>
-            <tr>
-              <th style={S.th}>{isAR ? 'الترتيب' : 'Rank'}</th>
-              <th style={S.th}>{isAR ? 'المرشح' : 'Candidate'}</th>
-              <th style={S.th}>{isAR ? 'النتيجة الإجمالية' : 'Overall Score'}</th>
-              <th style={S.th}>{isAR ? 'البوابات الإلزامية' : 'Mandatory Gates'}</th>
-              <th style={S.th}>{isAR ? 'تغطية الأدلة' : 'Evidence Coverage'}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((s: any) => (
-              <tr key={s.candidateId}>
-                <td style={S.td}>{s.rank ?? '—'}</td>
-                <td style={S.td}>{candidateById.get(s.candidateId)?.name || s.candidateId}</td>
-                <td style={S.td}><strong>{s.overallScore?.toFixed(1)}</strong></td>
-                <td style={S.td}>{s.mandatoryGatesPassed ? <span style={S.badge('#22c55e')}>{isAR ? 'اجتاز' : 'Passed'}</span> : <span style={S.badge('#e74c3c')}>{isAR ? 'فشل' : 'Failed'}</span>}</td>
-                <td style={S.td}>{s.evidenceCoveragePercent?.toFixed(0)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div style={S.card}>
-        <div style={{ ...S.row, justifyContent: 'space-between' }}>
-          <div style={{ fontWeight: 700 }}>{isAR ? 'تحليل الحساسية' : 'Sensitivity Analysis'}</div>
-          <button style={S.btn()} disabled={runningSensitivity} onClick={runSensitivity}>{runningSensitivity ? '...' : (isAR ? 'تشغيل (±10%)' : 'Run (±10%)')}</button>
-        </div>
-        {sensitivity && (
-          <div style={{ marginTop: 10, fontSize: 13 }}>
-            <span style={S.badge(sensitivity.rankingEverChanges ? '#f59e0b' : '#22c55e')}>
-              {sensitivity.rankingEverChanges ? (isAR ? 'الترتيب حسّاس لتغييرات الوزن' : 'Ranking is sensitive to weight changes') : (isAR ? 'الترتيب مستقر' : 'Ranking is stable')}
-            </span>
-            {sensitivity.mostInfluentialCriterionIds?.length > 0 && (
-              <div style={{ marginTop: 8, color: 'var(--text-dim)' }}>{isAR ? 'أكثر المعايير تأثيرًا:' : 'Most influential criteria:'} {sensitivity.mostInfluentialCriterionIds.length}</div>
-            )}
-          </div>
-        )}
-      </div>
     </div>
   )
 }
