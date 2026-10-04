@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useLang } from '../contexts/LangContext'
+import './CopilotPage.css'
 import ReactMarkdown from 'react-markdown'
 import CopilotProvenance, { ProvenanceTrace } from '../components/CopilotProvenance'
 import EaQuestionExplorer from '../components/EaQuestionExplorer'
@@ -792,6 +794,8 @@ function ActionDraftReview({ api }: { api: any }) {
 
 export default function CopilotPage() {
   const api = useApi()
+  const { isAR } = useLang()
+  const [panelOpen, setPanelOpen] = useState(false)
   const [architects, setArchitects] = useState<Architect[]>([])
   const [selectedArchitect, setSelectedArchitect] = useState<Architect | null>(null)
   const [consultArchitects, setConsultArchitects] = useState<string[]>([])
@@ -1049,26 +1053,27 @@ export default function CopilotPage() {
   const archColor = (code?: string) => DOMAIN_COLOR[code || 'CHIEF'] || '#7f8c8d'
 
   return (
-    <div className="side-panel-parent" style={{ display: 'flex', height: '100%', background: 'var(--navy)', overflow: 'hidden' }}>
+    <div className="copilot-workspace" dir={isAR ? 'rtl' : 'ltr'}>
 
       {/* ── Left sidebar ─────────────────────────────────────────────────── */}
-      <div className="side-panel-260" style={{ background: 'var(--navy-light)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column' }}>
+      <div className={`copilot-sidebar${panelOpen ? ' expanded' : ''}`}>
         {/* Header */}
         <div style={{ padding: '16px 14px 10px', borderBottom: '1px solid var(--border)' }}>
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 10 }}>🤖 EA Copilot</div>
           <button onClick={newConversation} style={{ width: '100%', padding: '7px 0', borderRadius: 8, background: 'var(--accent)', color: 'var(--navy)', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>+ New Conversation</button>
+          <button type="button" className="copilot-panel-toggle" aria-expanded={panelOpen} aria-controls="copilot-panel-content" title={isAR ? 'إظهار أو إخفاء اختيار المعماريين وسجل المحادثات' : 'Show or hide architect selection and conversation history'} onClick={() => setPanelOpen(open => !open)}>{isAR ? 'المعماريون وسجل المحادثات' : 'Architects & history'} <span aria-hidden="true">{panelOpen ? '▴' : '▾'}</span></button>
         </div>
 
         {/* Sidebar tabs */}
-        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)' }}>
+        <div className="copilot-panel-tabs" aria-label={isAR ? 'أدوات المساعد' : 'Copilot tools'}>
           {(['architects', 'history', 'meetings', 'playbooks', 'actiondrafts'] as const).map(t => (
-            <button key={t} style={{ flex: 1, padding: '8px 0', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => setSidebarTab(t)}>
-              {t === 'architects' ? '👥 Architects' : t === 'history' ? '🕐 History' : t === 'meetings' ? '📋 Meetings' : t === 'playbooks' ? '🧭 Playbooks' : '📝 Drafts'}
+            <button key={t} aria-pressed={sidebarTab === t} style={{ padding: '8px 4px', fontSize: 12, fontWeight: sidebarTab === t ? 600 : 400, color: sidebarTab === t ? 'var(--accent)' : 'var(--text-dim)', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: `2px solid ${sidebarTab === t ? 'var(--accent)' : 'transparent'}`, cursor: 'pointer' }} onClick={() => { setSidebarTab(t); setPanelOpen(t === 'architects' || t === 'history') }}>
+              {t === 'architects' ? (isAR ? '👥 المعماريون' : '👥 Architects') : t === 'history' ? (isAR ? '🕐 السجل' : '🕐 History') : t === 'meetings' ? (isAR ? '📋 الاجتماعات' : '📋 Meetings') : t === 'playbooks' ? (isAR ? '🧭 إجراءات العمل' : '🧭 Playbooks') : (isAR ? '📝 المسودات' : '📝 Drafts')}
             </button>
           ))}
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 10px' }}>
+        <div id="copilot-panel-content" className="copilot-panel-content">
           {sidebarTab === 'architects' ? (
             <>
               {/* Mode selector */}
@@ -1083,7 +1088,7 @@ export default function CopilotPage() {
                 const color = archColor(a.code)
                 return (
                   <div key={a.id} onClick={() => {
-                    if (mode === 'single') setSelectedArchitect(a)
+                    if (mode === 'single') { setSelectedArchitect(a); setPanelOpen(false) }
                     else setConsultArchitects(prev => prev.includes(a.code) ? prev.filter(c => c !== a.code) : [...prev, a.code].slice(0, 4))
                   }}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', background: isSelected ? color + '22' : 'none', border: `1px solid ${isSelected ? color + '55' : 'transparent'}`, transition: 'all 0.15s' }}>
@@ -1108,12 +1113,12 @@ export default function CopilotPage() {
                 </div>
               )}
             </>
-          ) : (
+          ) : sidebarTab === 'history' ? (
             // History
             <>
               {conversations.length === 0 && <div style={{ color: 'var(--text-dim)', fontSize: 12, textAlign: 'center', padding: 20 }}>No conversations yet</div>}
               {conversations.map(c => (
-                <div key={c.id} onClick={() => loadConversation(c.id)} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', background: activeConvId === c.id ? 'rgba(3,105,161,0.1)' : 'none', border: `1px solid ${activeConvId === c.id ? 'var(--accent)44' : 'transparent'}` }}
+                <div key={c.id} onClick={() => { loadConversation(c.id); setPanelOpen(false) }} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 4, cursor: 'pointer', background: activeConvId === c.id ? 'rgba(3,105,161,0.1)' : 'none', border: `1px solid ${activeConvId === c.id ? 'var(--accent)44' : 'transparent'}` }}
                   onMouseEnter={e => { if (activeConvId !== c.id) e.currentTarget.style.background = 'rgba(15,23,42,0.04)' }}
                   onMouseLeave={e => { if (activeConvId !== c.id) e.currentTarget.style.background = 'none' }}>
                   <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.title || 'Untitled'}</div>
@@ -1121,7 +1126,7 @@ export default function CopilotPage() {
                 </div>
               ))}
             </>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -1139,9 +1144,9 @@ export default function CopilotPage() {
           <ActionDraftReview api={api} />
         </div>
       ) : (
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="copilot-chat">
         {/* Chat header */}
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, background: 'var(--navy-light)' }}>
+        <div className="copilot-chat-header">
           {mode === 'single' && selectedArchitect ? (
             <>
               <div style={{ width: 36, height: 36, borderRadius: '50%', background: archColor(selectedArchitect.code) + '33', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{selectedArchitect.avatar}</div>
@@ -1162,7 +1167,7 @@ export default function CopilotPage() {
         </div>
 
         {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px' }}>
+        <div className="copilot-chat-messages">
           {messages.length === 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100%', gap: 20 }}>
               <div style={{ fontSize: 56 }}>{selectedArchitect?.avatar || '🤖'}</div>
@@ -1183,7 +1188,7 @@ export default function CopilotPage() {
               </div>
 
               {/* Bubble */}
-              <div style={{ maxWidth: '75%' }}>
+              <div className="copilot-message-bubble">
                 {m.role !== 'user' && m.architectName && (
                   <div style={{ fontSize: 11, fontWeight: 600, color: archColor(m.architectCode), marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
                     {m.architectName}
@@ -1224,9 +1229,9 @@ export default function CopilotPage() {
         </div>
 
         {/* Input */}
-        <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', background: 'var(--navy-light)' }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end' }}>
-            <textarea ref={inputRef} value={input} onChange={e => setInput(e.target.value)}
+        <div className="copilot-composer">
+          <div className="copilot-composer-row">
+            <textarea ref={inputRef} aria-label={isAR ? 'رسالتك إلى المساعد' : 'Message Copilot'} value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
               placeholder={mode === 'single' ? `Ask ${selectedArchitect?.name || 'the architect'}... (Enter to send, Shift+Enter for newline)` : 'Ask all selected architects...'}
               rows={2} style={{ flex: 1, padding: '10px 14px', background: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text)', fontSize: 13, outline: 'none', resize: 'none', lineHeight: 1.5 }} />
@@ -1244,7 +1249,7 @@ export default function CopilotPage() {
 
         {/* Voice controls */}
         {voiceMode && (
-          <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, padding: '10px 14px', background: 'var(--navy)', borderRadius: 10, border: '1px solid var(--border)' }}>
+          <div className="copilot-voice-controls" style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 10, padding: '10px 14px', background: 'var(--navy)', borderRadius: 10, border: '1px solid var(--border)' }}>
             <button
               onMouseDown={startRecording}
               onMouseUp={stopRecording}
@@ -1276,7 +1281,7 @@ export default function CopilotPage() {
           </div>
         )}
 
-        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, display: 'flex', gap: 16 }}>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: '4px 16px' }}>
             <span>Domain architects use ⚡ Haiku (low cost)</span>
             <span>Chief Architect uses 🧠 Sonnet (synthesis only)</span>
             <span>Context cached 5 min</span>

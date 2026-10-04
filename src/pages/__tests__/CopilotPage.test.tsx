@@ -26,9 +26,28 @@ jest.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ token: 'fake-token' }),
 }));
 
+jest.mock('../../contexts/LangContext', () => ({ useLang: () => ({ isAR: false, t: (k: string) => k }) }));
+
 beforeEach(() => {
   jest.clearAllMocks();
   localStorage.setItem('ea_token', 'fake-token');
+});
+
+describe('Copilot responsive navigation', () => {
+  it('opens history from the compact panel and preserves a draft when collapsed', async () => {
+    mockFetch({ '/copilot/architects': ARCHITECTS, '/copilot/conversations': [] });
+    render(<CopilotPage />);
+    const input = await screen.findByLabelText('Message Copilot');
+    fireEvent.change(input, { target: { value: 'Keep this draft' } });
+    const toggle = screen.getByRole('button', { name: /Architects & history/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(screen.getByRole('button', { name: /🕐 History/ }));
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('No conversations yet')).toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(input).toHaveValue('Keep this draft');
+  });
 });
 
 describe('CopilotPage - controlled chat failure', () => {
