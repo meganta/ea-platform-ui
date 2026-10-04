@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
+import { tenantInviteUrl } from '../lib/tenantHosts'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
 
@@ -30,7 +31,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default function UsersPage() {
   const { t } = useLang()
-  const { hasPermission } = useAuth()
+  const { hasPermission, user } = useAuth()
   const api = useApi()
   const [users, setUsers] = useState<any[]>([])
   const [invitations, setInvitations] = useState<any[]>([])
@@ -74,7 +75,7 @@ export default function UsersPage() {
   }
 
   const showInviteResult = (result: any) => {
-    setInviteResult({ email: result.email, inviteUrl: result.inviteUrl, delivery: result.emailDelivery || { status: 'NOT_CONFIGURED' } })
+    setInviteResult({ email: result.email, inviteUrl: tenantInviteUrl(result.inviteUrl, user?.tenantSlug), delivery: result.emailDelivery || { status: 'NOT_CONFIGURED' } })
     setLinkCopied(false)
     setShowInviteModal(true)
   }
@@ -159,8 +160,9 @@ export default function UsersPage() {
       const r = await api.get(`/users/invitations/${inv.id}/link`)
       if (!r?.inviteUrl) throw new Error(r?.message || 'Invitation not found')
       if (r.expired) { showMsg(t('users.invite_link_expired') || 'This invitation has expired. Use Resend to send a new link.', true); return }
-      if (await copyText(r.inviteUrl)) showMsg(t('users.invite_link_copied') || 'Invite link copied to clipboard')
-      else showInviteResult({ email: inv.email, inviteUrl: r.inviteUrl, emailDelivery: { status: 'LINK_ONLY' } })
+      const url = tenantInviteUrl(r.inviteUrl, user?.tenantSlug)
+      if (await copyText(url)) showMsg(t('users.invite_link_copied') || 'Invite link copied to clipboard')
+      else showInviteResult({ email: inv.email, inviteUrl: url, emailDelivery: { status: 'LINK_ONLY' } })
     } catch (e: any) { showMsg(e.message, true) }
   }
 
