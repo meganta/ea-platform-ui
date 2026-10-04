@@ -40,6 +40,7 @@ describe('Assess Maturity wizard', () => {
       'GET /surveys/s1': { version: { questions: [{ id: 'q1', subjectId: 'cap1', text: 'Is Route Planning documented?', source: 'TEMPLATE', evidenceRequirement: 'REQUIRED' }, { id: 'q2', subjectId: 'cap1', text: 'AI: is POD digital?', source: 'AI_GENERATED', reviewStatus: 'PENDING_REVIEW', evidenceRequirement: 'NONE' }] } },
       'POST /surveys/s1/questions/q2/review': {},
       'POST /business-capabilities/assessments/as1/launch': {},
+      'POST /business-capabilities/assessments/as1/readiness': { ready: false, respondentCount: 1, assignmentCount: 1, coverage: [{ capabilityAssetId: 'cap1', respondentCount: 1, questionCount: 2, missingDimensions: [] }] },
       'GET /business-capabilities/assessments/as1/progress': { assessment: { id: 'as1', name: 'Q3', status: 'OPEN', results: [] }, assignments: [] },
     });
     render(<AssessmentsPanel L={L} isAR={false} can={ALL} />);
@@ -68,8 +69,8 @@ describe('Assess Maturity wizard', () => {
     fireEvent.click(screen.getByText('Next'));
     expect(await screen.findByTestId('wizard-review')).toHaveTextContent('1 AI suggestions still need review');
     fireEvent.click(screen.getByText('Next'));
-    fireEvent.click(await screen.findByText('Launch assessment'));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/Review all AI-drafted questions/);
+    await screen.findByText('Resolve the launch checks before continuing.');
+    expect(screen.queryByText('Launch assessment')).not.toBeInTheDocument();
     expect(calls.some(c => c.url.endsWith('/launch'))).toBe(false);
   });
 });
@@ -156,7 +157,7 @@ describe('My Surveys (respondent)', () => {
     expect(screen.getByTestId('survey-progress')).toHaveTextContent('2/2 answered');
     fireEvent.click(screen.getByText('Save progress'));
     await waitFor(() => expect(calls.some(c => c.method === 'PUT')).toBe(true));
-    expect(calls.find(c => c.method === 'PUT')!.body.responses).toEqual(expect.arrayContaining([{ questionId: 'q1', value: true, notApplicable: false }, { questionId: 'q2', value: 3, notApplicable: false }]));
+    expect(calls.find(c => c.method === 'PUT')!.body.responses).toEqual(expect.arrayContaining([{ questionId: 'q1', value: true, notApplicable: false, comment: '' }, { questionId: 'q2', value: 3, notApplicable: false, comment: '' }]));
     expect(await screen.findByText('Saved. You can come back later.')).toBeInTheDocument(); // Submit stays disabled while a save is in flight
     fireEvent.click(screen.getByText('Submit'));
     await waitFor(() => expect(calls.some(c => c.url.endsWith('/submit'))).toBe(true));

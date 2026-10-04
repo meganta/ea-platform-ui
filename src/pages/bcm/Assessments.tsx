@@ -225,7 +225,8 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
   const [dims, setDims] = useState<Record<string, Set<string>>>({})
   const [targets, setTargets] = useState<Record<string, string>>({})
   const [users, setUsers] = useState<any[]>([])
-  const [respondents, setRespondents] = useState<Array<{ userId?: string; groupId?: string; role: string }>>([])
+  const [respondents, setRespondents] = useState<Array<{ userId?: string; groupId?: string; role: string; capabilityIds?: string[] }>>([])
+  const [readiness, setReadiness] = useState<any>(null)
   const [groups, setGroups] = useState<any[]>([])
   const [groupForm, setGroupForm] = useState<{ id?: string; name: string; nameAr: string; userIds: string[] } | null>(null)
   const [questionnaire, setQuestionnaire] = useState<any>(null)
@@ -291,6 +292,11 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
     }
     if (step === 5 && (!respondents.length || respondents.some(r => !r.userId && !r.groupId))) throw new Error(L('Select a user or group for every respondent row', 'اختر مستخدماً أو مجموعة لكل صف من المستجيبين'))
     if (step === 6 && !questionnaire) throw new Error(L('Generate the questionnaire first', 'أنشئ الاستبيان أولاً'))
+    if (step === 6 || step === 7) {
+      const report = await api('POST', `${BASE}/${assessment.id}/readiness`, { respondents })
+      setReadiness(report)
+      if (step === 7 && !report.ready) throw new Error(L('Resolve the launch checks before continuing.', 'عالج ملاحظات جاهزية الإطلاق قبل المتابعة.'))
+    }
     setStep(s => s + 1)
   })
 
@@ -302,6 +308,11 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
   const review = (qid: string, decision: 'APPROVED' | 'REJECTED') => run(async () => {
     await api('POST', `/surveys/${questionnaire.surveyId}/questions/${qid}/review`, { decision })
     setSurvey(await api('GET', `/surveys/${questionnaire.surveyId}`))
+  })
+  const removeQuestion = (qid: string) => run(async () => {
+    await api('DELETE', `/surveys/${questionnaire.surveyId}/questions/${qid}`)
+    const updated = await api('GET', `/surveys/${questionnaire.surveyId}`)
+    setSurvey(updated); setQuestionnaire((q: any) => ({ ...q, questions: updated.version.questions.length }))
   })
   const pendingAi = (survey?.version?.questions || []).filter((q: any) => q.source === 'AI_GENERATED' && q.reviewStatus !== 'APPROVED')
   const launch = () => run(async () => {
@@ -429,6 +440,16 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
                 {[['OWNER', 'Capability owner', 'مالك القدرة'], ['BUSINESS_SME', 'Business SME', 'خبير أعمال'], ['OPERATIONS', 'Operations', 'العمليات'], ['IT', 'IT', 'تقنية المعلومات'], ['DATA', 'Data', 'البيانات'], ['EA', 'Enterprise Architecture', 'البنية المؤسسية']].map(([v, en, ar]) => <option key={v} value={v}>{L(en, ar)}</option>)}
               </select>
               <button className="btn btn-secondary btn-sm" aria-label={L('Remove', 'إزالة')} onClick={() => setRespondents(rs => rs.filter((_, j) => j !== i))}>✕</button>
+              <fieldset style={{ width: '100%', border: '1px solid var(--border)', borderRadius: 6, padding: 8 }}>
+                <legend style={{ fontSize: 12 }}>{L('Capabilities for this recipient', 'القدرات المخصصة لهذا المستلم')} {i + 1}</legend>
+                <label style={{ display: 'block', fontSize: 12 }}><input type="checkbox" checked={!r.capabilityIds?.length} onChange={() => setRespondents(rs => rs.map((x, j) => j === i ? { ...x, capabilityIds: [] } : x))} />{L('All selected capabilities', 'جميع القدرات المحددة')}</label>
+                {[...selected].map(id => <label key={id} style={{ display: 'inline-flex', gap: 4, marginInlineEnd: 12, fontSize: 12 }}><input type="checkbox" checked={!r.capabilityIds?.length || r.capabilityIds.includes(id)} onChange={e => {
+                  const current = r.capabilityIds?.length ? r.capabilityIds : [...selected]
+                  const ids = e.target.checked ? [...new Set([...current, id])] : current.filter(c => c !== id)
+                  if (!ids.length) { setError(L('Keep at least one capability for this recipient, or remove the recipient.', 'أبقِ قدرة واحدة على الأقل لهذا المستلم أو أزله.')); return }
+                  setRespondents(rs => rs.map((x, j) => j === i ? { ...x, capabilityIds: ids.length === selected.size ? [] : ids } : x))
+                }} />{capName(id)}</label>)}
+              </fieldset>
             </div>
           ))}
           <button className="btn btn-secondary btn-sm" onClick={() => setRespondents(rs => [...rs, { userId: '', role: 'OWNER' }])}>+ {L('Add respondent', 'إضافة مستجيب')}</button>
@@ -473,7 +494,7 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
                       {q.evidenceRequirement === 'REQUIRED' && <span className="badge badge-review">{L('Evidence', 'دليل')}</span>}
                       {q.source === 'AI_GENERATED' && (q.reviewStatus === 'APPROVED'
                         ? <span className="badge badge-approved">{L('AI · approved', 'آلي · معتمد')}</span>
-                        : q.reviewStatus === 'REJECTED' ? <span className="badge badge-draft">{L('Rejected', 'مرفوض')}</span>
+                        : q.reviewStatus === 'REJECTED' ? <><span className="badge badge-draft">{L('Rejected', 'مرفوض')}</span><button disabled={busy} className="btn btn-secondary btn-sm" onClick={() => removeQuestion(q.id)}>{L('Remove rejected question', 'إزالة السؤال المرفوض')}</button></>
                         : <span style={{ display: 'flex', gap: 4 }}><span className="badge badge-review">{L('AI suggestion', 'اقتراح آلي')}</span><button className="btn btn-secondary btn-sm" onClick={() => review(q.id, 'APPROVED')}>{L('Approve', 'اعتماد')}</button><button className="btn btn-secondary btn-sm" onClick={() => review(q.id, 'REJECTED')}>{L('Reject', 'رفض')}</button></span>)}
                     </div>
                     ))}</section>
@@ -488,18 +509,25 @@ export function AssessWizard({ L, isAR, onClose, resumeId }: { L: LFn; isAR: boo
         <div style={{ fontSize: 13, display: 'grid', gap: 4 }} data-testid="wizard-review">
           <div><strong>{details.name}</strong> · {fw ? (isAR && fw.nameAr) || fw.name : ''}</div>
           <div>{selected.size} {L('capabilities', 'قدرات')} · {respondents.length} {L('user/group selections', 'اختيارات المستخدمين والمجموعات')} · {questionnaire?.questions ?? 0} {L('questions', 'أسئلة')}</div>
+          {readiness && <section aria-label={L('Launch readiness', 'جاهزية الإطلاق')}>
+            <h4>{readiness.ready ? L('Ready to launch', 'جاهز للإطلاق') : L('Needs attention before launch', 'يتطلب المعالجة قبل الإطلاق')}</h4>
+            <p>{readiness.respondentCount} {L('unique respondents', 'مستجيبين دون تكرار')} · {readiness.assignmentCount} {L('assignments across roles', 'تعيينات حسب الأدوار')}</p>
+            <HelpTip text={L('Counts use current active group members. Each capability needs respondents and questions for every selected dimension. Launch checks this again before creating assignments.', 'تعتمد الأعداد على أعضاء المجموعات النشطين حالياً. تحتاج كل قدرة إلى مستجيبين وأسئلة لكل بُعد محدد. يُعاد التحقق قبل إنشاء التعيينات عند الإطلاق.')} />
+            {(readiness.coverage || []).map((c: any) => <div key={c.capabilityAssetId}>{capName(c.capabilityAssetId)}: {c.respondentCount} {L('respondents', 'مستجيبين')} · {c.questionCount} {L('questions', 'أسئلة')}{!!c.missingDimensions?.length && <span> · {L('Missing dimensions', 'أبعاد بلا أسئلة')}: {c.missingDimensions.join(', ')}</span>}</div>)}
+            {!readiness.ready && <p role="alert">{L('Check recipient coverage, missing dimension questions, and unapproved or rejected AI questions.', 'راجع تغطية المستجيبين والأسئلة الناقصة للأبعاد والأسئلة الآلية غير المعتمدة أو المرفوضة.')}</p>}
+          </section>}
           {pendingAi.length > 0 && <div style={{ color: 'var(--warning)' }}>{L(`${pendingAi.length} AI suggestions still need review.`, `${pendingAi.length} اقتراحات آلية بحاجة للمراجعة.`)}</div>}
         </div>
       )}
       {step === 8 && (
         <div style={{ fontSize: 13 }}>
-          <p>{L('Launching locks the questionnaire and notifies nothing automatically; respondents will find it under My Surveys.', 'الإطلاق يقفل الاستبيان، وسيجده المستجيبون ضمن استبياناتي.')}</p>
+          <p>{L('Launching locks the questionnaire and creates assignments. Respondents will find it under My Surveys.', 'الإطلاق يقفل الاستبيان وينشئ التعيينات. سيجده المستجيبون ضمن استبياناتي.')}</p>
           <button className="btn btn-primary btn-sm" disabled={busy} onClick={launch}>{L('Launch assessment', 'إطلاق التقييم')}</button>
         </div>
       )}
 
       <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-        {step > 0 && step !== 8 && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setStep(s => s - 1)}>{L('Back', 'السابق')}</button>}
+        {step > 0 && <button className="btn btn-secondary btn-sm" disabled={busy} onClick={() => setStep(s => s - 1)}>{L('Back', 'السابق')}</button>}
         {step < 8 && <button className="btn btn-primary btn-sm" disabled={busy} onClick={next}>{L('Next', 'التالي')}</button>}
       </div>
     </div>
