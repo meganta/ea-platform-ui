@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import { EnumOption } from './assetProfile'
 
 /**
@@ -8,8 +8,10 @@ import { EnumOption } from './assetProfile'
  */
 export interface FieldDef { code: string; name: string; nameAr?: string | null; attributeType: string; isRequired: boolean; isReadOnly?: boolean; placeholder?: string | null; helpText?: string | null; helpTextAr?: string | null; enumValues?: EnumOption[] }
 
-export default function AttributeField({ def, value, onChange, idPrefix, isAR, t, error }: {
+export default function AttributeField({ def, value, onChange, idPrefix, isAR, t, error, tag }: {
   def: FieldDef; value: any; onChange: (v: any) => void; idPrefix: string; isAR: boolean; t: (k: string) => string; error?: string | null
+  /** Shown next to the label, e.g. where the attribute is defined. */
+  tag?: ReactNode
 }) {
   const id = `${idPrefix}-${def.code}`
   const label = (isAR && def.nameAr) || def.name
@@ -64,9 +66,12 @@ export default function AttributeField({ def, value, onChange, idPrefix, isAR, t
   }
   return (
     <div className="form-group ap-field">
-      <label className="form-label" id={`${id}-label`} htmlFor={type === 'MULTI_ENUM' && options.length ? undefined : id}>
-        {label}{def.isRequired && <span className="ap-required" aria-label={t('repository.profile.required')}> *</span>}
-      </label>
+      <div className="ap-label-row">
+        <label className="form-label" id={`${id}-label`} htmlFor={type === 'MULTI_ENUM' && options.length ? undefined : id}>
+          {label}{def.isRequired && <span className="ap-required" aria-label={t('repository.profile.required')}> *</span>}
+        </label>
+        {tag}
+      </div>
       {input}
       {help && !error && <div id={`${id}-help`} className="ap-help">{help}</div>}
       {error && <div id={`${id}-error`} role="alert" className="ap-error">{t(error)}</div>}

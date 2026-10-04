@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import RepositoryPage from '../RepositoryPage';
 
 jest.mock('../../contexts/LangContext', () => ({
@@ -172,6 +172,27 @@ describe('RepositoryPage - loading and listing', () => {
     fireEvent.change(statusSelect, { target: { value: 'DRAFT' } });
     expect(await screen.findByText('Draft Asset')).toBeInTheDocument();
     expect(screen.queryByText('Approved Asset')).not.toBeInTheDocument();
+  });
+
+  it('shows status tiles with counts from the summary; a tile filters the list by that status and selecting it again clears it', async () => {
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG,
+      '/ea-repository/summary': { total: 7, byStatus: [{ status: 'APPROVED', count: 5 }, { status: 'DRAFT', count: 2 }] },
+      '/ea-repository/assets': (url: string) => url.includes('status=DRAFT')
+        ? [asset({ id: 'a2', name: 'Draft Asset', status: 'DRAFT' })]
+        : [asset({ id: 'a1', name: 'Approved Asset', status: 'APPROVED' })],
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Approved Asset');
+    const tiles = screen.getByTestId('repo-stats');
+    await waitFor(() => expect(within(tiles).getByText('repository.list.stat.total').parentElement).toHaveTextContent('7'));
+    const draft = within(tiles).getByText('repository.profile.status.DRAFT').closest('button')!;
+    expect(draft).toHaveTextContent('2');
+    fireEvent.click(draft);
+    expect(await screen.findByText('Draft Asset')).toBeInTheDocument();
+    expect(draft).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(draft);
+    expect(await screen.findByText('Approved Asset')).toBeInTheDocument();
   });
 
   it('filters by source - proves the fix for a bug where this filter had working UI but was never actually applied', async () => {

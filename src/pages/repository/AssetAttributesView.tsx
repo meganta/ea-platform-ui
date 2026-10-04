@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { AssetProfile, displayValue, localName } from './assetProfile'
+import OriginTag, { OriginLegend, metaModelLabel } from './OriginTag'
 
 type T = (k: string) => string
 const WIDE = new Set(['LONG_TEXT', 'RICH_TEXT', 'JSON_DATA'])
@@ -14,6 +15,8 @@ export default function AssetAttributesView({ profile, t, isAR }: { profile: Ass
   const [onlyRecorded, setOnlyRecorded] = useState(false)
   const groups = profile.attributeGroups || []
   const { filled, total } = profile.completeness || { filled: 0, total: 0 }
+  const mm = metaModelLabel(profile, t)
+  const detail = (code: string, type: string) => [mm, code, type].filter(Boolean).join(' · ')
 
   if (!groups.length && !profile.otherAttributes?.length) {
     return <p className="ap-empty">{t(profile.resolution === 'RESOLVED' ? 'repository.profile.no_attributes' : 'repository.profile.type_unresolved')}</p>
@@ -28,6 +31,7 @@ export default function AssetAttributesView({ profile, t, isAR }: { profile: Ass
           {t('repository.profile.only_recorded')}
         </label>
       </div>
+      <OriginLegend t={t} profile={profile} show={profile.otherAttributes?.length ? ['meta', 'other'] : ['meta']} />
       {groups.map((g, gi) => {
         const attrs = g.attributes.filter(a => !onlyRecorded || a.hasValue)
         if (!attrs.length) return null
@@ -41,7 +45,7 @@ export default function AssetAttributesView({ profile, t, isAR }: { profile: Ass
                   const text = displayValue(a, a.value, isAR)
                   return (
                     <div key={a.code} className={`ap-attr${WIDE.has(a.attributeType) ? ' ap-wide' : ''}`}>
-                      <dt>{localName(a, isAR)}{a.isRequired && <span className="ap-required"> *</span>}</dt>
+                      <dt className="ap-dt"><span>{localName(a, isAR)}{a.isRequired && <span className="ap-required"> *</span>}</span><OriginTag origin="meta" t={t} detail={detail(a.code, a.attributeType)} /></dt>
                       <dd>
                         {!text ? <span className="ap-empty">{t('repository.profile.not_recorded')}</span>
                           : a.attributeType === 'URL' && /^https?:\/\//i.test(text) ? <a href={text} target="_blank" rel="noopener noreferrer" dir="ltr">{text}</a>
@@ -62,7 +66,7 @@ export default function AssetAttributesView({ profile, t, isAR }: { profile: Ass
           <div className="ap-group-body">
             <dl className="ap-attrs">
               {profile.otherAttributes.map(o => (
-                <div key={o.key} className="ap-attr"><dt dir="ltr">{o.key}</dt><dd>{typeof o.value === 'object' ? JSON.stringify(o.value) : String(o.value)}</dd></div>
+                <div key={o.key} className="ap-attr"><dt className="ap-dt"><span dir="ltr">{o.key}</span><OriginTag origin="other" t={t} /></dt><dd>{typeof o.value === 'object' ? JSON.stringify(o.value) : String(o.value)}</dd></div>
               ))}
             </dl>
           </div>

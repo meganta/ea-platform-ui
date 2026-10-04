@@ -72,3 +72,64 @@
   .ap-actions, .ap-foot { width: 100%; }
   .ap-actions .btn, .ap-foot .btn { flex: 1 1 auto; justify-content: center; }
 }
+
+/* ── Repository theme (same look as the Innovation module: header band, tab strip on
+   navy-light, padded content, rounded cards, accent-tinted chips and stat tiles) ── */
+.rp-page { display: flex; flex-direction: column; min-height: 100%; background: var(--navy); }
+.rp-header { padding: 20px 28px 16px; border-bottom: 1px solid var(--border); display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.rp-header-main { flex: 1; min-width: 0; }
+.rp-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin: 0; }
+.rp-sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+.rp-strip { display: flex; gap: 2px; padding: 0 28px; border-bottom: 1px solid var(--border); background: var(--navy-light); overflow-x: auto; }
+.rp-content { flex: 1; padding: 24px 28px; min-width: 0; }
+.rp-card { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+.rp-card + .rp-card, .rp-card-gap { margin-top: 16px; }
+.rp-card-flush { padding: 0; overflow: hidden; }
+.rp-card-title { font-size: 13px; font-weight: 700; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+.rp-stats { margin-bottom: 16px; }
+.rp-stat { text-align: start; background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; color: var(--text); font: inherit; cursor: default; width: 100%; }
+button.rp-stat { cursor: pointer; }
+button.rp-stat:hover, button.rp-stat:focus-visible { border-color: var(--accent); outline: none; }
+.rp-stat[aria-pressed="true"] { border-color: var(--accent); background: rgba(3, 105, 161, 0.12); }
+.rp-stat-label { font-size: 11px; color: var(--text-dim); }
+.rp-stat-value { font-size: 26px; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+.rp-stat-warn .rp-stat-value { color: var(--warning); }
+.rp-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 14px 16px; margin-bottom: 16px; }
+.rp-table-wrap { overflow-x: auto; }
+.rp-table-wrap table { margin: 0; }
+.rp-domain-tag { font-size: 11px; padding: 2px 10px; border-radius: 10px; background: rgba(3, 105, 161, 0.12); color: var(--accent); font-family: var(--font-mono); white-space: nowrap; }
+.rp-banner { margin-top: 12px; padding: 8px 14px; background: rgba(180, 83, 9, 0.1); border: 1px solid rgba(180, 83, 9, 0.3); border-radius: 10px; font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+
+/* The object page in the same theme. */
+.ap-page.rp-page { max-width: none; margin: 0; }
+.ap-page .ap-head { border-bottom: none; }
+.ap-page .ap-hero { padding: 16px 28px 16px; border-bottom: 1px solid var(--border); }
+.ap-page .ap-tabs { margin-top: 0; padding: 0 28px; background: var(--navy-light); border-bottom: 1px solid var(--border); }
+.ap-page .ap-tab { padding: 10px 16px; }
+.ap-page .ap-tab[aria-selected="true"] { color: var(--accent); }
+.ap-page .ap-body { padding: 24px 28px 32px; max-width: 1280px; }
+.ap-page .ap-section { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+.ap-page .ap-section.ap-plain { background: none; border: none; padding: 0; }
+.ap-page .ap-group, .ap-page .ap-slot { border-radius: 10px; }
+.ap-type-icon { width: 40px; height: 40px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; border: 1px solid var(--border); background: var(--navy-light); }
+.ap-hero-row { display: flex; gap: 14px; align-items: flex-start; min-width: 0; }
+
+/* Where an attribute / relationship comes from. */
+.ap-origin { display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 18px; white-space: nowrap; border: 1px solid transparent; vertical-align: middle; }
+.ap-origin-meta { color: var(--accent); background: rgba(3, 105, 161, 0.12); border-color: rgba(3, 105, 161, 0.3); }
+.ap-origin-other { color: var(--warning); background: rgba(217, 119, 6, 0.1); border-color: rgba(217, 119, 6, 0.35); }
+.ap-origin-core { color: var(--text-dim); background: var(--navy-mid); border-color: var(--border); }
+.ap-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ap-dt { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ap-label-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.ap-label-row .form-label { margin-bottom: 0; }
+.ap-legend { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+
+@media (max-width: 760px) {
+  .rp-header, .ap-page .ap-hero { padding: 14px 16px; }
+  .rp-strip, .ap-page .ap-tabs { padding: 0 16px; }
+  .rp-content, .ap-page .ap-body { padding: 16px; }
+  .rp-filters .form-input { flex: 1 1 100% !important; width: 100% !important; min-width: 0 !important; }
+  .rp-stat-value { font-size: 20px; }
+}
+.ap-page .ap-tab-static { color: var(--accent); border-bottom: 2px solid var(--accent); font-weight: 600; cursor: default; display: inline-block; }
