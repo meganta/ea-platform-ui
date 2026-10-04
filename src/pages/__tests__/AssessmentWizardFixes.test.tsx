@@ -112,6 +112,7 @@ describe('group and user assignment', () => {
       'POST /business-capabilities/assessments/respondent-groups': { id: 'g3', name: 'New team', userIds: ['u1', 'u2'] },
       'GET /business-capabilities/assessments/a1': { id: 'a1', name: 'Q4', status: 'SURVEY_DESIGN', frameworkId: 'fw', surveyId: 's1', scope: [{ capabilityAssetId: 'c7', dimensionCodes: ['PROCESS'] }] },
       'POST /business-capabilities/assessments/a1/scope/suggest': [],
+      'POST /business-capabilities/assessments/a1/readiness': { ready: true, respondentCount: 2, assignmentCount: 2, coverage: [{ capabilityAssetId: 'c7', respondentCount: 2, questionCount: 3, missingDimensions: [] }] },
       'GET /surveys/s1': { version: { questions: [{ id: 'q1', subjectId: 'c7', dimension: 'PROCESS', text: 'Process question' }, { id: 'q2', subjectId: 'c7', dimension: 'PEOPLE', text: 'People question' }, { id: 'q3', subjectId: 'c7', dimension: 'PROCESS', text: 'Another process question' }] } },
     });
   }
