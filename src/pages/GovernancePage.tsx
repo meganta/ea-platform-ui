@@ -191,7 +191,7 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
       {domainEntries.map(([domain, ds]: [string, any]) => {
         const domainFindings = filteredFindings.filter(f => f.domain === domain)
         const allDomainFindings = findings.filter(f => f.domain === domain)
-        const score = Math.round(ds.score || 0)
+        const score = Number((ds.score || 0).toFixed(2))
         const scoreColor = score >= 75 ? '#2ecc71' : score >= 60 ? '#f39c12' : '#e74c3c'
         const isCollapsed = collapsed[domain]
         const crit = allDomainFindings.filter(f => f.severity === 'CRITICAL').length
@@ -210,9 +210,9 @@ function DomainsFindingsTab({ findings, report, isAR, resolveText, reviewId, onF
               </div>
               {/* Sub-scores */}
               <div style={{ display: 'flex', gap: 6 }}>
-                {[['C', ds.complianceScore], ['R', ds.riskScore], ['S', ds.strategicScore]].map(([l,v]:any) => (
+                {[['C', ds.complianceScore, 'compliance'], ['R', ds.riskScore, 'risk'], ['S', ds.strategicScore, 'strategic']].filter(([, , dimension]) => !report.reportView || report.reportView.scoringDimensions?.includes(dimension)).map(([l,v]:any) => (
                   <div key={l} style={{ textAlign: 'center', minWidth: 28 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: (v||0) >= 70 ? '#2ecc71' : (v||0) >= 55 ? '#f39c12' : '#e74c3c' }}>{Math.round(v||0)}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: (v||0) >= 70 ? '#2ecc71' : (v||0) >= 55 ? '#f39c12' : '#e74c3c' }}>{typeof v === 'number' ? Number(v.toFixed(2)) : '—'}</div>
                     <div style={{ fontSize: 9, color: 'var(--text-muted)' }}>{l}</div>
                   </div>
                 ))}
@@ -1091,7 +1091,7 @@ export default function GovernancePage() {
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
             </div>
-            {r.overallScore != null && <ScoreCircle score={Math.round(r.overallScore)} label='Score' />}
+            {r.overallScore != null && <ScoreCircle score={r.overallScore} label='Score' />}
             <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[r.decision] + '22', color: DECISION_COLOR[r.decision] }}>{r.decision?.replace(/_/g, ' ')}</div>
             <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, background: 'var(--navy-light)', color: 'var(--text-muted)' }}>{r.status}</div>
           </div>
@@ -1543,7 +1543,13 @@ export default function GovernancePage() {
           </div>
         </div>
       )}
-      {report && <ReportView review={review} report={report} findings={findings} tab={tab} setTab={setTab} />}
+      {report && <ReportView key={review.id} onRescored={async (scores: any) => {
+        setReviews(previous => previous.map(item => item.id === review.id ? { ...item, ...scores } : item))
+        setReview((previous: any) => ({ ...previous, ...scores }))
+        setReport((previous: any) => ({ ...previous, ...scores, domainSummaries: { ...previous.domainSummaries, _scoreBreakdown: scores.scoreBreakdown } }))
+        const updated = await api.get('/governance/reviews/' + review.id + '/report')
+        setReport(updated)
+      }} review={review} report={report} findings={findings} tab={tab} setTab={setTab} />}
       {!report && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Report not available yet</div>}
     </div>
   )
@@ -1551,7 +1557,7 @@ export default function GovernancePage() {
   return null
 }
 
-function ReportView({ review, report, findings, tab, setTab }: { review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
+export function ReportView({ review, report, findings, tab, setTab, onRescored }: { onRescored?: (scores: any) => void | Promise<void>, review: any, report: any, findings: any[], tab: string, setTab: (t: any) => void }) {
   const [riskFilterSev, setRiskFilterSev] = React.useState<string[]>([])
   const [riskFilterCat, setRiskFilterCat] = React.useState<string>('')
   const [editingReport, setEditingReport] = React.useState<string | null>(null) // field name
@@ -1564,27 +1570,28 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   const confScore = extScores.confidenceScore || report.confidenceScore || 0
 
   // Report profile of this review type (backend governance-report-type-profiles.ts): which sections
-  // and score dimensions this type shows. Until it loads (or if it cannot), every section is shown.
+  // and score dimensions this type shows. The report API supplies the canonical export chapters.
   const [profile, setProfile] = React.useState<any>(null)
   React.useEffect(() => {
     let live = true
-    if (!review?.reviewType) return
+    if (report.reportView || !review?.reviewType) return
     fetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/governance/report-profiles/${review.reviewType}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
       .then(r => (r.ok ? r.json() : null)).then(p => { if (live && p && Array.isArray(p.excluded)) setProfile(p) }).catch(() => {})
     return () => { live = false }
-  }, [review?.reviewType])
+  }, [review?.reviewType, report.reportView])
   const sectionVisible = (key: string): boolean => {
-    if (!profile) return true
+    if (Array.isArray(report.reportView?.sections)) return report.reportView.sections.includes(key)
+    if (!profile) return key === 'executiveSummary' || key === 'validatedFindings'
     if (profile.excluded.includes(key)) return false
     if (profile.alwaysShown.includes(key)) return true
     if (profile.conditional.includes(key)) {
       // A conditional section is shown only when this report's own decision says its evidence was found.
       const decision = Array.isArray(report.sectionDecisions) ? report.sectionDecisions.find((d: any) => d.key === key) : undefined
-      return decision ? !!decision.show : true
+      return decision ? !!decision.show : false
     }
     return true
   }
-  const dimensionVisible = (dim: string): boolean => !profile || profile.scoringDimensionsDisplayed.includes(dim)
+  const dimensionVisible = (dim: string): boolean => Array.isArray(report.reportView?.scoringDimensions) ? report.reportView.scoringDimensions.includes(dim) : !!profile?.scoringDimensionsDisplayed?.includes(dim)
 
   // ── Edit helpers ──────────────────────────────────────────────────────────
   const apiUrl = (process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1')
@@ -1620,6 +1627,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   // ── Rescore state ──────────────────────────────────────────────────────────
   const [rescoring, setRescoring] = React.useState(false)
   const [rescoreResult, setRescoreResult] = React.useState<any>(null)
+  const [rescoreError, setRescoreError] = React.useState(false)
 
   // ── Unified score sources — used in ScoreCircles, formula, and penalty display ──
   // Always prefer rescoreResult (reflects latest edits), then report stored values
@@ -1627,10 +1635,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   // (governance-score-scope.ts) are the numbers the Word report and the review list show.
   // A dimension the review did not assess is null (shown as N/A), never a placeholder.
   const scoreBreakdown: ScoreBreakdown | null = rescoreResult?.scoreBreakdown ?? report.domainSummaries?._scoreBreakdown ?? null
-  const roundOrNull = (v: any): number | null => (typeof v === 'number' && isFinite(v) ? Math.round(v) : null)
+  const roundOrNull = (v: any): number | null => (typeof v === 'number' && isFinite(v) ? Math.round(v * 100) / 100 : null)
   const uScores = {
-    compliance: Math.round(rescoreResult?.complianceScore ?? report.complianceScore ?? 0),
-    risk:       Math.round(rescoreResult?.riskScore       ?? report.riskScore       ?? 0),
+    compliance: (rescoreResult?.complianceScore ?? report.complianceScore ?? 0),
+    risk:       (rescoreResult?.riskScore ?? report.riskScore ?? 0),
     future:     roundOrNull(rescoreResult && 'futureStateScore' in rescoreResult ? rescoreResult.futureStateScore : futureScore),
     financial:  roundOrNull(rescoreResult && 'financialScore' in rescoreResult ? rescoreResult.financialScore : finScore),
     domains:    roundOrNull(domainsScoreOf(scoreBreakdown) ?? rescoreResult?.domainQualityScore ?? report.domainQualityScore ?? (() => {
@@ -1638,7 +1646,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       const vals = (ds as any[]).map((d:any) => d?.score ?? d?.domainScore).filter((v:any) => typeof v === 'number')
       return vals.length ? vals.reduce((a:number,b:number)=>a+b,0)/vals.length : null
     })()),
-    overall:    Math.round(rescoreResult?.overallScore ?? report.overallScore ?? 0),
+    overall:    (rescoreResult?.overallScore ?? report.overallScore ?? 0),
     // Compute penalty from findings directly — matches backend formula exactly
     // criticalCount * 3, capped at maxPenalty (always available from findings)
     // critCount uses localFindings (reflects deletions immediately) with findings as fallback
@@ -1657,16 +1665,20 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   // showRerunModal is managed by parent GovernancePage
 
   const triggerRescore = React.useCallback(async () => {
+    setRescoreError(false)
     setRescoring(true)
     try {
       const res = await fetch(`${apiUrl}/governance/reviews/${review.id}/rescore`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token()}` },
       })
-      if (res.ok) setRescoreResult(await res.json())
-    } catch { /* non-blocking */ }
+      if (!res.ok) throw new Error("Score update failed")
+      const scores = await res.json()
+      setRescoreResult(scores)
+      await onRescored?.(scores)
+    } catch { setRescoreError(true) }
     finally { setRescoring(false) }
-  }, [review.id, apiUrl])
+  }, [review.id, apiUrl, onRescored])
 
   // confirmReRun removed — re-run handled by parent GovernancePage via handleRerunConfirm
 
@@ -1839,8 +1851,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const keys = sectionsOfTab[tabDef.key]
     return !keys || keys.some(sectionVisible)
   })
+  const tabIsAvailable = tabs.some(item => item.key === tab)
+  const activeTab = tabIsAvailable ? tab : 'summary'
   // A tab this review type does not have (e.g. deep-linked) falls back to the summary.
-  React.useEffect(() => { if (!tabs.some(tabDef => tabDef.key === tab)) setTab('summary') }, [tabs.map(tabDef => tabDef.key).join(','), tab])
+  React.useEffect(() => { if (!tabIsAvailable) setTab('summary') }, [tabIsAvailable, setTab])
 
   return (
     <div dir={isAR ? 'rtl' : 'ltr'}>
@@ -1860,7 +1874,11 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           <span>⏳</span> Recalculating scores...
         </div>
       )}
-      {rescoreResult && !rescoring && (
+      {rescoreError && <div role="alert" style={{ color: '#e74c3c', marginBottom: 12 }}>
+        {isAR ? 'تعذر تحديث الدرجات. قد لا تعكس الدرجات المعروضة آخر التعديلات.' : 'Scores could not be refreshed. Displayed scores may not reflect the latest edits.'}
+        <button onClick={triggerRescore} disabled={rescoring} style={{ marginInlineStart: 8 }}>{isAR ? 'إعادة المحاولة' : 'Retry'}</button>
+      </div>}
+      {rescoreResult && !rescoring && !rescoreError && (
         <div style={{ background: '#2ecc7115', border: '1px solid #2ecc7144', borderRadius: 8, padding: '8px 14px', marginBottom: 12, fontSize: 12, color: '#2ecc71', display: 'flex', alignItems: 'center', gap: 12 }}>
           <span>✓</span>
           <span>Scores recalculated · Overall: <strong>{rescoreResult.overallScore}</strong> · Decision: <strong>{rescoreResult.decision?.replace(/_/g,' ')}</strong></span>
@@ -1906,19 +1924,19 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       {review?.status === 'READY_FOR_REVIEW' ? (
         <div style={{ background: '#e74c3c22', border: '1px solid #e74c3c', borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
           <div style={{ fontSize: 18, fontWeight: 700, color: '#e74c3c', marginBottom: 4 }}>⚠ {t('gov.requires_manual_review')}</div>
-          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('gov.proposed_decision')}: {report.decision?.replace(/_/g, ' ')}</div>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{t('gov.proposed_decision')}: {(rescoreResult?.decision ?? report.decision)?.replace(/_/g, ' ')}</div>
         </div>
       ) : (
-        <div style={{ background: (DECISION_COLOR[report.decision] || '#64748B') + '22', border: '1px solid ' + (DECISION_COLOR[report.decision] || '#64748B'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[report.decision] || '#64748B', marginBottom: 4 }}>{report.decision?.replace(/_/g, ' ')}</div>
+        <div style={{ background: (DECISION_COLOR[rescoreResult?.decision ?? report.decision] || '#64748B') + '22', border: '1px solid ' + (DECISION_COLOR[rescoreResult?.decision ?? report.decision] || '#64748B'), borderRadius: 10, padding: '14px 20px', marginBottom: 20, textAlign: 'center' }}>
+          <div style={{ fontSize: 18, fontWeight: 700, color: DECISION_COLOR[rescoreResult?.decision ?? report.decision] || '#64748B', marginBottom: 4 }}>{(rescoreResult?.decision ?? report.decision)?.replace(/_/g, ' ')}</div>
           <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{isAR ? resolveText(report.decisionRationale) : report.decisionRationale}</div>
         </div>
       )}
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--navy-light)' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--navy-light)' }}>
         {tabs.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key as any)} style={{ padding: '8px 14px', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: tab === t.key ? '2px solid var(--accent)' : '2px solid transparent', color: tab === t.key ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontWeight: tab === t.key ? 600 : 400, whiteSpace: 'nowrap' }}>{t.label}</button>
+          <button key={t.key} onClick={() => setTab(t.key as any)} style={{ padding: '8px 14px', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', borderBottom: activeTab === t.key ? '2px solid var(--accent)' : '2px solid transparent', color: activeTab === t.key ? 'var(--accent)' : 'var(--text-muted)', cursor: 'pointer', fontSize: 13, fontWeight: activeTab === t.key ? 600 : 400, whiteSpace: 'nowrap' }}>{t.label}</button>
         ))}
       </div>
 
@@ -1941,7 +1959,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       })()}
 
       {/* Summary Tab */}
-      {tab === 'summary' && (
+      {activeTab === 'summary' && (
         <div>
           {/* Governance Review V2 (spec section 15): evidence coverage and
               extraction quality, shown only when this review actually ran
@@ -1984,7 +2002,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
           </div>
 
           {/* Review-type specific sections */}
-          {(report as any).additionalSections && (() => {
+          {!report.reportView && (report as any).additionalSections && (() => {
             const sec = (report as any).additionalSections
             const sections = [
               { key: 'businessCase',       label: '💼 Business Case Assessment',      color: '#2ecc71' },
@@ -2135,27 +2153,6 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
             </div>
           )}
 
-          {/* 4. Score improvement tips */}
-          {(() => {
-            const tips: string[] = []
-            if (report.complianceScore < 60) tips.push('Compliance score is low — address EA principle violations to unlock significant score improvement')
-            if (report.strategicScore < 60) tips.push('Strategic alignment is weak — map solution capabilities to Business Strategy goals explicitly')
-            if ((extScores.securityScore || 0) < 50) tips.push('Security score is critical — resolve IAM and encryption findings before ARB approval')
-            if (findings.filter((f:any) => f.severity === 'CRITICAL').length >= 5) tips.push('5+ CRITICAL findings — resolve at least 3 before re-run to move decision to CONDITIONAL')
-            if (tips.length === 0 && report.overallScore >= 60) tips.push('Score is in acceptable range — address HIGH findings to move toward APPROVED status')
-            return tips.length > 0 ? (
-              <div style={{ background: '#3498db11', border: '1px solid #3498db33', borderRadius: 10, padding: 16, marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#3498db', marginBottom: 10 }}>💡 SCORE IMPROVEMENT TIPS</div>
-                {tips.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, fontSize: 13 }}>
-                    <span style={{ color: '#3498db' }}>→</span>
-                    <span style={{ color: 'var(--text)' }}>{t}</span>
-                  </div>
-                ))}
-              </div>
-            ) : null
-          })()}
-
           {/* 5. Scope & Methodology */}
           {report.scopeDescription && (
             <div style={{ background: 'var(--navy-mid)', borderRadius: 10, padding: 16, marginBottom: 16 }}>
@@ -2192,7 +2189,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       )}
 
       {/* Domains & Findings Tab (merged) */}
-      {tab === 'domains' && <DomainsFindingsTab findings={localFindings} report={report} isAR={isAR} resolveText={resolveText} reviewId={review.id} onFindingUpdate={handleFindingUpdate} onFindingDelete={handleFindingDelete} onRescore={triggerRescore} />}
+      {activeTab === 'domains' && <DomainsFindingsTab findings={localFindings} report={sectionVisible('domainAssessment') ? report : { ...report, domainSummaries: {} }} isAR={isAR} resolveText={resolveText} reviewId={review.id} onFindingUpdate={handleFindingUpdate} onFindingDelete={handleFindingDelete} onRescore={triggerRescore} />}
 
       {/* UNUSED_DOMAINS_PLACEHOLDER */}
       {false && (
@@ -2307,10 +2304,10 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       )}
 
       {/* Strategic Tab */}
-      {tab === 'strategic' && strategyAssessed && (
+      {activeTab === 'strategic' && strategyAssessed && (
         <StrategyAlignmentPanel section={report.strategicAlignment?.alignment} score={rescoreResult && 'strategicScore' in rescoreResult ? rescoreResult.strategicScore : report.strategicScore} />
       )}
-      {tab === 'strategic' && !strategyAssessed && (() => {
+      {activeTab === 'strategic' && !strategyAssessed && (() => {
         const objectives = localObjectives
 
         // Strategy type weights and colors — declared FIRST (used in sort below)
@@ -2595,7 +2592,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       })()}
 
       {/* Compliance Tab */}
-      {tab === 'compliance' && (() => {
+      {activeTab === 'compliance' && (() => {
         const items = report.complianceMatrix?.items || []
         const statuses = ['COMPLIANT','PARTIALLY_COMPLIANT','NON_COMPLIANT','REQUIRES_EXCEPTION','RECOMMENDED','NOT_APPLICABLE']
         const statusColor: Record<string,string> = { COMPLIANT:'#2ecc71', PARTIALLY_COMPLIANT:'#f39c12', NON_COMPLIANT:'#e74c3c', REQUIRES_EXCEPTION:'#e67e22', NOT_APPLICABLE:'#64748B', RECOMMENDED:'#3498db' }
@@ -2788,7 +2785,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       })()}
 
       {/* Risk Register Tab */}
-      {tab === 'risk' && (() => {
+      {activeTab === 'risk' && (() => {
         const allRisks = localRisks  // use localRisks for live edit/delete
         const filteredRisks = allRisks.filter((r: any) => {
           if (riskFilterSev.length > 0 && !riskFilterSev.includes(r.severity)) return false
@@ -2875,7 +2872,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       })()}
 
       {/* Future State Tab */}
-      {tab === 'future' && (() => {
+      {activeTab === 'future' && (() => {
         const fs = report.futureStateAlignment
         if (!fs) return <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 32 }}>Future-state alignment not available</div>
         const pct = fs.alignmentPercentage || 0
@@ -2986,7 +2983,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
       })()}
 
       {/* Financial Tab */}
-      {tab === 'financial' && (() => {
+      {activeTab === 'financial' && (() => {
         const fin = report.financialOpportunities || {}
         const opps = fin.opportunities || []
         // Use localOpps for live totals (reflects user edits/deletes)

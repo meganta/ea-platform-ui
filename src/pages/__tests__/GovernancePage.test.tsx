@@ -181,6 +181,7 @@ describe('GovernancePage - report view: Strategic tab in-tab editing', () => {
     return {
       decision: 'REQUIRES_CHANGES', decisionRationale: 'Some issues to address.',
       executiveSummary: 'Summary text.', overallScore: 70,
+      reportView: { sections: ['executiveSummary', 'validatedFindings', 'strategicAlignment', 'financialAssessment'], scoringDimensions: ['strategic'] },
       strategicAlignment: {
         overallAlignmentPercentage: 60,
         objectives: [
@@ -255,6 +256,7 @@ describe('GovernancePage - report view: Strategic tab in-tab editing', () => {
 describe('GovernancePage - report view: Financial tab in-tab editing', () => {
   function makeReportWithOpportunity(overrides: Partial<Record<string, any>> = {}) {
     return {
+      reportView: { sections: ['executiveSummary', 'validatedFindings', 'financialAssessment'], scoringDimensions: ['financial'] },
       decision: 'REQUIRES_CHANGES', decisionRationale: 'Some issues to address.',
       executiveSummary: 'Summary text.', overallScore: 70,
       strategicAlignment: { overallAlignmentPercentage: 60, objectives: [] },
@@ -518,11 +520,12 @@ describe('GovernancePage - report view: sections and scores follow the review ty
     expect(screen.getByText('gov.compliance')).toBeTruthy();
   });
 
-  it('shows every section when the profile cannot be loaded (never hides content on a failed lookup)', async () => {
+  it('does not expose unrelated sections when the profile cannot be loaded', async () => {
     mockWithProfile(makeReview({ reviewType: 'RFP_SOW', title: 'Tender RFP' }), report(), false);
     render(<GovernancePage />);
     fireEvent.click(await screen.findByText('Tender RFP'));
-    expect(await screen.findByText('gov.strategic')).toBeTruthy();
-    expect(screen.getByText('gov.financial')).toBeTruthy();
+    expect(await screen.findByText('Domains & Findings')).toBeTruthy();
+    expect(screen.queryByText('gov.strategic')).toBeNull();
+    expect(screen.queryByText('gov.financial')).toBeNull();
   });
 });
