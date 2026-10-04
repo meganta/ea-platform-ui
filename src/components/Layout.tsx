@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import { useBranding } from '../contexts/BrandingContext'
@@ -37,6 +37,10 @@ export default function Layout() {
   const [showSetupModal, setShowSetupModal] = useState(false)
   const [setupChecked, setSetupChecked] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const sidebar = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
+  const menuLabel = locale === 'AR' ? 'وحدات المنصة' : 'Platform modules'
   // Auto-expanded whenever the current route is under /settings, so
   // landing directly on e.g. /settings/governance (a bookmark, a link
   // from elsewhere) shows the submenu open rather than collapsed with
@@ -47,6 +51,25 @@ export default function Layout() {
   const orgName = locale === 'AR' ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
 
   useEffect(() => { setSidebarOpen(false) }, [location.pathname])
+  useEffect(() => {
+    if (!sidebarOpen) return
+    const panel = sidebar.current
+    const main = content.current
+    const trigger = menuButton.current
+    main?.setAttribute('inert', '')
+    const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), [tabindex="0"]') || [])
+    focusable()[0]?.focus()
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); setSidebarOpen(false) }
+      if (e.key === 'Tab') {
+        const items = focusable(), first = items[0], last = items[items.length - 1]
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus() }
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => { main?.removeAttribute('inert'); document.removeEventListener('keydown', onKey); trigger?.focus() }
+  }, [sidebarOpen])
   useEffect(() => { if (location.pathname.startsWith('/settings')) setSettingsExpanded(true) }, [location.pathname])
 
   useEffect(() => {
@@ -105,17 +128,18 @@ export default function Layout() {
   const adminNav = visibleNav.filter(n => ['/access-governance', '/settings', '/getting-started', '/demo-requests'].includes(n.to))
 
   return (
-    <div className="layout">
-      <button className="mobile-menu-btn" aria-label="Open menu" onClick={() => setSidebarOpen(o => !o)}>☰</button>
-      <div className={`sidebar-backdrop${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
-      <div className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+    <div className="layout" dir={locale === 'AR' ? 'rtl' : 'ltr'}>
+      <button ref={menuButton} type="button" className="mobile-menu-btn" aria-label={menuLabel} title={locale === 'AR' ? 'افتح القائمة للوصول إلى وحدات المنصة' : 'Open the menu to access platform modules'} aria-expanded={sidebarOpen} aria-controls="platform-modules" onClick={() => setSidebarOpen(o => !o)}><span aria-hidden="true">☰</span><span>{locale === 'AR' ? 'الوحدات' : 'Modules'}</span></button>
+      <div className={`sidebar-backdrop${sidebarOpen ? ' open' : ''}`} aria-hidden="true" onClick={() => setSidebarOpen(false)} />
+      <div ref={sidebar} id="platform-modules" role={sidebarOpen ? 'dialog' : undefined} aria-modal={sidebarOpen || undefined} aria-label={menuLabel} className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+        <button type="button" className="sidebar-close" aria-label={locale === 'AR' ? 'إغلاق قائمة الوحدات' : 'Close modules menu'} onClick={() => setSidebarOpen(false)}>×</button>
         <div className="sidebar-logo">
           {logoUrl && !logoFailed
             ? <img src={logoUrl} alt={orgName || 'Logo'} style={{ maxHeight: 32, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />
             : <div className="logo-text">{orgName || 'EA Platform'}</div>}
           <div className="logo-sub">{locale === 'AR' ? 'هندسة المؤسسات' : 'Enterprise Architecture'}</div>
         </div>
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label={menuLabel} onClick={e => { if ((e.target as HTMLElement).closest('a')) setSidebarOpen(false) }}>
           <div className="nav-label">{t('nav.main')}</div>
           {mainNav.map(item => (
             <NavLink key={item.to} to={item.to} end={item.to === '/app'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
@@ -179,8 +203,7 @@ export default function Layout() {
           <button className="logout-btn" onClick={()=>{logout();nav('/login')}}>{t('auth.signout')}</button>
         </div>
       </div>
-      <div className="main-content"><Outlet /></div>
-      <NotificationBell />
+      <div ref={content} className="main-content"><Outlet /><NotificationBell /></div>
       {showSetupModal && <SetupAssistantPage modal onClose={() => setShowSetupModal(false)} />}
     </div>
   )

@@ -1,0 +1,45 @@
+.copilot-workspace { display:flex; height:100%; min-height:0; min-width:0; background:var(--navy); overflow:hidden }
+.copilot-workspace > * { min-width:0; min-height:0 }
+.copilot-sidebar { width:260px; flex-shrink:0; display:flex; flex-direction:column; background:var(--navy-light); border-inline-end:1px solid var(--border) }
+.copilot-panel-tabs { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-bottom:1px solid var(--border); flex-shrink:0 }
+.copilot-panel-tabs button { min-height:44px; overflow-wrap:anywhere }
+.copilot-panel-content { flex:1; min-height:0; overflow-y:auto; padding:10px }
+.copilot-panel-toggle { display:none }
+.copilot-chat { flex:1; display:flex; flex-direction:column; overflow:hidden }
+.copilot-chat-header { padding:12px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px; background:var(--navy-light); flex-shrink:0; overflow-wrap:anywhere }
+.copilot-chat-header > * { min-width:0 }
+.copilot-chat-messages { flex:1; min-height:0; overflow-y:auto; padding:20px; overscroll-behavior:contain }
+.copilot-message-bubble { min-width:0; max-width:85%; overflow-wrap:anywhere }
+.copilot-message-bubble pre { max-width:100%; overflow-x:auto; white-space:pre }
+.copilot-message-bubble img, .copilot-message-bubble svg { max-width:100%; height:auto }
+.copilot-composer { flex-shrink:0; padding:12px 20px max(12px,env(safe-area-inset-bottom)); border-top:1px solid var(--border); background:var(--navy-light) }
+.copilot-composer-row { display:flex; gap:10px; align-items:flex-end }
+.copilot-composer-row textarea { min-width:0; max-height:160px; overflow-y:auto }
+.copilot-composer-row button { flex-shrink:0; min-height:44px }
+.copilot-voice-controls { flex-wrap:wrap }
+@media (max-width:1024px) {
+  .copilot-workspace { flex-direction:column }
+  .copilot-sidebar { width:100%; max-height:45%; border-inline-end:0; border-bottom:1px solid var(--border) }
+  .copilot-sidebar > div:first-child { display:flex; flex-wrap:wrap; align-items:center; gap:8px; flex-shrink:0 }
+  .copilot-sidebar > div:first-child > div { display:none }
+  .copilot-sidebar > div:first-child > button { flex:1; min-width:130px; min-height:44px; width:auto !important }
+  .copilot-panel-toggle { display:block; padding:8px; border:1px solid var(--border); border-radius:8px; background:var(--navy); color:var(--text); font-size:12px }
+  .copilot-panel-tabs { grid-template-columns:repeat(5,minmax(0,1fr)) }
+  .copilot-sidebar:not(.expanded) .copilot-panel-content { display:none }
+  .copilot-chat-header { padding:8px 12px }
+  .copilot-chat-messages { padding:12px }
+  .copilot-message-bubble { max-width:calc(100% - 44px) }
+  .copilot-composer { padding:10px 12px max(10px,env(safe-area-inset-bottom)) }
+}
+@media (max-width:480px) {
+  .copilot-composer-row { flex-wrap:wrap; gap:8px }
+  .copilot-composer-row textarea { flex-basis:100% !important; width:100%; font-size:16px !important }
+  .copilot-composer-row button:last-child { flex:1 }
+  .copilot-panel-tabs button { font-size:11px !important }
+}
+@media (max-height:600px) and (max-width:1024px) {
+  .copilot-workspace { overflow-y:auto }
+  .copilot-sidebar { max-height:none }
+  .copilot-panel-content { max-height:160px; flex:none }
+  .copilot-chat { flex:1 0 360px }
+}
