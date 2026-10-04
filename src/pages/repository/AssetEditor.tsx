@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import AttributeField from './AttributeField'
-import { arrow, slotLabel } from './AssetRelationshipsView'
+import { arrow, slotDetail, slotLabel } from './AssetRelationshipsView'
+import OriginTag, { OriginLegend, metaModelLabel } from './OriginTag'
 import { AssetProfile, RelatedAsset, RelationshipSlot, assetProfileApi, fromInputValue, localName, toInputValue, validateValue } from './assetProfile'
 
 type T = (k: string) => string
@@ -31,6 +32,12 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
   const attributes = useMemo(() => (profile.attributeGroups || []).flatMap(g => g.attributes), [profile])
   const [values, setValues] = useState<Record<string, any>>(() => Object.fromEntries(attributes.map(x => [x.code, toInputValue(x.attributeType, x.value)])))
   const [changes, setChanges] = useState<Record<string, SlotChanges>>({})
+  // Recorded values the Meta Model does not define: editable as text (objects stay as they are), or removed.
+  const [otherValues, setOtherValues] = useState<Record<string, string>>(() => Object.fromEntries((profile.otherAttributes || []).filter(o => typeof o.value !== 'object').map(o => [o.key, String(o.value)])))
+  const [otherRemoved, setOtherRemoved] = useState<string[]>([])
+  // Links that match no Meta Model definition: kept, or removed on Save.
+  const [linksRemoved, setLinksRemoved] = useState<string[]>([])
+  const mm = metaModelLabel(profile, t)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [result, setResult] = useState<{ kind: 'error' | 'partial'; messages: string[] } | null>(null)
@@ -48,7 +55,7 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
     return { ...c, remove, add: [...add, { key: `${asset.id}-${Date.now()}`, asset, metadata: {} }] }
   })
 
-  const pendingCount = Object.values(changes).reduce((n, c) => n + c.add.length + c.remove.length + Object.keys(c.edit).length, 0)
+  const pendingCount = Object.values(changes).reduce((n, c) => n + c.add.length + c.remove.length + Object.keys(c.edit).length, 0) + linksRemoved.length
 
   const save = async () => {
     const errs: Record<string, string> = {}
@@ -65,6 +72,13 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
         if (attr.isReadOnly) continue
         const v = fromInputValue(attr.attributeType, values[attr.code])
         if (v === null) delete metadata[attr.code]; else metadata[attr.code] = v
+      }
+      for (const o of profile.otherAttributes || []) {
+        if (otherRemoved.includes(o.key)) { delete metadata[o.key]; continue }
+        if (!(o.key in otherValues) || otherValues[o.key] === String(o.value)) continue
+        const text = otherValues[o.key]
+        metadata[o.key] = typeof o.value === 'number' && text.trim() !== '' && Number.isFinite(Number(text)) ? Number(text)
+          : typeof o.value === 'boolean' && (text === 'true' || text === 'false') ? text === 'true' : text
       }
       await assetProfileApi.updateAsset(a.id, {
         name: core.name.trim(), nameAr: core.nameAr, description: core.description, descriptionAr: core.descriptionAr,
@@ -89,6 +103,10 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
         try { await assetProfileApi.updateLink(id, metadata) } catch (e: any) { failures.push(`${slotLabel(s, isAR)} — ${name(id)}: ${e.message}`) }
       }
     }
+    for (const id of linksRemoved) {
+      const o = (profile.otherRelationships || []).find(x => x.relationshipId === id)
+      try { await assetProfileApi.unlink(id) } catch (e: any) { failures.push(`${o?.label || ''} — ${o?.relatedAsset.name || id}: ${e.message}`) }
+    }
     setSaving(false)
     if (failures.length) { setResult({ kind: 'partial', messages: failures }); return }
     onSaved()
@@ -104,7 +122,8 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
       )}
 
       <section className="ap-section">
-        <div className="ap-section-title">{t('repository.profile.core')}</div>
+        <div className="ap-section-title">{t('repository.profile.core')}<OriginTag origin="core" t={t} /></div>
+        <OriginLegend t={t} profile={profile} show={['core', 'meta', 'other']} />
         <div className="ap-edit-grid">
           <div className="form-group"><label className="form-label" htmlFor="ap-name">{t('repository.profile.name_en')} <span className="ap-required">*</span></label><input id="ap-name" className="form-input" value={core.name} onChange={setC('name')} aria-invalid={!!errors.__name || undefined} />{errors.__name && <div role="alert" className="ap-error">{t(errors.__name)}</div>}</div>
           <div className="form-group"><label className="form-label" htmlFor="ap-name-ar">{t('repository.profile.name_ar')}</label><input id="ap-name-ar" className="form-input" dir="rtl" value={core.nameAr} onChange={setC('nameAr')} /></div>
@@ -150,26 +169,69 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
             {g.attributes.map(attr => (
               <div key={attr.code} className={['LONG_TEXT', 'RICH_TEXT', 'JSON_DATA', 'MULTI_ENUM'].includes(attr.attributeType) ? 'ap-wide' : undefined}>
                 <AttributeField def={attr} idPrefix="ap-attr" isAR={isAR} t={t} value={values[attr.code]} error={errors[attr.code]}
+                  tag={<OriginTag origin="meta" t={t} detail={[mm, attr.code, attr.attributeType].filter(Boolean).join(' · ')} />}
                   onChange={v => { setValues(vs => ({ ...vs, [attr.code]: v })); if (errors[attr.code]) setErrors(es => { const n = { ...es }; delete n[attr.code]; return n }) }} />
               </div>
             ))}
           </div>
         </section>
       ))}
-      {!!profile.otherAttributes?.length && <p className="ap-help">{t('repository.profile.other_data_kept').replace('{count}', String(profile.otherAttributes.length))}</p>}
+      {!!profile.otherAttributes?.length && (
+        <section className="ap-section" data-testid="edit-other-data">
+          <div className="ap-section-title">{t('repository.profile.other_data')}<HelpTip text={t('repository.profile.other_data_edit_help')} /></div>
+          <div className="ap-edit-grid">
+            {profile.otherAttributes.map(o => {
+              const id = `ap-other-${o.key}`
+              const removed = otherRemoved.includes(o.key)
+              return (
+                <div key={o.key} className={`form-group ap-field${removed ? ' ap-removed' : ''}`}>
+                  <div className="ap-label-row"><label className="form-label" htmlFor={id} dir="ltr">{o.key}</label><OriginTag origin="other" t={t} /></div>
+                  <div className="ap-input-row">
+                    {typeof o.value === 'object'
+                      ? <input id={id} className="form-input" dir="ltr" value={JSON.stringify(o.value)} readOnly title={t('repository.profile.other_data_structured')} />
+                      : <input id={id} className="form-input" value={otherValues[o.key] ?? ''} disabled={removed} onChange={e => setOtherValues(v => ({ ...v, [o.key]: e.target.value }))} />}
+                    <button type="button" className="btn btn-secondary btn-sm" aria-pressed={removed} aria-label={`${t(removed ? 'repository.profile.keep' : 'repository.profile.remove')} ${o.key}`}
+                      onClick={() => setOtherRemoved(r => (removed ? r.filter(k => k !== o.key) : [...r, o.key]))}>{removed ? '↺' : '✕'}</button>
+                  </div>
+                  {removed && <div className="ap-pending">{t('repository.profile.will_remove')}</div>}
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
 
       <section className="ap-section">
         <div className="ap-section-title">{t('repository.profile.relationships')}<HelpTip text={t('repository.profile.edit_relationships_help')} /></div>
         {typeChanged && <div className="ap-banner">{t('repository.profile.type_change_relationships')}</div>}
         {!(profile.relationshipSlots || []).length && <p className="ap-empty">{t('repository.profile.no_relationship_types')}</p>}
         {(profile.relationshipSlots || []).map(s => (
-          <SlotEditor key={slotKey(s)} slot={s} assetId={a.id} changes={changesFor(s)} t={t} isAR={isAR} disabled={typeChanged || saving}
+          <SlotEditor key={slotKey(s)} slot={s} mm={mm} assetId={a.id} changes={changesFor(s)} t={t} isAR={isAR} disabled={typeChanged || saving}
             onAdd={asset => addLink(s, asset)}
             onRemove={id => updateSlot(s, c => ({ ...c, remove: c.remove.includes(id) ? c.remove.filter(x => x !== id) : [...c.remove, id] }))}
             onCancelAdd={key => updateSlot(s, c => ({ ...c, add: c.add.filter(p => p.key !== key) }))}
             onEditAttr={(id, metadata) => updateSlot(s, c => ({ ...c, edit: { ...c.edit, [id]: metadata } }))}
             onEditPendingAttr={(key, metadata) => updateSlot(s, c => ({ ...c, add: c.add.map(p => (p.key === key ? { ...p, metadata } : p)) }))} />
         ))}
+        {!!profile.otherRelationships?.length && (
+          <section className="ap-slot" data-testid="edit-other-links" aria-label={t('repository.profile.other_relationships')}>
+            <div className="ap-slot-head"><div className="ap-slot-name">{t('repository.profile.other_relationships')}<OriginTag origin="other" t={t} /><HelpTip text={t('repository.profile.other_links_edit_help')} /></div><span className="ap-slot-meta">{profile.otherRelationships.length}</span></div>
+            <div className="ap-slot-body">
+              <ul className="ap-items">
+                {profile.otherRelationships.map(o => {
+                  const removed = linksRemoved.includes(o.relationshipId)
+                  return (
+                    <li key={o.relationshipId} className={`ap-item${removed ? ' ap-removed' : ''}`}>
+                      <div className="ap-item-main"><span aria-hidden>{arrow(o.direction, isAR)}</span><span className="ap-slot-meta">{o.label}</span><span style={{ fontSize: 13 }}>{localName(o.relatedAsset, isAR)}</span>{removed && <span className="ap-pending">{t('repository.profile.will_remove')}</span>}</div>
+                      <button type="button" className="btn btn-secondary btn-sm" disabled={saving} aria-label={`${t(removed ? 'repository.profile.keep' : 'repository.profile.remove')} ${o.relatedAsset.name}`}
+                        onClick={() => setLinksRemoved(r => (removed ? r.filter(x => x !== o.relationshipId) : [...r, o.relationshipId]))}>{removed ? '↺' : '✕'}</button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </section>
+        )}
       </section>
 
       <div className="ap-foot">
@@ -181,8 +243,8 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
   )
 }
 
-function SlotEditor({ slot: s, assetId, changes, t, isAR, disabled, onAdd, onRemove, onCancelAdd, onEditAttr, onEditPendingAttr }: {
-  slot: RelationshipSlot; assetId: string; changes: SlotChanges; t: T; isAR: boolean; disabled: boolean
+function SlotEditor({ slot: s, mm, assetId, changes, t, isAR, disabled, onAdd, onRemove, onCancelAdd, onEditAttr, onEditPendingAttr }: {
+  slot: RelationshipSlot; mm: string; assetId: string; changes: SlotChanges; t: T; isAR: boolean; disabled: boolean
   onAdd: (a: RelatedAsset) => void; onRemove: (id: string) => void; onCancelAdd: (key: string) => void
   onEditAttr: (id: string, metadata: Record<string, any>) => void; onEditPendingAttr: (key: string, metadata: Record<string, any>) => void
 }) {
@@ -219,6 +281,7 @@ function SlotEditor({ slot: s, assetId, changes, t, isAR, disabled, onAdd, onRem
           <span className="ap-chip">{localName(s.otherType, isAR) || '—'}</span>
           {s.isRequired && <span className="ap-chip">{t('repository.profile.required')}</span>}
           {s.single && <span className="ap-chip">{t('repository.profile.single')}</span>}
+          <OriginTag origin="meta" t={t} detail={slotDetail(s, mm)} />
         </div>
         <button type="button" className="btn btn-secondary btn-sm" disabled={disabled || !s.otherType} aria-expanded={open} aria-controls={pickerId} onClick={() => setOpen(o => !o)}>
           {open ? t('repository.profile.done_adding') : `+ ${t(s.single && s.count ? 'repository.profile.replace' : 'repository.profile.add')}`}

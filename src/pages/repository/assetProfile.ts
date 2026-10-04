@@ -22,6 +22,8 @@ export interface AssetProfile {
   asset: any
   objectType: { id: string; code: string; name: string; nameAr?: string | null; singularLabel?: string; singularLabelAr?: string | null; icon?: string; color?: string; description?: string | null } | null
   resolution: 'RESOLVED' | 'UNRESOLVED' | 'AMBIGUOUS' | 'NO_META_MODEL'
+  /** The Meta Model version the attributes and relationships come from. */
+  metaModel?: { versionId: string; version: string | null; status: string | null } | null
   attributeGroups: ProfileGroup[]
   otherAttributes: Array<{ key: string; value: any }>
   completeness: { filled: number; total: number; requiredMissing: string[] }

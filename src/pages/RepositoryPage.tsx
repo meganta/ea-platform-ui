@@ -429,7 +429,7 @@ export default function RepositoryPage() {
 
   if (selectedAsset) {
     return (
-      <div className="page-body">
+      <div>
         <AssetProfileScreen key={selectedAsset.id} asset={selectedAsset} startInEdit={startInEdit} t={t} isAR={!!isAR} api={api}
           domains={domains} typesFor={(d: string) => getRepositoryAssetTypes(config, d)}
           sourceLabel={getSourceLabel} statusClass={(st: string) => STATUS_COLORS[st] || 'badge-draft'} sourceClass={(src: string) => SOURCE_COLORS[src] || 'badge-draft'} syncedLabels={SYNCED_ATTRIBUTE_LABELS}
@@ -440,42 +440,42 @@ export default function RepositoryPage() {
     )
   }
 
+  const statusCount = (st: string) => (summary?.byStatus || []).find((x: any) => x.status === st)?.count || 0
+  const STATUS_TILES = ['APPROVED', 'UNDER_REVIEW', 'DRAFT', 'DEPRECATED']
   return (
-    <div>
-      <div className="page-header">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="page-title" style={{ display: 'flex', alignItems: 'center' }}>{t('repo.title')}<HelpTip text="This is the master list of everything in your architecture - applications, business capabilities, data, technology, and how they connect. Other parts of the platform (like reviews and diagrams) pull from what's stored here." /></div>
-            <div className="page-subtitle">
-              {config?.frameworkType} FRAMEWORK · {summary?.total || 0} ASSETS
-            </div>
+    <div className="rp-page" dir={isAR ? 'rtl' : 'ltr'}>
+      <div className="rp-header">
+        <div className="rp-header-main">
+          <h1 className="rp-title page-title">🗄 {t('repo.title')}<HelpTip text={t('repository.list.help')} /></h1>
+          <div className="rp-sub page-subtitle">
+            {config?.frameworkType} FRAMEWORK · {summary?.total || 0} ASSETS
           </div>
-          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ New Asset</button>
         </div>
+        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>+ New Asset</button>
         {!!summary?.needsReclassificationCount && (
-          <div style={{ marginTop: 10, padding: '8px 14px', background: 'rgba(180,83,9,0.1)', border: '1px solid rgba(180,83,9,0.3)', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div className="rp-banner">
             <span>⚠ {summary.needsReclassificationCount} asset{summary.needsReclassificationCount === 1 ? '' : 's'} could not be automatically matched to the current Meta Model and need manual reclassification.</span>
-            <button type="button" onClick={() => setShowNeedsReclassification(s => !s)} style={{ marginInlineStart: 'auto', fontSize: 12, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 6, cursor: 'pointer', background: showNeedsReclassification ? 'var(--accent)' : 'transparent', color: showNeedsReclassification ? '#fff' : 'var(--text)' }}>
+            <button type="button" onClick={() => setShowNeedsReclassification(s => !s)} style={{ marginInlineStart: 'auto', fontSize: 12, padding: '4px 10px', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer', background: showNeedsReclassification ? 'var(--accent)' : 'transparent', color: showNeedsReclassification ? '#fff' : 'var(--text)' }}>
               {showNeedsReclassification ? 'Show Normal List' : 'Review These Assets'}
             </button>
           </div>
         )}
       </div>
 
-      <div className="page-body">
-        {/* Filters - reordered per explicit correction: Source is now the
-            first dropdown (right after search), since it determines
-            which other filters are even meaningful. ADM Output assets
-            don't fit the Domain/Object Type taxonomy the same way
-            Manual/Upload/Integration data does (see the taxonomy
-            investigation this session) - so selecting it swaps Domain/
-            Object Type out for Group by Cycle instead, rather than
-            showing dropdowns that would mostly return nothing useful.
-            Status stays visible for every source - confirmed via live
-            data that ADM Output assets use the exact same status enum
-            as everything else, no separate status list needed. */}
-        <div className="flex gap-2 mb-4" style={{ flexWrap: 'wrap' }}>
-          <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Search assets..." value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="rp-content">
+        {/* Totals and status tiles (a status tile filters the list by that status). */}
+        <div className="stat-grid-5 rp-stats" data-testid="repo-stats">
+          <button type="button" className="rp-stat" aria-pressed={selectedStatus === 'ALL'} onClick={() => changeFilter(setSelectedStatus)('ALL')}>
+            <div className="rp-stat-label">{t('repository.list.stat.total')}</div><div className="rp-stat-value">{(summary?.total || 0).toLocaleString(isAR ? 'ar-SA' : 'en-US')}</div>
+          </button>
+          {STATUS_TILES.map(st => (
+            <button key={st} type="button" className="rp-stat" aria-pressed={selectedStatus === st} onClick={() => changeFilter(setSelectedStatus)(selectedStatus === st ? 'ALL' : st)}>
+              <div className="rp-stat-label">{t(`repository.profile.status.${st}`)}</div><div className="rp-stat-value">{statusCount(st).toLocaleString(isAR ? 'ar-SA' : 'en-US')}</div>
+            </button>
+          ))}
+        </div>
+        <div className="rp-card rp-filters">
+          <input className="form-input" style={{ flex: 1, minWidth: 200 }} placeholder="Search assets..." aria-label="Search assets" value={search} onChange={e => setSearch(e.target.value)} />
           <select className="form-input" style={{ width: 150 }} value={selectedSource} onChange={e => {
             const nextSource = e.target.value
             changeFilter(setSelectedSource)(nextSource)
@@ -580,14 +580,14 @@ export default function RepositoryPage() {
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="empty">
+          <div className="empty rp-card">
             <div style={{ fontSize: 40 }}>🗄</div>
             <div className="empty-title">No assets found</div>
             <div className="empty-sub">Create your first EA asset or adjust the filters</div>
             <button className="btn btn-primary mt-4" onClick={() => setShowAdd(true)}>+ New Asset</button>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="rp-card rp-card-flush rp-table-wrap">
           <table>
             <thead>
               <tr>
@@ -608,7 +608,7 @@ export default function RepositoryPage() {
                     <div style={{ fontWeight: 500 }}>{a.name}</div>
                     {a.nameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)', direction: 'rtl' }}>{a.nameAr}</div>}
                   </td>
-                  <td><span style={{ fontSize: 11, padding: '2px 8px', background: 'rgba(3,105,161,0.08)', borderRadius: 2, color: 'var(--accent)', fontFamily: 'var(--font-mono)' }}>{a.domain}</span></td>
+                  <td><span className="rp-domain-tag">{a.domain}</span></td>
                   <td style={{ fontSize: 12, color: 'var(--text-dim)' }}>{a.canonicalDisplayLabel || a.assetType?.replace(/_/g, ' ')}</td>
                   <td><span className={`badge ${STATUS_COLORS[a.status] || 'badge-draft'}`}>{a.status.replace(/_/g, ' ')}</span></td>
                   <td><span className={`badge ${SOURCE_COLORS[a.source] || 'badge-draft'}`} title={getSourceLabel(a).detail}>{getSourceLabel(a).label}</span></td>
