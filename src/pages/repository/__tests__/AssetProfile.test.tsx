@@ -8,6 +8,7 @@ const PROFILE = {
   asset: ASSET,
   objectType: { id: 'app', code: 'Application', name: 'Application', nameAr: 'تطبيق', icon: '🧩' },
   resolution: 'RESOLVED',
+  metaModel: { versionId: 'v1', version: '2.1', status: 'PUBLISHED' },
   attributeGroups: [
     { id: '', name: '', isCollapsed: false, attributes: [
       { code: 'alias', name: 'Alias', attributeType: 'TEXT', isRequired: false, isReadOnly: false, value: 'HR Portal', hasValue: true },
@@ -106,6 +107,72 @@ describe('asset profile page: view', () => {
     render(<AssetProfileScreen {...props({ api: failing, asset: { id: 'a1', name: 'Core Banking' } })} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('repository.profile.load_failed');
     expect(screen.getByRole('heading', { name: 'Core Banking' })).toBeInTheDocument();
+  });
+});
+
+describe('asset profile page: where each item comes from', () => {
+  const tagOf = (el: HTMLElement) => el.closest('.ap-attr, .ap-slot, .ap-item, .ap-field')!.querySelector('[data-origin]')!;
+
+  it('tags every attribute as Meta Model (naming the version and definition) and other recorded data as not in the Meta Model', async () => {
+    render(<AssetProfileScreen {...props()} />);
+    fireEvent.click(await screen.findByRole('tab', { name: /repository.profile.tab.attributes/ }));
+    const meta = document.querySelectorAll('.ap-attr [data-origin="meta"]');
+    expect(meta).toHaveLength(5);
+    expect(tagOf(screen.getByText('Hosting Type'))).toHaveAttribute('title', 'repository.profile.origin.meta_help (v2.1 · repository.profile.mm_status.PUBLISHED · hostingType · ENUM)');
+    expect(tagOf(screen.getByText('legacyField'))).toHaveAttribute('data-origin', 'other');
+    expect(screen.getByLabelText('repository.profile.origin.legend')).toBeInTheDocument();
+  });
+
+  it('tags every relationship slot as Meta Model and links matching no definition as not in the Meta Model', async () => {
+    render(<AssetProfileScreen {...props()} />);
+    fireEvent.click(await screen.findByRole('tab', { name: /repository.profile.tab.relationships/ }));
+    for (const id of ['slot-APP_USES_DATA-OUTGOING', 'slot-APP_OWNED_BY_ORG-OUTGOING', 'slot-PROJECT_INVOLVES_APP-INCOMING']) {
+      expect(within(screen.getByTestId(id)).getByText('repository.profile.origin.meta')).toBeInTheDocument();
+    }
+    expect(tagOf(screen.getByText('Legacy thing'))).toHaveAttribute('data-origin', 'other');
+  });
+
+  it('in edit mode tags core fields, each attribute and each relationship, and lets other data and other links be changed or removed', async () => {
+    const p = props({ startInEdit: true });
+    render(<AssetProfileScreen {...p} />);
+    await screen.findByLabelText(/repository.profile.name_en/);
+    expect(document.querySelector('.ap-section-title [data-origin="core"]')).toBeInTheDocument();
+    expect(tagOf(screen.getByLabelText('Alias'))).toHaveAttribute('data-origin', 'meta');
+    expect(within(screen.getByTestId('edit-slot-APP_USES_DATA-OUTGOING')).getByText('repository.profile.origin.meta')).toBeInTheDocument();
+
+    const other = screen.getByTestId('edit-other-data');
+    expect(within(other).getByText('repository.profile.origin.other')).toBeInTheDocument();
+    fireEvent.change(within(other).getByLabelText('legacyField'), { target: { value: 'changed' } });
+    const links = screen.getByTestId('edit-other-links');
+    expect(within(links).getByText('repository.profile.origin.other')).toBeInTheDocument();
+    fireEvent.click(within(links).getByRole('button', { name: 'repository.profile.remove Legacy thing' }));
+    expect(within(links).getByText('repository.profile.will_remove')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('repository.profile.save'));
+    await waitFor(() => expect(p.onChanged).toHaveBeenCalled());
+    const put = calls.find(c => c.init?.method === 'PUT')!;
+    expect(JSON.parse(put.init.body).metadata.legacyField).toBe('changed');
+    expect(calls.find(c => c.init?.method === 'DELETE')!.url).toMatch(/relationships\/r9$/);
+  });
+
+  it('removes a value the Meta Model does not define when asked', async () => {
+    const p = props({ startInEdit: true });
+    render(<AssetProfileScreen {...p} />);
+    await screen.findByLabelText(/repository.profile.name_en/);
+    fireEvent.click(within(screen.getByTestId('edit-other-data')).getByRole('button', { name: 'repository.profile.remove legacyField' }));
+    fireEvent.click(screen.getByText('repository.profile.save'));
+    await waitFor(() => expect(p.onChanged).toHaveBeenCalled());
+    const body = JSON.parse(calls.find(c => c.init?.method === 'PUT')!.init.body);
+    expect(body.metadata).not.toHaveProperty('legacyField');
+    expect(body.metadata.leanixCode).toBe('LX-1');
+  });
+
+  it('shows overview tiles that open the matching tab', async () => {
+    render(<AssetProfileScreen {...props()} />);
+    const stats = await screen.findByTestId('ap-stats');
+    await waitFor(() => expect(within(stats).getByText('repository.profile.stat.relationships').parentElement).toHaveTextContent('3'));
+    fireEvent.click(within(stats).getByText('repository.profile.stat.relationships'));
+    expect(screen.getByRole('tab', { name: /repository.profile.tab.relationships/ })).toHaveAttribute('aria-selected', 'true');
   });
 });
 

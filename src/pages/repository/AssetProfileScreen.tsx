@@ -4,6 +4,7 @@ import AssetAttributesView from './AssetAttributesView'
 import AssetRelationshipsView, { arrow, slotLabel } from './AssetRelationshipsView'
 import AssetEditor from './AssetEditor'
 import { AssetProfile, localName } from './assetProfile'
+import { metaModelLabel } from './OriginTag'
 import './AssetProfile.css'
 
 type T = (k: string) => string
@@ -84,29 +85,35 @@ export default function AssetProfileScreen({ asset: initial, startInEdit, t, isA
   const typeName = localName(profile.objectType, isAR) || asset.canonicalDisplayLabel || asset.assetType
 
   return (
-    <div className="ap-page" dir={isAR ? 'rtl' : 'ltr'} data-testid="asset-profile">
-      <nav className="ap-crumbs" aria-label={t('repository.profile.breadcrumb')}>
-        <button type="button" className="ap-link" onClick={onBack}>{isAR ? '→' : '←'} {t('repository.profile.back')}</button>
-      </nav>
+    <div className="ap-page rp-page" dir={isAR ? 'rtl' : 'ltr'} data-testid="asset-profile">
       <header className="ap-head">
-        <div className="ap-head-top">
-          <div style={{ minWidth: 0 }}>
-            <h1 className="ap-title" tabIndex={-1} ref={headingRef}>{isAR && asset.nameAr ? asset.nameAr : asset.name}</h1>
-            {(isAR ? asset.name : asset.nameAr) && asset.nameAr && <div className="ap-subtitle" dir={isAR ? 'ltr' : 'rtl'}>{isAR ? asset.name : asset.nameAr}</div>}
-            <div className="ap-badges">
-              <span className="ap-type">{profile.objectType?.icon ? <span aria-hidden>{profile.objectType.icon}</span> : <span className="ap-type-dot" style={{ background: profile.objectType?.color || 'var(--accent)' }} />}{typeName}</span>
-              {asset.status && <span className={`badge ${statusClass(asset.status)}`}>{asset.status}</span>}
-              {asset.lifecycleStatus && <span className="badge badge-draft">{asset.lifecycleStatus}</span>}
-              <span className={`badge ${sourceClass(asset.source)}`} title={source.detail}>{source.label}</span>
+        <div className="ap-hero">
+          <nav className="ap-crumbs" aria-label={t('repository.profile.breadcrumb')}>
+            <button type="button" className="ap-link" onClick={onBack}>{isAR ? '→' : '←'} {t('repository.profile.back')}</button>
+          </nav>
+          <div className="ap-head-top">
+            <div className="ap-hero-row">
+              <span className="ap-type-icon" aria-hidden style={profile.objectType?.color ? { borderColor: profile.objectType.color } : undefined}>{profile.objectType?.icon || '🗄'}</span>
+              <div style={{ minWidth: 0 }}>
+                <h1 className="ap-title" tabIndex={-1} ref={headingRef}>{isAR && asset.nameAr ? asset.nameAr : asset.name}</h1>
+                {(isAR ? asset.name : asset.nameAr) && asset.nameAr && <div className="ap-subtitle" dir={isAR ? 'ltr' : 'rtl'}>{isAR ? asset.name : asset.nameAr}</div>}
+                <div className="ap-badges">
+                  <span className="ap-type"><span className="ap-type-dot" style={{ background: profile.objectType?.color || 'var(--accent)' }} />{typeName}</span>
+                  {asset.status && <span className={`badge ${statusClass(asset.status)}`}>{asset.status}</span>}
+                  {asset.lifecycleStatus && <span className="badge badge-draft">{asset.lifecycleStatus}</span>}
+                  <span className={`badge ${sourceClass(asset.source)}`} title={source.detail}>{source.label}</span>
+                  {profile.metaModel?.version && <span className="ap-slot-meta">{t('repository.profile.origin.version').replace('{version}', metaModelLabel(profile, t))}</span>}
+                </div>
+              </div>
             </div>
+            {!editing && (
+              <div className="ap-actions">
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => setMode(true)} disabled={loading && !profile.attributeGroups.length && !error}>✏ {t('repository.profile.edit')}</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => onExplore(asset.id)} title={t('repository.profile.explore_help')}>🕸 Explore Dependencies</button>
+                <button type="button" className="btn btn-danger btn-sm" onClick={() => onDelete(asset.id)}>Delete Asset</button>
+              </div>
+            )}
           </div>
-          {!editing && (
-            <div className="ap-actions">
-              <button type="button" className="btn btn-primary btn-sm" onClick={() => setMode(true)} disabled={loading && !profile.attributeGroups.length && !error}>✏ {t('repository.profile.edit')}</button>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={() => onExplore(asset.id)} title={t('repository.profile.explore_help')}>🕸 Explore Dependencies</button>
-              <button type="button" className="btn btn-danger btn-sm" onClick={() => onDelete(asset.id)}>Delete Asset</button>
-            </div>
-          )}
         </div>
         {!editing && (
           <div className="ap-tabs" role="tablist" aria-label={t('repository.profile.sections')}>
@@ -115,6 +122,7 @@ export default function AssetProfileScreen({ asset: initial, startInEdit, t, isA
             ))}
           </div>
         )}
+        {editing && <div className="ap-tabs" aria-hidden><span className="ap-tab ap-tab-static">✏ {t('repository.profile.editing')}</span></div>}
       </header>
 
       <div className="ap-body">
@@ -130,6 +138,12 @@ export default function AssetProfileScreen({ asset: initial, startInEdit, t, isA
           <div role="tabpanel" id={`ap-panel-${tab}`} aria-labelledby={`ap-tab-${tab}`}>
             {tab === 'overview' && (
               <>
+                <div className="stat-grid-4 rp-stats" data-testid="ap-stats">
+                  <button type="button" className="rp-stat" onClick={() => setTab('attributes')}><div className="rp-stat-label">{t('repository.profile.stat.attributes')}</div><div className="rp-stat-value">{profile.completeness?.filled ?? 0}<span className="ap-slot-meta"> / {profile.completeness?.total ?? 0}</span></div></button>
+                  <button type="button" className="rp-stat" onClick={() => setTab('relationships')}><div className="rp-stat-label">{t('repository.profile.stat.relationships')}</div><div className="rp-stat-value">{linked}</div></button>
+                  <button type="button" className="rp-stat" onClick={() => setTab('attachments')}><div className="rp-stat-label">{t('repository.profile.stat.attachments')}</div><div className="rp-stat-value">{attachments.length}</div></button>
+                  <div className="rp-stat"><div className="rp-stat-label">{t('repository.profile.stat.findings')}</div><div className="rp-stat-value">{findingsLoading ? '…' : findings.length}</div></div>
+                </div>
                 <section className="ap-section">
                   <dl className="ap-facts" style={{ margin: 0 }}>
                     {fact(t('repository.profile.type'), typeName)}

@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { AssetProfile, RelationshipSlot, displayValue, localName } from './assetProfile'
+import OriginTag, { OriginLegend, metaModelLabel } from './OriginTag'
 
 type T = (k: string) => string
 const PREVIEW = 12
 
 export const slotLabel = (s: RelationshipSlot, isAR: boolean) => (isAR && s.labelAr) || s.label
+/** Tooltip detail naming the Meta Model definition behind a slot. */
+export const slotDetail = (s: RelationshipSlot, mm: string) => [mm, s.code, s.cardinality].filter(Boolean).join(' · ')
 export const arrow = (direction: string, isAR: boolean) => (direction === 'OUTGOING' ? (isAR ? '←' : '→') : (isAR ? '→' : '←'))
 
 /**
@@ -19,6 +22,7 @@ export default function AssetRelationshipsView({ profile, t, isAR, onOpenAsset }
   const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const q = filter.trim().toLowerCase()
   const match = (name: string, nameAr?: string | null) => !q || name.toLowerCase().includes(q) || (nameAr || '').toLowerCase().includes(q)
+  const mm = metaModelLabel(profile, t)
   const slots = (profile.relationshipSlots || []).filter(s => !hideEmpty || s.count > 0)
   const other = (profile.otherRelationships || []).filter(o => match(o.relatedAsset.name, o.relatedAsset.nameAr))
 
@@ -36,6 +40,7 @@ export default function AssetRelationshipsView({ profile, t, isAR, onOpenAsset }
         </label>
         <HelpTip text={t('repository.profile.relationships_help')} />
       </div>
+      <OriginLegend t={t} profile={profile} show={profile.otherRelationships?.length ? ['meta', 'other'] : ['meta']} />
       {profile.relationshipTotals?.truncated && <div className="ap-banner">{t('repository.profile.relationships_truncated')}</div>}
       {slots.map(s => {
         const key = `${s.definitionId}:${s.direction}`
@@ -51,6 +56,7 @@ export default function AssetRelationshipsView({ profile, t, isAR, onOpenAsset }
                 <span className="ap-chip">{s.otherType?.icon ? `${s.otherType.icon} ` : ''}{localName(s.otherType, isAR) || '—'}</span>
                 {s.isRequired && <span className={`ap-chip${s.count ? '' : ' ap-chip-warn'}`}>{t('repository.profile.required')}</span>}
                 {s.single && <span className="ap-chip">{t('repository.profile.single')}</span>}
+                <OriginTag origin="meta" t={t} detail={slotDetail(s, mm)} />
               </div>
               <span className="ap-slot-meta">{s.count}</span>
             </div>
@@ -94,6 +100,7 @@ export default function AssetRelationshipsView({ profile, t, isAR, onOpenAsset }
                     <span className="ap-slot-meta">{o.label}</span>
                     <button type="button" className="ap-link" onClick={() => onOpenAsset(o.relatedAsset.id, o.relatedAsset.name)}>{localName(o.relatedAsset, isAR)}</button>
                   </div>
+                  <OriginTag origin="other" t={t} detail={o.relationshipType} />
                 </li>
               ))}
             </ul>
