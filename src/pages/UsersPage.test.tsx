@@ -2,9 +2,10 @@ import React from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import UsersPage from './UsersPage';
 
+let mockTenantSlug: string | undefined;
 jest.mock('../contexts/AuthContext', () => ({
   useAuth: () => ({
-    user: { userId: 'u1', email: 'admin@acme.com', role: 'TENANT_ADMIN' },
+    user: { userId: 'u1', email: 'admin@acme.com', role: 'TENANT_ADMIN', tenantSlug: mockTenantSlug },
     hasPermission: () => true,
   }),
 }));
@@ -73,7 +74,15 @@ describe('UsersPage invitations', () => {
     await screen.findByText('pending@acme.com');
   };
 
-  beforeEach(() => { Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } }); });
+  beforeEach(() => { mockTenantSlug = undefined; Object.assign(navigator, { clipboard: { writeText: jest.fn().mockResolvedValue(undefined) } }); });
+
+  it("gives out links on the tenant's own address when it has one", async () => {
+    mockTenantSlug = 'test-tenant';
+    route({ 'GET /users/invitations/inv-1/link': { id: 'inv-1', inviteUrl: 'https://ea-platform-ui-1.run.app/invite/secret-token', expired: false }, 'GET /users/invitations': [INV], 'GET /users': [] });
+    await openInvitations();
+    fireEvent.click(screen.getByText(/users\.copy_link/));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith('https://hrdf.archmindworks.com/invite/secret-token'));
+  });
 
   it('copies the real token link from the API, not one built from the invitation id', async () => {
     route({ 'GET /users/invitations/inv-1/link': { id: 'inv-1', inviteUrl: 'https://ui/invite/secret-token', expired: false }, 'GET /users/invitations': [INV], 'GET /users': [] });

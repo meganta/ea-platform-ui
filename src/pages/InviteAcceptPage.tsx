@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, setToken } from '../lib/api'
+import { hostForTenant, tenantSignInUrl } from '../lib/tenantHosts'
 import BrandLogo from '../brand/BrandLogo'
 import BrandPattern from '../brand/BrandPattern'
 import Icon from '../brand/icons'
@@ -17,6 +18,8 @@ export default function InviteAcceptPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  // Where the new user is taken: the tenant's own address when it has one.
+  const [destination, setDestination] = useState<string | null>(null)
 
   useEffect(() => {
     if (!token) { setValidating(false); setError('Invalid invitation link'); return }
@@ -35,21 +38,27 @@ export default function InviteAcceptPage() {
     try {
       const result = await api.acceptInvitation(token!, { fullName, password })
       setSuccess(true)
-      // Auto-login after 2 seconds
+      // Then sign in: on the tenant's own address when it has one (a session on
+      // another address would not carry over), otherwise right here.
       setTimeout(async () => {
+        let slug = ''
         try {
-          // We need tenantSlug to login — fetch it from the created user's tenant
           const tenantRes = await fetch(`${API_URL}/auth/tenant-by-user/${result.userId}`)
-          if (!tenantRes.ok) {
-            nav('/login')
-            return
-          }
-          const tenantData = await tenantRes.json()
-          const loginRes = await api.login(result.email, password, tenantData.slug)
+          if (tenantRes.ok) slug = (await tenantRes.json()).slug || ''
+        } catch { /* fall through to the sign-in page */ }
+        const host = hostForTenant(slug)
+        if (host && host !== window.location.hostname) {
+          setDestination(host)
+          window.location.assign(tenantSignInUrl(slug, result.email))
+          return
+        }
+        try {
+          if (!slug) throw new Error('no tenant')
+          const loginRes = await api.login(result.email, password, slug)
           setToken(loginRes.accessToken)
           nav('/app')
         } catch {
-          nav('/login')
+          nav(slug ? `/login?${new URLSearchParams({ org: slug, email: result.email }).toString()}` : '/login')
         }
       }, 2000)
     } catch (e: any) {
@@ -73,7 +82,7 @@ export default function InviteAcceptPage() {
         <div className="login-card login-card-center" role="status">
           <span className="login-done-mark"><Icon name="check" size={28} /></span>
           <h2 className="login-title">Account Created!</h2>
-          <p className="login-muted">Your account has been set up. Redirecting to the platform...</p>
+          <p className="login-muted">{destination ? `Your account has been set up. Taking you to ${destination} to sign in...` : 'Your account has been set up. Redirecting to the platform...'}</p>
         </div>
       </div>
     )

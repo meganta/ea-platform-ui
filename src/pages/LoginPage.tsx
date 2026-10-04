@@ -6,6 +6,7 @@ import { API_BASE } from '../lib/api'
 import BrandLogo from '../brand/BrandLogo'
 import BrandPattern from '../brand/BrandPattern'
 import '../brand/brand.css'
+import { tenantSlugForHost } from '../lib/tenantHosts'
 
 interface PublicBrandingSummary {
   organizationNameEn?: string | null
@@ -14,20 +15,14 @@ interface PublicBrandingSummary {
   hasLogo?: boolean
 }
 
-// Domain-bound tenants - visiting this hostname auto-selects the tenant,
-// no manual org entry needed.
-const HOSTNAME_TENANT_MAP: Record<string, string> = {
-  'hrdf.archmindworks.com': 'test-tenant',
-  'monshaat.archmindworks.com': 'monshaat',
-}
-
 export default function LoginPage() {
   const { login } = useAuth()
   const { t, locale, setLocale } = useLang()
   const nav = useNavigate()
   const [searchParams] = useSearchParams()
-  const boundTenant = HOSTNAME_TENANT_MAP[window.location.hostname]
-  const [form, setForm] = useState({ email:'', password:'', tenantSlug: boundTenant || searchParams.get('org') || 'demo' })
+  // Domain-bound tenants: visiting the tenant's own address selects it (src/lib/tenantHosts.ts).
+  const boundTenant = tenantSlugForHost(window.location.hostname)
+  const [form, setForm] = useState({ email: searchParams.get('email') || '', password:'', tenantSlug: boundTenant || searchParams.get('org') || 'demo' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [orgBranding, setOrgBranding] = useState<PublicBrandingSummary | null>(null)
