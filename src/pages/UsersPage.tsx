@@ -21,6 +21,7 @@ const ROLE_LABELS: Record<string, string> = {
   ARCHITECT: 'Architect',
   REVIEWER: 'Reviewer',
   TENANT_ADMIN: 'Tenant Admin',
+  SUPERADMIN: 'Super Admin',
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -29,9 +30,31 @@ const ROLE_COLORS: Record<string, string> = {
   TENANT_ADMIN: 'badge-approved',
 }
 
+/** An Access Governance role (Access Governance > Roles). */
+interface TenantRole { id: string; code?: string; name: string; nameAr?: string | null; isActive?: boolean }
+
+/** Pick Access Governance roles; the list comes from Access Governance > Roles. */
+function RolePicker({ roles, value, onChange, idPrefix, t, isAR }: { roles: TenantRole[]; value: string[]; onChange: (ids: string[]) => void; idPrefix: string; t: (k: string) => string; isAR: boolean }) {
+  if (!roles.length) return <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('users.no_ag_roles') || 'No roles are defined yet. Add them in Access Governance > Roles.'}</div>
+  return (
+    <div role="group" aria-labelledby={`${idPrefix}-label`} style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 180, overflowY: 'auto', padding: '6px 8px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)' }}>
+      {roles.map(r => (
+        <label key={r.id} htmlFor={`${idPrefix}-${r.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+          <input id={`${idPrefix}-${r.id}`} type="checkbox" checked={value.includes(r.id)} onChange={e => onChange(e.target.checked ? [...value, r.id] : value.filter(x => x !== r.id))} />
+          {(isAR && r.nameAr) || r.name}
+        </label>
+      ))}
+    </div>
+  )
+}
+
+const roleNames = (ids: string[] | undefined, roles: TenantRole[], isAR: boolean) =>
+  (ids || []).map(id => roles.find(r => r.id === id)).filter(Boolean).map(r => (isAR && r!.nameAr) || r!.name)
+
 export default function UsersPage() {
-  const { t } = useLang()
+  const { t, isAR } = useLang() as any
   const { hasPermission, user } = useAuth()
+  const isAdmin = user?.role === 'TENANT_ADMIN' || user?.role === 'SUPERADMIN'
   const api = useApi()
   const [users, setUsers] = useState<any[]>([])
   const [invitations, setInvitations] = useState<any[]>([])
@@ -41,8 +64,10 @@ export default function UsersPage() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
   const [resettingUser, setResettingUser] = useState<any>(null)
-  const [inviteForm, setInviteForm] = useState({ email: '', fullName: '', role: 'ARCHITECT' })
-  const [createForm, setCreateForm] = useState({ email: '', fullName: '', password: '', role: 'ARCHITECT' })
+  const [inviteForm, setInviteForm] = useState<{ email: string; fullName: string; role: string; tenantRoleIds: string[] }>({ email: '', fullName: '', role: 'ARCHITECT', tenantRoleIds: [] })
+  const [createForm, setCreateForm] = useState<{ email: string; fullName: string; password: string; role: string; tenantRoleIds: string[] }>({ email: '', fullName: '', password: '', role: 'ARCHITECT', tenantRoleIds: [] })
+  // Roles come from Access Governance > Roles (active ones).
+  const [tenantRoles, setTenantRoles] = useState<TenantRole[]>([])
   const [resetPassword, setResetPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -58,8 +83,10 @@ export default function UsersPage() {
     setLoading(true)
     try {
       const [u, i] = await Promise.all([api.get('/users'), api.get('/users/invitations')])
-      setUsers(u || [])
-      setInvitations(i || [])
+      setUsers(Array.isArray(u) ? u : [])
+      setInvitations(Array.isArray(i) ? i : [])
+      const roles = await api.get('/access-governance/roles').catch(() => [])
+      setTenantRoles((Array.isArray(roles) ? roles : []).filter((r: TenantRole) => r.isActive !== false))
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -82,10 +109,11 @@ export default function UsersPage() {
 
   const inviteUser = async () => {
     if (!inviteForm.email) { showMsg(t('users.invite_email_required') || 'Email is required', true); return }
+    if (tenantRoles.length && !inviteForm.tenantRoleIds.length) { showMsg(t('users.role_required') || 'Choose at least one role', true); return }
     try {
       const result = await api.post('/users/invite', inviteForm)
       showInviteResult(result)
-      setInviteForm({ email: '', fullName: '', role: 'ARCHITECT' })
+      setInviteForm({ email: '', fullName: '', role: 'ARCHITECT', tenantRoleIds: [] })
       load()
     } catch (e: any) { showMsg(e.message, true) }
   }
@@ -93,7 +121,7 @@ export default function UsersPage() {
   // A repeated invite renews the link (the old one stops working) and emails the new one.
   const resendInvitation = async (inv: any) => {
     try {
-      const result = await api.post('/users/invite', { email: inv.email, role: inv.role, ...(inv.fullName ? { fullName: inv.fullName } : {}) })
+      const result = await api.post('/users/invite', { email: inv.email, role: inv.role, tenantRoleIds: inv.tenantRoleIds || [], ...(inv.fullName ? { fullName: inv.fullName } : {}) })
       showInviteResult(result)
       load()
     } catch (e: any) { showMsg(e.message, true) }
@@ -102,12 +130,13 @@ export default function UsersPage() {
   const closeInviteModal = () => { setShowInviteModal(false); setInviteResult(null) }
 
   const createUser = async () => {
-    if (!createForm.email || !createForm.password) { showMsg('Email and password are required', true); return }
+    if (!createForm.email || !createForm.password) { showMsg(t('users.email_password_required') || 'Email and password are required', true); return }
+    if (tenantRoles.length && !createForm.tenantRoleIds.length) { showMsg(t('users.role_required') || 'Choose at least one role', true); return }
     try {
       await api.post('/users', createForm)
       showMsg('User created successfully')
       setShowCreateModal(false)
-      setCreateForm({ email: '', fullName: '', password: '', role: 'ARCHITECT' })
+      setCreateForm({ email: '', fullName: '', password: '', role: 'ARCHITECT', tenantRoleIds: [] })
       load()
     } catch (e: any) { showMsg(e.message, true) }
   }
@@ -115,8 +144,18 @@ export default function UsersPage() {
   const updateUser = async () => {
     if (!editingUser) return
     try {
-      await api.put(`/users/${editingUser.id}`, { role: editingUser.role, isActive: editingUser.isActive, fullName: editingUser.fullName })
-      showMsg('User updated')
+      const original = users.find(x => x.id === editingUser.id) || {}
+      await api.put(`/users/${editingUser.id}`, {
+        fullName: editingUser.fullName, isActive: editingUser.isActive,
+        ...(editingUser.email && editingUser.email !== original.email ? { email: editingUser.email } : {}),
+        ...(editingUser.role !== original.role ? { role: editingUser.role } : {}),
+      })
+      // Access Governance roles: assign the added ones, remove the dropped ones (each audited there).
+      const before: string[] = (original.tenantRoles || []).map((r: TenantRole) => r.id)
+      const after: string[] = editingUser.tenantRoleIds || before
+      for (const id of after.filter(x => !before.includes(x))) await api.post(`/access-governance/roles/${id}/assign`, { userId: editingUser.id, reason: 'Assigned in Settings > Users' })
+      for (const id of before.filter(x => !after.includes(x))) await api.del(`/access-governance/roles/${id}/assign/${editingUser.id}`)
+      showMsg(t('users.updated') || 'User updated')
       setEditingUser(null)
       load()
     } catch (e: any) { showMsg(e.message, true) }
@@ -137,6 +176,15 @@ export default function UsersPage() {
     try {
       await api.del(`/users/${id}`)
       showMsg('User deactivated')
+      load()
+    } catch (e: any) { showMsg(e.message, true) }
+  }
+
+  const deleteUserPermanently = async (u: any) => {
+    if (!window.confirm((t('users.confirm_delete_permanent') || 'Delete {email} permanently? The account and its role assignments are removed and cannot be restored. Audit history is kept.').replace('{email}', u.email))) return
+    try {
+      await api.del(`/users/${u.id}/permanent`)
+      showMsg((t('users.deleted') || '{email} was deleted').replace('{email}', u.email))
       load()
     } catch (e: any) { showMsg(e.message, true) }
   }
@@ -210,7 +258,8 @@ export default function UsersPage() {
                   <tr style={{ background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)' }}>
                     <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.name') || 'Name'}</th>
                     <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.email') || 'Email'}</th>
-                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.role') || 'Role'}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.ag_roles') || 'Roles'}</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.access_level') || 'Access level'}</th>
                     <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.status') || 'Status'}</th>
                     <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.last_login') || 'Last Login'}</th>
                     <th style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600, color: 'var(--text-dim)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{t('users.actions') || 'Actions'}</th>
@@ -224,6 +273,12 @@ export default function UsersPage() {
                         {u.fullNameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{u.fullNameAr}</div>}
                       </td>
                       <td style={{ padding: '10px 14px', color: 'var(--text-dim)' }}>{u.email}</td>
+                      <td style={{ padding: '10px 14px' }} data-testid={`user-roles-${u.id}`}>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {(u.tenantRoles || []).length ? (u.tenantRoles || []).map((r: TenantRole) => <span key={r.id} className="badge badge-active">{(isAR && r.nameAr) || r.name}</span>)
+                            : <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{t('users.no_roles') || 'No role'}</span>}
+                        </div>
+                      </td>
                       <td style={{ padding: '10px 14px' }}>
                         <span className={`badge ${ROLE_COLORS[u.role] || 'badge-draft'}`}>{ROLE_LABELS[u.role] || u.role}</span>
                       </td>
@@ -236,7 +291,7 @@ export default function UsersPage() {
                       <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           {canEdit && (
-                            <button onClick={() => setEditingUser({ ...u })} style={{ padding: '4px 10px', fontSize: 11, background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}>
+                            <button onClick={() => setEditingUser({ ...u, tenantRoleIds: (u.tenantRoles || []).map((r: TenantRole) => r.id) })} style={{ padding: '4px 10px', fontSize: 11, background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}>
                               {t('users.edit') || 'Edit'}
                             </button>
                           )}
@@ -250,12 +305,17 @@ export default function UsersPage() {
                               {t('users.deactivate') || 'Deactivate'}
                             </button>
                           )}
+                          {isAdmin && canDisable && u.id !== user?.userId && (
+                            <button onClick={() => deleteUserPermanently(u)} aria-label={`${t('users.delete_permanent') || 'Delete permanently'} ${u.email}`} style={{ padding: '4px 10px', fontSize: 11, background: 'var(--danger)', border: '1px solid var(--danger)', color: '#fff', borderRadius: 4, cursor: 'pointer' }}>
+                              🗑 {t('users.delete_permanent') || 'Delete permanently'}
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
                   ))}
                   {users.length === 0 && (
-                    <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{t('users.no_users') || 'No users yet.'}</td></tr>
+                    <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{t('users.no_users') || 'No users yet.'}</td></tr>
                   )}
                 </tbody>
               </table>
@@ -289,7 +349,12 @@ export default function UsersPage() {
                   {invitations.map(inv => (
                     <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '10px 14px' }}>{inv.email}</td>
-                      <td style={{ padding: '10px 14px' }}><span className={`badge ${ROLE_COLORS[inv.role] || 'badge-draft'}`}>{ROLE_LABELS[inv.role] || inv.role}</span></td>
+                      <td style={{ padding: '10px 14px' }}>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                          {roleNames(inv.tenantRoleIds, tenantRoles, isAR).map(n => <span key={n} className="badge badge-active">{n}</span>)}
+                          <span className={`badge ${ROLE_COLORS[inv.role] || 'badge-draft'}`}>{ROLE_LABELS[inv.role] || inv.role}</span>
+                        </div>
+                      </td>
                       <td style={{ padding: '10px 14px', color: 'var(--text-dim)', fontSize: 12 }}>{new Date(inv.expiresAt).toLocaleDateString()}</td>
                       <td style={{ padding: '10px 14px' }}><span className="badge badge-progress">{t('users.pending') || 'Pending'}</span></td>
                       <td style={{ padding: '10px 14px', textAlign: 'right' }}>
@@ -352,8 +417,12 @@ export default function UsersPage() {
               <label htmlFor="invite-name" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || 'Full Name'}</label>
               <input id="invite-name" type="text" value={inviteForm.fullName} onChange={e => setInviteForm({ ...inviteForm, fullName: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder="John Doe" />
             </div>
+            <div style={{ marginBottom: 12 }}>
+              <div id="invite-roles-label" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.ag_roles') || 'Roles'}{tenantRoles.length ? ' *' : ''}<HelpTip text={t('users.ag_roles_help') || 'Roles come from Access Governance > Roles, where their permissions are defined. The person gets the roles you choose here.'} /></div>
+              <RolePicker roles={tenantRoles} value={inviteForm.tenantRoleIds} onChange={ids => setInviteForm({ ...inviteForm, tenantRoleIds: ids })} idPrefix="invite-roles" t={t} isAR={!!isAR} />
+            </div>
             <div style={{ marginBottom: 16 }}>
-              <label htmlFor="invite-role" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || 'Role'}</label>
+              <label htmlFor="invite-role" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.access_level') || 'Access level'}<HelpTip text={t('users.access_level_help') || 'Platform-wide access: Tenant Admin can manage settings and users; Architect and Reviewer cannot. Detailed permissions come from the roles above.'} /></label>
               <select id="invite-role" value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }}>
                 <option value="ARCHITECT">{t('users.role_architect') || 'Architect'}</option>
                 <option value="REVIEWER">{t('users.role_reviewer') || 'Reviewer'}</option>
@@ -386,8 +455,12 @@ export default function UsersPage() {
               <label htmlFor="create-password" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.password') || 'Password'} *</label>
               <input id="create-password" type="password" value={createForm.password} onChange={e => setCreateForm({ ...createForm, password: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} placeholder="Min 8 characters" />
             </div>
+            <div style={{ marginBottom: 12 }}>
+              <div id="create-roles-label" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.ag_roles') || 'Roles'}{tenantRoles.length ? ' *' : ''}<HelpTip text={t('users.ag_roles_help') || 'Roles come from Access Governance > Roles, where their permissions are defined. The person gets the roles you choose here.'} /></div>
+              <RolePicker roles={tenantRoles} value={createForm.tenantRoleIds} onChange={ids => setCreateForm({ ...createForm, tenantRoleIds: ids })} idPrefix="create-roles" t={t} isAR={!!isAR} />
+            </div>
             <div style={{ marginBottom: 16 }}>
-              <label htmlFor="create-role" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || 'Role'}</label>
+              <label htmlFor="create-role" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.access_level') || 'Access level'}<HelpTip text={t('users.access_level_help') || 'Platform-wide access: Tenant Admin can manage settings and users; Architect and Reviewer cannot. Detailed permissions come from the roles above.'} /></label>
               <select id="create-role" value={createForm.role} onChange={e => setCreateForm({ ...createForm, role: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }}>
                 <option value="ARCHITECT">{t('users.role_architect') || 'Architect'}</option>
                 <option value="REVIEWER">{t('users.role_reviewer') || 'Reviewer'}</option>
@@ -408,12 +481,21 @@ export default function UsersPage() {
           <div style={{ background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', width: 420, maxWidth: '90vw', padding: 24, boxShadow: 'var(--shadow-lg)' }}>
             <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600 }}>✏️ {t('users.edit_title') || 'Edit User'}</h3>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || 'Full Name'}</label>
-              <input type="text" value={editingUser.fullName || ''} onChange={e => setEditingUser({ ...editingUser, fullName: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} />
+              <label htmlFor="edit-name" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.full_name') || 'Full Name'}</label>
+              <input id="edit-name" type="text" value={editingUser.fullName || ''} onChange={e => setEditingUser({ ...editingUser, fullName: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} />
             </div>
             <div style={{ marginBottom: 12 }}>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.role') || 'Role'}</label>
-              <select value={editingUser.role} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }}>
+              <label htmlFor="edit-email" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.email') || 'Email'}</label>
+              <input id="edit-email" type="email" dir="ltr" value={editingUser.email || ''} onChange={e => setEditingUser({ ...editingUser, email: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div id="edit-roles-label" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.ag_roles') || 'Roles'}<HelpTip text={t('users.ag_roles_help') || 'Roles come from Access Governance > Roles, where their permissions are defined. The person gets the roles you choose here.'} /></div>
+              <RolePicker roles={tenantRoles} value={editingUser.tenantRoleIds || []} onChange={ids => setEditingUser({ ...editingUser, tenantRoleIds: ids })} idPrefix="edit-roles" t={t} isAR={!!isAR} />
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <label htmlFor="edit-role" style={{ display: 'block', fontSize: 12, fontWeight: 500, marginBottom: 4, color: 'var(--text-dim)' }}>{t('users.access_level') || 'Access level'}<HelpTip text={t('users.access_level_help') || 'Platform-wide access: Tenant Admin can manage settings and users; Architect and Reviewer cannot. Detailed permissions come from the roles above.'} /></label>
+              <select id="edit-role" value={editingUser.role} onChange={e => setEditingUser({ ...editingUser, role: e.target.value })} style={{ width: '100%', padding: '8px 12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)', background: 'var(--navy)', fontSize: 13 }}>
+                {!['ARCHITECT', 'REVIEWER', 'TENANT_ADMIN'].includes(editingUser.role) && <option value={editingUser.role}>{ROLE_LABELS[editingUser.role] || editingUser.role}</option>}
                 <option value="ARCHITECT">{t('users.role_architect') || 'Architect'}</option>
                 <option value="REVIEWER">{t('users.role_reviewer') || 'Reviewer'}</option>
                 <option value="TENANT_ADMIN">{t('users.role_admin') || 'Tenant Admin'}</option>

@@ -129,6 +129,91 @@ describe('UsersPage invitations', () => {
     fireEvent.click(screen.getByText(/users\.resend$/));
     expect(await screen.findByTestId('invite-result')).toHaveTextContent('users.invite_sent');
     const post = calls.find(c => c.init?.method === 'POST')!;
-    expect(JSON.parse(post.init.body)).toEqual({ email: 'pending@acme.com', role: 'REVIEWER', fullName: 'Pat' });
+    expect(JSON.parse(post.init.body)).toEqual({ email: 'pending@acme.com', role: 'REVIEWER', fullName: 'Pat', tenantRoleIds: [] });
+  });
+});
+
+describe('UsersPage roles from Access Governance', () => {
+  const ROLES = [
+    { id: 'role-arch', code: 'architect', name: 'Architect', nameAr: 'معماري', isActive: true },
+    { id: 'role-eng', code: 'engineer', name: 'Innovation Engineer', isActive: true },
+    { id: 'role-old', code: 'old', name: 'Retired role', isActive: false },
+  ];
+  const USERS = [
+    { id: 'u1', email: 'admin@acme.com', fullName: 'Admin', role: 'TENANT_ADMIN', isActive: true, tenantRoles: [{ id: 'role-arch', name: 'Architect' }] },
+    { id: 'u2', email: 'old@acme.com', fullName: 'Old User', role: 'ARCHITECT', isActive: false, tenantRoles: [] },
+  ];
+  let calls: Array<{ url: string; init?: any }> = [];
+  const route = (routes: Record<string, any>) => {
+    calls = [];
+    (fetch as jest.Mock).mockImplementation(async (url: string, init?: any) => {
+      calls.push({ url, init });
+      const method = init?.method || 'GET';
+      const key = Object.keys(routes).sort((a, b) => b.length - a.length).find(k => { const [m, p] = k.split(' '); return m === method && url.includes(p); });
+      const body = key ? routes[key] : {};
+      return { ok: true, json: async () => (typeof body === 'function' ? body(url, init) : body) };
+    });
+  };
+  const base = { 'GET /access-governance/roles': ROLES, 'GET /users/invitations': [], 'GET /users': USERS };
+
+  it("shows each user's Access Governance roles and offers only active roles when inviting", async () => {
+    route({ ...base, 'POST /users/invite': { id: 'i', email: 'n@acme.com', inviteUrl: 'https://ui/invite/t', emailDelivery: { status: 'SENT' } } });
+    render(<UsersPage />);
+    expect(await screen.findByTestId('user-roles-u1')).toHaveTextContent('Architect');
+    expect(screen.getByTestId('user-roles-u2')).toHaveTextContent('users.no_roles');
+    fireEvent.click(screen.getAllByText(/users\.invite$/)[0]);
+    expect(screen.getByLabelText('Innovation Engineer')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Retired role')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/users\.email/), { target: { value: 'n@acme.com' } });
+    fireEvent.click(screen.getByText('users.send_invite'));
+    expect(await screen.findByText('users.role_required')).toBeInTheDocument();
+    expect(calls.some(c => c.init?.method === 'POST')).toBe(false);
+    fireEvent.click(screen.getByLabelText('Innovation Engineer'));
+    fireEvent.click(screen.getByText('users.send_invite'));
+    await screen.findByTestId('invite-result');
+    expect(JSON.parse(calls.find(c => c.init?.method === 'POST')!.init.body)).toMatchObject({ email: 'n@acme.com', role: 'ARCHITECT', tenantRoleIds: ['role-eng'] });
+  });
+
+  it('creating a user sends the chosen roles', async () => {
+    route({ ...base, 'POST /users': { id: 'u3' } });
+    render(<UsersPage />);
+    await screen.findByTestId('user-roles-u1');
+    fireEvent.click(screen.getAllByText(/users\.create/)[0]);
+    fireEvent.change(screen.getByLabelText(/users\.email/), { target: { value: 'c@acme.com' } });
+    fireEvent.change(screen.getByLabelText(/users\.password/), { target: { value: 'password-1' } });
+    fireEvent.click(screen.getByLabelText('Architect'));
+    fireEvent.click(screen.getByText('users.create'));
+    await waitFor(() => expect(calls.find(c => c.init?.method === 'POST')).toBeTruthy());
+    expect(JSON.parse(calls.find(c => c.init?.method === 'POST')!.init.body)).toMatchObject({ email: 'c@acme.com', tenantRoleIds: ['role-arch'] });
+  });
+
+  it("editing changes the name and email and adds/removes Access Governance roles, without re-sending an unchanged access level", async () => {
+    route({ ...base, 'PUT /users/u1': { id: 'u1' }, 'POST /access-governance/roles/': { id: 'a' }, 'DELETE /access-governance/roles/': null });
+    render(<UsersPage />);
+    await screen.findByTestId('user-roles-u1');
+    fireEvent.click(screen.getAllByText('users.edit')[0]);
+    fireEvent.change(screen.getByLabelText('users.full_name'), { target: { value: 'HRDF Admin' } });
+    fireEvent.change(screen.getByLabelText('users.email'), { target: { value: 'admin@hrdf.com' } });
+    fireEvent.click(screen.getByLabelText('Architect'));
+    fireEvent.click(screen.getByLabelText('Innovation Engineer'));
+    fireEvent.click(screen.getByText('users.save'));
+    await waitFor(() => expect(calls.some(c => c.init?.method === 'DELETE')).toBe(true));
+    expect(JSON.parse(calls.find(c => c.init?.method === 'PUT')!.init.body)).toEqual({ fullName: 'HRDF Admin', isActive: true, email: 'admin@hrdf.com' });
+    const assign = calls.find(c => c.init?.method === 'POST')!;
+    expect(assign.url).toMatch(/access-governance\/roles\/role-eng\/assign$/);
+    expect(JSON.parse(assign.init.body)).toMatchObject({ userId: 'u1' });
+    expect(calls.find(c => c.init?.method === 'DELETE')!.url).toMatch(/access-governance\/roles\/role-arch\/assign\/u1$/);
+  });
+
+  it('an administrator can delete another user permanently after confirming', async () => {
+    route({ ...base, 'DELETE /users/u2/permanent': { deleted: true } });
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<UsersPage />);
+    await screen.findByTestId('user-roles-u1');
+    expect(screen.queryByRole('button', { name: 'users.delete_permanent admin@acme.com' })).not.toBeInTheDocument(); // never your own account
+    fireEvent.click(screen.getByRole('button', { name: 'users.delete_permanent old@acme.com' }));
+    await waitFor(() => expect(calls.some(c => c.init?.method === 'DELETE' && /\/users\/u2\/permanent$/.test(c.url))).toBe(true));
+    expect(confirm).toHaveBeenCalled();
+    confirm.mockRestore();
   });
 });
