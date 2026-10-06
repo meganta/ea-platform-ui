@@ -108,7 +108,7 @@ export default function ElementDrawer({ architectureId, element, parentName, con
             <div className="ap-section-title" style={{ marginTop: 10 }}>{t('refarch.el.proposed')}</div>
             <ul className="ra-list">{proposed.map(l => (
               <li key={l.id}>
-                <span>{l.targetName} <span className="text-dim" style={{ fontSize: 11 }}>{l.basis}{l.confidence != null ? ` · ${l.confidence}` : ''}</span></span>
+                <span>{l.targetName} <span className="ra-chip">{t(`refarch.link.${l.linkType}`)}</span> <span className="text-dim" style={{ fontSize: 11 }}>{t(`refarch.basis.${l.basis}`)}{l.confidence != null ? ` · ${Math.round(l.confidence * 100)}%` : ''}</span></span>
                 <span className="flex gap-2">
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => run(() => api.post(`/reference-architectures/links/${l.id}/decision`, { decision: 'CONFIRM' }))}>{t('refarch.el.confirm')}</button>
                   <button type="button" className="btn btn-secondary btn-sm" onClick={() => run(() => api.post(`/reference-architectures/links/${l.id}/decision`, { decision: 'REJECT' }))}>{t('refarch.el.reject')}</button>
