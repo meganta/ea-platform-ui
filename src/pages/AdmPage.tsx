@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { AdmReferencePanel } from '../components/ReferenceArchitecturePanels'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import ReactMarkdown from 'react-markdown'
@@ -1595,6 +1596,9 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, focus
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{isAR ? currentStep.title : (currentStep.titleAr || '')}</div>
                 </div>
               )}
+
+              {/* Applicable reference architectures: normative input to every step (phases unchanged) */}
+              <AdmReferencePanel cycleId={cycle.id} />
 
               {/* Architecture Scope Selector — Step 1.2 only */}
               {activeStep === '1.2' && (

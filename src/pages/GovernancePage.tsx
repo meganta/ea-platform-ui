@@ -7,6 +7,7 @@ import GovernanceScoreFormula, { ScoreBreakdown, domainsScoreOf } from '../compo
 import { AttachedViewsPanel } from '../components/AttachedViewsPanel'
 import { exportFileName } from '../lib/exportFileName'
 import PrincipleCompliancePanel from '../components/PrincipleCompliancePanel'
+import { GovernanceReferencePanel } from '../components/ReferenceArchitecturePanels'
 import StrategyAlignmentPanel, { usesStrategyAlignment } from '../components/StrategyAlignmentPanel'
 import PipelineStepList, { PipelineStep, stepsRatio } from '../components/PipelineStepList'
 
@@ -2622,6 +2623,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
         return (
           <div>
             <PrincipleCompliancePanel section={principleSection} />
+            <GovernanceReferencePanel reviewId={review.id} />
             {/* Visual status breakdown */}
             {total > 0 && (
               <div style={{ marginBottom: 20 }}>
