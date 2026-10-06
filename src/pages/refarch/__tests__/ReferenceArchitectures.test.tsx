@@ -98,6 +98,19 @@ describe('Reference Architectures page', () => {
     await waitFor(() => expect(calls(f, 'GET', '/reference-architectures/a1/links?elementKey=portal').length).toBe(1))
   })
 
+  it('a proposal says what kind of link it is and where it came from', async () => {
+    mockParams = new URLSearchParams('ra=a1')
+    const f = workspaceFetch({ '/reference-architectures/a1/links?elementKey=portal': [{ id: 'p1', status: 'PROPOSED', linkType: 'DEVIATES_FROM', basis: 'GOVERNANCE_FINDING', confidence: null, targetName: 'Legacy portal', targetId: 'app9', targetType: 'Application', targetModule: 'REPOSITORY' }] }); global.fetch = f as any
+    render(<ReferenceArchitecturesPage />)
+    await screen.findByTestId('ra-coverage')
+    fireEvent.click(screen.getByRole('tab', { name: 'refarch.tab.architecture' }))
+    fireEvent.click(within(await screen.findByTestId('ra-diagram')).getByRole('button', { name: /Digital portal - refarch\.conf\.ALIGNED/ }))
+    const drawer = await screen.findByTestId('ra-drawer')
+    await waitFor(() => expect(drawer).toHaveTextContent('Legacy portal'))
+    expect(drawer).toHaveTextContent('refarch.link.DEVIATES_FROM')
+    expect(drawer).toHaveTextContent('refarch.basis.GOVERNANCE_FINDING')
+  })
+
   it('plans selected gaps into a draft EA plan and keeps aligned elements out of the selection', async () => {
     mockParams = new URLSearchParams('ra=a1')
     const f = workspaceFetch({ '/reference-architectures/a1/gaps/initiative': { plan: { nameEn: 'Close gaps' }, activitiesAdded: 1 } }); global.fetch = f as any
