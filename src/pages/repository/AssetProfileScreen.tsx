@@ -6,6 +6,7 @@ import AssetEditor from './AssetEditor'
 import { AssetProfile, localName } from './assetProfile'
 import { metaModelLabel } from './OriginTag'
 import './AssetProfile.css'
+import { AssetReferenceAlignment } from '../../components/ReferenceArchitecturePanels'
 
 type T = (k: string) => string
 type Tab = 'overview' | 'attributes' | 'relationships' | 'attachments'
@@ -144,6 +145,7 @@ export default function AssetProfileScreen({ asset: initial, startInEdit, t, isA
                   <button type="button" className="rp-stat" onClick={() => setTab('attachments')}><div className="rp-stat-label">{t('repository.profile.stat.attachments')}</div><div className="rp-stat-value">{attachments.length}</div></button>
                   <div className="rp-stat"><div className="rp-stat-label">{t('repository.profile.stat.findings')}</div><div className="rp-stat-value">{findingsLoading ? '…' : findings.length}</div></div>
                 </div>
+                <AssetReferenceAlignment assetId={asset.id} />
                 <section className="ap-section">
                   <dl className="ap-facts" style={{ margin: 0 }}>
                     {fact(t('repository.profile.type'), typeName)}
