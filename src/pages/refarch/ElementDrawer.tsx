@@ -18,12 +18,14 @@ const CAPABILITY_LINKS = ['REALIZED_BY', 'SUPPORTED_BY', 'DEPENDS_ON', 'DEVIATES
  * Repository objects of any domain the Meta Model permits (realization rules
  * come from the backend); its expected types only sort the search results.
  */
-export default function ElementDrawer({ architectureId, element, parentName, conformance, editable, metaModelTypes, realization, architectureDomain, api, t, isAR, onChanged, onClose }: {
+export default function ElementDrawer({ architectureId, element, parentName, conformance, editable, referenceModel = false, metaModelTypes, realization, architectureDomain, api, t, isAR, onChanged, onClose }: {
   architectureId: string
   element: RefElement
   parentName: string | null
   conformance: ElementConformance | undefined
   editable: boolean
+  /** A reference model is never implemented: the drawer only gives information (no implementations, links or decisions). */
+  referenceModel?: boolean
   versionId: string
   metaModelTypes: Array<{ code: string; name: string; domain: string | null }>
   realization?: RealizationRules
@@ -51,7 +53,7 @@ export default function ElementDrawer({ architectureId, element, parentName, con
 
   const loadLinks = () => api.get(`/reference-architectures/${architectureId}/links?elementKey=${encodeURIComponent(key)}`).then(r => setLinks(Array.isArray(r) ? r : [])).catch(() => setLinks([]))
   useEffect(() => {
-    loadLinks()
+    if (!referenceModel) loadLinks()
     setTypes(element.metaModelTypeCodes || []); setConfigRequired(element.metaModelStatus === 'CONFIGURATION_REQUIRED'); setObligation(element.obligation || 'RECOMMENDED'); setMsg(null)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, architectureId])
@@ -120,6 +122,7 @@ export default function ElementDrawer({ architectureId, element, parentName, con
         </div>
       )}
 
+      {!referenceModel && (<>
       <div className="ap-section">
         <div className="ap-section-title">{t('refarch.el.implementations')}<HelpTip text={t('refarch.el.realization_help')} /></div>
         {(conformance?.realizedBy || []).length === 0 ? <p className="ap-empty" style={{ margin: 0 }}>{t('refarch.el.no_impl')}</p> : linkedList(conformance!.realizedBy)}
@@ -143,7 +146,9 @@ export default function ElementDrawer({ architectureId, element, parentName, con
         )}
       </div>
 
-      {confirmedTraces.length > 0 && (
+      </>)}
+
+      {!referenceModel && confirmedTraces.length > 0 && (
         <div className="ap-section">
           <div className="ap-section-title">{t('refarch.el.traces')}</div>
           <ul className="ra-list">{confirmedTraces.map(l => <li key={l.id}><span>{l.targetName}</span><span className="ra-chip">{t(`refarch.link.${l.linkType}`)}</span></li>)}</ul>
@@ -182,6 +187,7 @@ export default function ElementDrawer({ architectureId, element, parentName, con
         </div>
       )}
 
+      {!referenceModel && (<>
       <div className="ap-section">
         <div className="ap-section-title">{t('refarch.el.link_object')}<HelpTip text={t('refarch.coverage.help')} /></div>
         <div className="form-group">
@@ -237,6 +243,8 @@ export default function ElementDrawer({ architectureId, element, parentName, con
         </div>
         <button type="button" className="btn btn-secondary btn-sm" disabled={!decisionWhy.trim()} onClick={() => run(() => api.post(`/reference-architectures/${architectureId}/decisions`, { elementKey: key, outcome: decision, rationale: decisionWhy }))}>{t('refarch.el.record')}</button>
       </div>
+      </>)}
+      {referenceModel && <p className="text-dim" style={{ fontSize: 12 }} data-testid="ra-model-drawer-note">{t('refarch.model.element_note')}</p>}
     </aside>
   )
 }
