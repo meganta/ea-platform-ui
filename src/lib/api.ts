@@ -19,6 +19,7 @@ export const api = {
     req('POST', '/public/demo-requests', data),
   listDemoRequests: () => req('GET', '/demo-requests'),
   me: () => req('GET', '/auth/me'),
+  exitOwnerAccess: () => req('POST', '/owner-access/exit'),
   getMe: () => req('GET', '/users/me'),
   updateMe: (data: any) => req('PUT', '/users/me', data),
   changeMyPassword: (data: any) => req('PUT', '/users/me/password', data),

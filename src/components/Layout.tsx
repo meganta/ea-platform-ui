@@ -1,6 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import DelegatedAccessBanner from './DelegatedAccessBanner'
 import { useLang } from '../contexts/LangContext'
 import { useBranding } from '../contexts/BrandingContext'
 import SetupAssistantPage from '../pages/SetupAssistantPage'
@@ -142,6 +143,11 @@ export default function Layout() {
           <div className="logo-sub">{locale === 'AR' ? 'هندسة المؤسسات' : 'Enterprise Architecture'}</div>
         </div>
         <nav className="sidebar-nav" aria-label={menuLabel} onClick={e => { if ((e.target as HTMLElement).closest('a')) setSidebarOpen(false) }}>
+          {user?.platformRole === 'PLATFORM_OWNER' && !user?.delegatedAccess && (
+            <NavLink to="/owner/dashboard" className="nav-item" style={{ background: '#0B1F33', color: '#FBBF24', fontWeight: 600, marginBottom: 6 }}>
+              🛡 {t('owner.nav.open_console')}
+            </NavLink>
+          )}
           <div className="nav-label">{t('nav.main')}</div>
           {mainNav.map(item => (
             <NavLink key={item.to} to={item.to} end={item.to === '/app'} className={({isActive})=>`nav-item${isActive?' active':''}`}>
@@ -205,7 +211,7 @@ export default function Layout() {
           <button className="logout-btn" onClick={()=>{logout();nav('/login')}}>{t('auth.signout')}</button>
         </div>
       </div>
-      <div ref={content} className="main-content"><Outlet /><NotificationBell /></div>
+      <div ref={content} className="main-content"><DelegatedAccessBanner /><Outlet /><NotificationBell /></div>
       {showSetupModal && <SetupAssistantPage modal onClose={() => setShowSetupModal(false)} />}
     </div>
   )
