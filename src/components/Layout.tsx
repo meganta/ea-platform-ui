@@ -26,7 +26,6 @@ const SETTINGS_CHILDREN: NavItem[] = [
   { to: '/settings/governance', label: 'Governance', icon: '🏛', permission: null },
   { to: '/settings/output', label: 'Output Preferences', icon: '🖼', permission: null },
   { to: '/settings/notifications', label: 'Notifications', icon: '🔔', permission: null },
-  { to: '/settings/users', label: 'Users & Access', icon: '👥', permission: null },
   { to: '/settings/api-billing', label: 'API & Billing', icon: '🔑', permission: null },
 ]
 
@@ -91,23 +90,23 @@ export default function Layout() {
     { to: '/adm', label: t('nav.adm'), icon: '⚙', permission: 'Repository.View' },
     { to: '/copilot', label: t('nav.copilot'), icon: '💬', permission: 'AIArchitect.Use' },
     { to: '/governance', label: '🏛 Governance', icon: '', permission: 'Reviews.View' },
-    { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'Reviews.View', superadminOnly: true },
+    { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'DecisionEvaluation.ViewAssessments' },
     { to: '/my-surveys', label: '📝 ' + (locale === 'AR' ? 'استبياناتي' : 'My Surveys'), icon: '', permission: 'Surveys.Respond' },
     { to: '/business-capabilities', label: '🧱 ' + (locale === 'AR' ? 'قدرات الأعمال' : 'Business Capabilities'), icon: '', permission: 'BusinessCapability.View' },
     { to: '/strategy', label: '🎯 ' + t('strategy.refresh.heading'), icon: '', permission: 'Strategy.View' },
     { to: '/ea-planning', label: '🗓 EA Planning', icon: '', permission: 'Repository.View' },
-    { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Repository.View' },
+    { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Innovation.View' },
     { to: '/notifications', label: '🔔 ' + t('nav.notifications'), icon: '', permission: null },
     { to: '/meta-model', label: '🧩 Meta-Model', icon: '', permission: 'MetaModel.View' },
     { to: '/ea-views', label: '🗺 EA Views', icon: '', permission: 'Views.View' },
-    { to: '/connector-hub', label: '🔌 Connectors', icon: '', permission: 'Repository.View', superadminOnly: true },
+    { to: '/connector-hub', label: '🔌 Connectors', icon: '', permission: 'Connector.View' },
     { to: '/reports', label: '📊 ' + (locale === 'AR' ? 'التقارير' : 'Reports'), icon: '', permission: 'Repository.View' },
     { to: '/repository', label: '🗄 ' + t('nav.repository'), icon: '', permission: 'Repository.View' },
     { to: '/reference-architectures', label: '🧭 ' + t('nav.refarch'), icon: '', permission: 'ReferenceArchitecture.View' },
     { to: '/architecture-health', label: '🩺 ' + t('nav.health'), icon: '', permission: 'ArchitectureHealth.View' },
     { to: '/knowledge', label: '📚 ' + t('nav.knowledge'), icon: '', permission: 'Repository.View' },
-    { to: '/glossary', label: '📖 Glossary', icon: '', permission: 'Repository.View', superadminOnly: true },
-    { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View', superadminOnly: true },
+    { to: '/glossary', label: '📖 Glossary', icon: '', permission: 'Repository.View' },
+    { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View' },
     // Settings category (restructured, explicit direction): a single
     // expandable nav group replacing the old flat, crowded /settings
     // (11 tabs in one page) and the Setup Assistant's Profile &
@@ -115,9 +114,8 @@ export default function Layout() {
     // domains-in-scope setting). Users & Access and API & Billing reuse
     // the existing, fuller standalone UsersPage/BillingPage content
     // rather than duplicating it under a second, thinner implementation.
-    { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Users.View', superadminOnly: true, children: SETTINGS_CHILDREN },
-    { to: '/getting-started', label: '🏛 Getting Started', icon: '', permission: null, superadminOnly: true },
-    { to: '/demo-requests', label: '📨 Demo Requests', icon: '', permission: null, superadminOnly: true },
+    { to: '/settings', label: '⚙ Settings', icon: '', permission: 'Settings.Manage', children: SETTINGS_CHILDREN },
+    { to: '/getting-started', label: '🏛 Getting Started', icon: '', permission: 'Settings.Manage' },
   ]
 
   const visibleNav = navItems.filter(item => {
@@ -126,9 +124,9 @@ export default function Layout() {
     return hasPermission(item.permission)
   })
 
-  const mainNav = visibleNav.filter(n => !['/repository', '/reference-architectures', '/architecture-health', '/knowledge', '/glossary', '/access-governance', '/settings', '/getting-started', '/demo-requests'].includes(n.to))
+  const mainNav = visibleNav.filter(n => !['/repository', '/reference-architectures', '/architecture-health', '/knowledge', '/glossary', '/access-governance', '/settings', '/getting-started'].includes(n.to))
   const repoNav = visibleNav.filter(n => ['/repository', '/reference-architectures', '/architecture-health', '/knowledge', '/glossary'].includes(n.to))
-  const adminNav = visibleNav.filter(n => ['/access-governance', '/settings', '/getting-started', '/demo-requests'].includes(n.to))
+  const adminNav = visibleNav.filter(n => ['/access-governance', '/settings', '/getting-started'].includes(n.to))
 
   return (
     <div className="layout" dir={locale === 'AR' ? 'rtl' : 'ltr'}>
