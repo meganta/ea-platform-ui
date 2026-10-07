@@ -35,7 +35,7 @@ export function AdmReferencePanel({ cycleId }: { cycleId: string }) {
   )
 }
 
-const GOV_COLOR: Record<string, string> = { ALIGNMENT: STATUS_COLOR.ALIGNED, GAP: STATUS_COLOR.GAP, DEVIATION: STATUS_COLOR.DEVIATION, APPROVED_EXCEPTION: STATUS_COLOR.APPROVED_EXCEPTION, NOT_ASSESSABLE: STATUS_COLOR.NOT_ASSESSED }
+const GOV_COLOR: Record<string, string> = { ALIGNMENT: STATUS_COLOR.ALIGNED, SUPPORTING: STATUS_COLOR.PARTIALLY_ALIGNED, GAP: STATUS_COLOR.GAP, DEVIATION: STATUS_COLOR.DEVIATION, APPROVED_EXCEPTION: STATUS_COLOR.APPROVED_EXCEPTION, NOT_ASSESSABLE: STATUS_COLOR.NOT_ASSESSED }
 
 /** Governance: reference architecture evidence for one review; a deviation can be raised as a finding with its evidence. */
 export function GovernanceReferencePanel({ reviewId }: { reviewId: string }) {

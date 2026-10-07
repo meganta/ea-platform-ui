@@ -25,6 +25,18 @@ export interface RefElement {
   changeClass?: string | null
 }
 
+export interface LinkedObject {
+  linkId: string; objectId: string; name: string | null; linkType: string; relationship?: string
+  targetType?: string | null; targetDomain?: string | null; crossDomain?: boolean
+  present: boolean; lifecycleStatus: string | null
+}
+
+/** Which relationships each Meta Model type may hold towards a reference capability (from GET /reference-architectures/meta-model). */
+export type RealizationRules = { relationships: string[]; byType: Record<string, string[]> } | undefined
+
+/** The relationship a link type needs from its target type: deviations and exceptions are about an implementation. */
+export const neededRelationship = (linkType: string) => (linkType === 'SUPPORTED_BY' || linkType === 'DEPENDS_ON' ? linkType : 'REALIZED_BY')
+
 export interface ElementConformance {
   stableKey: string
   name: string
@@ -35,7 +47,12 @@ export interface ElementConformance {
   status: string
   absence: string | null
   reason: string
-  realizedBy: Array<{ linkId: string; objectId: string; name: string | null; linkType: string; present: boolean; lifecycleStatus: string | null }>
+  /** element -REALIZED_BY-> Repository asset of any domain (legacy REALIZES etc. read as REALIZED_BY). */
+  realizedBy: LinkedObject[]
+  /** element -SUPPORTED_BY-> asset: contributes without implementing. */
+  supportedBy?: LinkedObject[]
+  /** element -DEPENDS_ON-> asset: the capability needs it. */
+  dependsOn?: LinkedObject[]
   deviations: Array<{ linkId: string; objectId: string; name: string | null }>
   exceptions: Array<{ linkId: string; objectId: string; name: string | null; expiresAt: string | null; expired: boolean }>
   proposedLinks: number
