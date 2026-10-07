@@ -39,6 +39,12 @@ import EaPlanningPage from './pages/EaPlanningPage'
 import GlossaryPage from './pages/GlossaryPage'
 import LandingPage from './pages/LandingPage'
 import DemoRequestsPage from './pages/DemoRequestsPage'
+import OwnerLayout, { OwnerRoute } from './pages/owner/OwnerLayout'
+import OwnerDashboardPage from './pages/owner/OwnerDashboardPage'
+import OwnerTenantsPage from './pages/owner/OwnerTenantsPage'
+import OwnerTenantDetailPage from './pages/owner/OwnerTenantDetailPage'
+import OwnerAuditPage from './pages/owner/OwnerAuditPage'
+import OwnerSettingsPage from './pages/owner/OwnerSettingsPage'
 import './styles.css'
 
 function ProtectedRoute({ children, permission, superadminOnly }: { children: React.ReactNode; permission?: string; superadminOnly?: boolean }) {
@@ -72,6 +78,16 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/invite/:token" element={<InviteAcceptPage />} />
             <Route path="/shared/:token" element={<SharedViewPage />} />
+            {/* Owner Console: its own shell and route space, platform owners only (the API enforces the same). */}
+            <Route path="/owner" element={<OwnerRoute><OwnerLayout /></OwnerRoute>}>
+              <Route index element={<Navigate to="/owner/dashboard" replace />} />
+              <Route path="dashboard" element={<OwnerDashboardPage />} />
+              <Route path="tenants" element={<OwnerTenantsPage />} />
+              <Route path="tenants/:tenantId" element={<OwnerTenantDetailPage />} />
+              <Route path="tenants/:tenantId/:tab" element={<OwnerTenantDetailPage />} />
+              <Route path="audit" element={<OwnerAuditPage />} />
+              <Route path="settings" element={<OwnerSettingsPage />} />
+            </Route>
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="/app" element={<DashboardPage />} />
               <Route path="adm" element={<ProtectedRoute permission="Repository.View"><AdmPage /></ProtectedRoute>} />

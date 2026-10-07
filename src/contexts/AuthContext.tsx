@@ -8,6 +8,11 @@ export interface User {
   tenantId: string
   tenantSlug?: string
   isPlatformAdmin?: boolean
+  /** Platform role above tenants (Owner Console). */
+  platformRole?: 'PLATFORM_OWNER' | null
+  /** Set while a platform owner manages a tenant through a delegated access session. */
+  delegatedAccess?: { sessionId: string; actorUserId: string; homeTenantId: string; expiresAt: string } | null
+  tenantName?: string
   fullName?: string
   fullNameAr?: string
   locale?: string
@@ -17,13 +22,21 @@ export interface AuthCtx {
   user: User | null
   loading: boolean
   permissions: string[]
-  login: (e: string, p: string, t: string) => Promise<void>
+  login: (e: string, p: string, t: string) => Promise<User>
   logout: () => void
+  /** Owner: switch to a delegated tenant session (the owner token is kept aside). */
+  enterTenant: (delegatedToken: string) => Promise<void>
+  /** Owner: end the delegated session and return to the owner identity. */
+  exitTenant: () => Promise<void>
   hasPermission: (code: string) => boolean
   reloadPermissions: () => Promise<void>
 }
 
 const Ctx = createContext<AuthCtx>({} as AuthCtx)
+/** The owner's own token while a delegated tenant session is active. */
+export const OWNER_TOKEN_KEY = 'ea_owner_token'
+
+export const isPlatformOwner = (u: User | null | undefined) => !!u && u.platformRole === 'PLATFORM_OWNER' && !u.delegatedAccess
 export const useAuth = () => useContext(Ctx)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -56,13 +69,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string, tenantSlug: string) => {
     const { accessToken } = await api.login(email, password, tenantSlug)
+    localStorage.removeItem(OWNER_TOKEN_KEY)
     setToken(accessToken)
+    const me = await api.me()
+    setUser(me)
+    await loadPermissions()
+    return me
+  }
+
+  const logout = () => { clearToken(); localStorage.removeItem(OWNER_TOKEN_KEY); setUser(null); setPermissions([]) }
+
+  const enterTenant = async (delegatedToken: string) => {
+    const ownerToken = getToken()
+    if (ownerToken && !localStorage.getItem(OWNER_TOKEN_KEY)) localStorage.setItem(OWNER_TOKEN_KEY, ownerToken)
+    setToken(delegatedToken)
     const me = await api.me()
     setUser(me)
     await loadPermissions()
   }
 
-  const logout = () => { clearToken(); setUser(null); setPermissions([]) }
+  const exitTenant = async () => {
+    try { await api.exitOwnerAccess() } catch { /* session may already be over: the server refuses the token anyway */ }
+    const ownerToken = localStorage.getItem(OWNER_TOKEN_KEY)
+    localStorage.removeItem(OWNER_TOKEN_KEY)
+    if (!ownerToken) { logout(); return }
+    setToken(ownerToken)
+    try {
+      const me = await api.me()
+      setUser(me)
+      await loadPermissions()
+    } catch {
+      logout()
+    }
+  }
 
   const hasPermission = useCallback((code: string) => {
     if (!user) return false
@@ -78,7 +117,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadPermissions])
 
   return (
-    <Ctx.Provider value={{ user, loading, permissions, login, logout, hasPermission, reloadPermissions }}>
+    <Ctx.Provider value={{ user, loading, permissions, login, logout, enterTenant, exitTenant, hasPermission, reloadPermissions }}>
       {children}
     </Ctx.Provider>
   )

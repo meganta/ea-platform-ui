@@ -51,7 +51,11 @@ export default function LoginPage() {
 
   const submit = async (e:FormEvent) => {
     e.preventDefault(); setError(''); setLoading(true)
-    try { await login(form.email, form.password, form.tenantSlug); nav('/app') }
+    try {
+      const me = await login(form.email, form.password, form.tenantSlug)
+      // A platform owner lands on the Owner Console; everyone else in their tenant workspace.
+      nav(me?.platformRole === 'PLATFORM_OWNER' && !me?.delegatedAccess ? '/owner/dashboard' : '/app')
+    }
     catch(err:any) { setError(err.message||'Login failed') }
     finally { setLoading(false) }
   }

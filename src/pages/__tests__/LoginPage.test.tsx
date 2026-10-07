@@ -92,6 +92,15 @@ describe('LoginPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/app');
   });
 
+  it('sends a platform owner to the Owner Console', async () => {
+    mockLogin.mockResolvedValue({ userId: 'o', platformRole: 'PLATFORM_OWNER', delegatedAccess: null });
+    renderLoginPage();
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'owner@test.com' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'Owner1234!' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign In' }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/owner/dashboard'));
+  });
+
   it('displays the error message when login() rejects', async () => {
     mockLogin.mockRejectedValue(new Error('Invalid credentials'));
     renderLoginPage();
