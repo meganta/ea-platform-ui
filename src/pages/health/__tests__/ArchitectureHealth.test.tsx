@@ -10,6 +10,11 @@ jest.mock('react-router-dom', () => ({ useSearchParams: () => [mockParams, mockS
 let mockIsAR = false
 jest.mock('../../../contexts/LangContext', () => ({ useLang: () => ({ t: (k: string) => k, isAR: mockIsAR, locale: mockIsAR ? 'AR' : 'EN' }) }))
 jest.mock('../../../components/HelpTip', () => () => <span>?</span>)
+let mockPerms = new Set<string>(['ArchitectureHealth.GenerateTemplate', 'ArchitectureHealth.UploadCollection', 'ArchitectureHealth.ApproveChanges', 'ArchitectureHealth.ExecuteChanges'])
+jest.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: (c: string) => mockPerms.has(c) }) }))
+jest.mock('../../../lib/studyExport', () => ({ saveBlob: jest.fn() }))
+import CollectionsPanel from '../CollectionsPanel'
+import { makeApi } from '../health'
 
 const criterion = (code: string, score: number | null, extra: any = {}) => ({ code, weight: 10, why: `why ${code}`, status: score === null ? 'NOT_ASSESSED' : 'ASSESSED', score, evidence: { measured: 2, of: 4 }, explanation: `explains ${code}`, gap: score !== null && score < 60 ? `gap ${code}` : null, recommendedAction: score !== null && score < 60 ? `act ${code}` : null, targetScore: 60, gapPoints: score === null ? null : Math.max(0, 60 - score), ...extra })
 
@@ -135,5 +140,69 @@ describe('Copilot health card', () => {
     render(<CopilotViewAttachments attachments={[{ kind: 'HEALTH_ASSESSMENT', id: 'e1', scope: 'ENTERPRISE', generatedAt: 'x', domains: [{ code: 'DATA', name: 'Data', maturityScore: 22, maturityLevel: 2, targetScore: 60, completeness: 30, relationshipCompleteness: 10, gapPoints: 38 }] }]} />)
     expect(screen.getByTestId('copilot-health-card')).toHaveTextContent('copilot.health.enterprise')
     expect(screen.getByText('Data').closest('a')).toHaveAttribute('href', '/architecture-health?domain=DATA')
+  })
+})
+
+describe('Data collection panel', () => {
+  const EX = { id: 'ex1', domainCode: 'APPLICATION', status: 'VALIDATED', itemKeys: ['a', 'b'], createdAt: '2026-10-07', baselineCompleteness: 40, projectedCompleteness: 60, afterCompleteness: null, baselineMaturity: 30, afterMaturity: null,
+    validation: { summary: { READY: 2, READY_WITH_WARNING: 1, NEEDS_CLARIFICATION: 1, REJECTED: 1, objectsToCreate: 1, objectsToUpdate: 2, relationshipsToCreate: 3, relationshipsToReplace: 0, conflicts: 1, possibleDuplicates: 0 }, fileProblems: [], rows: [{ rowRef: 'Application!3', objectName: 'Case Manager', status: 'READY', reasons: [], noChanges: false }] } }
+  const CHANGES = [
+    { id: 'c1', objectId: 'app1', objectName: 'Case Manager', rowRef: 'Application!3', changeType: 'UPDATE_FIELD', field: 'owner', previousValue: null, newValue: 'Operations', validationStatus: 'READY', reasons: [], decision: 'PENDING', executed: false },
+    { id: 'c2', objectId: 'app2', objectName: 'Portal', rowRef: 'Application!4', changeType: 'UPDATE_FIELD', field: 'criticality', previousValue: 'LOW', newValue: 'HIGH', validationStatus: 'NEEDS_CLARIFICATION', reasons: ['Replaces the recorded value'], conflict: true, decision: 'PENDING', executed: false },
+    { id: 'c3', objectId: 'app2', objectName: 'Portal', rowRef: 'Application!4', changeType: 'CREATE_RELATIONSHIP', field: 'CAP', targetName: 'Nope', validationStatus: 'REJECTED', reasons: ['No Capability named Nope'], decision: 'PENDING', executed: false },
+  ]
+  beforeEach(() => { mockPerms = new Set(['ArchitectureHealth.GenerateTemplate', 'ArchitectureHealth.UploadCollection', 'ArchitectureHealth.ApproveChanges', 'ArchitectureHealth.ExecuteChanges']) })
+
+  it('starts a collection (downloads the template) and shows validation, changes and decisions', async () => {
+    const fetchMock = route({
+      '/architecture-health/collections?domain=APPLICATION': [EX],
+      '/architecture-health/domains/APPLICATION/collections': { id: 'ex1' },
+      '/architecture-health/collections/ex1/template': 'xlsx',
+      '/architecture-health/collections/ex1/changes': CHANGES,
+      '/architecture-health/collections/ex1/decisions': { decided: 1 },
+      '/architecture-health/collections/ex1': EX,
+    })
+    global.fetch = jest.fn((url: string, init?: any) => fetchMock(url, init).then((r: any) => ({ ...r, blob: () => Promise.resolve(new Blob(['x'])) }))) as any
+    render(<CollectionsPanel api={makeApi('')} t={(k: string) => k} code="APPLICATION" canCollect onExecuted={jest.fn()} />)
+    await waitFor(() => expect(screen.getByText('health.collect.state.VALIDATED')).toBeInTheDocument())
+    fireEvent.click(screen.getByText(/health.collect.start$/))
+    await waitFor(() => expect(screen.getByTestId('health-collection-detail')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId('health-changes')).toHaveTextContent('Operations'))
+    // A rejected change has no checkbox; the conflict shows the recorded value.
+    expect(screen.queryByLabelText('health.collect.select Nope')).toBeNull()
+    expect(screen.getByTestId('health-changes')).toHaveTextContent('LOW')
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    fireEvent.click(screen.getByText('health.collect.approve_ready'))
+    await waitFor(() => expect(screen.getByText('health.collect.decided')).toBeInTheDocument())
+    const decision = (global.fetch as jest.Mock).mock.calls.find(c => String(c[0]).endsWith('/decisions'))
+    expect(JSON.parse(decision[1].body)).toEqual({ allReady: true, decision: 'APPROVED' })
+    // Approving a selected change sends its id and the note.
+    fireEvent.click(screen.getAllByRole('checkbox')[1])
+    fireEvent.change(screen.getByLabelText('health.collect.note'), { target: { value: 'Confirmed' } })
+    fireEvent.click(screen.getByText(/health.collect.approve_selected/))
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.filter(c => String(c[0]).endsWith('/decisions'))).toHaveLength(2))
+    const second = (global.fetch as jest.Mock).mock.calls.filter(c => String(c[0]).endsWith('/decisions'))[1]
+    expect(JSON.parse(second[1].body)).toEqual({ changeIds: ['c2'], decision: 'APPROVED', note: 'Confirmed' })
+  })
+
+  it('hides actions people may not take, and writes approved changes when allowed', async () => {
+    mockPerms = new Set(['ArchitectureHealth.ExecuteChanges'])
+    const onExecuted = jest.fn()
+    global.fetch = route({
+      '/architecture-health/collections?domain=APPLICATION': [EX],
+      '/architecture-health/collections/ex1/changes': [{ ...CHANGES[0], decision: 'APPROVED' }],
+      '/architecture-health/collections/ex1/execute': { written: 1, failed: 0, before: { completeness: 40, maturity: 30 }, after: { completeness: 55, maturity: 38 } },
+      '/architecture-health/collections/ex1': EX,
+    }) as any
+    render(<CollectionsPanel api={makeApi('')} t={(k: string) => k} code="APPLICATION" canCollect onExecuted={onExecuted} />)
+    await waitFor(() => expect(screen.getByText('health.collect.open')).toBeInTheDocument())
+    expect(screen.queryByText(/health.collect.start$/)).toBeNull()
+    fireEvent.click(screen.getByText('health.collect.open'))
+    await waitFor(() => expect(screen.getByText('health.collect.execute')).toBeInTheDocument())
+    expect(screen.queryByText('health.collect.approve_ready')).toBeNull()
+    expect(screen.queryByText('health.collect.upload')).toBeNull()
+    fireEvent.click(screen.getByText('health.collect.execute'))
+    await waitFor(() => expect(screen.getByTestId('health-collection-result')).toHaveTextContent('health.collect.result'))
+    expect(onExecuted).toHaveBeenCalled()
   })
 })
