@@ -5,6 +5,7 @@ import { CopilotViewAttachment, downloadAttachmentDeck, downloadAttachmentPng, i
 import CopilotStudyCard, { isStudyAttachment } from './CopilotStudyCard'
 import CopilotDeckCard, { isDeckAttachment } from './CopilotDeckCard'
 import CopilotHealthCard, { isHealthAttachment } from './CopilotHealthCard'
+import CopilotResearchCard, { isResearchAttachment } from './CopilotResearchCard'
 
 /**
  * EA Views that Copilot ran to illustrate an answer, shown under the answer:
@@ -70,7 +71,7 @@ function ViewCard({ attachment: a, question }: { attachment: CopilotViewAttachme
 
 export default function CopilotViewAttachments({ attachments, question, conversationId }: { attachments?: unknown[] | null; question?: string; conversationId?: string | null }) {
   const { isAR } = useLang()
-  const valid = (attachments || []).filter(a => isViewAttachment(a) || isStudyAttachment(a) || isDeckAttachment(a) || isHealthAttachment(a))
+  const valid = (attachments || []).filter(a => isViewAttachment(a) || isStudyAttachment(a) || isDeckAttachment(a) || isHealthAttachment(a) || isResearchAttachment(a))
   if (valid.length === 0) return null
   return (
     <div dir={isAR ? 'rtl' : 'ltr'} data-testid="copilot-view-attachments">
@@ -80,6 +81,8 @@ export default function CopilotViewAttachments({ attachments, question, conversa
           ? <CopilotDeckCard key={a.id} attachment={a} conversationId={conversationId} />
           : isHealthAttachment(a)
             ? <CopilotHealthCard key={a.id} attachment={a} />
+            : isResearchAttachment(a)
+              ? <CopilotResearchCard key={a.id} attachment={a} />
             : <ViewCard key={a.id} attachment={a} question={question} />))}
     </div>
   )

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../../components/HelpTip'
 import { authFetch } from './shared'
+import WebResearchSettingsCard from './WebResearchSettingsCard'
 
 export default function AiSettingsPage() {
   const { setLocale } = useLang()
@@ -76,6 +77,7 @@ export default function AiSettingsPage() {
             {saving ? 'Saving...' : 'Save AI Configuration'}
           </button>
         </div>
+        <WebResearchSettingsCard />
       </div>
     </div>
   )
