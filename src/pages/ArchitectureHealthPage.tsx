@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import HelpTip from '../components/HelpTip'
 import { useLang } from '../contexts/LangContext'
 import { HealthApi, HealthAssessment, HealthItem, REFERENCE_CLASSES, T, fmt, heatColor, makeApi } from './health/health'
+import CollectionsPanel from './health/CollectionsPanel'
 import './repository/AssetProfile.css'
 import './health/ArchitectureHealth.css'
 
@@ -219,6 +220,8 @@ function DomainView({ api, t, isAR, code }: { api: HealthApi; t: T; isAR: boolea
           <div className="ah-dim" style={{ marginTop: 8 }}>{t('health.plan.blocked')}: {a.collectionPlan.blocked.map(b => `${b.label} (${b.needs})`).join('; ')}</div>
         )}
       </div>
+
+      <CollectionsPanel api={api} t={t} code={a.domain.code} canCollect={a.collectionPlan.itemKeys.length > 0} onExecuted={() => load(true)} />
 
       <div className="rp-card">
         <div className="rp-card-title">{t('health.criteria.title')}<HelpTip text={t('health.criteria.help')} /></div>
