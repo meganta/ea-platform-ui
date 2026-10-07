@@ -4,6 +4,7 @@ import HelpTip from '../components/HelpTip'
 import { useLang } from '../contexts/LangContext'
 import { HealthApi, HealthAssessment, HealthItem, REFERENCE_CLASSES, T, fmt, heatColor, makeApi } from './health/health'
 import CollectionsPanel from './health/CollectionsPanel'
+import { BacklogPanel, EnterpriseIntelligencePanel, InsightsPanel, RationalisationPanel } from './health/ArchitectPanels'
 import './repository/AssetProfile.css'
 import './health/ArchitectureHealth.css'
 
@@ -111,6 +112,7 @@ function EnterpriseView({ api, t, isAR, onOpen }: { api: HealthApi; t: T; isAR: 
           </ol>
         )}
       </div>
+      <EnterpriseIntelligencePanel api={api} t={t} />
       {data.unresolvedObjects > 0 && <div className="rp-banner">{t('health.unresolved').replace('{count}', String(data.unresolvedObjects))}</div>}
     </div>
   )
@@ -118,7 +120,12 @@ function EnterpriseView({ api, t, isAR, onOpen }: { api: HealthApi; t: T; isAR: 
 
 // ── One domain ──────────────────────────────────────────────────────────────
 
-function GapRow({ item, api, code, t }: { item: HealthItem; api: HealthApi; code: string; t: T }) {
+/** Opens a View Library viewpoint as a private workspace view in EA Views. */
+function openViewpoint(api: HealthApi, viewpointId: string) {
+  return api.post(`/ea-views/open-viewpoint/${encodeURIComponent(viewpointId)}`, {}).then((v: any) => { if (v?.id) window.location.assign(`/ea-views?viewId=${encodeURIComponent(v.id)}`) })
+}
+
+function GapRow({ item, api, code, t, viewpoint }: { item: HealthItem; api: HealthApi; code: string; t: T; viewpoint?: { viewpointId: string; name: string } }) {
   const [objects, setObjects] = useState<any[] | null>(null)
   const [open, setOpen] = useState(false)
   const toggle = () => {
@@ -134,7 +141,10 @@ function GapRow({ item, api, code, t }: { item: HealthItem; api: HealthApi; code
         <td><Bar value={item.coverage} /> <span className="ah-dim">{item.useful}/{item.expected}</span></td>
         <td>{item.missing}{item.invalid > 0 && <div className="ah-dim">{t('health.gap.invalid').replace('{count}', String(item.invalid))}</div>}</td>
         <td>+{item.gainPoints}</td>
-        <td><button type="button" className="ah-link-btn" aria-expanded={open} onClick={toggle}>{open ? t('health.gap.hide') : t('health.gap.show')}</button></td>
+        <td className="ah-gap-view">
+          <button type="button" className="ah-link-btn" aria-expanded={open} onClick={toggle}>{open ? t('health.gap.hide') : t('health.gap.show')}</button>
+          {viewpoint && <div><button type="button" className="ah-link-btn" title={viewpoint.name} onClick={() => openViewpoint(api, viewpoint.viewpointId).catch(() => undefined)}>{t('health.gap.view')}</button></div>}
+        </td>
       </tr>
       {open && (
         <tr><td colSpan={7}>
@@ -151,7 +161,7 @@ function GapRow({ item, api, code, t }: { item: HealthItem; api: HealthApi; code
 }
 
 function DomainView({ api, t, isAR, code }: { api: HealthApi; t: T; isAR: boolean; code: string }) {
-  const [data, setData] = useState<{ assessment: HealthAssessment; latest: any } | null>(null)
+  const [data, setData] = useState<{ assessment: HealthAssessment; latest: any; gapViewpoints?: Record<string, { viewpointId: string; name: string }> } | null>(null)
   const [history, setHistory] = useState<any[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -222,6 +232,8 @@ function DomainView({ api, t, isAR, code }: { api: HealthApi; t: T; isAR: boolea
       </div>
 
       <CollectionsPanel api={api} t={t} code={a.domain.code} canCollect={a.collectionPlan.itemKeys.length > 0} onExecuted={() => load(true)} />
+      <BacklogPanel api={api} t={t} code={a.domain.code} />
+      <RationalisationPanel api={api} t={t} code={a.domain.code} />
 
       <div className="rp-card">
         <div className="rp-card-title">{t('health.criteria.title')}<HelpTip text={t('health.criteria.help')} /></div>
@@ -250,7 +262,7 @@ function DomainView({ api, t, isAR, code }: { api: HealthApi; t: T; isAR: boolea
           <div className="rp-table-wrap">
             <table className="ah-table" data-testid="health-gaps">
               <thead><tr><th>{t('health.gaps.type')}</th><th>{t('health.gaps.item')}</th><th>{t('health.gaps.priority')}</th><th>{t('health.gaps.coverage')}</th><th>{t('health.gaps.missing')}</th><th>{t('health.gaps.gain')}</th><th /></tr></thead>
-              <tbody>{shownGaps.map(i => <GapRow key={i.key} item={i} api={api} code={a.domain.code} t={t} />)}</tbody>
+              <tbody>{shownGaps.map(i => <GapRow key={i.key} item={i} api={api} code={a.domain.code} t={t} viewpoint={data.gapViewpoints?.[i.key]} />)}</tbody>
             </table>
           </div>
         )}
@@ -345,6 +357,8 @@ export default function ArchitectureHealthPage() {
                 </button>
               ))}
             </div>
+            {selected === 'ENTERPRISE' && <InsightsPanel api={api} t={t} />}
+            {selected !== 'ENTERPRISE' && <InsightsPanel api={api} t={t} domains={[selected]} compact />}
             {selected === 'ENTERPRISE' ? <EnterpriseView api={api} t={t} isAR={isAR} onOpen={open} /> : <DomainView key={selected} api={api} t={t} isAR={isAR} code={selected} />}
           </>
         )}
