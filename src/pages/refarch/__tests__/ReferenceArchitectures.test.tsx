@@ -98,6 +98,51 @@ describe('Reference Architectures page', () => {
     await waitFor(() => expect(calls(f, 'GET', '/reference-architectures/a1/links?elementKey=portal').length).toBe(1))
   })
 
+  it('links a capability to an object of another domain the Meta Model permits (REALIZED_BY), expected types first, never a type that cannot realize', async () => {
+    mockParams = new URLSearchParams('ra=a1')
+    const MM = {
+      domains: [{ code: 'APPLICATION', name: 'Application' }, { code: 'TECHNOLOGY', name: 'Technology' }, { code: 'DATA', name: 'Data' }],
+      objectTypes: [{ code: 'Application', name: 'Application', domain: 'APPLICATION' }, { code: 'ITServer', name: 'Server', domain: 'TECHNOLOGY' }, { code: 'ConceptualDataEntity', name: 'Data Entity', domain: 'DATA' }],
+      realization: { relationships: ['REALIZED_BY', 'SUPPORTED_BY', 'DEPENDS_ON'], byType: { Application: ['REALIZED_BY', 'SUPPORTED_BY', 'DEPENDS_ON'], ITServer: ['REALIZED_BY', 'SUPPORTED_BY', 'DEPENDS_ON'], ConceptualDataEntity: ['SUPPORTED_BY', 'DEPENDS_ON'] } },
+    }
+    const crossConf = { ...CONF, elements: CONF.elements.map((e: any) => e.stableKey === 'portal' ? { ...e, realizedBy: [{ linkId: 'l1', objectId: 'srv1', name: 'Portal server', linkType: 'REALIZED_BY', targetType: 'ITServer', targetDomain: 'TECHNOLOGY', crossDomain: true, present: true, lifecycleStatus: 'ACTIVE' }], supportedBy: [{ linkId: 'l2', objectId: 'ent1', name: 'Applicant', linkType: 'SUPPORTED_BY', targetType: 'ConceptualDataEntity', targetDomain: 'DATA', crossDomain: true, present: true, lifecycleStatus: null }] } : e) }
+    const f = workspaceFetch({
+      '/reference-architectures/meta-model': MM,
+      '/reference-architectures/a1/conformance': crossConf,
+      '/ea-repository/assets?search=': { items: [{ id: 'srv2', name: 'Kiosk server', assetType: 'ITServer' }, { id: 'ent2', name: 'Kiosk data', assetType: 'ConceptualDataEntity' }, { id: 'app2', name: 'Kiosk app', assetType: 'Application' }] },
+      '/reference-architectures/a1/links': (url: string, init: any) => (init?.method === 'POST' ? { id: 'new' } : []),
+    }); global.fetch = f as any
+    render(<ReferenceArchitecturesPage />)
+    await screen.findByTestId('ra-coverage')
+    fireEvent.click(screen.getByRole('tab', { name: 'refarch.tab.architecture' }))
+    // The realized capability shows where its implementations sit.
+    fireEvent.click(within(await screen.findByTestId('ra-diagram')).getByRole('button', { name: /Digital portal - refarch\.conf\.ALIGNED/ }))
+    let drawer = await screen.findByTestId('ra-drawer')
+    expect(drawer).toHaveTextContent('Portal server')
+    expect(drawer).toHaveTextContent('TECHNOLOGY · refarch.el.cross_domain')
+    expect(drawer).toHaveTextContent('refarch.el.supported_by')
+    expect(drawer).toHaveTextContent('Applicant')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'common.close' }))
+    fireEvent.click(within(screen.getByTestId('ra-diagram')).getByRole('button', { name: /Kiosk - refarch\.conf\.GAP/ }))
+    drawer = await screen.findByTestId('ra-drawer')
+    expect((within(drawer).getByLabelText('refarch.el.link_type') as HTMLSelectElement).value).toBe('REALIZED_BY')
+    fireEvent.change(within(drawer).getByLabelText('refarch.el.search_object'), { target: { value: 'Kiosk' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: '🔍' }))
+    await waitFor(() => expect(drawer).toHaveTextContent('Kiosk server'))
+    const items = within(drawer).getAllByRole('listitem').map(li => li.textContent || '')
+    const app = items.findIndex(x => x.includes('Kiosk app')); const srv = items.findIndex(x => x.includes('Kiosk server'))
+    expect(app).toBeGreaterThan(-1); expect(app).toBeLessThan(srv)
+    expect(drawer).not.toHaveTextContent('Kiosk data')
+    expect(items[srv]).toContain('refarch.el.cross_domain')
+    fireEvent.click(within(within(drawer).getAllByRole('listitem')[srv]).getByRole('button', { name: 'refarch.el.record' }))
+    await waitFor(() => expect(calls(f, 'POST', '/reference-architectures/a1/links')).toHaveLength(1))
+    expect(JSON.parse(calls(f, 'POST', '/reference-architectures/a1/links')[0][1].body)).toMatchObject({ elementKey: 'kiosk', linkType: 'REALIZED_BY', targetId: 'srv2' })
+    // A data entity can support the capability or be a dependency of it.
+    fireEvent.change(within(drawer).getByLabelText('refarch.el.link_type'), { target: { value: 'SUPPORTED_BY' } })
+    fireEvent.click(within(drawer).getByRole('button', { name: '🔍' }))
+    await waitFor(() => expect(drawer).toHaveTextContent('Kiosk data'))
+  })
+
   it('a proposal says what kind of link it is and where it came from', async () => {
     mockParams = new URLSearchParams('ra=a1')
     const f = workspaceFetch({ '/reference-architectures/a1/links?elementKey=portal': [{ id: 'p1', status: 'PROPOSED', linkType: 'DEVIATES_FROM', basis: 'GOVERNANCE_FINDING', confidence: null, targetName: 'Legacy portal', targetId: 'app9', targetType: 'Application', targetModule: 'REPOSITORY' }] }); global.fetch = f as any

@@ -156,7 +156,7 @@ function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: R
               </div>
               {selectedEl && (
                 <ElementDrawer key={selectedEl.stableKey} architectureId={arch.id} element={selectedEl} parentName={parentName} conformance={confByKey[selectedEl.stableKey]} editable={draft}
-                  versionId={version.id} metaModelTypes={metaModel?.objectTypes || []} api={api} t={t} isAR={isAR} onChanged={loadVersion} onClose={() => setSelected(null)} />
+                  versionId={version.id} metaModelTypes={metaModel?.objectTypes || []} realization={metaModel?.realization} architectureDomain={arch.domainCode || null} api={api} t={t} isAR={isAR} onChanged={loadVersion} onClose={() => setSelected(null)} />
               )}
             </div>
           </>
@@ -251,7 +251,7 @@ function AddElement({ api, t, versionId, elements, metaModel, onAdded }: any) {
       <div className="ra-form-grid" style={{ marginTop: 10 }}>
         <div className="form-group"><label className="form-label" htmlFor="ra-add-name">{t('refarch.form.element_name')}</label><input id="ra-add-name" className="form-input" value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></div>
         <div className="form-group"><label className="form-label" htmlFor="ra-add-parent">{t('refarch.form.parent')}</label><select id="ra-add-parent" className="form-input" value={f.parentKey} onChange={e => setF({ ...f, parentKey: e.target.value })}><option value="">—</option>{elements.filter((e: any) => e.reviewStatus !== 'REJECTED').map((e: any) => <option key={e.stableKey} value={e.stableKey}>{e.name}</option>)}</select></div>
-        <div className="form-group"><label className="form-label" htmlFor="ra-add-kind">{t('refarch.kind')}</label><select id="ra-add-kind" className="form-input" value={f.kind} onChange={e => setF({ ...f, kind: e.target.value })}>{['LAYER', 'AREA', 'GROUP', 'COMPONENT', 'STAGE', 'PATTERN', 'CONCEPT'].map(k => <option key={k} value={k}>{t(`refarch.ekind.${k}`)}</option>)}</select></div>
+        <div className="form-group"><label className="form-label" htmlFor="ra-add-kind">{t('refarch.kind')}</label><select id="ra-add-kind" className="form-input" value={f.kind} onChange={e => setF({ ...f, kind: e.target.value })}>{['LAYER', 'AREA', 'GROUP', 'CAPABILITY', 'COMPONENT', 'STAGE', 'PATTERN', 'CONCEPT'].map(k => <option key={k} value={k}>{t(`refarch.ekind.${k}`)}</option>)}</select></div>
         <div className="form-group"><label className="form-label" htmlFor="ra-add-type">{t('refarch.form.types')}</label><select id="ra-add-type" className="form-input" value={f.type} disabled={f.configurationRequired} onChange={e => setF({ ...f, type: e.target.value })}><option value="">—</option>{(metaModel?.objectTypes || []).map((o: any) => <option key={o.code} value={o.code}>{o.name}</option>)}</select></div>
         <div className="form-group"><label className="form-label" htmlFor="ra-add-obl">{t('refarch.form.obligation')}</label><select id="ra-add-obl" className="form-input" value={f.obligation} onChange={e => setF({ ...f, obligation: e.target.value })}>{['MANDATORY', 'RECOMMENDED', 'OPTIONAL'].map(o => <option key={o} value={o}>{t(`refarch.form.obligation.${o}`)}</option>)}</select></div>
       </div>
@@ -266,7 +266,8 @@ function ActualTab({ arch, conf, t, isAR, api, onChanged, onSelect }: any) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const propose = () => { setBusy(true); api.post(`/reference-architectures/${arch.id}/links/propose`, { useAi }).then((r: any) => { setMsg({ ok: true, text: `${r.proposed} ${t('refarch.propose.done')}${r.notes?.length ? ` · ${r.notes.join(' ')}` : ''}` }); onChanged() }).catch((e: any) => setMsg({ ok: false, text: e.message })).finally(() => setBusy(false)) }
-  const rows: ElementConformance[] = (conf?.elements || []).filter((e: ElementConformance) => (e.metaModelTypeCodes || []).length > 0 || e.realizedBy.length > 0)
+  // Every capability that can be realized (any domain), not only the ones with an expected Meta Model type.
+  const rows: ElementConformance[] = (conf?.elements || []).filter((e: any) => e.realizable !== false || e.realizedBy.length > 0)
   return (
     <div className="rp-card">
       <div className="ap-toolbar">
@@ -282,7 +283,11 @@ function ActualTab({ arch, conf, t, isAR, api, onChanged, onSelect }: any) {
             <tr key={e.stableKey}>
               <td><button type="button" className="ra-leaf" onClick={() => onSelect(e.stableKey)}>{localName(e, isAR)}</button><div className="text-dim" style={{ fontSize: 11 }}>{(e.metaModelTypeCodes || []).join(', ')}</div></td>
               <td><StatusChip status={e.status} t={t} /></td>
-              <td>{e.realizedBy.filter(r => r.present).map(r => r.name).join(', ') || <span className="ap-empty">{t('refarch.el.no_impl')}</span>}</td>
+              <td>{e.realizedBy.filter(r => r.present).length ? e.realizedBy.filter(r => r.present).map(r => (
+                <span key={r.linkId} className="ra-chip" style={{ marginInlineEnd: 4 }}>{r.name}{r.targetDomain ? ` · ${r.targetDomain}` : ''}{r.crossDomain ? ` ↗` : ''}</span>
+              )) : <span className="ap-empty">{t('refarch.el.no_impl')}</span>}
+                {(e.supportedBy || []).filter(r => r.present).length > 0 && <div className="text-dim" style={{ fontSize: 11 }}>{t('refarch.link.SUPPORTED_BY')}: {(e.supportedBy || []).filter(r => r.present).map(r => r.name).join(', ')}</div>}
+              </td>
               <td>{e.proposedLinks || ''}</td>
             </tr>
           ))}</tbody>
