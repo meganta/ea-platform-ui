@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
+import UsersPage from './UsersPage'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
@@ -38,11 +39,20 @@ const S = {
 const RISK_COLORS: Record<string, string> = { NORMAL: '#64748B', SENSITIVE: '#f39c12', PRIVILEGED: '#e67e22', CRITICAL: '#e74c3c' }
 const STATUS_COLORS: Record<string, string> = { PENDING: '#f39c12', APPROVED: '#27ae60', REJECTED: '#e74c3c', CANCELLED: '#64748B', ACTIVE: '#00b4d8', COMPLETED: '#27ae60' }
 
+type AgTab = 'overview'|'roles'|'users'|'requests'|'sod'|'reviews'|'audit'
+const AG_TABS: AgTab[] = ['overview', 'roles', 'users', 'requests', 'sod', 'reviews', 'audit']
+/** Opens on ?tab=<name> (e.g. /access-governance?tab=users, where /settings/users now leads). */
+function initialTab(): AgTab {
+  const t = new URLSearchParams(window.location.search).get('tab') as AgTab | null
+  return t && AG_TABS.includes(t) ? t : 'overview'
+}
+
 export default function AccessGovernancePage() {
   const api = useApi()
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'TENANT_ADMIN'
-  const [tab, setTab] = useState<'overview'|'roles'|'users'|'requests'|'sod'|'reviews'|'audit'>('overview')
+  const { hasPermission } = useAuth()
+  // Tenant administrators (legacy TENANT_ADMIN / SUPERADMIN, or a role granting Tenant.Administer) manage roles and access.
+  const isAdmin = hasPermission('Tenant.Administer')
+  const [tab, setTab] = useState<AgTab>(initialTab)
 
   return (
     <div style={S.page}>
@@ -61,7 +71,7 @@ export default function AccessGovernancePage() {
         const TAB_HELP: Record<string, string> = {
           overview: "A snapshot of who has access to what across your organization, and whether anything needs your attention.",
           roles: "A role is a bundle of permissions you can hand to someone all at once - like 'Architect' or 'Reviewer' - instead of assigning each permission one by one.",
-          users: "See what access each person in your organization currently has, and adjust it if needed.",
+          users: "Everyone in your organization: invite or create users, give them roles, see the access each person has, deactivate or delete accounts.",
           requests: "When someone asks for access to something they don't already have, it shows up here for an admin to approve or decline.",
           sod: "Short for 'Segregation of Duties' - a safeguard that flags when one person has been given two roles that shouldn't be combined, like being able to both request and approve the same thing.",
           reviews: "A periodic check-in where admins confirm that everyone's current access still makes sense, and remove anything that's no longer needed.",
@@ -76,7 +86,7 @@ export default function AccessGovernancePage() {
       <div style={S.content}>
         {tab === 'overview' && <OverviewTab api={api} isAdmin={isAdmin} />}
         {tab === 'roles' && <RolesTab api={api} isAdmin={isAdmin} />}
-        {tab === 'users' && <UsersTab api={api} isAdmin={isAdmin} />}
+        {tab === 'users' && <UsersPage embedded />}
         {tab === 'requests' && <RequestsTab api={api} isAdmin={isAdmin} />}
         {tab === 'sod' && <SodTab api={api} isAdmin={isAdmin} />}
         {tab === 'reviews' && <ReviewsTab api={api} isAdmin={isAdmin} />}
@@ -248,91 +258,6 @@ function RolesTab({ api, isAdmin }: any) {
                 </>}
               </td>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </div>
-  )
-}
-
-// ── Users ──────────────────────────────────────────────────────────────────
-function UsersTab({ api, isAdmin }: any) {
-  const [users, setUsers] = useState<any[]>([])
-  const [roles, setRoles] = useState<any[]>([])
-  const [effective, setEffective] = useState<{ userId: string; perms: any[] } | null>(null)
-  const [assigning, setAssigning] = useState<string | null>(null)
-  const [assignRoleId, setAssignRoleId] = useState('')
-
-  const load = useCallback(() => {
-    if (!isAdmin) return
-    api.get('/access-governance/users').then(setUsers).catch(() => {})
-    api.get('/access-governance/roles').then(setRoles).catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin])
-  useEffect(() => { load() }, [load])
-
-  const viewEffective = async (userId: string) => {
-    const perms = await api.get(`/access-governance/users/${userId}/effective-permissions`)
-    setEffective({ userId, perms })
-  }
-
-  const assignRole = async (userId: string) => {
-    if (!assignRoleId) return
-    try {
-      await api.post(`/access-governance/roles/${assignRoleId}/assign`, { userId })
-      setAssigning(null); setAssignRoleId(''); load()
-    } catch (e: any) { alert(e.message) }
-  }
-
-  const removeRole = async (userId: string, roleId: string) => {
-    if (!window.confirm('Remove this role assignment?')) return
-    try { await api.del(`/access-governance/roles/${roleId}/assign/${userId}`); load() } catch (e: any) { alert(e.message) }
-  }
-
-  if (!isAdmin) return <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Requires Tenant Administrator access.</div>
-
-  return (
-    <div>
-      <div style={{ overflowX: 'auto' }}>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead><tr><th style={S.th}>User</th><th style={S.th}>Legacy Role</th><th style={S.th}>Governance Roles</th><th style={S.th}>Last Login</th><th style={S.th}></th></tr></thead>
-        <tbody>
-          {users.map(u => (
-            <>
-              <tr key={u.id}>
-                <td style={S.td}><div>{u.fullName}</div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{u.email}</div></td>
-                <td style={S.td}>{u.role}</td>
-                <td style={S.td}>{u.tenantRoles.length === 0 ? <span style={{ color: 'var(--text-dim)' }}>—</span> : u.tenantRoles.map((r: any) => (
-                  <span key={r.id} style={{ ...S.badge('#00b4d8'), marginRight: 4, cursor: 'pointer' }} onClick={() => removeRole(u.id, r.id)} title="Click to remove">{r.name} ✕</span>
-                ))}</td>
-                <td style={S.td}>{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : <span style={{ color: '#f39c12' }}>Never</span>}</td>
-                <td style={S.td}>
-                  <button style={{ ...S.btn(), fontSize: 11, padding: '4px 8px', marginRight: 6 }} onClick={() => viewEffective(u.id)}>Effective Access</button>
-                  <button style={{ ...S.btn('primary'), fontSize: 11, padding: '4px 8px' }} onClick={() => setAssigning(assigning === u.id ? null : u.id)}>+ Assign</button>
-                </td>
-              </tr>
-              {assigning === u.id && (
-                <tr><td colSpan={5} style={S.td}>
-                  <div style={S.row}>
-                    <select style={{ ...S.input, marginBottom: 0, width: 240 }} value={assignRoleId} onChange={e => setAssignRoleId(e.target.value)}>
-                      <option value="">Select role…</option>
-                      {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                    </select>
-                    <button style={S.btn('primary')} onClick={() => assignRole(u.id)}>Assign</button>
-                  </div>
-                </td></tr>
-              )}
-              {effective?.userId === u.id && effective && (
-                <tr><td colSpan={5} style={S.td}>
-                  <div style={{ fontSize: 12 }}>
-                    {effective.perms.length === 0 ? <span style={{ color: 'var(--text-dim)' }}>No permissions granted.</span> : effective.perms.map((p: any, i: number) => (
-                      <div key={i} style={{ padding: '3px 0' }}>{p.code} <span style={{ color: 'var(--text-dim)' }}>via {p.source}</span>{p.domainScope?.length > 0 && <span style={{ color: 'var(--text-dim)' }}> · scoped to {p.domainScope.join(', ')}</span>}</div>
-                    ))}
-                  </div>
-                </td></tr>
-              )}
-            </>
           ))}
         </tbody>
       </table>

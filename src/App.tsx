@@ -28,7 +28,6 @@ import ReportsPage from './pages/ReportsPage'
 import SharedViewPage from './pages/SharedViewPage'
 import AccessGovernancePage from './pages/AccessGovernancePage'
 import SetupAssistantPage from './pages/SetupAssistantPage'
-import UsersPage from './pages/UsersPage'
 import StrategyPage from './pages/StrategyRefreshPage'
 import BusinessCapabilitiesPage from './pages/BusinessCapabilitiesPage'
 import MySurveysPage from './pages/MySurveysPage'
@@ -39,12 +38,12 @@ import DecisionEvaluationPage from './pages/DecisionEvaluationPage'
 import EaPlanningPage from './pages/EaPlanningPage'
 import GlossaryPage from './pages/GlossaryPage'
 import LandingPage from './pages/LandingPage'
-import DemoRequestsPage from './pages/DemoRequestsPage'
 import OwnerLayout, { OwnerRoute } from './pages/owner/OwnerLayout'
 import OwnerDashboardPage from './pages/owner/OwnerDashboardPage'
 import OwnerTenantsPage from './pages/owner/OwnerTenantsPage'
 import OwnerTenantDetailPage from './pages/owner/OwnerTenantDetailPage'
 import OwnerAuditPage from './pages/owner/OwnerAuditPage'
+import OwnerDemoRequestsPage from './pages/owner/OwnerDemoRequestsPage'
 import OwnerSettingsPage from './pages/owner/OwnerSettingsPage'
 import OutreachDashboardPage from './pages/owner/outreach/OutreachDashboardPage'
 import OutreachEntitiesPage from './pages/owner/outreach/OutreachEntitiesPage'
@@ -93,6 +92,7 @@ export default function App() {
               <Route path="tenants/:tenantId" element={<OwnerTenantDetailPage />} />
               <Route path="tenants/:tenantId/:tab" element={<OwnerTenantDetailPage />} />
               <Route path="audit" element={<OwnerAuditPage />} />
+              <Route path="demo-requests" element={<OwnerDemoRequestsPage />} />
               <Route path="settings" element={<OwnerSettingsPage />} />
               <Route path="outreach" element={<OutreachDashboardPage />} />
               <Route path="outreach/entities" element={<OutreachEntitiesPage />} />
@@ -110,33 +110,33 @@ export default function App() {
               <Route path="architecture-health" element={<ProtectedRoute permission="ArchitectureHealth.View"><ArchitectureHealthPage /></ProtectedRoute>} />
               <Route path="repository" element={<ProtectedRoute permission="Repository.View"><RepositoryPage /></ProtectedRoute>} />
               <Route path="knowledge" element={<ProtectedRoute permission="Repository.View"><KnowledgePage /></ProtectedRoute>} />
-              <Route path="glossary" element={<ProtectedRoute permission="Repository.View" superadminOnly><GlossaryPage /></ProtectedRoute>} />
-              <Route path="settings" element={<ProtectedRoute permission="Users.View" superadminOnly><Navigate to="/settings/organization" replace /></ProtectedRoute>} />
-              <Route path="settings/organization" element={<ProtectedRoute permission="Users.View" superadminOnly><OrganizationSettingsPage /></ProtectedRoute>} />
-              <Route path="settings/ai" element={<ProtectedRoute permission="Users.View" superadminOnly><AiSettingsPage /></ProtectedRoute>} />
-              <Route path="settings/knowledge-base" element={<ProtectedRoute permission="Users.View" superadminOnly><KnowledgeBaseSettingsPage /></ProtectedRoute>} />
-              <Route path="settings/governance" element={<ProtectedRoute permission="Users.View" superadminOnly><GovernanceSettingsPage /></ProtectedRoute>} />
-              <Route path="settings/output" element={<ProtectedRoute permission="Users.View" superadminOnly><OutputSettingsPage /></ProtectedRoute>} />
-              <Route path="settings/notifications" element={<ProtectedRoute permission="Users.View" superadminOnly><NotificationsSettingsPage /></ProtectedRoute>} />
-              <Route path="settings/users" element={<ProtectedRoute permission="Users.View" superadminOnly><UsersPage /></ProtectedRoute>} />
-              <Route path="settings/api-billing" element={<ProtectedRoute permission="Users.View" superadminOnly><ApiBillingSettingsPage /></ProtectedRoute>} />
+              <Route path="glossary" element={<ProtectedRoute permission="Repository.View"><GlossaryPage /></ProtectedRoute>} />
+              <Route path="settings" element={<ProtectedRoute permission="Settings.Manage"><Navigate to="/settings/organization" replace /></ProtectedRoute>} />
+              <Route path="settings/organization" element={<ProtectedRoute permission="Settings.Manage"><OrganizationSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/ai" element={<ProtectedRoute permission="Settings.Manage"><AiSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/knowledge-base" element={<ProtectedRoute permission="Settings.Manage"><KnowledgeBaseSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/governance" element={<ProtectedRoute permission="Settings.Manage"><GovernanceSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/output" element={<ProtectedRoute permission="Settings.Manage"><OutputSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/notifications" element={<ProtectedRoute permission="Settings.Manage"><NotificationsSettingsPage /></ProtectedRoute>} />
+              <Route path="settings/users" element={<Navigate to="/access-governance?tab=users" replace />} />
+              <Route path="settings/api-billing" element={<ProtectedRoute permission="Settings.Manage"><ApiBillingSettingsPage /></ProtectedRoute>} />
               <Route path="governance" element={<ProtectedRoute permission="Reviews.View"><GovernancePage /></ProtectedRoute>} />
               <Route path="meta-model" element={<ProtectedRoute permission="MetaModel.View"><MetaModelPage /></ProtectedRoute>} />
               <Route path="ea-views" element={<ProtectedRoute permission="Views.View"><EaViewsPage /></ProtectedRoute>} />
-              <Route path="connector-hub" element={<ProtectedRoute permission="Repository.View" superadminOnly><ConnectorHubPage /></ProtectedRoute>} />
+              <Route path="connector-hub" element={<ProtectedRoute permission="Connector.View"><ConnectorHubPage /></ProtectedRoute>} />
               <Route path="reports" element={<ProtectedRoute permission="Repository.View"><ReportsPage /></ProtectedRoute>} />
-              <Route path="access-governance" element={<ProtectedRoute permission="Roles.View" superadminOnly><AccessGovernancePage /></ProtectedRoute>} />
-              <Route path="users" element={<ProtectedRoute permission="Users.View"><UsersPage /></ProtectedRoute>} />
-              <Route path="getting-started" element={<ProtectedRoute superadminOnly><SetupAssistantPage /></ProtectedRoute>} />
+              <Route path="access-governance" element={<ProtectedRoute permission="Roles.View"><AccessGovernancePage /></ProtectedRoute>} />
+              <Route path="users" element={<Navigate to="/access-governance?tab=users" replace />} />
+              <Route path="getting-started" element={<ProtectedRoute permission="Settings.Manage"><SetupAssistantPage /></ProtectedRoute>} />
               <Route path="my-surveys" element={<ProtectedRoute permission="Surveys.Respond"><MySurveysPage /></ProtectedRoute>} />
               <Route path="business-capabilities" element={<ProtectedRoute permission="BusinessCapability.View"><BusinessCapabilitiesPage /></ProtectedRoute>} />
               <Route path="strategy" element={<ProtectedRoute permission="Strategy.View"><StrategyPage /></ProtectedRoute>} />
-              <Route path="innovation" element={<ProtectedRoute permission="Repository.View"><InnovationPage /></ProtectedRoute>} />
+              <Route path="innovation" element={<ProtectedRoute permission="Innovation.View"><InnovationPage /></ProtectedRoute>} />
               <Route path="notifications" element={<NotificationsPage />} />
-              <Route path="billing" element={<ProtectedRoute permission="Users.View" superadminOnly><BillingPage /></ProtectedRoute>} />
-              <Route path="decision-evaluation" element={<ProtectedRoute permission="Reviews.View" superadminOnly><DecisionEvaluationPage /></ProtectedRoute>} />
+              <Route path="billing" element={<ProtectedRoute permission="Settings.Manage"><BillingPage /></ProtectedRoute>} />
+              <Route path="decision-evaluation" element={<ProtectedRoute permission="DecisionEvaluation.ViewAssessments"><DecisionEvaluationPage /></ProtectedRoute>} />
               <Route path="ea-planning" element={<ProtectedRoute permission="Repository.View"><EaPlanningPage /></ProtectedRoute>} />
-              <Route path="demo-requests" element={<ProtectedRoute superadminOnly><DemoRequestsPage /></ProtectedRoute>} />
+              <Route path="demo-requests" element={<Navigate to="/app" replace />} />
             </Route>
           </Routes>
         </BrowserRouter>
