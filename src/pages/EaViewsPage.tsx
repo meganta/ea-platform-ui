@@ -21,7 +21,7 @@ import { buildChangeSummaryRows, buildRelationshipChangeRows, buildComparisonMat
 import { buildPropertyFieldDisplay, requiresCurrentEditConfirmation, isScenarioLocked, determineAssetActions, canIntroduce, buildRelationshipAuthoringRows } from './eaviews/authoringUtils'
 import { resolveEvidenceRef, buildProposedChangeRows, canApproveProposal, CLAIM_STYLE } from './eaviews/aiAssistUtils'
 
-const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useViewsApi() {
   const { token } = useAuth() as any

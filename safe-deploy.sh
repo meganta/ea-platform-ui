@@ -4,7 +4,7 @@
 
 set -e
 
-API_URL="https://ea-platform-api-693660680541.me-central1.run.app/api/v1"
+API_URL="https://archmindworks.com/api/v1"
 PROJECT="ea-platform-20260428"
 REGION="me-central1"
 

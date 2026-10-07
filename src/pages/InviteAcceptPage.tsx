@@ -7,7 +7,7 @@ import BrandPattern from '../brand/BrandPattern'
 import Icon from '../brand/icons'
 import '../brand/brand.css'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 export default function InviteAcceptPage() {
   const { token } = useParams<{ token: string }>()

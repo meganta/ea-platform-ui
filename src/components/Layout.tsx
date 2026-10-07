@@ -7,7 +7,7 @@ import { useBranding } from '../contexts/BrandingContext'
 import SetupAssistantPage from '../pages/SetupAssistantPage'
 import NotificationBell from './NotificationBell'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 interface NavItem {
   to: string

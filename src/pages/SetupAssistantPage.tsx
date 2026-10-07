@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
   fetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
 

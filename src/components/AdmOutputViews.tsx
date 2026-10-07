@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from './HelpTip'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 interface ViewPicture { viewId: string; title: string; svgContent: string; visualization: string; architectureState: string; objects: number; openUrl: string }
 

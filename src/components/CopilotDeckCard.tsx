@@ -4,7 +4,7 @@ import HelpTip from './HelpTip'
 import { exportFileName } from '../lib/exportFileName'
 import { saveBlob } from '../lib/studyExport'
 
-const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 /** An answer Copilot turned into a PowerPoint deck (the outline is stored with the message; the file is rendered on download). */
 export interface CopilotDeckAttachment {

@@ -6,7 +6,7 @@ import { STATUS_COLOR, localName, makeApi } from '../pages/refarch/refArch'
 // Reference architecture context shown inside other modules - read from
 // the Reference Architecture API, never recomputed here.
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const box: React.CSSProperties = { border: '1px solid var(--border)', borderRadius: 10, padding: 14, background: 'var(--navy-light)', marginTop: 12 }
 const chip = (color: string): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '1px 8px', borderRadius: 999, fontSize: 11, border: '1px solid var(--border)', background: 'var(--navy-mid)', whiteSpace: 'nowrap', borderInlineStart: `3px solid ${color}` })
 const link = (id: string) => `/reference-architectures?ra=${encodeURIComponent(id)}`

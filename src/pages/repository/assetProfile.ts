@@ -1,5 +1,5 @@
 /** Client and types for an EA Repository object's Meta Model-driven profile (view + edit). */
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 export interface EnumOption { value: string; label: string; labelAr?: string | null; color?: string | null }
 export interface ProfileAttribute {

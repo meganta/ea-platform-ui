@@ -7,7 +7,7 @@ import CollectionsPanel from './health/CollectionsPanel'
 import './repository/AssetProfile.css'
 import './health/ArchitectureHealth.css'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useApi(): HealthApi {
   return useMemo(() => makeApi(API_URL), [])

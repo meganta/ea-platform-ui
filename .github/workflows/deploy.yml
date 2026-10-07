@@ -19,8 +19,8 @@ concurrency:
 env:
   REGION: me-central1
   SERVICE: ea-platform-ui
-  # Must match the API endpoint of the approved manual procedure.
-  REACT_APP_API_URL: https://ea-platform-api-693660680541.me-central1.run.app/api/v1
+  # The platform domain: the archmindworks.com load balancer routes /api/* to Cloud Run ea-platform-api.
+  REACT_APP_API_URL: https://archmindworks.com/api/v1
 
 jobs:
   test:

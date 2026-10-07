@@ -9,7 +9,7 @@ import { Phase7Workspace } from '../components/Phase7Workspace'
 import HelpTip from '../components/HelpTip'
 import DesignPicker from '../components/DesignPicker'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
   fetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
 const scrollToElement = (id: string, block: ScrollLogicalPosition = 'center') => {
@@ -604,7 +604,7 @@ function SectionProgress({ outputId }: { outputId: string }) {
   const { isAR } = useLang()
   const [sections, setSections] = useState<any[]>([])
   const token = () => localStorage.getItem('ea_token')
-  const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+  const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
   useEffect(() => {
     const load = () => {

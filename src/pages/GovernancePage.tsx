@@ -11,7 +11,7 @@ import { GovernanceReferencePanel } from '../components/ReferenceArchitecturePan
 import StrategyAlignmentPanel, { usesStrategyAlignment } from '../components/StrategyAlignmentPanel'
 import PipelineStepList, { PipelineStep, stepsRatio } from '../components/PipelineStepList'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useApi() {
   const token = () => localStorage.getItem('ea_token')
@@ -295,7 +295,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
     setEvidenceLoading(true)
     try {
       const token = localStorage.getItem('ea_token') || ''
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
       const res = await fetch(`${apiUrl}/governance/reviews/${reviewId}/evidence?findingId=${f.id}`, { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json().catch(() => [])
       setEvidence(Array.isArray(data) ? data : [])
@@ -310,7 +310,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
     setSaving(true)
     try {
       const token = localStorage.getItem('ea_token') || ''
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
       await fetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(draft),
@@ -325,7 +325,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
     e.stopPropagation()
     if (!reviewId || !onDelete) return
     const token = localStorage.getItem('ea_token') || ''
-    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     // Mark as REJECTED in DB — rescore excludes REJECTED findings
     await fetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -829,7 +829,7 @@ export default function GovernancePage() {
   const handleRerunConfirm = async () => {
     setShowRerunModal(false)
     try {
-      const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+      const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
       const t = localStorage.getItem('ea_token') || ''
       await fetch(`${apiUrl}/governance/reviews/${review?.id}/run`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } })
       setView('progress')
@@ -1569,7 +1569,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   React.useEffect(() => {
     let live = true
     if (!review?.reviewType) return
-    fetch(`${process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'}/governance/report-profiles/${review.reviewType}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+    fetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/governance/report-profiles/${review.reviewType}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
       .then(r => (r.ok ? r.json() : null)).then(p => { if (live && p && Array.isArray(p.excluded)) setProfile(p) }).catch(() => {})
     return () => { live = false }
   }, [review?.reviewType])
@@ -1587,7 +1587,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
   const dimensionVisible = (dim: string): boolean => !profile || profile.scoringDimensionsDisplayed.includes(dim)
 
   // ── Edit helpers ──────────────────────────────────────────────────────────
-  const apiUrl = (process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1')
+  const apiUrl = (process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1')
   const token = () => localStorage.getItem('ea_token') || ''
 
   const saveReportField = async (fieldPath: string, value: any) => {
@@ -1704,7 +1704,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     setEditingOppIdx(null)
     setOppDraft({})
     const token = localStorage.getItem('ea_token') || ''
-    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ financialOpportunities: { ...report.financialOpportunities, opportunities: newOpps } }),
@@ -1715,7 +1715,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newOpps = localOpps.filter((_: any, i: number) => i !== idx)
     setLocalOpps(newOpps)
     const token = localStorage.getItem('ea_token') || ''
-    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ financialOpportunities: { ...report.financialOpportunities, opportunities: newOpps } }),
@@ -1726,7 +1726,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newItems = localCompliance.map((item, i) => i === idx ? { ...item, ...data } : item)
     setLocalCompliance(newItems)
     const token = localStorage.getItem('ea_token') || ''
-    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
@@ -1737,7 +1737,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newItems = localCompliance.filter((_: any, i: number) => i !== idx)
     setLocalCompliance(newItems)
     const token = localStorage.getItem('ea_token') || ''
-    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
@@ -1758,7 +1758,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newObjs = localObjectives.map((o, i) => i === idx ? { ...o, ...data } : o)
     setLocalObjectives(newObjs)
     const t2 = localStorage.getItem('ea_token') || ''
-    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
@@ -1769,7 +1769,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newObjs = localObjectives.filter((_: any, i: number) => i !== idx)
     setLocalObjectives(newObjs)
     const t2 = localStorage.getItem('ea_token') || ''
-    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
@@ -1782,7 +1782,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newAreas = localFutureAreas.map((a, i) => i === idx ? { ...a, ...data } : a)
     setLocalFutureAreas(newAreas)
     const t2 = localStorage.getItem('ea_token') || ''
-    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
@@ -1793,7 +1793,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newAreas = localFutureAreas.filter((_: any, i: number) => i !== idx)
     setLocalFutureAreas(newAreas)
     const t2 = localStorage.getItem('ea_token') || ''
-    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl2 = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
@@ -1805,7 +1805,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newRisks = localRisks.map((r, i) => i === idx ? { ...r, ...data } : r)
     setLocalRisks(newRisks)
     const token = localStorage.getItem('ea_token') || ''
-    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
@@ -1816,7 +1816,7 @@ function ReportView({ review, report, findings, tab, setTab }: { review: any, re
     const newRisks = localRisks.filter((_: any, i: number) => i !== idx)
     setLocalRisks(newRisks)
     const token = localStorage.getItem('ea_token') || ''
-    const apiUrl = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),

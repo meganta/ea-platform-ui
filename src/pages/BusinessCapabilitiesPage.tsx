@@ -12,7 +12,7 @@ import { ExecutiveInsights, CapabilityInsight, ImprovementActions, CapabilityAdv
 // phases and intentionally absent. Business wording only: no repository /
 // database terminology is shown to users.
 
-const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const BASE = `${API}/business-capabilities`
 
 async function call(method: string, path: string, body?: any) {

@@ -9,7 +9,7 @@ import { ElementConformance, RefApi, RefElement, STATUS_COLOR, STATUS_ORDER, T, 
 import './repository/AssetProfile.css'
 import './refarch/ReferenceArchitecture.css'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const KINDS = ['REFERENCE_MODEL', 'REFERENCE_ARCHITECTURE', 'REFERENCE_PATTERN']
 type Tab = 'overview' | 'architecture' | 'actual' | 'conformance' | 'target' | 'tailoring' | 'controls' | 'usage' | 'versions'
 const TABS: Tab[] = ['overview', 'architecture', 'actual', 'conformance', 'target', 'tailoring', 'controls', 'usage', 'versions']
