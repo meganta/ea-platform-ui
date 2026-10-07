@@ -6,6 +6,7 @@ import ReactMarkdown from 'react-markdown'
 import CopilotProvenance, { ProvenanceTrace } from '../components/CopilotProvenance'
 import EaQuestionExplorer from '../components/EaQuestionExplorer'
 import CopilotViewAttachments from '../components/CopilotViewAttachments'
+import CopilotHealthInsights from '../components/CopilotHealthInsights'
 
 const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
@@ -1175,6 +1176,7 @@ export default function CopilotPage() {
               <div style={{ fontSize: 14, color: 'var(--text-dim)', maxWidth: 400, textAlign: 'center' }}>
                 {mode === 'single' ? (selectedArchitect?.description || 'Ask me anything about enterprise architecture') : 'Multiple domain architects will analyze your question from different perspectives'}
               </div>
+              {mode === 'single' && <CopilotHealthInsights architect={selectedArchitect} />}
               {/* Suggested EA questions: choosing one fills the composer, exactly as if typed. */}
               <EaQuestionExplorer onSelect={q => { setInput(q); inputRef.current?.focus() }} />
             </div>

@@ -29,6 +29,10 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
   const { hasPermission } = useAuth()
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState(false)
+  const [radar, setRadar] = useState<any>(null)
+  const [radarBusy, setRadarBusy] = useState(false)
+  const [radarResult, setRadarResult] = useState<any>(null)
+  const [radarError, setRadarError] = useState(false)
 
   useEffect(() => {
     let stop = false
@@ -48,6 +52,26 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
     load()
     return () => { stop = true; clearTimeout(timer) }
   }, [a.researchId])
+
+  const auth = () => ({ Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` })
+  const loadRadar = async () => {
+    setRadarBusy(true); setRadarError(false)
+    try {
+      const res = await fetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/radar-matches`, { headers: auth() })
+      if (!res.ok) throw new Error(String(res.status))
+      setRadar(await res.json())
+    } catch { setRadarError(true) }
+    finally { setRadarBusy(false) }
+  }
+  const sendToRadar = async (technologyId: string) => {
+    setRadarBusy(true); setRadarError(false)
+    try {
+      const res = await fetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/radar`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ technologyId }) })
+      if (!res.ok) throw new Error(String(res.status))
+      setRadarResult(await res.json()); setRadar(null)
+    } catch { setRadarError(true) }
+    finally { setRadarBusy(false) }
+  }
 
   const send = async () => {
     setSending(true); setSendError(false)
@@ -111,7 +135,36 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
                 </button>
               )}
             <HelpTip text={t('copilot.research.send_de_help')} />
+            {o.decision?.code !== 'REUSE_EXISTING' && hasPermission('Innovation.ManageOwnPosition') && !radarResult && !radar && (
+              <button type="button" onClick={loadRadar} disabled={radarBusy} style={{ fontSize: 11.5, padding: '5px 11px', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--text)', border: '1px solid var(--border)' }}>
+                📡 {t('copilot.research.radar')}
+              </button>
+            )}
+            {o.decision?.code !== 'REUSE_EXISTING' && hasPermission('Innovation.ManageOwnPosition') && <HelpTip text={t('copilot.research.radar_help')} />}
           </div>
+          {radar && (
+            <div data-testid="research-radar-matches" style={{ marginTop: 6, fontSize: 11.5 }}>
+              {radar.matches.length === 0 ? <div style={{ color: 'var(--text-dim)' }}>{t('copilot.research.radar_none')}</div> : (
+                <>
+                  <div style={{ color: 'var(--text-dim)', marginBottom: 4 }}>{t('copilot.research.radar_choose')}</div>
+                  {radar.matches.map((m: any) => (
+                    <div key={m.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 4 }}>
+                      <button type="button" disabled={radarBusy} onClick={() => sendToRadar(m.id)} style={{ fontSize: 11.5, padding: '3px 9px', borderRadius: 8, cursor: 'pointer', background: 'var(--accent)', color: 'var(--navy)', border: '1px solid var(--accent)', fontWeight: 600 }}>{(isAR && m.nameAr) || m.name}</button>
+                      <span style={{ color: 'var(--text-dim)' }}>{m.tenantStatus ? t('copilot.research.radar_current').replace('{status}', m.tenantStatus) : t('copilot.research.radar_not_positioned')}{!m.willChange && ` — ${t('copilot.research.radar_kept')}`}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              <button type="button" onClick={() => setRadar(null)} style={{ fontSize: 11, background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}>{t('common.cancel')}</button>
+            </div>
+          )}
+          {radarResult && (
+            <div data-testid="research-radar-done" style={{ marginTop: 6, fontSize: 11.5 }}>
+              ✓ {radarResult.statusChanged ? t('copilot.research.radar_done').replace('{name}', radarResult.technology.name).replace('{status}', radarResult.status) : t('copilot.research.radar_noted').replace('{name}', radarResult.technology.name).replace('{status}', radarResult.previousStatus || '—')}
+              {' '}<a href="/innovation">{t('copilot.research.radar_open')}</a>
+            </div>
+          )}
+          {radarError && <div role="alert" style={{ fontSize: 11, color: '#f97316', marginTop: 4 }}>{t('copilot.research.radar_failed')}</div>}
           {sendError && <div role="alert" style={{ fontSize: 11, color: '#f97316', marginTop: 4 }}>{t('copilot.research.send_failed')}</div>}
           <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--text)', border: '1px solid var(--border)', marginTop: 8 }}>
             {open ? t('copilot.research.hide_details') : t('copilot.research.show_details')}
