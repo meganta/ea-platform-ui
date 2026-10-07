@@ -14,6 +14,9 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/
 const KINDS = ['REFERENCE_MODEL', 'REFERENCE_ARCHITECTURE', 'REFERENCE_PATTERN']
 type Tab = 'overview' | 'architecture' | 'actual' | 'conformance' | 'target' | 'tailoring' | 'controls' | 'usage' | 'versions'
 const TABS: Tab[] = ['overview', 'architecture', 'actual', 'conformance', 'target', 'tailoring', 'controls', 'usage', 'versions']
+/** A reference model is structure only (never implemented): no implementation, conformance, Current -> Target or traces tabs. */
+const MODEL_HIDDEN_TABS: Tab[] = ['actual', 'conformance', 'target', 'controls']
+const isModel = (a: any) => a?.kind === 'REFERENCE_MODEL'
 
 function useApi(): RefApi {
   return useMemo(() => makeApi(API_URL), [])
@@ -65,20 +68,24 @@ function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: R
   const [conf, setConf] = useState<any>(null)
   const [scenarios, setScenarios] = useState<any[]>([])
   const [scenarioId, setScenarioId] = useState('')
+  const [archKind, setArchKind] = useState<string | null>(null)
   const [tab, setTab] = useState<Tab>('overview')
   const [selected, setSelected] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const loadArch = useCallback(() => api.get(`/reference-architectures/${id}`).then(a => {
-    setArch(a)
+    setArch(a); setArchKind(a.kind)
     setVersionId(v => v || a.activeVersionId || a.versions?.[0]?.id || null)
   }).catch(e => setError(e.message)), [api, id])
   const loadVersion = useCallback(() => {
     if (!versionId) return
     api.get(`/reference-architectures/versions/${versionId}`).then(setVersion).catch(e => setError(e.message))
+    // A reference model is never implemented: it has no conformance to load.
+    if (archKind === 'REFERENCE_MODEL') { setConf(null); return }
+    if (!archKind) return
     api.get(`/reference-architectures/${id}/conformance?versionId=${versionId}${scenarioId ? `&scenarioId=${scenarioId}` : ''}`).then(setConf).catch(() => setConf(null))
-  }, [api, id, versionId, scenarioId])
+  }, [api, id, versionId, scenarioId, archKind])
   useEffect(() => { loadArch(); api.get('/ea-views/scenarios').then(r => setScenarios(Array.isArray(r) ? r : [])).catch(() => setScenarios([])) }, [loadArch, api])
   useEffect(() => { loadVersion() }, [loadVersion])
 
@@ -135,7 +142,7 @@ function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: R
         </div>
       </div>
       <div className="rp-strip" role="tablist" aria-label={localName(arch, isAR)}>
-        {TABS.filter(x => x !== 'tailoring' || arch.derivedFromId).map(x => (
+        {TABS.filter(x => (x !== 'tailoring' || arch.derivedFromId) && !(isModel(arch) && MODEL_HIDDEN_TABS.includes(x))).map(x => (
           <button key={x} type="button" role="tab" className="ap-tab" aria-selected={tab === x} onClick={() => setTab(x)}>{t(`refarch.tab.${x}`)}</button>
         ))}
       </div>
@@ -154,6 +161,9 @@ function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: R
 
         {tab === 'architecture' && (
           <>
+            {isModel(arch) ? (
+              <div className="ap-toolbar"><span className="text-dim" style={{ fontSize: 13 }}>{t('refarch.model.read_only')}</span><HelpTip text={t('refarch.model.help')} /></div>
+            ) : (
             <div className="ap-toolbar">
               <label className="form-label" htmlFor="ra-state" style={{ margin: 0 }}>{t('refarch.state')}</label>
               <select id="ra-state" className="form-input" value={scenarioId} onChange={e => setScenarioId(e.target.value)}>
@@ -162,13 +172,14 @@ function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: R
               </select>
               <HelpTip text={t('refarch.diagram.help')} />
             </div>
+            )}
             <div className={selectedEl ? 'ra-split' : ''}>
               <div className="rp-card">
                 <ReferenceDiagram elements={elements} conformance={confByKey} selected={selected} onSelect={setSelected} t={t} isAR={isAR} />
                 {draft && <AddElement api={api} t={t} versionId={version.id} elements={elements} metaModel={metaModel} onAdded={refresh} />}
               </div>
               {selectedEl && (
-                <ElementDrawer key={selectedEl.stableKey} architectureId={arch.id} element={selectedEl} parentName={parentName} conformance={confByKey[selectedEl.stableKey]} editable={draft}
+                <ElementDrawer key={selectedEl.stableKey} architectureId={arch.id} element={selectedEl} parentName={parentName} conformance={isModel(arch) ? undefined : confByKey[selectedEl.stableKey]} editable={draft} referenceModel={isModel(arch)}
                   versionId={version.id} metaModelTypes={metaModel?.objectTypes || []} realization={metaModel?.realization} architectureDomain={arch.domainCode || null} api={api} t={t} isAR={isAR} onChanged={loadVersion} onClose={() => setSelected(null)} />
               )}
             </div>
@@ -211,7 +222,13 @@ function OverviewTab({ arch, version, conf, t, isAR, api, onFilter, onChanged }:
         </dl>
         {desc && <p style={{ marginBottom: 0 }}>{desc}</p>}
       </div>
-      {conf && (
+      {isModel(arch) && (
+        <div className="rp-card" data-testid="ra-model-note">
+          <div className="rp-card-title">{t('refarch.model.title')}<HelpTip text={t('refarch.model.help')} /></div>
+          <p style={{ margin: 0, fontSize: 13 }}>{t('refarch.model.note')}</p>
+        </div>
+      )}
+      {conf && !isModel(arch) && (
         <div className="rp-card" data-testid="ra-coverage">
           <div className="rp-card-title">{t('refarch.coverage')}<HelpTip text={t('refarch.coverage.help')} /></div>
           <p style={{ fontSize: 16, fontWeight: 600, margin: '0 0 6px' }}>{conf.summary.coverage.statement}</p>

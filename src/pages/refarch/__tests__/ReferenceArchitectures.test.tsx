@@ -165,6 +165,28 @@ describe('Reference Architectures page', () => {
     confirm.mockRestore()
   })
 
+  it('a reference model is structure only: no implementation/conformance/target/traces tabs, no coverage, no conformance call, and its building blocks give information only', async () => {
+    mockParams = new URLSearchParams('ra=a1')
+    const f = workspaceFetch({ '/reference-architectures/a1': { ...ARCH, kind: 'REFERENCE_MODEL', authorityLevel: 'NATIONAL', derivedFromId: null, derivedFrom: null } }); global.fetch = f as any
+    render(<ReferenceArchitecturesPage />)
+    expect(await screen.findByTestId('ra-model-note')).toHaveTextContent('refarch.model.note')
+    expect(screen.queryByTestId('ra-coverage')).toBeNull()
+    for (const tab of ['refarch.tab.actual', 'refarch.tab.conformance', 'refarch.tab.target', 'refarch.tab.controls']) expect(screen.queryByRole('tab', { name: tab })).toBeNull()
+    expect(screen.getByRole('tab', { name: 'refarch.tab.architecture' })).toBeInTheDocument()
+    expect(calls(f, 'GET', '/conformance')).toHaveLength(0)
+    fireEvent.click(screen.getByRole('tab', { name: 'refarch.tab.architecture' }))
+    expect(screen.getByText('refarch.model.read_only')).toBeInTheDocument()
+    expect(screen.queryByLabelText('refarch.state')).toBeNull()
+    fireEvent.click(within(await screen.findByTestId('ra-diagram')).getByRole('button', { name: /Digital portal/ }))
+    const drawer = await screen.findByTestId('ra-drawer')
+    expect(drawer).toHaveTextContent('ref.pptx')
+    expect(within(drawer).getByTestId('ra-model-drawer-note')).toBeInTheDocument()
+    expect(within(drawer).queryByLabelText('refarch.el.link_type')).toBeNull()
+    expect(within(drawer).queryByText('refarch.el.implementations')).toBeNull()
+    expect(within(drawer).queryByLabelText('refarch.el.decide')).toBeNull()
+    expect(calls(f, 'GET', '/links?elementKey=')).toHaveLength(0)
+  })
+
   it('a proposal says what kind of link it is and where it came from', async () => {
     mockParams = new URLSearchParams('ra=a1')
     const f = workspaceFetch({ '/reference-architectures/a1/links?elementKey=portal': [{ id: 'p1', status: 'PROPOSED', linkType: 'DEVIATES_FROM', basis: 'GOVERNANCE_FINDING', confidence: null, targetName: 'Legacy portal', targetId: 'app9', targetType: 'Application', targetModule: 'REPOSITORY' }] }); global.fetch = f as any
