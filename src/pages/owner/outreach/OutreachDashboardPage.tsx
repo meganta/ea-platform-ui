@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../../../contexts/LangContext'
+import HelpTip from '../../../components/HelpTip'
 import { ErrorBox, Header, Loading, Tile } from '../ownerUi'
 import { outreachApi } from './outreachApi'
 import { OutreachNav } from './OutreachShell'
@@ -10,6 +11,11 @@ const TILES: Array<[string, string]> = [
   ['eaLeaders', 'owner.outreach.dash.ea_leaders'], ['dtLeaders', 'owner.outreach.dash.dt_leaders'], ['innovationLeaders', 'owner.outreach.dash.innovation_leaders'],
   ['entitiesWithoutTenant', 'owner.outreach.dash.no_tenant'], ['tenantsFromOutreach', 'owner.outreach.dash.tenants_created'], ['tenantsEnriched', 'owner.outreach.dash.tenants_enriched'],
   ['invitationsSent', 'owner.outreach.dash.invitations_sent'], ['activatedUsers', 'owner.outreach.dash.activated'], ['engagedTenants', 'owner.outreach.dash.engaged_tenants'],
+]
+const CHANNEL_TILES: Array<[string, string]> = [
+  ['linkedinProfiles', 'owner.outreach.dash.li_profiles'], ['connectionRequestsPrepared', 'owner.outreach.metric.li_requests_prepared'], ['connectionRequestsSent', 'owner.outreach.metric.li_requests_sent'],
+  ['linkedinConnections', 'owner.outreach.metric.li_connections'], ['linkedinMessagesPrepared', 'owner.outreach.metric.li_messages_prepared'], ['linkedinMessagesSent', 'owner.outreach.metric.li_messages_sent'],
+  ['linkedinReplies', 'owner.outreach.metric.li_replies'], ['emailsPrepared', 'owner.outreach.metric.prepared'], ['emailsSent', 'owner.outreach.metric.sent'],
 ]
 
 export default function OutreachDashboardPage() {
@@ -32,6 +38,12 @@ export default function OutreachDashboardPage() {
           {!data.email?.configured && <div className="oc-warn" role="note">{t('owner.outreach.email_not_configured')}</div>}
           <div className="stat-grid-4">
             {TILES.map(([k, label]) => <Tile key={k} label={t(label)} value={data.metrics[k] ?? 0} />)}
+          </div>
+          <div className="oc-card" style={{ marginTop: 16 }}>
+            <h2 className="oc-h2">{t('owner.outreach.dash.channels')}<HelpTip text={t('owner.outreach.dash.channels_help')} /></h2>
+            <div className="stat-grid-3">
+              {CHANNEL_TILES.map(([k, label]) => <Tile key={k} label={t(label)} value={data.metrics[k] ?? 0} />)}
+            </div>
           </div>
           <div className="oc-card" style={{ marginTop: 16 }}>
             <h2 className="oc-h2">{t('owner.outreach.dash.funnel')}</h2>

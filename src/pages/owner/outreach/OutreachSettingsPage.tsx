@@ -6,6 +6,8 @@ import { ErrorBox, Header, Loading, Pill } from '../ownerUi'
 import { outreachApi } from './outreachApi'
 import { OutreachNav } from './OutreachShell'
 
+const CAPABILITIES = ['supportsProfileDiscovery', 'supportsConnectionRequest', 'supportsDirectMessaging', 'supportsMessageStatus']
+
 export default function OutreachSettingsPage() {
   const { t, isAR } = useLang()
   const [settings, setSettings] = useState<any>(null)
@@ -32,9 +34,9 @@ export default function OutreachSettingsPage() {
   const save = async (ev: React.FormEvent) => {
     ev.preventDefault(); setError(''); setNotice('')
     const dto: any = {}
-    for (const k of ['sendingEnabled', 'legalBasisNote', 'dailySendLimit', 'batchLimit', 'requireOwnerVerification', 'retentionDays', 'senderName', 'replyTo', 'contactLine']) {
-      const v = form[k]
-      dto[k] = ['dailySendLimit', 'batchLimit', 'retentionDays'].includes(k) ? Number(v) : v
+    for (const k of ['sendingEnabled', 'legalBasisNote', 'dailySendLimit', 'batchLimit', 'linkedinDailyLimit', 'requireOwnerVerification', 'retentionDays', 'senderName', 'replyTo', 'contactLine']) {
+      const v = k === 'linkedinDailyLimit' ? form[k] ?? 15 : form[k]
+      dto[k] = ['dailySendLimit', 'batchLimit', 'linkedinDailyLimit', 'retentionDays'].includes(k) ? Number(v) : v
     }
     try { await outreachApi.saveSettings(dto); setNotice(t('owner.outreach.settings.saved')); load() } catch (e: any) { setError(e.message) }
   }
@@ -99,6 +101,7 @@ export default function OutreachSettingsPage() {
           <div className="oc-grid-3" style={{ gap: 12 }}>
             <div className="form-group"><label className="form-label" htmlFor="or-set-daily">{t('owner.outreach.settings.daily')}</label><input id="or-set-daily" className="form-input" type="number" min={1} max={500} value={form.dailySendLimit} onChange={e => setForm({ ...form, dailySendLimit: e.target.value })} /></div>
             <div className="form-group"><label className="form-label" htmlFor="or-set-batch">{t('owner.outreach.settings.batch')}</label><input id="or-set-batch" className="form-input" type="number" min={1} max={50} value={form.batchLimit} onChange={e => setForm({ ...form, batchLimit: e.target.value })} /></div>
+            <div className="form-group"><div className="flex" style={{ alignItems: 'center' }}><label className="form-label" htmlFor="or-set-li-daily">{t('owner.outreach.settings.li_daily')}</label><HelpTip text={t('owner.outreach.settings.li_daily_help')} /></div><input id="or-set-li-daily" className="form-input" type="number" min={1} max={50} value={form.linkedinDailyLimit ?? 15} onChange={e => setForm({ ...form, linkedinDailyLimit: e.target.value })} /></div>
             <div className="form-group"><label className="form-label" htmlFor="or-set-retention">{t('owner.outreach.settings.retention')}<HelpTip text={t('owner.outreach.settings.retention_help')} /></label><input id="or-set-retention" className="form-input" type="number" min={30} max={1825} value={form.retentionDays} onChange={e => setForm({ ...form, retentionDays: e.target.value })} /></div>
           </div>
           <label style={{ display: 'flex', gap: 8, fontSize: 14, margin: '4px 0 12px' }}>
@@ -120,6 +123,13 @@ export default function OutreachSettingsPage() {
         {!providers ? <Loading /> : (
           <ul className="oc-list">
             <li><strong>{t('owner.outreach.providers.email')}</strong> — <Pill text={providers.email?.configured ? t('owner.settings.enabled') : t('owner.settings.disabled')} color={providers.email?.configured ? 'var(--success)' : 'var(--warning)'} /><div className="oc-muted">{t(providers.email?.configured ? 'owner.outreach.providers.email_on' : 'owner.outreach.providers.email_off')}</div></li>
+            {(providers.channels || []).map((c: any) => (
+              <li key={`ch-${c.channel}`}>
+                <strong>{t('owner.outreach.providers.channel')}: {t(`owner.outreach.channel.${c.channel}`)}</strong> — <Pill text={c.capabilities?.configured ? t('owner.settings.enabled') : t(c.channel === 'LINKEDIN' ? 'owner.outreach.providers.manual' : 'owner.settings.disabled')} color={c.capabilities?.configured ? 'var(--success)' : 'var(--warning)'} />
+                <div className="oc-muted">{CAPABILITIES.map(k => `${t(`owner.outreach.capability.${k}`)}: ${c.capabilities?.[k] ? t('owner.outreach.yes') : t('owner.outreach.no')}`).join(' · ')}</div>
+                {c.channel === 'LINKEDIN' && <div className="oc-muted">{t('owner.outreach.providers.linkedin_manual')}</div>}
+              </li>
+            ))}
             {(providers.providers || []).map((p: any) => (
               <li key={p.name}><strong>{t(`owner.outreach.provider.${p.name}`)}</strong> — <Pill text={p.configured ? t('owner.settings.enabled') : t('owner.settings.disabled')} color={p.configured ? 'var(--success)' : 'var(--warning)'} /><div className="oc-muted">{t(`owner.outreach.provider_detail.${p.name}`)}</div></li>
             ))}
