@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { api, getToken } from '../lib/api'
 import HelpTip from '../components/HelpTip'
 
-const GOV_API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const GOV_API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 const DECISION_COLOR: Record<string, string> = {
   APPROVED: '#2ecc71',

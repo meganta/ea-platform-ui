@@ -7,7 +7,7 @@ import CopilotProvenance, { ProvenanceTrace } from '../components/CopilotProvena
 import EaQuestionExplorer from '../components/EaQuestionExplorer'
 import CopilotViewAttachments from '../components/CopilotViewAttachments'
 
-const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useApi() {
   const { token } = useAuth() as any
@@ -280,7 +280,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
     fd.append('language', transcriptLang)
     setAnalyzing(true)
     const token = localStorage.getItem('ea_token') || ''
-    const res = await fetch(`${process.env.REACT_APP_API_URL||'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'}/copilot/meetings/${selected.id}/transcript/audio`, { method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:fd })
+    const res = await fetch(`${process.env.REACT_APP_API_URL||'https://archmindworks.com/api/v1'}/copilot/meetings/${selected.id}/transcript/audio`, { method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:fd })
     const data = await res.json()
     if (data?.content) {
       const updated = await api.get(`/copilot/meetings/${selected.id}`)

@@ -4,7 +4,7 @@ import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { tenantInviteUrl } from '../lib/tenantHosts'
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useApi() {
   return useMemo(() => {

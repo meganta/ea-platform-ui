@@ -4,7 +4,7 @@ import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 import { getToken } from '../lib/api'
 
-const GOV_API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const GOV_API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 async function govGet(path: string) {
   const res = await fetch(GOV_API + path, { headers: { Authorization: 'Bearer ' + (getToken() || '') } })

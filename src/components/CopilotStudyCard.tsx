@@ -5,7 +5,7 @@ import { exportFileName } from '../lib/exportFileName'
 import { fetchStudyExport, saveBlob, ExportProgress } from '../lib/studyExport'
 import { RECOMMENDATION_LABEL, STUDY_STATUS_LABEL } from './studyLabels'
 
-const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 /**
  * An Innovation study the Chief Architect prepared, refreshed or found in

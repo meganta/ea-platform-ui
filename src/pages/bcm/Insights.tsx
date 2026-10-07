@@ -278,7 +278,7 @@ export function CapabilityAdvisor({ L, can }: { L: LFn; can: { run: boolean; dec
 }
 
 // ── Phase 4: Executive overview (KPIs -> drill-down) + reports ─────────────
-const API_BASE = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API_BASE = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 export async function downloadReport(type: string, format: 'csv' | 'xlsx' | 'docx', assessmentId?: string) {
   const res = await fetch(`${API_BASE}/business-capabilities/insights/reports/${type}?format=${format}${assessmentId ? `&assessmentId=${assessmentId}` : ''}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)

@@ -2412,7 +2412,7 @@ const Ctx = createContext<LangCtx>({
 
 export const useLang = () => useContext(Ctx)
 
-const API_URL = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 export function LangProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(() => (localStorage.getItem('ea_locale') as Locale) || 'AR')

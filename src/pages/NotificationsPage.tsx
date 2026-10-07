@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
 
-const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useApi() {
   return useMemo(() => {

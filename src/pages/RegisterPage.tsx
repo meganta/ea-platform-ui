@@ -5,7 +5,7 @@ import BrandLogo from '../brand/BrandLogo'
 import BrandPattern from '../brand/BrandPattern'
 import '../brand/brand.css'
 
-const API_BASE = process.env.REACT_APP_API_URL || 'https://ea-platform-api-7omywjptqq-ww.a.run.app/api/v1'
+const API_BASE = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 type Step = 'org' | 'admin' | 'done'
 

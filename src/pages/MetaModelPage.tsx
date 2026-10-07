@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
 
-const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useMetaApi() {
   const { token } = useAuth() as any
@@ -1115,7 +1115,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
     setLoading(true)
     const fd = new FormData(); fd.append('file', file)
     const token = localStorage.getItem('ea_token') || ''
-    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'}/meta-model/import/validate`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/meta-model/import/validate`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
     const data = await res.json()
     setValidationResult(data)
     setStep('validate')
@@ -1127,7 +1127,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
     setLoading(true)
     const fd = new FormData(); fd.append('file', file); fd.append('mode', mode)
     const token = localStorage.getItem('ea_token') || ''
-    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'}/meta-model/import`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/meta-model/import`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
     const data = await res.json()
     setResult(data); setStep('done')
     setLoading(false)
@@ -1271,7 +1271,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
 function ExportPanel({ api }: { api: any }) {
   const download = async (fmt: 'json' | 'csv') => {
     const token = localStorage.getItem('ea_token') || ''
-    const base = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+    const base = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     const res = await fetch(`${base}/meta-model/export/${fmt}`, { headers: { Authorization: `Bearer ${token}` } })
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)

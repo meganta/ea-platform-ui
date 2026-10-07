@@ -11,7 +11,7 @@ import { STUDY_STATUS_LABEL, RECOMMENDATION_LABEL } from '../components/studyLab
 import IdeaAssessmentView from './innovation/IdeaAssessmentView'
 import IdeaMatrix from './innovation/IdeaMatrix'
 import { IDEA_STATUS_COLOR, IDEA_STATUS_LABEL, QUADRANT, RECOMMENDATION, label, pickBi, scoreColor } from './innovation/ideaLabels'
-const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useApi() {
   return useMemo(() => {
