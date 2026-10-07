@@ -1,0 +1,46 @@
+/* Meta-Model Studio release control: version bar, release panel, delete-impact dialog. */
+.mm-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 28px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.mm-bar.draft { background: rgba(243, 156, 18, 0.10); }
+.mm-bar.published { background: rgba(46, 204, 113, 0.08); }
+.mm-bar-text { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; }
+.mm-bar-dim { color: var(--text-dim); }
+.mm-pill { padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.mm-btn { padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; background: var(--navy-mid); color: var(--text); }
+.mm-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.mm-btn.primary { background: var(--accent); color: var(--navy); }
+.mm-btn.danger { background: rgba(231, 76, 60, 0.13); color: #e74c3c; }
+.mm-btn.small { padding: 3px 10px; font-size: 11px; }
+
+.mm-card { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+.mm-stack { display: flex; flex-direction: column; gap: 14px; }
+.mm-steps { display: flex; gap: 8px; flex-wrap: wrap; }
+.mm-step { padding: 4px 12px; border-radius: 14px; font-size: 12px; background: var(--navy-mid); color: var(--text-dim); }
+.mm-step.active { background: var(--accent); color: var(--navy); font-weight: 600; }
+.mm-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.mm-tile { background: var(--navy); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; }
+.mm-tile-value { font-size: 24px; font-weight: 700; }
+.mm-tile-label { font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.mm-form { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.mm-field label { display: block; font-size: 11px; color: var(--text-dim); font-weight: 600; margin-bottom: 4px; }
+.mm-field input { width: 100%; padding: 8px 12px; background: var(--navy); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; }
+.mm-change { border: 1px solid var(--border); border-left-width: 3px; border-radius: 8px; padding: 10px 14px; background: var(--navy); }
+.mm-change-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mm-change ul, .mm-dialog ul { margin: 6px 0 0; padding-inline-start: 18px; font-size: 12px; }
+.mm-meta { font-size: 11px; color: var(--text-dim); }
+.mm-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mm-version { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--navy); }
+.mm-notice { padding: 10px 14px; border-radius: 8px; font-size: 13px; }
+.mm-notice.ok { background: rgba(46, 204, 113, 0.12); color: #2ecc71; }
+.mm-notice.err { background: rgba(231, 76, 60, 0.12); color: #e74c3c; }
+.mm-notice.warn { background: rgba(243, 156, 18, 0.12); color: #f39c12; }
+
+.mm-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
+.mm-dialog { background: var(--navy-light); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 620px; max-height: 90vh; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.mm-dialog h2 { font-size: 17px; margin: 0; }
+.mm-dialog-actions { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+
+@media (max-width: 900px) {
+  .mm-bar { padding: 10px 16px; }
+  .mm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mm-form { grid-template-columns: 1fr; }
+}

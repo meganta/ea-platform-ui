@@ -1,11 +1,20 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
+import { useLang } from '../contexts/LangContext'
+import { ReleaseContext, releaseState, useRelease, MetaModelVersion } from './metamodel/release'
+import VersionBar from './metamodel/VersionBar'
+import ReleasePanel from './metamodel/ReleasePanel'
+import DeleteImpactDialog, { DeleteKind } from './metamodel/DeleteImpactDialog'
 
 const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useMetaApi() {
   const { token } = useAuth() as any
+  return useMemo(() => makeMetaApi(token), [token])
+}
+
+function makeMetaApi(token?: string) {
   const authHeader = { Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' }
   // Two things need handling here: (1) genuine failures should surface a
   // real error instead of leaving callers hanging — thrown Error with the
@@ -23,7 +32,7 @@ function useMetaApi() {
   const get = (path: string) => fetch(`${API}${path}`, { headers: authHeader }).then(handle)
   const post = (path: string, body?: any) => fetch(`${API}${path}`, { method: 'POST', headers: authHeader, body: body ? JSON.stringify(body) : undefined }).then(handle)
   const put = (path: string, body: any) => fetch(`${API}${path}`, { method: 'PUT', headers: authHeader, body: JSON.stringify(body) }).then(handle)
-  const del = (path: string) => fetch(`${API}${path}`, { method: 'DELETE', headers: authHeader }).then(r => r.ok)
+  const del = (path: string) => fetch(`${API}${path}`, { method: 'DELETE', headers: authHeader }).then(handle)
   return { get, post, put, del }
 }
 
@@ -136,6 +145,7 @@ function SetupWizard({ api, onCreated }: { api: any, onCreated: () => void }) {
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 function Dashboard({ stats, onTab }: { stats: any, onTab: (t: string) => void }) {
+  const { t } = useLang()
   const model = stats?.model
   const fw = model?.frameworkVersion
 
@@ -155,7 +165,7 @@ function Dashboard({ stats, onTab }: { stats: any, onTab: (t: string) => void })
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button style={S.btn('primary')} onClick={() => onTab('designer')}>🎨 Open Designer</button>
-          <button style={S.btn()} onClick={() => onTab('versions')}>📋 Versions</button>
+          <button style={S.btn()} onClick={() => onTab('versions')}>📋 {t('mm.rel.title')}</button>
         </div>
       </div>
 
@@ -199,8 +209,21 @@ function Dashboard({ stats, onTab }: { stats: any, onTab: (t: string) => void })
   )
 }
 
+// ── Read-only hint + delete target ────────────────────────────────────────────
+type DeleteTarget = { kind: DeleteKind; id: string; name: string } | null
+
+function ReadOnlyHint() {
+  const { t } = useLang()
+  const { editable } = useRelease()
+  if (editable) return null
+  return <div style={{ fontSize: 12, color: 'var(--text-dim)', marginBottom: 12 }}>🔒 {t('mm.readonly')}</div>
+}
+
 // ── Domains Manager ───────────────────────────────────────────────────────────
 function DomainsManager({ api }: { api: any }) {
+  const { t } = useLang()
+  const { editable } = useRelease()
+  const [deleting, setDeleting] = useState<DeleteTarget>(null)
   const [domains, setDomains] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
@@ -222,10 +245,6 @@ function DomainsManager({ api }: { api: any }) {
     load()
   }
 
-  const remove = async (id: string) => {
-    if (!window.confirm('Delete this domain? Object types must be reassigned first.')) return
-    await api.del(`/meta-model/domains/${id}`); load()
-  }
 
   const startEdit = (d: any) => { setEditing(d); setForm({ code: d.code, name: d.name, nameAr: d.nameAr || '', color: d.color, icon: d.icon || '📁', description: d.description || '' }); setShowForm(true) }
 
@@ -239,10 +258,12 @@ function DomainsManager({ api }: { api: any }) {
           <div style={{ fontSize: 18, fontWeight: 700 }}>Domains</div>
           <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Organize your meta-model by architectural domains</div>
         </div>
-        <button style={S.btn('primary')} onClick={() => { setEditing(null); setForm({ code: '', name: '', nameAr: '', color: '#3498db', icon: '📁', description: '' }); setShowForm(true) }}>+ Add Domain</button>
+        {editable && <button style={S.btn('primary')} onClick={() => { setEditing(null); setForm({ code: '', name: '', nameAr: '', color: '#3498db', icon: '📁', description: '' }); setShowForm(true) }}>+ Add Domain</button>}
       </div>
+      <ReadOnlyHint />
+      {deleting && <DeleteImpactDialog api={api} kind={deleting.kind} id={deleting.id} name={deleting.name} onClose={() => setDeleting(null)} onDeleted={() => { setDeleting(null); load() }} />}
 
-      {showForm && (
+      {showForm && editable && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>{editing ? 'Edit Domain' : 'New Domain'}</div>
           <div style={S.grid2}>
@@ -288,8 +309,8 @@ function DomainsManager({ api }: { api: any }) {
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <div style={{ width: 12, height: 12, borderRadius: '50%', background: d.color }} />
-                <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => startEdit(d)}>Edit</button>
-                <button style={{ ...S.btn('danger'), padding: '4px 10px', fontSize: 12 }} onClick={() => remove(d.id)}>Delete</button>
+                <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => startEdit(d)} disabled={!editable} title={editable ? undefined : t('mm.readonly')}>Edit</button>
+                <button style={{ ...S.btn('danger'), padding: '4px 10px', fontSize: 12 }} onClick={() => setDeleting({ kind: 'domain', id: d.id, name: d.name })}>{t('mm.del.button')}</button>
               </div>
             </div>
           ))}
@@ -301,6 +322,9 @@ function DomainsManager({ api }: { api: any }) {
 
 // ── Object Types List ─────────────────────────────────────────────────────────
 function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => void }) {
+  const { t } = useLang()
+  const { editable } = useRelease()
+  const [deleting, setDeleting] = useState<DeleteTarget>(null)
   const [types, setTypes] = useState<any[]>([])
   const [domains, setDomains] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -341,8 +365,10 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
           <div style={{ fontSize: 18, fontWeight: 700 }}>Object Types</div>
           <div style={{ fontSize: 13, color: 'var(--text-dim)' }}>EA entity types defined in your meta-model</div>
         </div>
-        <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ Add Object Type</button>
+        {editable && <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ Add Object Type</button>}
       </div>
+      <ReadOnlyHint />
+      {deleting && <DeleteImpactDialog api={api} kind={deleting.kind} id={deleting.id} name={deleting.name} onClose={() => setDeleting(null)} onDeleted={() => { setDeleting(null); load() }} />}
 
       <div style={{ display: 'flex', gap: 10, marginBottom: 16 }}>
         <input style={{ ...S.input, maxWidth: 280 }} placeholder="🔍 Search object types..." value={search} onChange={e => setSearch(e.target.value)} />
@@ -353,7 +379,7 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
         <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--text-dim)', display: 'flex', alignItems: 'center' }}>{filtered.length} / {types.length} types</div>
       </div>
 
-      {showForm && (
+      {showForm && editable && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>New Object Type</div>
           <div style={S.grid2}>
@@ -404,6 +430,7 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
                 <span style={S.badge(CLASSIFICATION_COLOR[ot.classification] || '#7f8c8d')}>{ot.classification}</span>
                 <span style={{ fontSize: 12, color: 'var(--text-dim)' }}>{ot._count?.attributeDefs || 0} attrs · {(ot._count?.sourceRelationships || 0) + (ot._count?.targetRelationships || 0)} rels</span>
+                <button style={{ ...S.btn('danger'), padding: '3px 10px', fontSize: 11 }} aria-label={`${t('mm.del.button')} ${ot.name}`} onClick={e => { e.stopPropagation(); setDeleting({ kind: 'object-type', id: ot.id, name: ot.name }) }}>{t('mm.del.button')}</button>
                 <span style={{ color: 'var(--accent)', fontSize: 16 }}>›</span>
               </div>
             </div>
@@ -416,6 +443,9 @@ function ObjectTypesList({ api, onSelect }: { api: any, onSelect: (ot: any) => v
 
 // ── Object Type Editor ────────────────────────────────────────────────────────
 function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: any, onBack: () => void }) {
+  const { t } = useLang()
+  const { editable } = useRelease()
+  const [deleting, setDeleting] = useState<DeleteTarget>(null)
   const [detail, setDetail] = useState<any>(null)
   const [tab, setTab] = useState<'overview'|'attributes'|'relationships'>('overview')
   const [attrForm, setAttrForm] = useState({ code: '', name: '', attributeType: 'TEXT', isRequired: false, helpText: '' })
@@ -434,10 +464,6 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
     setShowAttrForm(false)
   }
 
-  const deleteAttr = async (id: string) => {
-    await api.del(`/meta-model/attributes/${id}`)
-    api.get(`/meta-model/object-types/${objectType.id}`).then(setDetail)
-  }
 
   const ATTR_TYPES = ['TEXT','LONG_TEXT','RICH_TEXT','INTEGER','DECIMAL','PERCENTAGE','BOOLEAN','DATE','DATETIME','URL','EMAIL','ENUM','MULTI_ENUM','REFERENCE','MULTI_REFERENCE','USER','CURRENCY','LIFECYCLE_STATUS','MATURITY_SCORE','JSON_DATA']
   const ATTR_TYPE_COLOR: Record<string, string> = { TEXT: '#3498db', ENUM: '#e67e22', REFERENCE: '#9b59b6', BOOLEAN: '#1abc9c', DATE: '#f39c12', INTEGER: '#e74c3c', DECIMAL: '#e74c3c' }
@@ -455,7 +481,11 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
         </div>
         {detail.allowHierarchy && <span style={S.badge('#f39c12')}>🌳 Hierarchical</span>}
         <span style={S.badge(detail.classification === 'FRAMEWORK' ? '#3498db' : '#9b59b6')}>{detail.classification}</span>
+        <button style={{ ...S.btn('danger'), marginLeft: 'auto' }} onClick={() => setDeleting({ kind: 'object-type', id: detail.id, name: detail.name })}>{t('mm.del.button')}</button>
       </div>
+      <ReadOnlyHint />
+      {deleting && <DeleteImpactDialog api={api} kind={deleting.kind} id={deleting.id} name={deleting.name} onClose={() => setDeleting(null)}
+        onDeleted={() => { setDeleting(null); if (deleting.kind === 'object-type') onBack(); else api.get(`/meta-model/object-types/${objectType.id}`).then(setDetail) }} />}
 
       <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
         {(['overview','attributes','relationships'] as const).map(t => (
@@ -487,9 +517,9 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
       {tab === 'attributes' && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-            <button style={S.btn('primary')} onClick={() => setShowAttrForm(!showAttrForm)}>+ Add Attribute</button>
+            {editable && <button style={S.btn('primary')} onClick={() => setShowAttrForm(!showAttrForm)}>+ Add Attribute</button>}
           </div>
-          {showAttrForm && (
+          {showAttrForm && editable && (
             <div style={{ ...S.card, marginBottom: 16, borderColor: 'var(--accent)' }}>
               <div style={S.grid2}>
                 <div><label style={S.label}>Code *</label><input style={S.input} value={attrForm.code} onChange={e => setAttrForm(f => ({ ...f, code: e.target.value }))} placeholder="criticality" /></div>
@@ -523,7 +553,7 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.code} · {a.attributeType.replace(/_/g,' ')}</div>
                 </div>
-                <button style={{ ...S.btn('danger'), padding: '3px 10px', fontSize: 11 }} onClick={() => deleteAttr(a.id)}>✕</button>
+                <button style={{ ...S.btn('danger'), padding: '3px 10px', fontSize: 11 }} aria-label={`${t('mm.del.button')} ${a.name}`} onClick={() => setDeleting({ kind: 'attribute', id: a.id, name: a.name })}>✕</button>
               </div>
             ))}
           </div>
@@ -552,6 +582,9 @@ function ObjectTypeEditor({ api, objectType, onBack }: { api: any, objectType: a
 
 // ── Relationships Manager ─────────────────────────────────────────────────────
 function RelationshipsManager({ api }: { api: any }) {
+  const { t } = useLang()
+  const { editable } = useRelease()
+  const [deleting, setDeleting] = useState<DeleteTarget>(null)
   const [rels, setRels] = useState<any[]>([])
   const [types, setTypes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -583,9 +616,6 @@ function RelationshipsManager({ api }: { api: any }) {
     load(); if (viewMode === 'matrix') loadMatrix()
   }
 
-  const remove = async (id: string) => {
-    await api.del(`/meta-model/relationships/${id}`); load()
-  }
 
   const CARDINALITIES = ['ONE_TO_ONE','ONE_TO_MANY','MANY_TO_ONE','MANY_TO_MANY']
   const CARD_COLOR: Record<string,string> = { ONE_TO_ONE: '#1abc9c', ONE_TO_MANY: '#3498db', MANY_TO_ONE: '#e67e22', MANY_TO_MANY: '#9b59b6' }
@@ -601,11 +631,13 @@ function RelationshipsManager({ api }: { api: any }) {
           <div style={{ display: 'flex', gap: 2, background: 'var(--navy-light)', borderRadius: 8, padding: 2 }}>
             {(['list','matrix'] as const).map(m => <button key={m} style={{ ...S.btn(), padding: '5px 12px', background: viewMode === m ? 'var(--accent)' : 'none', color: viewMode === m ? 'var(--navy)' : 'var(--text-dim)' }} onClick={() => setViewMode(m)}>{m === 'list' ? '☰ List' : '⊞ Matrix'}</button>)}
           </div>
-          <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ Add Relationship</button>
+          {editable && <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ Add Relationship</button>}
         </div>
       </div>
+      <ReadOnlyHint />
+      {deleting && <DeleteImpactDialog api={api} kind={deleting.kind} id={deleting.id} name={deleting.name} onClose={() => setDeleting(null)} onDeleted={() => { setDeleting(null); load(); if (viewMode === 'matrix') loadMatrix() }} />}
 
-      {showForm && (
+      {showForm && editable && (
         <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>New Relationship</div>
           <div style={S.grid2}>
@@ -654,7 +686,7 @@ function RelationshipsManager({ api }: { api: any }) {
                 <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 2 }}>{r.code} · {r.classification}</div>
               </div>
               <span style={S.badge(CARD_COLOR[r.cardinality] || '#7f8c8d')}>{r.cardinality?.replace(/_/g,' ')}</span>
-              {r.classification === 'CUSTOM' && <button style={{ ...S.btn('danger'), padding: '3px 10px', fontSize: 11 }} onClick={() => remove(r.id)}>✕</button>}
+              <button style={{ ...S.btn('danger'), padding: '3px 10px', fontSize: 11 }} aria-label={`${t('mm.del.button')} ${r.forwardLabel}`} onClick={() => setDeleting({ kind: 'relationship', id: r.id, name: `${r.sourceType?.name} → ${r.forwardLabel} → ${r.targetType?.name}` })}>✕</button>
             </div>
           ))}
         </div>
@@ -1008,95 +1040,6 @@ function AiAdvisor({ api }: { api: any }) {
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-// ── Versions Manager ──────────────────────────────────────────────────────────
-function VersionsManager({ api }: { api: any }) {
-  const [versions, setVersions] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ version: '', description: '' })
-  const [impact, setImpact] = useState<any>(null)
-
-  const load = () => { setLoading(true); api.get('/meta-model/versions').then((v: any) => { setVersions(Array.isArray(v) ? v : []); setLoading(false) }) }
-  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const create = async () => {
-    if (!form.version) return
-    await api.post('/meta-model/versions', form)
-    setShowForm(false); load()
-  }
-
-  const publish = async (id: string) => {
-    if (!window.confirm('Publish this version? It will become the active meta-model.')) return
-    await api.post(`/meta-model/versions/${id}/publish`, { force: false })
-    load()
-  }
-
-  const loadImpact = (id: string) => { api.get(`/meta-model/versions/${id}/impact`).then(setImpact) }
-
-  const STATUS_COLOR: Record<string,string> = { DRAFT: '#f39c12', PUBLISHED: '#2ecc71', DEPRECATED: '#7f8c8d', ARCHIVED: '#e74c3c' }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div><div style={{ fontSize: 18, fontWeight: 700 }}>Versions</div><div style={{ fontSize: 13, color: 'var(--text-dim)' }}>Manage meta-model versions and publish changes</div></div>
-        <button style={S.btn('primary')} onClick={() => setShowForm(!showForm)}>+ New Version</button>
-      </div>
-
-      {showForm && (
-        <div style={{ ...S.card, marginBottom: 20, borderColor: 'var(--accent)' }}>
-          <div style={S.grid2}>
-            <div><label style={S.label}>Version *</label><input style={S.input} value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} placeholder="1.1" /></div>
-            <div><label style={S.label}>Description</label><input style={S.input} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} /></div>
-          </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
-            <button style={S.btn()} onClick={() => setShowForm(false)}>Cancel</button>
-            <button style={S.btn('primary')} onClick={create}>Create Version</button>
-          </div>
-        </div>
-      )}
-
-      {impact && (
-        <div style={{ ...S.card, marginBottom: 20, borderColor: impact.canPublish ? '#2ecc71' : '#e74c3c' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Impact Analysis — v{impact.version}</div>
-          <div style={S.grid3}>
-            <div style={{ ...S.statCard }}><div style={S.label}>Breaking</div><div style={{ fontSize: 24, fontWeight: 700, color: '#e74c3c' }}>{impact.breaking.count}</div></div>
-            <div style={{ ...S.statCard }}><div style={S.label}>Potentially Breaking</div><div style={{ fontSize: 24, fontWeight: 700, color: '#f39c12' }}>{impact.potentiallyBreaking.count}</div></div>
-            <div style={{ ...S.statCard }}><div style={S.label}>Non-Breaking</div><div style={{ fontSize: 24, fontWeight: 700, color: '#2ecc71' }}>{impact.nonBreaking.count}</div></div>
-          </div>
-          <div style={{ marginTop: 12, color: impact.canPublish ? '#2ecc71' : '#e74c3c', fontWeight: 600, fontSize: 13 }}>
-            {impact.canPublish ? '✅ Safe to publish' : '⚠ Breaking changes detected — review before publishing'}
-          </div>
-          <button style={{ ...S.btn(), marginTop: 8 }} onClick={() => setImpact(null)}>Close</button>
-        </div>
-      )}
-
-      {loading ? <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: 40 }}>Loading...</div> : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {versions.map(v => (
-            <div key={v.id} style={{ ...S.card, padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontWeight: 700, fontSize: 16 }}>v{v.version}</span>
-                  <span style={S.badge(STATUS_COLOR[v.status] || '#7f8c8d')}>{v.status}</span>
-                </div>
-                {v.description && <div style={{ fontSize: 13, color: 'var(--text-dim)', marginTop: 2 }}>{v.description}</div>}
-                <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 4 }}>
-                  {v._count?.domains || 0} domains · {v._count?.objectTypes || 0} types · {v._count?.relationships || 0} relationships
-                  {v.publishedAt && ` · Published ${new Date(v.publishedAt).toLocaleDateString()}`}
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button style={{ ...S.btn(), fontSize: 12, padding: '4px 12px' }} onClick={() => loadImpact(v.id)}>📊 Impact</button>
-                {v.status === 'DRAFT' && <button style={{ ...S.btn('primary'), fontSize: 12, padding: '4px 12px' }} onClick={() => publish(v.id)}>🚀 Publish</button>}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }
@@ -1573,6 +1516,12 @@ export default function MetaModelPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [tab, setTab] = useState('dashboard')
   const [selectedObjectType, setSelectedObjectType] = useState<any>(null)
+  const [versions, setVersions] = useState<MetaModelVersion[]>([])
+  const { t } = useLang()
+
+  const loadVersions = useCallback(() => {
+    api.get('/meta-model/versions').then((v: any) => setVersions(Array.isArray(v) ? v : [])).catch(() => setVersions([]))
+  }, [api])
 
   const loadStats = useCallback(() => {
     setLoadError(null)
@@ -1582,6 +1531,11 @@ export default function MetaModelPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadStats() }, [loadStats])
+  useEffect(() => { loadVersions() }, [loadVersions])
+
+  // A release action (new draft, publish, discard) changes what every screen shows.
+  const reloadRelease = useCallback(() => { loadVersions(); loadStats() }, [loadVersions, loadStats])
+  const release = useMemo(() => releaseState(versions, reloadRelease), [versions, reloadRelease])
 
   const TABS = [
     { id: 'dashboard', label: '🏠 Dashboard' },
@@ -1595,7 +1549,7 @@ export default function MetaModelPage() {
     { id: 'export', label: '📤 Export' },
     { id: 'validation', label: '✅ Validation' },
     { id: 'ai', label: '🤖 AI Advisor' },
-    { id: 'versions', label: '📋 Versions' },
+    { id: 'versions', label: `📋 ${t('mm.rel.title')}` },
     { id: 'audit', label: '📜 Audit' },
   ]
 
@@ -1621,6 +1575,7 @@ export default function MetaModelPage() {
   )
 
   return (
+    <ReleaseContext.Provider value={release}>
     <div style={S.page}>
       <div style={S.header}>
         <div style={{ flex: 1 }}>
@@ -1628,6 +1583,8 @@ export default function MetaModelPage() {
           <div style={{ fontSize: 12, color: 'var(--text-dim)' }}>{stats?.model?.name}</div>
         </div>
       </div>
+
+      <VersionBar api={api} onOpenRelease={() => { setTab('versions'); setSelectedObjectType(null) }} />
 
       <div style={S.tabs}>
         {TABS.map(t => <button key={t.id} style={S.tab(tab === t.id)} onClick={() => { setTab(t.id); setSelectedObjectType(null) }}>{t.label}</button>)}
@@ -1646,9 +1603,10 @@ export default function MetaModelPage() {
         {tab === 'export' && <ExportPanel api={api} />}
         {tab === 'validation' && <ValidationPanel api={api} />}
         {tab === 'ai' && <AiAdvisor api={api} />}
-        {tab === 'versions' && <VersionsManager api={api} />}
+        {tab === 'versions' && <ReleasePanel api={api} />}
         {tab === 'audit' && <AuditHistory api={api} />}
       </div>
     </div>
+    </ReleaseContext.Provider>
   )
 }

@@ -2,14 +2,24 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MetaModelPage from '../MetaModelPage';
 
 jest.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ token: 'fake-token' }),
+  useAuth: () => ({ token: 'fake-token', hasPermission: () => true }),
 }));
+
+jest.mock('../../contexts/LangContext', () => {
+  const { METAMODEL_TRANSLATIONS } = jest.requireActual('../metamodel/metaModelStrings');
+  return { useLang: () => ({ t: (k: string) => METAMODEL_TRANSLATIONS[k]?.EN ?? k, isAR: false }) };
+});
 
 beforeEach(() => {
   jest.clearAllMocks();
 });
 
-function mockFetch(routes: Record<string, any>) {
+// The studio edits only while a draft is open; tests get one unless they set their own versions.
+const DRAFT_VERSION = { id: 'v-draft', version: 'draft-1', status: 'DRAFT', _count: {} };
+const PUBLISHED_VERSION = { id: 'v-pub', version: '2026.09', status: 'PUBLISHED', publishedAt: '2026-09-01T00:00:00Z', _count: { domains: 9, objectTypes: 66, relationships: 182 } };
+
+function mockFetch(input: Record<string, any>) {
+  const routes = { '/meta-model/versions': [DRAFT_VERSION, PUBLISHED_VERSION], ...input };
   const sortedPatterns = Object.keys(routes).sort((a, b) => b.length - a.length); // most specific first
   global.fetch = jest.fn().mockImplementation((url: string, options?: any) => {
     for (const pattern of sortedPatterns) {
@@ -123,16 +133,37 @@ describe('MetaModelPage - DomainsManager', () => {
     });
   });
 
-  it('does not delete when the user cancels the confirmation dialog', async () => {
-    mockFetch({ '/meta-model/stats': STATS_WITH_MODEL, '/meta-model/domains': [SAMPLE_DOMAIN] });
-    const confirmSpy = jest.spyOn(window, 'confirm').mockReturnValue(false);
+  it('is read-only while no draft is open: no add or edit, a hint to start a draft', async () => {
+    mockFetch({ '/meta-model/stats': STATS_WITH_MODEL, '/meta-model/domains': [SAMPLE_DOMAIN], '/meta-model/versions': [PUBLISHED_VERSION] });
+    render(<MetaModelPage />);
+    expect(await screen.findByText('Viewing published 2026.09 — read-only')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('🗂 Domains'));
+    await screen.findByText('Business Architecture');
+    expect(screen.queryByText('+ Add Domain')).not.toBeInTheDocument();
+    expect(screen.getByText(/Start a new draft to change the Meta Model/)).toBeInTheDocument();
+    expect(screen.getByText('Edit')).toBeDisabled();
+  });
+
+  it('Delete opens the impact dialog and cancelling it deletes nothing', async () => {
+    mockFetch({
+      '/meta-model/stats': STATS_WITH_MODEL, '/meta-model/domains': [SAMPLE_DOMAIN],
+      '/meta-model/where-used/domain/d1': {
+        kind: 'DOMAIN', item: { id: 'd1', code: 'BUSINESS', name: 'Business Architecture' }, version: { id: 'v-draft', version: 'draft-1', status: 'DRAFT' },
+        editable: true, canDelete: false, blocked: '5 object type(s) are assigned to this domain.',
+        impact: { severity: 'NON_BREAKING', objects: 0, links: 0, values: 0, views: [], referenceElements: [], consequences: ['No Repository data depends on this change.'] },
+        objectTypes: [{ id: 'o1', code: 'CAP', name: 'Capability' }],
+      },
+    });
     render(<MetaModelPage />);
     fireEvent.click(await screen.findByText('🗂 Domains'));
     await screen.findByText('Business Architecture');
-    const callsBefore = (global.fetch as jest.Mock).mock.calls.length;
     fireEvent.click(screen.getByText('Delete'));
-    expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
-    confirmSpy.mockRestore();
+    expect(await screen.findByTestId('mm-del-blocked')).toHaveTextContent('5 object type(s) are assigned');
+    expect(screen.getByText('Capability')).toBeInTheDocument();
+    expect(screen.queryByText('Delete from draft')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Close'));
+    const deletes = (global.fetch as jest.Mock).mock.calls.filter(([, o]) => o?.method === 'DELETE');
+    expect(deletes).toHaveLength(0);
   });
 
   it('stops the loading spinner instead of hanging forever when the domains request fails - the actual reported bug (all four Meta-Model Studio tabs stuck on "Loading..." with no visible error, since none of their fetch chains had a .catch())', async () => {
