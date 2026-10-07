@@ -644,7 +644,7 @@ export default function RepositoryPage() {
       </div>
 
       {quickEdit && (
-        <QuickEditModal assetId={quickEdit.id} t={t} isAR={!!isAR} onClose={() => setQuickEdit(null)}
+        <QuickEditModal assetId={quickEdit.id} domains={getRepositoryDomains(config)} typesFor={(d: string) => getRepositoryAssetTypes(config, d)} t={t} isAR={!!isAR} onClose={() => setQuickEdit(null)}
           onSaved={() => { setQuickEdit(null); load() }} onOpenFull={() => { const a = quickEdit; setQuickEdit(null); openAsset(a, true) }} />
       )}
       {showAdd && <AssetModal config={config} onClose={() => setShowAdd(false)} onSave={createAsset} t={t} api={api} />}

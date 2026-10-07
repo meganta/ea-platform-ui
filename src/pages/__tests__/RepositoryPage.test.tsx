@@ -291,9 +291,11 @@ describe('RepositoryPage - CRUD', () => {
     const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByLabelText('Criticality')).toHaveValue('LOW');
     expect(within(dialog).getByLabelText('repository.profile.owner')).toHaveValue('IT');
-    // No relationships, domain or type in the quick edit; the URL is unchanged.
+    // Domain, object type and status are there; relationships are not, and the URL is unchanged.
+    expect(within(dialog).getByLabelText('repository.profile.domain')).toHaveValue('APPLICATION');
+    expect(within(dialog).getByLabelText(/repository.profile.type/)).toHaveValue('Application');
+    expect(within(dialog).getByLabelText('repository.profile.status')).toHaveValue('APPROVED');
     expect(within(dialog).queryByText('Supports')).toBeNull();
-    expect(within(dialog).queryByLabelText('repository.profile.domain')).toBeNull();
     expect(mockSetSearchParams).not.toHaveBeenCalled();
 
     fireEvent.change(within(dialog).getByLabelText('Criticality'), { target: { value: 'HIGH' } });
@@ -304,9 +306,54 @@ describe('RepositoryPage - CRUD', () => {
     const body = JSON.parse(putCall[1].body);
     expect(putCall[0]).toContain('/ea-repository/assets/a1');
     expect(body.metadata).toEqual({ criticality: 'HIGH', users: 250, legacyCode: 'X-1' });
-    expect(body).not.toHaveProperty('domain');
-    expect(body).not.toHaveProperty('assetType');
+    expect(body).toMatchObject({ domain: 'APPLICATION', assetType: 'Application', status: 'APPROVED' });
     expect(listCalls).toBeGreaterThan(before);
+  });
+
+  it('quick edit can change domain, object type and status; the new type\'s attributes are shown and saved', async () => {
+    const CFG = { enabledDomains: ['BUSINESS', 'APPLICATION'], allDomains: { BUSINESS: ['GovCapability'], APPLICATION: ['Application', 'SharedService'] } };
+    const a1 = asset({ assetType: 'Application', metadata: { criticality: 'LOW' } });
+    mockFetch({
+      '/ea-repository/framework-config': CFG, '/ea-repository/summary': {}, '/ea-repository/assets': [a1],
+      '/ea-repository/assets/a1/profile': { asset: a1, objectType: null, resolution: 'RESOLVED', attributeGroups: [{ id: 'g', name: 'G', isCollapsed: false, attributes: [{ code: 'criticality', name: 'Criticality', attributeType: 'TEXT', isRequired: false, isReadOnly: false, value: 'LOW', hasValue: true }] }], otherAttributes: [], completeness: { filled: 1, total: 1, requiredMissing: [] }, relationshipSlots: [], otherRelationships: [], relationshipTotals: { linked: 0, truncated: false } },
+      '/ea-repository/object-types/SharedService/attributes': { attributes: [{ code: 'consumers', name: 'Consumers', attributeType: 'INTEGER', isRequired: false }] },
+      '/ea-repository/assets/a1': (url: string, init: any) => (init?.method === 'PUT' ? a1 : a1),
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('✏'));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByLabelText('Criticality');
+    expect(within(dialog).queryByTestId('qe-type-note')).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText(/repository.profile.type/), { target: { value: 'SharedService' } });
+    expect(await within(dialog).findByLabelText('Consumers')).toBeInTheDocument();
+    expect(within(dialog).getByTestId('qe-type-note')).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Criticality')).toBeNull();
+    fireEvent.change(within(dialog).getByLabelText('Consumers'), { target: { value: '12' } });
+    fireEvent.change(within(dialog).getByLabelText('repository.profile.status'), { target: { value: 'UNDER_REVIEW' } });
+    fireEvent.click(within(dialog).getByText('repository.profile.save'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT')[1].body);
+    expect(body).toMatchObject({ domain: 'APPLICATION', assetType: 'SharedService', status: 'UNDER_REVIEW' });
+    expect(body.metadata).toEqual({ criticality: 'LOW', consumers: 12 });
+  });
+
+  it('quick edit: choosing another domain clears a type that does not belong to it, and saving then asks for a type', async () => {
+    const CFG = { enabledDomains: ['BUSINESS', 'APPLICATION'], allDomains: { BUSINESS: ['GovCapability'], APPLICATION: ['Application'] } };
+    const a1 = asset({ assetType: 'Application', metadata: {} });
+    mockFetch({
+      '/ea-repository/framework-config': CFG, '/ea-repository/summary': {}, '/ea-repository/assets': [a1],
+      '/ea-repository/assets/a1/profile': { asset: a1, objectType: null, resolution: 'RESOLVED', attributeGroups: [], otherAttributes: [], completeness: { filled: 0, total: 0, requiredMissing: [] }, relationshipSlots: [], otherRelationships: [], relationshipTotals: { linked: 0, truncated: false } },
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('✏'));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.change(await within(dialog).findByLabelText('repository.profile.domain'), { target: { value: 'BUSINESS' } });
+    expect(within(dialog).getByLabelText(/repository.profile.type/)).toHaveValue('');
+    fireEvent.click(within(dialog).getByText('repository.profile.save'));
+    expect(await within(dialog).findByText('repository.profile.fix_errors')).toBeInTheDocument();
+    expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[1]?.method === 'PUT')).toBe(false);
   });
 
   it('quick edit checks attribute values before saving and Cancel closes without saving', async () => {

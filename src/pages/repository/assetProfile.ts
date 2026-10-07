@@ -42,6 +42,8 @@ async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const assetProfileApi = {
   profile: (id: string) => call<AssetProfile>(`/ea-repository/assets/${encodeURIComponent(id)}/profile`),
+  /** The attributes a Meta Model object type defines (used when an object's type is changed). */
+  typeAttributes: (assetType: string) => call<{ attributes: any[] }>(`/ea-repository/object-types/${encodeURIComponent(assetType)}/attributes`),
   candidates: (id: string, definitionId: string, direction: string, search: string) =>
     call<{ items: RelatedAsset[]; total: number }>(`/ea-repository/assets/${encodeURIComponent(id)}/relationship-candidates?definitionId=${encodeURIComponent(definitionId)}&direction=${direction}&search=${encodeURIComponent(search)}`),
   updateAsset: (id: string, body: any) => call(`/ea-repository/assets/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(body) }),
