@@ -46,6 +46,12 @@ import OwnerTenantsPage from './pages/owner/OwnerTenantsPage'
 import OwnerTenantDetailPage from './pages/owner/OwnerTenantDetailPage'
 import OwnerAuditPage from './pages/owner/OwnerAuditPage'
 import OwnerSettingsPage from './pages/owner/OwnerSettingsPage'
+import OutreachDashboardPage from './pages/owner/outreach/OutreachDashboardPage'
+import OutreachEntitiesPage from './pages/owner/outreach/OutreachEntitiesPage'
+import OutreachEntityPage from './pages/owner/outreach/OutreachEntityPage'
+import OutreachProspectsPage from './pages/owner/outreach/OutreachProspectsPage'
+import OutreachCampaignsPage, { OutreachCampaignPage } from './pages/owner/outreach/OutreachCampaignsPage'
+import OutreachSettingsPage from './pages/owner/outreach/OutreachSettingsPage'
 import './styles.css'
 
 function ProtectedRoute({ children, permission, superadminOnly }: { children: React.ReactNode; permission?: string; superadminOnly?: boolean }) {
@@ -88,6 +94,13 @@ export default function App() {
               <Route path="tenants/:tenantId/:tab" element={<OwnerTenantDetailPage />} />
               <Route path="audit" element={<OwnerAuditPage />} />
               <Route path="settings" element={<OwnerSettingsPage />} />
+              <Route path="outreach" element={<OutreachDashboardPage />} />
+              <Route path="outreach/entities" element={<OutreachEntitiesPage />} />
+              <Route path="outreach/entities/:id" element={<OutreachEntityPage />} />
+              <Route path="outreach/prospects" element={<OutreachProspectsPage />} />
+              <Route path="outreach/campaigns" element={<OutreachCampaignsPage />} />
+              <Route path="outreach/campaigns/:id" element={<OutreachCampaignPage />} />
+              <Route path="outreach/settings" element={<OutreachSettingsPage />} />
             </Route>
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="/app" element={<DashboardPage />} />

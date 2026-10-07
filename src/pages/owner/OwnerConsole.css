@@ -73,3 +73,46 @@
   .oc-content { padding:16px }
   .oc-kv { grid-template-columns:1fr }
 }
+
+/* ── Government Outreach (pages/owner/outreach) ───────────────────────── */
+.oc-h2 { font-size:15px; font-weight:700; margin:0 0 10px; display:flex; align-items:center; gap:6px }
+.oc-h3 { font-size:13px; font-weight:700; margin:14px 0 6px; display:flex; align-items:center; gap:6px }
+.oc-warn { background:rgba(217,119,6,0.08); border:1px solid rgba(217,119,6,0.3); color:var(--warning); padding:10px 12px; border-radius:var(--radius); font-size:13px; margin-bottom:12px }
+.oc-empty { padding:20px; text-align:center; color:var(--text-dim); font-size:13px; border:1px dashed var(--border); border-radius:var(--radius); margin-top:12px }
+.oc-grid-3 { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px }
+.oc-fields { display:flex; flex-direction:column; gap:8px; font-size:13px }
+.oc-fields > div { display:grid; grid-template-columns:minmax(120px, 30%) 1fr; gap:4px 12px }
+.oc-fields > div > span:first-child { color:var(--text-dim) }
+.oc-list { list-style:none; padding:0; margin:8px 0; display:flex; flex-direction:column; gap:6px; font-size:13px }
+.oc-evidence-list { list-style:none; padding:0; margin:6px 0; display:flex; flex-direction:column; gap:8px; font-size:12px }
+.oc-evidence-list li { padding:8px 10px; background:var(--navy); border-inline-start:3px solid var(--accent); border-radius:4px }
+.oc-evidence-list blockquote { margin:0 0 4px; font-style:italic }
+.oc-blockers { list-style:none; padding:0; margin:4px 0; display:flex; flex-wrap:wrap; gap:4px }
+.oc-blockers li { font-size:11px; padding:2px 8px; border-radius:999px; background:rgba(217,119,6,0.1); color:var(--warning); border:1px solid rgba(217,119,6,0.3) }
+.oc-selection { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 12px; margin:8px 0; background:var(--navy-light); border:1px solid var(--accent); border-radius:var(--radius); font-size:13px }
+.oc-search { margin-bottom:12px }
+.oc-chips { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:10px; font-size:12px }
+.oc-chip { font-size:12px; padding:3px 10px; border-radius:999px; background:var(--navy); border:1px solid var(--border); color:var(--text); cursor:pointer }
+span.oc-chip { cursor:default }
+.oc-link { background:none; border:none; padding:0; color:var(--accent); cursor:pointer; font:inherit; text-align:start }
+.oc-btn-danger { background:var(--danger); color:#fff; border:1px solid var(--danger) }
+.oc-compact td, .oc-compact th { padding:5px 8px; font-size:12px }
+.oc-job { margin-bottom:12px }
+.oc-stages { list-style:none; padding:0; margin:8px 0; display:flex; flex-wrap:wrap; gap:6px; font-size:12px }
+.oc-stages li { padding:3px 10px; border-radius:999px; border:1px solid var(--border); color:var(--text-dim) }
+.oc-stages li.done { color:var(--success); border-color:var(--success) }
+.oc-stages li.current { color:#0EA5E9; border-color:#0EA5E9; font-weight:600 }
+.oc-funnel { list-style:none; padding:0; margin:0 0 8px; display:flex; flex-direction:column; gap:8px }
+.oc-funnel li { display:grid; grid-template-columns:minmax(110px, 22%) 1fr 56px; align-items:center; gap:10px; font-size:13px }
+.oc-funnel-bar { height:14px; background:var(--navy); border-radius:7px; overflow:hidden }
+.oc-funnel-bar span { display:block; height:100%; background:var(--accent); border-radius:7px; min-width:2px }
+.oc-funnel-count { text-align:end; font-weight:700 }
+.oc-footer-preview pre { white-space:pre-wrap; font-family:inherit; font-size:12px; margin:6px 0 0; color:var(--text-dim) }
+.oc-drawer-overlay { position:fixed; inset:0; background:rgba(15,23,42,0.45); z-index:50; display:flex; justify-content:flex-end }
+.oc-drawer { width:min(560px, 100%); height:100%; overflow-y:auto; background:var(--navy-light); padding:18px; box-shadow:var(--shadow-sm) }
+@media (max-width: 900px) {
+  .oc-grid-3 { grid-template-columns:1fr }
+  .oc-fields > div { grid-template-columns:1fr }
+  .oc-funnel li { grid-template-columns:1fr 48px; }
+  .oc-funnel-bar { grid-column:1 / -1; grid-row:2 }
+}
