@@ -4,6 +4,7 @@ import { join } from 'path';
 import VersionBar from '../VersionBar';
 import ReleasePanel from '../ReleasePanel';
 import DeleteImpactDialog from '../DeleteImpactDialog';
+import OrphanedLinksCard from '../OrphanedLinksCard';
 import { ReleaseContext, releaseState, MetaModelVersion } from '../release';
 import { METAMODEL_TRANSLATIONS } from '../metaModelStrings';
 
@@ -173,6 +174,45 @@ describe('DeleteImpactDialog', () => {
     render(<DeleteImpactDialog api={api} kind="attribute" id="a1" name="Vendor" onClose={jest.fn()} onDeleted={jest.fn()} />);
     fireEvent.click(await screen.findByText('Delete from draft'));
     expect(await screen.findByRole('alert')).toHaveTextContent('Version is published');
+  });
+});
+
+describe('OrphanedLinksCard', () => {
+  const REPORT = {
+    orphaned: {
+      total: 112, reconnectable: 109,
+      groups: [
+        { definitionCode: 'APP_SUPPORTS_CAPABILITY', name: 'Application supports Capability', sourceType: 'Application', targetType: 'GovCapability', label: 'supports', count: 109, reconnectTo: { id: 'd-new', code: 'Application-supports-Capability', name: 'Application supports Capability' } },
+        { definitionCode: 'APP_EXPOSES_API', name: 'Application exposes API', sourceType: 'Application', targetType: 'API', label: 'exposes', count: 3, reconnectTo: null },
+      ],
+    },
+    duplicates: { rowsToRemove: 4 },
+  };
+  const ANALYZE = '/ea-repository/relationship-integrity/analyze';
+
+  it('lists links whose relationship was removed and which ones the published Meta Model reconnects', async () => {
+    const api = makeApi({ [ANALYZE]: REPORT });
+    render(<OrphanedLinksCard api={api} />);
+    expect(await screen.findByText('112 links have no relationship in the published Meta Model; 109 can be reconnected now.')).toBeInTheDocument();
+    expect(screen.getByText('Reconnects to: Application supports Capability (Application-supports-Capability)')).toBeInTheDocument();
+    expect(screen.getByText(/Not in the published Meta Model/)).toBeInTheDocument();
+  });
+
+  it('reconnects only (never links other rows) and removes duplicates only when asked', async () => {
+    const api = makeApi({ [ANALYZE]: REPORT });
+    api.post.mockResolvedValue({ reconnected: 109, removed: 4 } as any);
+    render(<OrphanedLinksCard api={api} />);
+    fireEvent.click(await screen.findByTestId('mm-orph-dups'));
+    fireEvent.click(screen.getByText('Reconnect 109 links'));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith('/ea-repository/relationship-integrity/apply', { linkUnlinked: false, removeDuplicates: true }));
+    expect(await screen.findByText('109 links reconnected; 4 duplicates removed.')).toBeInTheDocument();
+  });
+
+  it('shows nothing when no link lost its relationship', async () => {
+    const api = makeApi({ [ANALYZE]: { orphaned: { total: 0, reconnectable: 0, groups: [] }, duplicates: { rowsToRemove: 0 } } });
+    const { container } = render(<OrphanedLinksCard api={api} />);
+    await waitFor(() => expect(api.get).toHaveBeenCalled());
+    expect(container).toBeEmptyDOMElement();
   });
 });
 

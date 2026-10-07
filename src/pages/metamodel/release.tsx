@@ -8,6 +8,8 @@ export interface ChangeImpact {
   severity: Severity
   objects: number
   links: number
+  /** Links without a relationship today that publishing reconnects to this one. */
+  reconnects?: number
   values: number
   views: UsageRef[]
   referenceElements: UsageRef[]

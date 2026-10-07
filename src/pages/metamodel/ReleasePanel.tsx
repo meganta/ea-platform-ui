@@ -3,6 +3,7 @@ import { useLang } from '../../contexts/LangContext'
 import { useAuth } from '../../contexts/AuthContext'
 import HelpTip from '../../components/HelpTip'
 import { useRelease, fill, ReleaseImpact, ReleaseChange, SEVERITY_COLOR } from './release'
+import OrphanedLinksCard from './OrphanedLinksCard'
 import './MetaModelRelease.css'
 
 const STATUS_COLOR: Record<string, string> = { DRAFT: '#f39c12', PUBLISHED: '#2ecc71', DEPRECATED: '#7f8c8d', ARCHIVED: '#e74c3c' }
@@ -14,6 +15,7 @@ function ChangeRow({ c }: { c: ReleaseChange }) {
     c.impact.objects ? fill(t('mm.rel.objects'), { n: c.impact.objects }) : null,
     c.impact.links ? fill(t('mm.rel.links'), { n: c.impact.links }) : null,
     c.impact.values ? fill(t('mm.rel.values'), { n: c.impact.values }) : null,
+    c.impact.reconnects ? fill(t('mm.rel.reconnects'), { n: c.impact.reconnects }) : null,
   ].filter(Boolean)
   return (
     <div className="mm-change" style={{ borderLeftColor: color }} data-testid="mm-change">
@@ -174,6 +176,8 @@ export default function ReleasePanel({ api }: { api: any }) {
           </div>
         </div>
       )}
+
+      {isAdmin && <OrphanedLinksCard api={api} refreshKey={published?.id} />}
 
       <div className="mm-card mm-stack">
         <div style={{ fontWeight: 600 }}>{t('mm.rel.history')}</div>
