@@ -55,6 +55,8 @@
 .ap-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
 .ap-edit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0 16px; }
 .ap-edit-grid .ap-wide { grid-column: 1 / -1; }
+.modal.ap-quick { width: 760px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto; box-sizing: border-box; }
+.ap-quick .ap-edit-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
 .ap-picker { position: relative; margin-top: 8px; }
 .ap-picker-list { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); max-height: 240px; overflow-y: auto; background: var(--navy-light); }
 .ap-picker-list li button { width: 100%; text-align: start; background: none; border: none; color: var(--text); padding: 8px 10px; cursor: pointer; font-size: 13px; display: flex; justify-content: space-between; gap: 8px; }
