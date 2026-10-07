@@ -15,6 +15,8 @@ jest.mock('react-router-dom', () => ({
 let mockIsAR = false
 jest.mock('../../../contexts/LangContext', () => ({ useLang: () => ({ t: (k: string) => k, isAR: mockIsAR, locale: mockIsAR ? 'AR' : 'EN' }) }))
 jest.mock('../../../components/HelpTip', () => () => <span>?</span>)
+let mockAdmin = false
+jest.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: () => mockAdmin }) }))
 
 const ARCH = { id: 'a1', code: 'APP', name: 'Application Reference Architecture', nameAr: 'المعمارية المرجعية للتطبيقات', kind: 'REFERENCE_ARCHITECTURE', authorityLevel: 'ORGANIZATION', domainCode: 'APPLICATION', activeVersionId: 'v1', derivedFromId: 'm1', derivedFrom: { id: 'm1', name: 'National Application Model', kind: 'REFERENCE_MODEL' }, versions: [{ id: 'v1', version: '1.0', status: 'ACTIVE', _count: { elements: 3 } }] }
 const MODEL = { id: 'm1', name: 'National Application Model', kind: 'REFERENCE_MODEL', authorityLevel: 'NATIONAL', domainCode: 'APPLICATION', activeVersion: { id: 'mv1', version: '1.0' }, latestVersion: { id: 'mv1', version: '1.0', status: 'ACTIVE' } }
@@ -44,7 +46,7 @@ function route(routes: Record<string, any>) {
 const calls = (f: jest.Mock, method: string, part: string) => f.mock.calls.filter(c => (c[1]?.method || 'GET') === method && String(c[0]).includes(part))
 
 beforeEach(() => {
-  mockParams = new URLSearchParams(); mockIsAR = false
+  mockParams = new URLSearchParams(); mockIsAR = false; mockAdmin = false
   Object.defineProperty(window, 'localStorage', { value: { getItem: () => 'tok' }, writable: true })
 })
 
@@ -141,6 +143,26 @@ describe('Reference Architectures page', () => {
     fireEvent.change(within(drawer).getByLabelText('refarch.el.link_type'), { target: { value: 'SUPPORTED_BY' } })
     fireEvent.click(within(drawer).getByRole('button', { name: '🔍' }))
     await waitFor(() => expect(drawer).toHaveTextContent('Kiosk data'))
+  })
+
+  it('only administrators see Delete; it asks first, calls the API and returns to the list, and shows a refusal', async () => {
+    mockParams = new URLSearchParams('ra=a1')
+    let f = workspaceFetch(); global.fetch = f as any
+    const { unmount } = render(<ReferenceArchitecturesPage />)
+    await screen.findByTestId('ra-coverage')
+    expect(screen.queryByRole('button', { name: 'refarch.delete' })).toBeNull()
+    unmount()
+    mockAdmin = true
+    f = workspaceFetch({ '/reference-architectures/a1': (url: string, init: any) => (init?.method === 'DELETE' ? { deleted: true } : ARCH) }); global.fetch = f as any
+    const confirm = jest.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true)
+    render(<ReferenceArchitecturesPage />)
+    await screen.findByTestId('ra-coverage')
+    fireEvent.click(screen.getByRole('button', { name: 'refarch.delete' }))
+    expect(calls(f, 'DELETE', '/reference-architectures/a1')).toHaveLength(0)
+    fireEvent.click(screen.getByRole('button', { name: 'refarch.delete' }))
+    await waitFor(() => expect(calls(f, 'DELETE', '/reference-architectures/a1')).toHaveLength(1))
+    expect(confirm).toHaveBeenCalledTimes(2)
+    confirm.mockRestore()
   })
 
   it('a proposal says what kind of link it is and where it came from', async () => {

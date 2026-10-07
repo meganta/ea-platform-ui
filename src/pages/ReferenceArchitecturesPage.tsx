@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import HelpTip from '../components/HelpTip'
 import { useLang } from '../contexts/LangContext'
+import { useAuth } from '../contexts/AuthContext'
 import ReferenceDiagram from './refarch/ReferenceDiagram'
 import ElementDrawer from './refarch/ElementDrawer'
 import ImportWizard from './refarch/ImportWizard'
@@ -56,6 +57,8 @@ function CreateForm({ api, t, domains, architectures, onCreated, onCancel }: { a
 
 function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: RefApi; t: T; isAR: boolean; metaModel: any; onBack: () => void }) {
   const navigate = useNavigate()
+  const { hasPermission } = useAuth() as any
+  const isAdmin = !!hasPermission?.('Tenant.Administer')
   const [arch, setArch] = useState<any>(null)
   const [versionId, setVersionId] = useState<string | null>(null)
   const [version, setVersion] = useState<any>(null)
@@ -98,6 +101,12 @@ function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: R
     return api.post(`/ea-views/open-viewpoint/${vp.id}`, {}).then((v: any) => navigate(`/ea-views?viewId=${encodeURIComponent(v.id)}`))
   }).catch(e => setMsg({ ok: false, text: e.message }))
 
+  // Tenant administrators only; the backend refuses while another architecture, a view, or recorded links/decisions rely on it.
+  const remove = () => {
+    if (!window.confirm(t('refarch.delete_confirm').replace('{name}', localName(arch, isAR)))) return
+    api.del(`/reference-architectures/${arch.id}`).then(() => onBack()).catch((e: any) => setMsg({ ok: false, text: e.message }))
+  }
+
   return (
     <div className="rp-page" dir={isAR ? 'rtl' : 'ltr'}>
       <div className="rp-header">
@@ -119,6 +128,10 @@ function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: R
             </select>
           </div>
           <button type="button" className="btn btn-secondary btn-sm" onClick={openInViews}>{t('refarch.open_in_views')}</button>
+          {isAdmin && (<span className="flex gap-2" style={{ alignItems: 'center' }}>
+            <button type="button" className="btn btn-danger btn-sm" onClick={remove}>{t('refarch.delete')}</button>
+            <HelpTip text={t('refarch.delete_help')} />
+          </span>)}
         </div>
       </div>
       <div className="rp-strip" role="tablist" aria-label={localName(arch, isAR)}>
