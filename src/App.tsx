@@ -11,6 +11,7 @@ import AdmPage from './pages/AdmPage'
 import CopilotPage from './pages/CopilotPage'
 import RepositoryPage from './pages/RepositoryPage'
 import ReferenceArchitecturesPage from './pages/ReferenceArchitecturesPage'
+import ArchitectureHealthPage from './pages/ArchitectureHealthPage'
 import KnowledgePage from './pages/KnowledgePage'
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage'
 import AiSettingsPage from './pages/settings/AiSettingsPage'
@@ -77,6 +78,7 @@ export default function App() {
               <Route path="adm" element={<ProtectedRoute permission="Repository.View"><AdmPage /></ProtectedRoute>} />
               <Route path="copilot" element={<ProtectedRoute permission="AIArchitect.Use"><CopilotPage /></ProtectedRoute>} />
               <Route path="reference-architectures" element={<ProtectedRoute permission="ReferenceArchitecture.View"><ReferenceArchitecturesPage /></ProtectedRoute>} />
+              <Route path="architecture-health" element={<ProtectedRoute permission="ArchitectureHealth.View"><ArchitectureHealthPage /></ProtectedRoute>} />
               <Route path="repository" element={<ProtectedRoute permission="Repository.View"><RepositoryPage /></ProtectedRoute>} />
               <Route path="knowledge" element={<ProtectedRoute permission="Repository.View"><KnowledgePage /></ProtectedRoute>} />
               <Route path="glossary" element={<ProtectedRoute permission="Repository.View" superadminOnly><GlossaryPage /></ProtectedRoute>} />

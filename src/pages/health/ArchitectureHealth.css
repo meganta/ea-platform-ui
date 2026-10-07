@@ -1,0 +1,31 @@
+/* Architecture Health dashboards. Uses the app shell tokens only. */
+.ah-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.ah-tile { background: var(--navy-light); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; min-width: 0; }
+.ah-tile-label { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 4px; }
+.ah-tile-value { font-size: 24px; font-weight: 700; line-height: 1.2; margin-top: 2px; }
+.ah-tile-sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; overflow-wrap: anywhere; }
+.ah-grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 900px) { .ah-grid-2 { grid-template-columns: minmax(0, 1fr); } }
+.ah-bar { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; min-width: 60px; }
+.ah-bar > span { display: block; height: 100%; background: var(--accent); }
+.ah-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); white-space: nowrap; }
+.ah-prio-CRITICAL { color: #dc2626; border-color: rgba(220, 38, 38, .4); }
+.ah-prio-HIGH_VALUE, .ah-prio-HIGH { color: #d97706; border-color: rgba(217, 119, 6, .4); }
+.ah-prio-RECOMMENDED, .ah-prio-MEDIUM { color: var(--accent); }
+.ah-prio-OPTIONAL, .ah-prio-LOW { color: var(--text-dim); }
+.ah-domains { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
+.ah-domain-btn { font: inherit; font-size: 12px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--text); cursor: pointer; }
+.ah-domain-btn[aria-pressed="true"] { border-color: var(--accent); background: rgba(3, 105, 161, .12); font-weight: 600; }
+.ah-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ah-table th, .ah-table td { text-align: start; padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.ah-table th { font-size: 11px; color: var(--text-dim); font-weight: 600; }
+.ah-dim { color: var(--text-dim); font-size: 11.5px; }
+.ah-heat { display: inline-block; min-width: 38px; padding: 2px 6px; border-radius: 6px; text-align: center; font-size: 11.5px; font-weight: 600; }
+.ah-list { margin: 0; padding-inline-start: 18px; font-size: 12.5px; }
+.ah-list li { margin-bottom: 6px; }
+.ah-plan { padding: 12px 14px; border-radius: 10px; border: 1px solid var(--accent); background: rgba(3, 105, 161, .08); font-size: 13px; margin-bottom: 12px; }
+.ah-objects { margin: 8px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--navy); border: 1px solid var(--border); }
+.ah-btn { font: inherit; font-size: 12px; padding: 5px 11px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); background: transparent; color: var(--text); }
+.ah-btn-primary { background: var(--accent); color: var(--navy); border-color: var(--accent); font-weight: 600; }
+.ah-btn:disabled { opacity: .6; cursor: default; }
+.ah-link-btn { font: inherit; font-size: 11.5px; background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; text-decoration: underline; }
