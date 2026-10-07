@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
+import { useAuth } from '../contexts/AuthContext'
 import HelpTip from './HelpTip'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
@@ -25,6 +26,9 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
   const [r, setR] = useState<any>(null)
   const [loadFailed, setLoadFailed] = useState(false)
   const [open, setOpen] = useState(false)
+  const { hasPermission } = useAuth()
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState(false)
 
   useEffect(() => {
     let stop = false
@@ -44,6 +48,17 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
     load()
     return () => { stop = true; clearTimeout(timer) }
   }, [a.researchId])
+
+  const send = async () => {
+    setSending(true); setSendError(false)
+    try {
+      const res = await fetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/decision-assessment`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+      if (!res.ok) throw new Error(String(res.status))
+      const body = await res.json()
+      setR((prev: any) => ({ ...prev, decisionAssessmentId: body.assessment.id }))
+    } catch { setSendError(true) }
+    finally { setSending(false) }
+  }
 
   const status = r?.status || a.status
   const o = r?.outcome
@@ -87,6 +102,17 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
               </table>
             </div>
           )}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginTop: 8 }}>
+            {r?.decisionAssessmentId
+              ? <a data-testid="research-de-link" href={`/decision-evaluation?assessment=${encodeURIComponent(r.decisionAssessmentId)}`} style={{ fontSize: 11.5, padding: '5px 11px', borderRadius: 8, background: 'var(--accent)', color: 'var(--navy)', fontWeight: 600, textDecoration: 'none' }}>↗ {t('copilot.research.open_de')}</a>
+              : hasPermission('DecisionEvaluation.CreateAssessments') && (
+                <button type="button" onClick={send} disabled={sending} style={{ fontSize: 11.5, padding: '5px 11px', borderRadius: 8, cursor: sending ? 'default' : 'pointer', background: 'var(--accent)', color: 'var(--navy)', border: '1px solid var(--accent)', fontWeight: 600 }}>
+                  {sending ? t('copilot.research.sending') : `⚖ ${t('copilot.research.send_de')}`}
+                </button>
+              )}
+            <HelpTip text={t('copilot.research.send_de_help')} />
+          </div>
+          {sendError && <div role="alert" style={{ fontSize: 11, color: '#f97316', marginTop: 4 }}>{t('copilot.research.send_failed')}</div>}
           <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 8, cursor: 'pointer', background: 'transparent', color: 'var(--text)', border: '1px solid var(--border)', marginTop: 8 }}>
             {open ? t('copilot.research.hide_details') : t('copilot.research.show_details')}
           </button>

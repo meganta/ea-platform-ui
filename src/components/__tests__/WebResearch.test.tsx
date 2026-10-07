@@ -5,6 +5,9 @@ import CopilotResearchCard, { isResearchAttachment, RESEARCH_POLL_MS } from '../
 let mockIsAR = false
 jest.mock('../../contexts/LangContext', () => ({ useLang: () => ({ t: (k: string) => k, isAR: mockIsAR }) }))
 jest.mock('../HelpTip', () => () => <span>?</span>)
+let mockCanCreate = true
+jest.mock('../../contexts/AuthContext', () => ({ useAuth: () => ({ hasPermission: (c: string) => c === 'DecisionEvaluation.CreateAssessments' && mockCanCreate }) }))
+import DecisionPreparedBy from '../DecisionPreparedBy'
 
 const ok = (body: any) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) })
 
@@ -79,5 +82,34 @@ describe('Copilot research card', () => {
     global.fetch = jest.fn(() => ok({ id: 'r1', status: 'NOT_CONFIGURED', provider: 'NONE', error: 'Web research is switched off' })) as any
     render(<CopilotResearchCard attachment={{ ...att, status: 'NOT_CONFIGURED' } as any} />)
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Web research is switched off'))
+  })
+  it('sends a completed research to Decisions & Evaluation and then links to it', async () => {
+    const fetchMock = jest.fn((url: string, init?: any) => ok(init?.method === 'POST' ? { assessment: { id: 'de1', status: 'DRAFT' }, created: true } : DONE))
+    global.fetch = fetchMock as any
+    render(<CopilotResearchCard attachment={{ ...att, status: 'COMPLETED' } as any} />)
+    await waitFor(() => expect(screen.getByText(/copilot.research.send_de$/)).toBeInTheDocument())
+    fireEvent.click(screen.getByText(/copilot.research.send_de$/))
+    await waitFor(() => expect(screen.getByTestId('research-de-link')).toHaveAttribute('href', '/decision-evaluation?assessment=de1'))
+    expect(String(fetchMock.mock.calls.find(c => c[1]?.method === 'POST')![0])).toContain('/technology-research/r1/decision-assessment')
+  })
+
+  it('without permission offers no send; an already-sent research links directly', async () => {
+    mockCanCreate = false
+    global.fetch = jest.fn(() => ok({ ...DONE, decisionAssessmentId: 'de9' })) as any
+    render(<CopilotResearchCard attachment={{ ...att, status: 'COMPLETED' } as any} />)
+    await waitFor(() => expect(screen.getByTestId('research-de-link')).toHaveAttribute('href', '/decision-evaluation?assessment=de9'))
+    expect(screen.queryByText(/copilot.research.send_de$/)).toBeNull()
+    mockCanCreate = true
+  })
+})
+
+describe('Prepared by Copilot badge', () => {
+  it('names the domain architect with its domain, or the Chief across domains', () => {
+    const { rerender } = render(<DecisionPreparedBy assessment={{ originType: 'COPILOT_RESEARCH', preparedBy: 'COPILOT', preparedByArchitectName: 'Data Architect', preparedByDomain: 'DATA' }} />)
+    expect(screen.getByTestId('decision-prepared-by')).toHaveTextContent('decision.prepared.copilot · decision.prepared.domain · decision.prepared.from_research')
+    rerender(<DecisionPreparedBy assessment={{ preparedBy: 'COPILOT', preparedByArchitectName: 'Chief Architect', preparedByDomain: null }} />)
+    expect(screen.getByTestId('decision-prepared-by')).toHaveTextContent('decision.prepared.chief')
+    rerender(<DecisionPreparedBy assessment={{ preparedBy: null, originType: null }} />)
+    expect(screen.queryByTestId('decision-prepared-by')).toBeNull()
   })
 })

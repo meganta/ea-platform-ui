@@ -2,6 +2,7 @@ import CompareTab from './decision/DecisionComparisonWorkspace'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useLang } from '../contexts/LangContext'
 import { useAuth } from '../contexts/AuthContext'
+import DecisionPreparedBy from '../components/DecisionPreparedBy'
 
 const API = process.env.REACT_APP_API_URL || 'https://ea-platform-api-693660680541.me-central1.run.app/api/v1'
 
@@ -76,7 +77,8 @@ export default function DecisionEvaluationPage() {
   const api = useApi()
   const [assessments, setAssessments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // ?assessment=<id> opens one assessment directly (e.g. from a Copilot research card).
+  const [selectedId, setSelectedId] = useState<string | null>(() => { try { return new URLSearchParams(window.location.search).get('assessment') } catch { return null } })
   const [showCreate, setShowCreate] = useState(false)
 
   const load = useCallback(() => {
@@ -120,6 +122,7 @@ export default function DecisionEvaluationPage() {
                     <span style={S.badge(STATUS_COLORS[a.status] || '#94a3b8')}>{a.status.replace(/_/g, ' ')}</span>
                     {a.outcome && <span style={S.badge(OUTCOME_COLORS[a.outcome] || '#94a3b8')}>{a.outcome.replace(/_/g, ' ')}</span>}
                     {a.version > 1 && <span style={S.badge('#94a3b8')}>v{a.version}</span>}
+                    <DecisionPreparedBy assessment={a} />
                   </div>
                 </div>
               ))}
@@ -250,6 +253,7 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
           <div>
             <div style={S.title}>{assessment.title}</div>
             <div style={S.subtitle}>{isAR ? PROFILES[assessment.profile]?.ar : PROFILES[assessment.profile]?.en} · <span style={{ color: STATUS_COLORS[status] }}>{status.replace(/_/g, ' ')}</span></div>
+            <div style={{ marginTop: 4 }}><DecisionPreparedBy assessment={assessment} /></div>
           </div>
         </div>
         <div style={S.row}>
