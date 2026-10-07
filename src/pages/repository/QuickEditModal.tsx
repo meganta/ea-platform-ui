@@ -60,7 +60,7 @@ export default function QuickEditModal({ assetId, domains, typesFor, t, isAR, on
     }).catch(() => { if (live) setTypeAttrs([]) })
     return () => { live = false }
   }, [core.assetType, typeChanged, profile])
-  const groups = useMemo(() => (typeAttrs ? [{ id: 'type', name: t('repository.quick.type_attributes'), nameAr: null, isCollapsed: false, attributes: typeAttrs }] : profile?.attributeGroups || []), [typeAttrs, profile, t])
+  const groups: Array<{ id: string; name: string; nameAr?: string | null; attributes: any[] }> = useMemo(() => (typeAttrs ? [{ id: 'type', name: t('repository.quick.type_attributes'), nameAr: null, isCollapsed: false, attributes: typeAttrs }] : profile?.attributeGroups || []), [typeAttrs, profile, t])
   const attributes = useMemo(() => groups.flatMap((g: any) => g.attributes), [groups])
   const types = typesFor(core.domain)
   const setC = (k: keyof typeof core) => (e: any) => setCore(c => ({ ...c, [k]: e.target.value }))
