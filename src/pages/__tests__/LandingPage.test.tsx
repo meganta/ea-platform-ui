@@ -141,7 +141,7 @@ describe('ArchMind landing page — customers', () => {
     expect(section).toHaveAttribute('id', 'customers')
     expect(screen.getByRole('heading', { level: 3, name: /Human Resources Development Fund \(HRDF\)/ })).toBeInTheDocument()
     expect(screen.getByAltText('Human Resources Development Fund logo')).toHaveAttribute('src', '/customers/hrdf.png')
-    expect(screen.getAllByRole('link', { name: 'Customers' })[0]).toHaveAttribute('href', '#customers')
+    expect(screen.getAllByRole('link', { name: 'Success stories' })[0]).toHaveAttribute('href', '#customers')
   })
 
   it('shows the Arabic name in Arabic', () => {

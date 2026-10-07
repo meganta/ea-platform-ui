@@ -86,7 +86,7 @@ const navItems = [
   { href: '#capabilities', label: c('Capabilities', 'القدرات') },
   { href: '#ai-architects', label: c('AI Architects', 'المعماريون الأذكياء') },
   { href: '#frameworks', label: c('Frameworks', 'الأطر') },
-  { href: '#customers', label: c('Customers', 'عملاؤنا') },
+  { href: '#customers', label: c('Success stories', 'قصص نجاح') },
   { href: '#resources', label: c('Resources', 'الموارد') },
 ]
 
@@ -311,7 +311,7 @@ export default function LandingPage() {
 
         <section className="am-section lp-surface" id="customers" aria-labelledby="customers-title">
           <div className="am-container">
-            <SectionHeading eyebrow={c('OUR CUSTOMERS', 'عملاؤنا')} title={c('Organizations operating enterprise architecture with ArchMind', 'جهات تشغّل بنيتها المؤسسية مع ArchMind')} body={c('Public-sector and enterprise architecture teams use ArchMind to run their architecture practice.', 'تعتمد فرق البنية المؤسسية في القطاع الحكومي والمؤسسات على ArchMind في تشغيل ممارساتها المعمارية.')} L={L} id="customers-title" />
+            <SectionHeading eyebrow={c('SUCCESS STORIES', 'قصص نجاح')} title={c('Organizations operating enterprise architecture with ArchMind', 'جهات تشغّل بنيتها المؤسسية مع ArchMind')} body={c('Public-sector and enterprise architecture teams use ArchMind to run their architecture practice.', 'تعتمد فرق البنية المؤسسية في القطاع الحكومي والمؤسسات على ArchMind في تشغيل ممارساتها المعمارية.')} L={L} id="customers-title" />
             <ul className="lp-customers">{customers.map((customer) => <CustomerCard key={customer.id} customer={customer} L={L} />)}</ul>
           </div>
         </section>
@@ -344,7 +344,7 @@ export default function LandingPage() {
           </nav>
           <nav className="lp-footer-col" aria-label={L(c('Company', 'الشركة'))}>
             <h2 className="am-label">{L(c('Company', 'الشركة'))}</h2>
-            <a href="#customers">{L(c('Customers', 'عملاؤنا'))}</a>
+            <a href="#customers">{L(c('Success stories', 'قصص نجاح'))}</a>
             <a href="#demo">{L(c('Contact', 'تواصل معنا'))}</a>
             <Link to="/login">{L(labels.signIn)}</Link>
           </nav>
