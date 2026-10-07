@@ -17,7 +17,6 @@ export const api = {
   login: (email: string, password: string, tenantSlug: string) => req('POST', '/auth/login', { email, password, tenantSlug }),
   submitDemoRequest: (data: { fullName: string; organization: string; jobTitle: string; email: string; phone?: string; country: string; preferredLanguage: string; message: string }) =>
     req('POST', '/public/demo-requests', data),
-  listDemoRequests: () => req('GET', '/demo-requests'),
   me: () => req('GET', '/auth/me'),
   exitOwnerAccess: () => req('POST', '/owner-access/exit'),
   getMe: () => req('GET', '/users/me'),

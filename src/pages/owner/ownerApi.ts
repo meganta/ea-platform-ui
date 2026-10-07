@@ -33,6 +33,7 @@ export const qs = (params: Record<string, string | undefined | null>) => {
 export const ownerApi = {
   me: () => call('GET', '/owner/me'),
   dashboard: () => call('GET', '/owner/dashboard'),
+  demoRequests: () => call('GET', '/owner/demo-requests'),
   tenants: (f: { search?: string; status?: string; sector?: string; sort?: string } = {}) => call('GET', `/owner/tenants${qs(f)}`),
   comparison: () => call('GET', '/owner/comparison'),
   createTenant: (dto: any) => call('POST', '/owner/tenants', dto),

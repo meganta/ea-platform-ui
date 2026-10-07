@@ -2,13 +2,19 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AccessGovernancePage from '../AccessGovernancePage';
 
 let mockUser: any = { role: 'TENANT_ADMIN' };
+let mockPerms: string[] = [];
+// Mirrors AuthContext.hasPermission: legacy TENANT_ADMIN / SUPERADMIN pass every check, others need the permission.
 jest.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({ user: mockUser }),
+  useAuth: () => ({ user: mockUser, hasPermission: (c: string) => ['TENANT_ADMIN', 'SUPERADMIN'].includes(mockUser?.role) || mockPerms.includes(c) }),
 }));
+jest.mock('../../contexts/LangContext', () => ({ useLang: () => ({ t: (k: string) => k, isAR: false, locale: 'EN' }) }));
+jest.mock('../../lib/tenantHosts', () => ({ tenantInviteUrl: (u: string) => u }));
 
 beforeEach(() => {
   jest.clearAllMocks();
   mockUser = { role: 'TENANT_ADMIN' };
+  mockPerms = [];
+  window.history.replaceState({}, '', '/access-governance');
   localStorage.setItem('ea_token', 'fake-token');
 });
 
@@ -186,5 +192,65 @@ describe('AccessGovernancePage - SodTab', () => {
     fireEvent.click(screen.getByText('Delete'));
     expect((global.fetch as jest.Mock).mock.calls.length).toBe(callsBefore);
     confirmSpy.mockRestore();
+  });
+});
+
+
+describe('AccessGovernancePage - roles can be edited by every tenant administrator', () => {
+  const ROLE = { id: 'r1', code: 'Architect', name: 'Architect', isSystemRole: false, rolePermissions: [], _count: { assignments: 2 } };
+  const PERMS = [{ code: 'Repository.View', module: 'Repository', description: 'View the repository', riskLevel: 'NORMAL' }, { code: 'Innovation.View', module: 'Innovation', description: 'Open Innovation', riskLevel: 'NORMAL' }];
+  const routes = (onSave: (b: any) => void) => ({
+    '/access-governance/roles/r1/permissions': (o: any) => { onSave(JSON.parse(o.body)); return { updated: true }; },
+    '/access-governance/roles/r1': { ...ROLE, rolePermissions: [{ permissionCode: 'Repository.View' }] },
+    '/access-governance/roles': [ROLE],
+    '/access-governance/permissions': PERMS,
+  });
+
+  it.each([
+    ['tenant SUPERADMIN', { role: 'SUPERADMIN' }, []],
+    ['TENANT_ADMIN', { role: 'TENANT_ADMIN' }, []],
+    ['a user whose role grants Tenant.Administer', { role: 'ARCHITECT' }, ['Roles.View', 'Tenant.Administer']],
+  ])('%s can check and uncheck a role\'s permissions and save them', async (_l, user, perms) => {
+    mockUser = user; mockPerms = perms as string[];
+    const saved: any[] = [];
+    mockFetch(routes(b => saved.push(b)));
+    render(<AccessGovernancePage />);
+    fireEvent.click(screen.getByText('Roles'));
+    fireEvent.click(await screen.findByText('Architect'));
+    const repo = await screen.findByRole('checkbox', { name: /Repository.View/ });
+    const innov = screen.getByRole('checkbox', { name: /Innovation.View/ });
+    expect(repo).toBeEnabled();
+    expect(repo).toBeChecked();
+    fireEvent.click(repo);
+    fireEvent.click(innov);
+    fireEvent.click(screen.getByText('Save Permissions'));
+    await waitFor(() => expect(saved).toEqual([{ permissions: [{ code: 'Innovation.View' }] }]));
+  });
+
+  it('a user without Tenant.Administer sees the permissions read-only', async () => {
+    mockUser = { role: 'ARCHITECT' }; mockPerms = ['Roles.View'];
+    mockFetch(routes(() => undefined));
+    render(<AccessGovernancePage />);
+    fireEvent.click(screen.getByText('Roles'));
+    fireEvent.click(await screen.findByText('Architect'));
+    expect(await screen.findByRole('checkbox', { name: /Repository.View/ })).toBeDisabled();
+    expect(screen.queryByText('Save Permissions')).not.toBeInTheDocument();
+  });
+});
+
+describe('AccessGovernancePage - Users live here', () => {
+  it('the Users tab is the full user management (invite, create, roles, effective access) and ?tab=users opens it', async () => {
+    window.history.replaceState({}, '', '/access-governance?tab=users');
+    mockFetch({
+      '/users/invitations': [],
+      '/access-governance/users/u1/effective-permissions': [{ code: 'Innovation.View', source: 'Innovation Engineer', domainScope: [] }],
+      '/access-governance/roles': [{ id: 'r9', name: 'Innovation Engineer', isActive: true }],
+      '/users': [{ id: 'u1', email: 'eng@example.sa', fullName: 'Eng One', role: 'ARCHITECT', isActive: true, tenantRoles: [{ id: 'r9', name: 'Innovation Engineer' }] }],
+    });
+    render(<AccessGovernancePage />);
+    expect(await screen.findByText('Eng One')).toBeInTheDocument();
+    expect(screen.getByText(/users.invite/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('users.effective_access'));
+    expect(await screen.findByTestId('user-effective-u1')).toHaveTextContent('Innovation.View');
   });
 });

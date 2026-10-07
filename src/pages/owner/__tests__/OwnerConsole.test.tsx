@@ -43,6 +43,7 @@ import OwnerTenantDetailPage from '../OwnerTenantDetailPage';
 import EnrichmentPanel from '../EnrichmentPanel';
 import OwnerAuditPage from '../OwnerAuditPage';
 import OwnerSettingsPage from '../OwnerSettingsPage';
+import OwnerDemoRequestsPage from '../OwnerDemoRequestsPage';
 import DelegatedAccessBanner from '../../../components/DelegatedAccessBanner';
 
 const OWNER = { userId: 'o', email: 'owner@archmind.sa', role: 'ARCHITECT', tenantId: 'home', platformRole: 'PLATFORM_OWNER', delegatedAccess: null };
@@ -296,6 +297,41 @@ describe('Audit and settings', () => {
     render(<OwnerSettingsPage />);
     expect(await screen.findByText('owner.settings.disabled')).toBeInTheDocument();
     expect(screen.getByText('owner.settings.grant')).toBeInTheDocument();
+  });
+});
+
+describe('Demo requests (owner only)', () => {
+  const ROWS = [
+    { id: 'r2', fullName: 'Aisha Al Saud', organization: 'Example Authority', jobTitle: 'Enterprise Architect', email: 'aisha@example.gov.sa', phone: null, country: 'Saudi Arabia', preferredLanguage: 'English', message: 'We would like a demo.', createdAt: '2026-09-14T10:00:00.000Z' },
+    { id: 'r1', fullName: 'Omar Khalid', organization: 'Another Org', jobTitle: 'CIO', email: 'omar@another.org', phone: '+966500000000', country: 'United Arab Emirates', preferredLanguage: 'Arabic', message: 'Interested in governance.', createdAt: '2026-09-13T09:00:00.000Z' },
+  ];
+
+  it('lists requests in the order the API returns them and filters by search', async () => {
+    api.demoRequests.mockResolvedValue(ROWS);
+    render(<OwnerDemoRequestsPage />);
+    await screen.findByText('Aisha Al Saud');
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows[0]).toHaveTextContent('Aisha Al Saud');
+    expect(rows[1]).toHaveTextContent('Omar Khalid');
+    expect(screen.getByRole('link', { name: 'omar@another.org' })).toHaveAttribute('href', 'mailto:omar@another.org');
+    fireEvent.change(screen.getByLabelText('owner.demo.search'), { target: { value: 'governance' } });
+    expect(screen.queryByText('Aisha Al Saud')).not.toBeInTheDocument();
+    expect(screen.getByText('Omar Khalid')).toBeInTheDocument();
+  });
+
+  it('shows the empty state and an error with retry', async () => {
+    api.demoRequests.mockResolvedValueOnce([]);
+    const { unmount } = render(<OwnerDemoRequestsPage />);
+    expect(await screen.findByTestId('owner-demo-empty')).toHaveTextContent('owner.demo.empty');
+    unmount();
+    api.demoRequests.mockRejectedValueOnce(new Error('Forbidden'));
+    render(<OwnerDemoRequestsPage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Forbidden');
+  });
+
+  it('is in the owner navigation', () => {
+    render(<OwnerRoute><OwnerLayout /></OwnerRoute>);
+    expect(screen.getByText('owner.nav.demo').closest('a')).toHaveAttribute('href', '/owner/demo-requests');
   });
 });
 

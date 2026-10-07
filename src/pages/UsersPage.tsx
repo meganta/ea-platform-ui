@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { Fragment, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from '../components/HelpTip'
@@ -51,10 +51,14 @@ function RolePicker({ roles, value, onChange, idPrefix, t, isAR }: { roles: Tena
 const roleNames = (ids: string[] | undefined, roles: TenantRole[], isAR: boolean) =>
   (ids || []).map(id => roles.find(r => r.id === id)).filter(Boolean).map(r => (isAR && r!.nameAr) || r!.name)
 
-export default function UsersPage() {
+/** Users of the tenant. Lives inside Access Governance (Users tab, `embedded`); the old /settings/users and /users addresses redirect there. */
+export default function UsersPage({ embedded = false }: { embedded?: boolean } = {}) {
   const { t, isAR } = useLang() as any
   const { hasPermission, user } = useAuth()
-  const isAdmin = user?.role === 'TENANT_ADMIN' || user?.role === 'SUPERADMIN'
+  // Tenant administrators: legacy TENANT_ADMIN / SUPERADMIN, or a role granting Tenant.Administer.
+  const isAdmin = hasPermission('Tenant.Administer')
+  const canSeeAccess = hasPermission('Roles.View')
+  const [effective, setEffective] = useState<{ userId: string; perms: any[] } | null>(null)
   const api = useApi()
   const [users, setUsers] = useState<any[]>([])
   const [invitations, setInvitations] = useState<any[]>([])
@@ -214,12 +218,22 @@ export default function UsersPage() {
     } catch (e: any) { showMsg(e.message, true) }
   }
 
+  const toggleEffective = async (userId: string) => {
+    if (effective?.userId === userId) { setEffective(null); return }
+    try {
+      const perms = await api.get(`/access-governance/users/${userId}/effective-permissions`)
+      setEffective({ userId, perms: Array.isArray(perms) ? perms : [] })
+    } catch (e: any) { setError(e.message) }
+  }
+
   return (
-    <div style={{ padding: '20px 28px', height: '100%', overflow: 'auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>👥 {t('users.title') || 'Users'}</h1>
-        <HelpTip text={t('users.help') || 'Manage users in your tenant. Invite new users by email, or create them directly. Deactivate users who no longer need access.'} />
-      </div>
+    <div style={embedded ? undefined : { padding: '20px 28px', height: '100%', overflow: 'auto' }} dir={isAR ? 'rtl' : 'ltr'}>
+      {!embedded && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 700 }}>👥 {t('users.title') || 'Users'}</h1>
+          <HelpTip text={t('users.help') || 'Manage users in your tenant. Invite new users by email, or create them directly. Deactivate users who no longer need access.'} />
+        </div>
+      )}
 
       {(error || success) && (
         <div style={{ padding: '10px 16px', borderRadius: 8, marginBottom: 16, background: error ? 'rgba(220,38,38,0.08)' : 'rgba(22,163,74,0.08)', color: error ? 'var(--danger)' : 'var(--success)', border: `1px solid ${error ? 'rgba(220,38,38,0.2)' : 'rgba(22,163,74,0.2)'}` }}>
@@ -252,7 +266,7 @@ export default function UsersPage() {
           </div>
 
           {loading ? <div className="spinner" style={{ margin: '40px auto' }} /> : (
-            <div style={{ background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--navy-light)', borderRadius: 'var(--radius)', border: '1px solid var(--border)', overflowX: 'auto' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--navy-mid)', borderBottom: '1px solid var(--border)' }}>
@@ -267,7 +281,8 @@ export default function UsersPage() {
                 </thead>
                 <tbody>
                   {users.map(u => (
-                    <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <Fragment key={u.id}>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
                       <td style={{ padding: '10px 14px' }}>
                         <div style={{ fontWeight: 500 }}>{u.fullName || u.email}</div>
                         {u.fullNameAr && <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{u.fullNameAr}</div>}
@@ -290,6 +305,11 @@ export default function UsersPage() {
                       </td>
                       <td style={{ padding: '10px 14px', textAlign: 'right' }}>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          {canSeeAccess && (
+                            <button type="button" aria-expanded={effective?.userId === u.id} onClick={() => toggleEffective(u.id)} style={{ padding: '4px 10px', fontSize: 11, background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}>
+                              {t('users.effective_access')}
+                            </button>
+                          )}
                           {canEdit && (
                             <button onClick={() => setEditingUser({ ...u, tenantRoleIds: (u.tenantRoles || []).map((r: TenantRole) => r.id) })} style={{ padding: '4px 10px', fontSize: 11, background: 'var(--navy-mid)', border: '1px solid var(--border)', borderRadius: 4, cursor: 'pointer' }}>
                               {t('users.edit') || 'Edit'}
@@ -313,6 +333,20 @@ export default function UsersPage() {
                         </div>
                       </td>
                     </tr>
+                    {effective && effective.userId === u.id && (
+                      <tr data-testid={`user-effective-${u.id}`}>
+                        <td colSpan={7} style={{ padding: '10px 14px', fontSize: 12, background: 'var(--navy)' }}>
+                          {effective.perms.length === 0 ? <span style={{ color: 'var(--text-dim)' }}>{t('users.effective_none')}</span> : (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                              {effective.perms.map((p: any, i: number) => (
+                                <span key={i} className="badge badge-draft" title={`${t('users.effective_via')} ${p.source}${p.domainScope?.length ? ` · ${p.domainScope.join(', ')}` : ''}`}>{p.code}</span>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   ))}
                   {users.length === 0 && (
                     <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--text-dim)' }}>{t('users.no_users') || 'No users yet.'}</td></tr>
