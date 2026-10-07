@@ -103,6 +103,7 @@ export default function Layout() {
     { to: '/reports', label: '📊 ' + (locale === 'AR' ? 'التقارير' : 'Reports'), icon: '', permission: 'Repository.View' },
     { to: '/repository', label: '🗄 ' + t('nav.repository'), icon: '', permission: 'Repository.View' },
     { to: '/reference-architectures', label: '🧭 ' + t('nav.refarch'), icon: '', permission: 'ReferenceArchitecture.View' },
+    { to: '/architecture-health', label: '🩺 ' + t('nav.health'), icon: '', permission: 'ArchitectureHealth.View' },
     { to: '/knowledge', label: '📚 ' + t('nav.knowledge'), icon: '', permission: 'Repository.View' },
     { to: '/glossary', label: '📖 Glossary', icon: '', permission: 'Repository.View', superadminOnly: true },
     { to: '/access-governance', label: '🔐 Access Governance', icon: '', permission: 'Roles.View', superadminOnly: true },
@@ -124,8 +125,8 @@ export default function Layout() {
     return hasPermission(item.permission)
   })
 
-  const mainNav = visibleNav.filter(n => !['/repository', '/reference-architectures', '/knowledge', '/glossary', '/access-governance', '/settings', '/getting-started', '/demo-requests'].includes(n.to))
-  const repoNav = visibleNav.filter(n => ['/repository', '/reference-architectures', '/knowledge', '/glossary'].includes(n.to))
+  const mainNav = visibleNav.filter(n => !['/repository', '/reference-architectures', '/architecture-health', '/knowledge', '/glossary', '/access-governance', '/settings', '/getting-started', '/demo-requests'].includes(n.to))
+  const repoNav = visibleNav.filter(n => ['/repository', '/reference-architectures', '/architecture-health', '/knowledge', '/glossary'].includes(n.to))
   const adminNav = visibleNav.filter(n => ['/access-governance', '/settings', '/getting-started', '/demo-requests'].includes(n.to))
 
   return (
