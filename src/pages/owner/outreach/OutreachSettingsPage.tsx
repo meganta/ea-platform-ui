@@ -5,6 +5,7 @@ import { fmtDate } from '../ownerApi'
 import { ErrorBox, Header, Loading, Pill } from '../ownerUi'
 import { outreachApi } from './outreachApi'
 import { OutreachNav } from './OutreachShell'
+import { LinkedInPageCard } from './OutreachPagePage'
 
 const CAPABILITIES = ['supportsProfileDiscovery', 'supportsConnectionRequest', 'supportsDirectMessaging', 'supportsMessageStatus']
 
@@ -136,6 +137,8 @@ export default function OutreachSettingsPage() {
           </ul>
         )}
       </section>
+
+      <div style={{ marginTop: 16 }}><LinkedInPageCard /></div>
 
       <section className="oc-card" style={{ marginTop: 16 }}>
         <h2 className="oc-h2">{t('owner.outreach.suppression.title')}<HelpTip text={t('owner.outreach.suppression.help')} /></h2>

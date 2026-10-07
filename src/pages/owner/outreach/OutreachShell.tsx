@@ -12,6 +12,7 @@ export function OutreachNav() {
     { to: '/owner/outreach/entities', label: t('owner.outreach.nav.entities') },
     { to: '/owner/outreach/prospects', label: t('owner.outreach.nav.prospects') },
     { to: '/owner/outreach/campaigns', label: t('owner.outreach.nav.campaigns') },
+    { to: '/owner/outreach/page', label: t('owner.outreach.nav.page') },
     { to: '/owner/outreach/settings', label: t('owner.outreach.nav.settings') },
   ]
   return (
