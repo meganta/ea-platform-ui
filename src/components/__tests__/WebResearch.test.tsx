@@ -19,12 +19,36 @@ beforeEach(() => {
 })
 
 describe('Web research settings', () => {
-  it('shows Anthropic by default and saves provider, model, searches and domains', async () => {
+  it('follows the AI settings by default: no provider or model to fill in, shows what is in use', async () => {
+    const fetchMock = jest.fn((url: string, init?: any) => ok(init?.method === 'PUT'
+      ? { ...JSON.parse(init.body), model: null, effective: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', source: 'AI_SETTINGS', reason: null } }
+      : { provider: 'AUTO', model: null, maxSearches: 5, allowedDomains: [], blockedDomains: [], effective: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', source: 'AI_SETTINGS', reason: null } }))
+    global.fetch = fetchMock as any
+    render(<WebResearchSettingsCard />)
+    await waitFor(() => expect(screen.getByLabelText('settings.web.provider')).toHaveValue('AUTO'))
+    expect(screen.queryByLabelText('settings.web.model')).toBeNull()
+    expect(screen.getByTestId('web-research-effective')).toHaveTextContent('settings.web.source.AI_SETTINGS')
+    fireEvent.click(screen.getByText('settings.web.save'))
+    await waitFor(() => expect(screen.getByText('settings.web.saved')).toBeInTheDocument())
+    const put = fetchMock.mock.calls.find(c => c[1]?.method === 'PUT')!
+    expect(JSON.parse(put[1].body)).toMatchObject({ provider: 'AUTO', model: null, maxSearches: 5 })
+  })
+
+  it('says when the AI provider cannot search and Anthropic is used instead', async () => {
+    global.fetch = jest.fn(() => ok({ provider: 'AUTO', model: null, maxSearches: 5, allowedDomains: [], blockedDomains: [], effective: { provider: 'ANTHROPIC', model: null, source: 'FALLBACK', reason: 'x' } })) as any
+    render(<WebResearchSettingsCard />)
+    await waitFor(() => expect(screen.getByTestId('web-research-effective')).toHaveTextContent('settings.web.source.FALLBACK'))
+  })
+
+  it('an override shows the model field and saves provider, model, searches and domains', async () => {
     const fetchMock = jest.fn((url: string, init?: any) => ok(init?.method === 'PUT' ? { ...JSON.parse(init.body), model: JSON.parse(init.body).model || null } : { provider: 'ANTHROPIC', model: null, maxSearches: 5, allowedDomains: [], blockedDomains: [] }))
     global.fetch = fetchMock as any
     render(<WebResearchSettingsCard />)
     await waitFor(() => expect(screen.getByLabelText('settings.web.provider')).toHaveValue('ANTHROPIC'))
     expect(screen.getByLabelText('settings.web.model')).toHaveAttribute('placeholder', 'claude-opus-5-5')
+    fireEvent.change(screen.getByLabelText('settings.web.provider'), { target: { value: 'AUTO' } })
+    expect(screen.queryByLabelText('settings.web.model')).toBeNull()
+    fireEvent.change(screen.getByLabelText('settings.web.provider'), { target: { value: 'ANTHROPIC' } })
     fireEvent.change(screen.getByLabelText('settings.web.max_searches'), { target: { value: '8' } })
     fireEvent.change(screen.getByLabelText('settings.web.allowed'), { target: { value: 'gartner.com, forrester.com' } })
     expect(screen.getByLabelText('settings.web.blocked')).toBeDisabled()
