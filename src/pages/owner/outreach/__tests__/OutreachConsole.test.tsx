@@ -44,6 +44,7 @@ import OutreachProspectsPage from '../OutreachProspectsPage';
 import OutreachCampaignsPage, { OutreachCampaignPage } from '../OutreachCampaignsPage';
 import OutreachSettingsPage from '../OutreachSettingsPage';
 import ProspectDrawer from '../ProspectDrawer';
+import OutreachPagePage, { LinkedInCallbackPage, LinkedInPageCard } from '../OutreachPagePage';
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -318,6 +319,107 @@ describe('Multi-channel outreach', () => {
   });
 });
 
+describe('ArchMind LinkedIn page', () => {
+  const NOT_CONFIGURED = { provider: 'linkedin-page-manual', capabilities: { configured: false }, status: 'NOT_CONNECTED', publishMode: 'MANUAL', candidates: [], manualPageUrl: null, pageUrl: null };
+
+  it('without a LinkedIn app: explains manual publishing, offers no sign-in and saves the page address', async () => {
+    api.linkedinPage.mockResolvedValue(NOT_CONFIGURED);
+    api.linkedinPageUrl.mockResolvedValue({ ...NOT_CONFIGURED, manualPageUrl: 'https://www.linkedin.com/company/archmind/' });
+    render(<LinkedInPageCard />);
+    expect(await screen.findByText('owner.outreach.page.not_configured')).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.page.never_password')).toBeInTheDocument();
+    expect(screen.queryByText('owner.outreach.page.connect')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('owner.outreach.page.manual_url'), { target: { value: 'https://www.linkedin.com/company/archmind/' } });
+    fireEvent.click(screen.getByText('owner.outreach.save'));
+    await waitFor(() => expect(api.linkedinPageUrl).toHaveBeenCalledWith('https://www.linkedin.com/company/archmind/'));
+  });
+
+  it('with a LinkedIn app: Connect goes to LinkedIn sign-in; several pages are offered to choose', async () => {
+    api.linkedinPage.mockResolvedValue({ ...NOT_CONFIGURED, capabilities: { configured: true }, status: 'SELECT_ORGANIZATION', candidates: [{ urn: 'urn:li:organization:1', name: 'ArchMind' }, { urn: 'urn:li:organization:2', name: 'Other' }] });
+    api.linkedinPageConnect.mockResolvedValue({ url: 'https://www.linkedin.com/oauth/v2/authorization?state=x' });
+    api.linkedinPageSelect.mockResolvedValue({});
+    const assign = jest.fn();
+    const original = window.location;
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...original, assign } });
+    render(<LinkedInPageCard />);
+    fireEvent.click((await screen.findAllByText('owner.outreach.page.use_this'))[0]);
+    await waitFor(() => expect(api.linkedinPageSelect).toHaveBeenCalledWith('urn:li:organization:1'));
+    await waitFor(() => expect(screen.getByText('owner.outreach.page.connect')).not.toBeDisabled());
+    fireEvent.click(screen.getByText('owner.outreach.page.connect'));
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('https://www.linkedin.com/oauth/v2/authorization?state=x'));
+    Object.defineProperty(window, 'location', { configurable: true, value: original });
+  });
+
+  it('the LinkedIn return page hands code and state to the backend and returns to the page', async () => {
+    mockSearch = new URLSearchParams('code=abc&state=st1');
+    api.linkedinPageCallback.mockResolvedValue({ status: 'CONNECTED' });
+    render(<LinkedInCallbackPage />);
+    await waitFor(() => expect(api.linkedinPageCallback).toHaveBeenCalledWith({ code: 'abc', state: 'st1' }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('/owner/outreach/page', { replace: true }));
+  });
+
+  it('a LinkedIn sign-in refusal is shown, nothing is sent', async () => {
+    mockSearch = new URLSearchParams('error=user_cancelled_login&error_description=The+member+cancelled');
+    render(<LinkedInCallbackPage />);
+    expect(await screen.findByText('The member cancelled')).toBeInTheDocument();
+    expect(api.linkedinPageCallback).not.toHaveBeenCalled();
+  });
+
+  it('prepares a post, approves it, and publishing by hand offers copy, open page and record', async () => {
+    const POST = { id: 'pp1', kind: 'THOUGHT_LEADERSHIP', topic: 'Capability maps', language: 'EN', body: 'Capability maps connect strategy to architecture decisions. #EnterpriseArchitecture', status: 'READY_FOR_REVIEW', generation: { generator: 'TEMPLATE' }, createdAt: '2026-10-08T00:00:00Z' };
+    api.linkedinPage.mockResolvedValue({ ...NOT_CONFIGURED, manualPageUrl: 'https://www.linkedin.com/company/archmind/', pageUrl: 'https://www.linkedin.com/company/archmind/' });
+    api.pagePosts.mockResolvedValue([]);
+    api.createPagePost.mockResolvedValue(POST);
+    api.pagePost.mockResolvedValueOnce(POST).mockResolvedValue({ ...POST, status: 'APPROVED' });
+    api.approvePagePost.mockResolvedValue({});
+    api.publishPagePost.mockResolvedValue({ status: 'MANUAL_REQUIRED', reason: 'LINKEDIN_NOT_CONFIGURED', pageUrl: 'https://www.linkedin.com/company/archmind/' });
+    api.recordPagePost.mockResolvedValue({});
+    const writeText = jest.fn(async () => undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(<OutreachPagePage />);
+    expect(await screen.findByText('owner.outreach.page.no_posts')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('owner.outreach.page.new_post'));
+    fireEvent.change(screen.getByLabelText('owner.outreach.page.topic'), { target: { value: 'Capability maps' } });
+    fireEvent.click(screen.getByText('owner.outreach.page.prepare'));
+    await waitFor(() => expect(api.createPagePost).toHaveBeenCalledWith({ kind: 'THOUGHT_LEADERSHIP', topic: 'Capability maps', language: 'EN' }));
+    expect(await screen.findByText('owner.outreach.li.count')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('owner.outreach.approve'));
+    await waitFor(() => expect(api.approvePagePost).toHaveBeenCalledWith('pp1'));
+    fireEvent.click(await screen.findByText('owner.outreach.page.publish'));
+    fireEvent.change(screen.getByLabelText('owner.password'), { target: { value: 'Owner1234!' } });
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'owner.outreach.page.publish' })).getByRole('button', { name: 'owner.outreach.page.publish' }));
+    await waitFor(() => expect(api.publishPagePost).toHaveBeenCalledWith('pp1', 'Owner1234!'));
+    expect(await screen.findByText('owner.outreach.page.manual_required')).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.page.open_page').closest('a')).toHaveAttribute('href', 'https://www.linkedin.com/company/archmind/');
+    fireEvent.click(screen.getByText('owner.outreach.page.copy'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(POST.body));
+    fireEvent.change(screen.getByLabelText('owner.outreach.page.post_link'), { target: { value: 'https://www.linkedin.com/feed/update/urn:li:share:5/' } });
+    fireEvent.click(screen.getByText('owner.outreach.page.mark_published'));
+    await waitFor(() => expect(api.recordPagePost).toHaveBeenCalledWith('pp1', { postUrl: 'https://www.linkedin.com/feed/update/urn:li:share:5/' }));
+  });
+
+  it('a welcome post cannot be prepared without an entity and its recorded agreement', async () => {
+    api.linkedinPage.mockResolvedValue(NOT_CONFIGURED);
+    api.pagePosts.mockResolvedValue([]);
+    api.entities.mockResolvedValue({ entities: [{ id: 'e1', nameEn: 'Human Resources Development Fund', tenantId: 't1', suppressed: false }, { id: 'e2', nameEn: 'No workspace', tenantId: null }] });
+    api.createPagePost.mockResolvedValue({ id: 'pp2' });
+    api.pagePost.mockResolvedValue({ id: 'pp2', kind: 'ENTITY_WELCOME', body: 'x'.repeat(50), status: 'READY_FOR_REVIEW', generation: {} });
+    render(<OutreachPagePage />);
+    fireEvent.click(await screen.findByText('owner.outreach.page.new_post'));
+    fireEvent.change(screen.getByLabelText('owner.outreach.page.kind'), { target: { value: 'ENTITY_WELCOME' } });
+    fireEvent.change(screen.getByLabelText('owner.outreach.page.topic'), { target: { value: 'Starting the EA journey' } });
+    expect(await screen.findByText('Human Resources Development Fund')).toBeInTheDocument();
+    expect(screen.queryByText('No workspace')).not.toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.page.prepare')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('owner.outreach.col.entity'), { target: { value: 'e1' } });
+    expect(screen.getByText('owner.outreach.page.prepare')).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('owner.outreach.page.consent'), { target: { value: 'Approved by the CIO office by email' } });
+    fireEvent.click(screen.getByText('owner.outreach.page.prepare'));
+    await waitFor(() => expect(api.createPagePost).toHaveBeenCalledWith({ kind: 'ENTITY_WELCOME', topic: 'Starting the EA journey', language: 'EN', entityId: 'e1', entityConsentNote: 'Approved by the CIO office by email' }));
+  });
+});
+
 describe('Prospect search', () => {
   it('turns a sentence into adjustable filters and queries with them', async () => {
     api.prospects.mockResolvedValue([{ ...PROSPECT, entity: { id: 'e1', nameEn: ENTITY.nameEn }, outreach: { eligible: true, blockers: [] } }]);
@@ -421,7 +523,7 @@ describe('AR/EN coverage', () => {
     const families: Record<string, string[]> = {
       'owner.outreach.type.': [...C.ENTITY_TYPES, 'auto'], 'owner.outreach.gov.': C.GOV_STATUSES, 'owner.outreach.match.': C.TENANT_MATCHES, 'owner.outreach.match_help.': C.TENANT_MATCHES,
       'owner.outreach.entity_outreach.': C.ENTITY_OUTREACH, 'owner.outreach.role.': C.ROLE_CATEGORIES, 'owner.outreach.role_short.': C.ROLE_CATEGORIES, 'owner.outreach.seniority.': C.SENIORITIES,
-      'owner.outreach.employment.': C.EMPLOYMENT, 'owner.outreach.channel.': C.CHANNELS, 'owner.outreach.itype.': C.INTERACTION_TYPES, 'owner.outreach.li_status.': C.LINKEDIN_STATUSES,
+      'owner.outreach.employment.': C.EMPLOYMENT, 'owner.outreach.page.status.': C.PAGE_STATUSES, 'owner.outreach.page.mode.': ['API', 'MANUAL'], 'owner.outreach.page.kind.': C.POST_KINDS, 'owner.outreach.page.post_status.': C.POST_STATUSES, 'owner.outreach.channel.': C.CHANNELS, 'owner.outreach.itype.': C.INTERACTION_TYPES, 'owner.outreach.li_status.': C.LINKEDIN_STATUSES,
       'owner.outreach.strategy.': C.STRATEGIES, 'owner.outreach.strategy_detail.': C.STRATEGIES, 'owner.outreach.li_type.': C.LINKEDIN_TYPES, 'owner.outreach.recommend.': C.RECOMMENDATIONS, 'owner.outreach.recommend_reason.': C.RECOMMENDATIONS,
       'owner.outreach.tl.': C.TIMELINE_KINDS, 'owner.outreach.li_source.': ['SOURCE', 'OWNER'], 'owner.outreach.li.recorded.': ['SENT', 'REPLIED', 'FAILED'],
       'owner.outreach.capability.': ['supportsProfileDiscovery', 'supportsConnectionRequest', 'supportsDirectMessaging', 'supportsMessageStatus'], 'owner.outreach.email_status.': C.EMAIL_STATUSES, 'owner.outreach.stage.': C.STAGES, 'owner.outreach.blocker.': C.BLOCKERS,

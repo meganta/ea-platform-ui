@@ -51,6 +51,7 @@ import OutreachEntityPage from './pages/owner/outreach/OutreachEntityPage'
 import OutreachProspectsPage from './pages/owner/outreach/OutreachProspectsPage'
 import OutreachCampaignsPage, { OutreachCampaignPage } from './pages/owner/outreach/OutreachCampaignsPage'
 import OutreachSettingsPage from './pages/owner/outreach/OutreachSettingsPage'
+import OutreachPagePage, { LinkedInCallbackPage } from './pages/owner/outreach/OutreachPagePage'
 import './styles.css'
 
 function ProtectedRoute({ children, permission, superadminOnly }: { children: React.ReactNode; permission?: string; superadminOnly?: boolean }) {
@@ -101,6 +102,8 @@ export default function App() {
               <Route path="outreach/campaigns" element={<OutreachCampaignsPage />} />
               <Route path="outreach/campaigns/:id" element={<OutreachCampaignPage />} />
               <Route path="outreach/settings" element={<OutreachSettingsPage />} />
+              <Route path="outreach/page" element={<OutreachPagePage />} />
+              <Route path="outreach/linkedin/callback" element={<LinkedInCallbackPage />} />
             </Route>
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="/app" element={<DashboardPage />} />
