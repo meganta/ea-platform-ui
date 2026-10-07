@@ -65,14 +65,17 @@ describe('Owner shell', () => {
 describe('Outreach dashboard', () => {
   it('shows the metrics, the funnel and that email is not configured', async () => {
     api.dashboard.mockResolvedValue({
-      metrics: { entities: 12, relevantProfessionals: 40, eaLeaders: 9, dtLeaders: 7, innovationLeaders: 3, entitiesWithoutTenant: 8, tenantsFromOutreach: 4, tenantsEnriched: 3, invitationsSent: 6, activatedUsers: 2, engagedTenants: 1 },
-      funnel: [{ stage: 'DISCOVERED', count: 40 }, { stage: 'QUALIFIED', count: 20 }, { stage: 'TENANT_CREATED', count: 10 }, { stage: 'INVITED', count: 6 }, { stage: 'ACTIVATED', count: 2 }, { stage: 'ENGAGED', count: 1 }],
+      metrics: { linkedinProfiles: 31, connectionRequestsSent: 5, linkedinConnections: 7, entities: 12, relevantProfessionals: 40, eaLeaders: 9, dtLeaders: 7, innovationLeaders: 3, entitiesWithoutTenant: 8, tenantsFromOutreach: 4, tenantsEnriched: 3, invitationsSent: 6, activatedUsers: 2, engagedTenants: 1 },
+      funnel: [{ stage: 'DISCOVERED', count: 40 }, { stage: 'VERIFIED', count: 20 }, { stage: 'CONTACTED', count: 10 }, { stage: 'CONNECTED', count: 7 }, { stage: 'INVITED', count: 6 }, { stage: 'ACTIVATED', count: 2 }, { stage: 'ENGAGED', count: 1 }],
       entitiesByType: { MINISTRY: 5, FUND: 2 }, email: { configured: false },
     });
     render(<OutreachDashboardPage />);
     expect(await screen.findByText('owner.outreach.dash.ea_leaders')).toBeInTheDocument();
     expect(screen.getByText('owner.outreach.email_not_configured')).toBeInTheDocument();
     expect(screen.getByText('owner.outreach.funnel.ENGAGED')).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.funnel.CONNECTED')).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.dash.li_profiles')).toBeInTheDocument();
+    expect(screen.getByText('31')).toBeInTheDocument();
     expect(screen.getAllByText('40')).toHaveLength(2); // tile + funnel
     fireEvent.click(screen.getByText('owner.outreach.type.MINISTRY · 5'));
     expect(mockNavigate).toHaveBeenCalledWith('/owner/outreach/entities?type=MINISTRY');
@@ -183,7 +186,7 @@ describe('Entity page', () => {
     fireEvent.click(screen.getByText('owner.outreach.prepare_outreach (2)'));
     fireEvent.change(await screen.findByLabelText('owner.outreach.campaigns.name'), { target: { value: 'Q4 outreach' } });
     fireEvent.click(screen.getByText('owner.outreach.generate_drafts'));
-    await waitFor(() => expect(api.drafts).toHaveBeenCalledWith('c1', { prospectIds: ['p1', 'p2'], language: undefined }));
+    await waitFor(() => expect(api.drafts).toHaveBeenCalledWith('c1', { prospectIds: ['p1', 'p2'], language: undefined, strategy: 'EMAIL', linkedinType: undefined }));
     expect(await screen.findByText('owner.outreach.blocker.NO_TENANT')).toBeInTheDocument();
     fireEvent.click(screen.getByText('owner.outreach.open_campaign'));
     expect(mockNavigate).toHaveBeenCalledWith('/owner/outreach/campaigns/c1');
@@ -217,6 +220,101 @@ describe('Prospect drawer', () => {
     fireEvent.click(screen.getByText('owner.confirm'));
     await waitFor(() => expect(api.erase).toHaveBeenCalledWith('p1', { suppress: true, reason: 'Removal request by email' }));
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});
+
+describe('Multi-channel outreach', () => {
+  const LI = 'https://www.linkedin.com/in/ahmed-alqahtani';
+  const PANEL = {
+    recommendation: { recommended: 'LINKEDIN_THEN_EMAIL', reason: 'x' },
+    linkedin: { url: LI, urlSource: 'SOURCE', status: 'UNKNOWN', eligibility: { eligible: true, blockers: [] }, capabilities: { configured: false, sendModes: ['MANUAL'] } },
+    email: { address: 'ahmed.q@hrdf.org.sa', status: 'VERIFIED_PUBLIC', eligibility: { eligible: true, blockers: [] } },
+    tenant: { id: 't1', name: 'HRDF', ready: true, enriched: true }, invitation: { id: 'inv', stage: 'VERIFIED' },
+  };
+  const DETAIL = { prospect: { ...PROSPECT, linkedinUrl: LI, relevance: [], evidence: [], classification: {} }, entity: ENTITY, eligibility: { email: { eligible: true, blockers: [] } }, suggestedRole: null, messages: [], outreachPanel: PANEL };
+
+  it('the prospect outreach panel shows channels and readiness, prepares LinkedIn steps and records a LinkedIn status', async () => {
+    api.prospect.mockResolvedValue(DETAIL);
+    api.timeline.mockResolvedValue({ items: [{ at: '2026-10-01T08:00:00Z', kind: 'DISCOVERED', channel: null }, { at: '2026-10-03T08:00:00Z', kind: 'INTERACTION_SENT_MANUALLY', channel: 'LINKEDIN', interactionType: 'CONNECTION_REQUEST' }] });
+    api.campaigns.mockResolvedValue([{ id: 'c1', name: 'Q4', status: 'ACTIVE' }]);
+    api.drafts.mockResolvedValue({ drafted: 1, results: [{ prospectId: 'p1', channel: 'LINKEDIN', status: 'DRAFTED' }] });
+    api.setLinkedInStatus.mockResolvedValue({});
+    render(<ProspectDrawer prospectId="p1" onClose={jest.fn()} />);
+    expect(await screen.findByText('owner.outreach.panel.title')).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.panel.enriched')).toBeInTheDocument();
+    expect(screen.getByText(/owner.outreach.recommend.LINKEDIN_THEN_EMAIL/)).toBeInTheDocument();
+    expect(await screen.findByText(/owner.outreach.tl.INTERACTION_SENT_MANUALLY/)).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.panel.view_tenant')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('owner.outreach.panel.record_li'), { target: { value: 'CONNECTED' } });
+    fireEvent.click(screen.getByText('owner.outreach.panel.record'));
+    await waitFor(() => expect(api.setLinkedInStatus).toHaveBeenCalledWith('p1', { status: 'CONNECTED' }));
+    fireEvent.click(screen.getByText('owner.outreach.panel.prepare_connection'));
+    const dialog = await screen.findByRole('dialog', { name: 'owner.outreach.prepare_outreach' });
+    await waitFor(() => expect(within(dialog).getByText('Q4')).toBeInTheDocument());
+    fireEvent.change(within(dialog).getByLabelText('owner.outreach.campaign'), { target: { value: 'c1' } });
+    fireEvent.click(within(dialog).getByText('owner.outreach.generate_drafts'));
+    await waitFor(() => expect(api.drafts).toHaveBeenCalledWith('c1', { prospectIds: ['p1'], language: undefined, strategy: 'LINKEDIN', linkedinType: 'CONNECTION_REQUEST' }));
+  });
+
+  it('LinkedIn actions are disabled without an eligible profile', async () => {
+    api.prospect.mockResolvedValue({ ...DETAIL, outreachPanel: { ...PANEL, recommendation: { recommended: 'EMAIL' }, linkedin: { url: null, status: 'UNKNOWN', eligibility: { eligible: false, blockers: ['LINKEDIN_UNAVAILABLE'] } } } });
+    api.timeline.mockResolvedValue({ items: [] });
+    render(<ProspectDrawer prospectId="p1" onClose={jest.fn()} />);
+    expect(await screen.findByText('owner.outreach.blocker.LINKEDIN_UNAVAILABLE')).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.panel.prepare_connection')).toBeDisabled();
+    expect(screen.getByText('owner.outreach.panel.prepare_both')).toBeDisabled();
+    expect(screen.getByText('owner.outreach.panel.prepare_email')).not.toBeDisabled();
+  });
+
+  it('the LinkedIn editor counts characters, copies the text, opens the profile and records the manual send', async () => {
+    mockParams = { id: 'c1' };
+    api.campaign.mockResolvedValue({
+      campaign: { id: 'c1', name: 'Q4', status: 'ACTIVE' }, metrics: {}, entities: [], prospects: [],
+      interactions: [{ id: 'l1', channel: 'LINKEDIN', interactionType: 'CONNECTION_REQUEST', status: 'APPROVED', body: 'Hello Ahmed, I would welcome connecting.', prospect: { fullName: 'Ahmed', linkedinStatus: 'CONNECTION_REQUEST_PREPARED' }, entity: ENTITY, generation: { generator: 'TEMPLATE' } }],
+    });
+    api.preview.mockResolvedValue({ interaction: { id: 'l1', channel: 'LINKEDIN', interactionType: 'CONNECTION_REQUEST', status: 'APPROVED', body: 'Hello Ahmed, I would welcome connecting.', language: 'EN', generation: {} }, channel: 'LINKEDIN', profileUrl: LI, charLimit: 280, length: 40, capabilities: { detail: 'manual' }, sendMode: 'MANUAL', notConnected: false });
+    api.materials.mockResolvedValue([]);
+    api.recordOutcome.mockResolvedValue({});
+    const writeText = jest.fn(async () => undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    render(<OutreachCampaignPage />);
+    expect((await screen.findAllByText('owner.outreach.channel.LINKEDIN')).length).toBeGreaterThan(1);
+    expect(screen.getByText('owner.outreach.li_status.CONNECTION_REQUEST_PREPARED')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('owner.outreach.review_edit'));
+    expect(await screen.findByText('owner.outreach.li.count')).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.li.open_profile').closest('a')).toHaveAttribute('href', LI);
+    fireEvent.click(screen.getByText('owner.outreach.li.copy'));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('Hello Ahmed, I would welcome connecting.'));
+    fireEvent.click(screen.getByText('owner.outreach.li.mark_request_sent'));
+    await waitFor(() => expect(api.recordOutcome).toHaveBeenCalledWith('l1', { outcome: 'SENT', note: undefined }));
+    expect(screen.queryByLabelText('owner.outreach.col.subject')).not.toBeInTheDocument();
+  });
+
+  it('a send answers MANUAL_REQUIRED for LinkedIn texts and says so', async () => {
+    mockParams = { id: 'c1' };
+    api.campaign.mockResolvedValue({
+      campaign: { id: 'c1', name: 'Q4', status: 'ACTIVE' }, metrics: {}, entities: [], prospects: [],
+      interactions: [{ id: 'l1', channel: 'LINKEDIN', interactionType: 'DIRECT_MESSAGE', status: 'APPROVED', body: 'Thank you for connecting.', prospect: { fullName: 'Ahmed' }, entity: ENTITY, generation: {} }],
+    });
+    api.send.mockResolvedValue({ sent: 0, manual: 1, remainingToday: { EMAIL: 20, LINKEDIN: 15 }, results: [{ interactionId: 'l1', status: 'MANUAL_REQUIRED', channel: 'LINKEDIN' }] });
+    render(<OutreachCampaignPage />);
+    fireEvent.click(await screen.findByLabelText('owner.outreach.select Ahmed'));
+    fireEvent.click(screen.getByText('owner.outreach.send (1)'));
+    fireEvent.change(screen.getByLabelText('owner.password'), { target: { value: 'pw' } });
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('owner.outreach.send'));
+    expect(await screen.findByText('owner.outreach.send.manual')).toBeInTheDocument();
+    expect(screen.getByText('owner.outreach.result.MANUAL_REQUIRED')).toBeInTheDocument();
+  });
+
+  it('settings show each channel\'s capabilities and the LinkedIn daily limit', async () => {
+    api.settings.mockResolvedValue({ sendingEnabled: false, dailySendLimit: 20, batchLimit: 10, linkedinDailyLimit: 15, requireOwnerVerification: true, retentionDays: 365, senderName: 'ArchMind' });
+    api.materials.mockResolvedValue([]);
+    api.suppressions.mockResolvedValue([]);
+    api.providers.mockResolvedValue({ email: { configured: true }, providers: [], channels: [{ channel: 'EMAIL', name: 'platform-email', capabilities: { configured: true } }, { channel: 'LINKEDIN', name: 'linkedin-manual', capabilities: { configured: false, supportsDirectMessaging: false } }] });
+    render(<OutreachSettingsPage />);
+    expect(await screen.findByText('owner.outreach.providers.linkedin_manual')).toBeInTheDocument();
+    expect(screen.getByLabelText('owner.outreach.settings.li_daily')).toHaveValue(15);
+    expect(screen.getByText('owner.outreach.providers.manual')).toBeInTheDocument();
   });
 });
 
@@ -284,13 +382,13 @@ describe('Campaigns', () => {
     api.campaign.mockResolvedValue(CAMPAIGN);
     api.materials.mockResolvedValue([{ id: 'mat', name: 'ArchMind deck', isDefault: true }]);
     api.preview.mockResolvedValue({ message: { id: 'm1', status: 'DRAFT', subject: 'Workspace for HRDF', body: 'Dear Ahmed, …', recipient: 'a@hrdf.org.sa', attachMaterial: true, materialId: 'mat', language: 'EN', generation: { generator: 'AI', rejected: [] } }, footer: 'To open the workspace, activate your account with this single-use link:\n{{ACTIVATION_LINK}}', material: null });
-    api.updateMessage.mockResolvedValue({});
+    api.updateInteraction.mockResolvedValue({});
     render(<OutreachCampaignPage />);
     fireEvent.click((await screen.findAllByText('owner.outreach.review_edit'))[0]);
     expect(await screen.findByText(/\{\{ACTIVATION_LINK\}\}/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('owner.outreach.col.subject'), { target: { value: 'An initial workspace for HRDF' } });
     fireEvent.click(screen.getByText('owner.outreach.save'));
-    await waitFor(() => expect(api.updateMessage).toHaveBeenCalledWith('m1', { subject: 'An initial workspace for HRDF' }));
+    await waitFor(() => expect(api.updateInteraction).toHaveBeenCalledWith('m1', { subject: 'An initial workspace for HRDF' }));
   });
 });
 
@@ -323,15 +421,18 @@ describe('AR/EN coverage', () => {
     const families: Record<string, string[]> = {
       'owner.outreach.type.': [...C.ENTITY_TYPES, 'auto'], 'owner.outreach.gov.': C.GOV_STATUSES, 'owner.outreach.match.': C.TENANT_MATCHES, 'owner.outreach.match_help.': C.TENANT_MATCHES,
       'owner.outreach.entity_outreach.': C.ENTITY_OUTREACH, 'owner.outreach.role.': C.ROLE_CATEGORIES, 'owner.outreach.role_short.': C.ROLE_CATEGORIES, 'owner.outreach.seniority.': C.SENIORITIES,
-      'owner.outreach.employment.': C.EMPLOYMENT, 'owner.outreach.email_status.': C.EMAIL_STATUSES, 'owner.outreach.stage.': C.STAGES, 'owner.outreach.blocker.': C.BLOCKERS,
+      'owner.outreach.employment.': C.EMPLOYMENT, 'owner.outreach.channel.': C.CHANNELS, 'owner.outreach.itype.': C.INTERACTION_TYPES, 'owner.outreach.li_status.': C.LINKEDIN_STATUSES,
+      'owner.outreach.strategy.': C.STRATEGIES, 'owner.outreach.strategy_detail.': C.STRATEGIES, 'owner.outreach.li_type.': C.LINKEDIN_TYPES, 'owner.outreach.recommend.': C.RECOMMENDATIONS, 'owner.outreach.recommend_reason.': C.RECOMMENDATIONS,
+      'owner.outreach.tl.': C.TIMELINE_KINDS, 'owner.outreach.li_source.': ['SOURCE', 'OWNER'], 'owner.outreach.li.recorded.': ['SENT', 'REPLIED', 'FAILED'],
+      'owner.outreach.capability.': ['supportsProfileDiscovery', 'supportsConnectionRequest', 'supportsDirectMessaging', 'supportsMessageStatus'], 'owner.outreach.email_status.': C.EMAIL_STATUSES, 'owner.outreach.stage.': C.STAGES, 'owner.outreach.blocker.': C.BLOCKERS,
       'owner.outreach.template.': C.TEMPLATE_ROLES, 'owner.outreach.legacy.': C.LEGACY_ROLES, 'owner.outreach.message_status.': C.MESSAGE_STATUSES, 'owner.outreach.tenant.': ['LINKED', 'NONE'],
       'owner.outreach.source.': ['AI_DISCOVERY', 'OWNER'], 'owner.outreach.basis.': ['LEXICON', 'LEXICON_AND_AI', 'AI_PROPOSED', 'OWNER', 'NONE'],
       'owner.outreach.factor.': ['ROLE', 'SENIORITY', 'CURRENT_EMPLOYMENT', 'GOVERNMENT_ORGANIZATION', 'SOURCE_QUALITY', 'EVIDENCE_RECENCY'],
       'owner.outreach.job.mode.': ['ENTITIES', 'PROFESSIONALS'], 'owner.outreach.job.status.': [...C.JOB_RUNNING, 'READY_FOR_REVIEW', 'COMPLETED', 'FAILED', 'CANCELLED'],
       'owner.outreach.job.stage.': ['ENTITY_DISCOVERY', 'PROFESSIONAL_DISCOVERY', 'VERIFICATION', 'CLASSIFICATION', 'DEDUPLICATION', 'ENTITY_MAPPING'],
-      'owner.outreach.funnel.': ['DISCOVERED', 'QUALIFIED', 'TENANT_CREATED', 'INVITED', 'ACTIVATED', 'ENGAGED'], 'owner.outreach.skip.': ['NOT_FOUND', 'ENTITY_SUPPRESSED', 'NOT_GOVERNMENT', 'DISCOVERY_RUNNING'],
+      'owner.outreach.funnel.': C.FUNNEL, 'owner.outreach.skip.': ['NOT_FOUND', 'ENTITY_SUPPRESSED', 'NOT_GOVERNMENT', 'DISCOVERY_RUNNING'],
       'owner.outreach.invite.status.': ['PREPARED', 'BLOCKED', 'FAILED', 'NOT_FOUND'], 'owner.outreach.draft_status.': ['DRAFTED', 'EXISTS', 'BLOCKED'], 'owner.outreach.campaign_status.': ['DRAFT', 'ACTIVE', 'CLOSED'],
-      'owner.outreach.result.': ['SENT', 'APPROVED', 'SKIPPED', 'BLOCKED', 'FAILED'], 'owner.outreach.generator.': ['AI', 'TEMPLATE'],
+      'owner.outreach.result.': ['SENT', 'APPROVED', 'SKIPPED', 'BLOCKED', 'FAILED', 'MANUAL_REQUIRED'], 'owner.outreach.generator.': ['AI', 'TEMPLATE'],
       'owner.outreach.provider.': ['web-search-organizations', 'official-site-people', 'web-search-people', 'linkedin'], 'owner.outreach.provider_detail.': ['web-search-organizations', 'official-site-people', 'web-search-people', 'linkedin'],
       'owner.outreach.suppression.scope.': ['EMAIL', 'PERSON', 'ENTITY', 'DOMAIN'], 'owner.outreach.suppression.source.': ['OWNER', 'OPT_OUT', 'ERASURE'],
       'owner.stage.': ['QUEUED', 'DISCOVERING', 'READY_FOR_REVIEW', 'COMPLETED', 'FAILED', 'CANCELLED'], 'owner.status.': ['ACTIVE', 'SUSPENDED'],
