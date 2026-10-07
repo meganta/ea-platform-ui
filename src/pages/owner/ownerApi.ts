@@ -5,7 +5,7 @@ import { API_BASE, getToken } from '../../lib/api'
 
 export type T = (k: string) => string
 
-async function handle(r: Response) {
+export async function handle(r: Response) {
   const text = await r.text()
   let body: any = null
   try { body = text ? JSON.parse(text) : null } catch { body = null }
@@ -19,13 +19,13 @@ async function handle(r: Response) {
   return body
 }
 
-function call(method: string, path: string, body?: any) {
+export function call(method: string, path: string, body?: any) {
   const headers: Record<string, string> = { Authorization: `Bearer ${getToken() || ''}` }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   return fetch(`${API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }).then(handle)
 }
 
-const qs = (params: Record<string, string | undefined | null>) => {
+export const qs = (params: Record<string, string | undefined | null>) => {
   const p = Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '') as Array<[string, string]>
   return p.length ? `?${new URLSearchParams(p).toString()}` : ''
 }

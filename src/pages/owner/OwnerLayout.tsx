@@ -23,6 +23,7 @@ export default function OwnerLayout() {
   const items = [
     { to: '/owner/dashboard', label: t('owner.nav.dashboard'), icon: '▦' },
     { to: '/owner/tenants', label: t('owner.nav.tenants'), icon: '🏛' },
+    { to: '/owner/outreach', label: t('owner.nav.outreach'), icon: '✉' },
     { to: '/owner/audit', label: t('owner.nav.audit'), icon: '🛡' },
     { to: '/owner/settings', label: t('owner.nav.settings'), icon: '⚙' },
   ]

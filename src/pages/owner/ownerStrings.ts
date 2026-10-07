@@ -1,4 +1,6 @@
 // Owner Console strings (AR/EN), merged into LangContext's TRANSLATIONS.
+import { OUTREACH_TRANSLATIONS } from './outreach/outreachStrings'
+
 export const OWNER_TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   // Shell
   'owner.brand': { EN: 'Platform Owner', AR: 'مالك المنصة' },
@@ -387,4 +389,5 @@ export const OWNER_TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'owner.settings.grant': { EN: 'Platform owners are granted by an operator with database access (scripts/grant-platform-owner.js). No tenant administrator can grant this role.', AR: 'يُمنح دور مالك المنصة من قبل مشغّل لديه صلاحية الوصول إلى قاعدة البيانات (scripts/grant-platform-owner.js)، ولا يستطيع أي مدير جهة منح هذا الدور.' },
   'owner.settings.enabled': { EN: 'Configured', AR: 'مفعّل' },
   'owner.settings.disabled': { EN: 'Not configured', AR: 'غير مفعّل' },
+  ...OUTREACH_TRANSLATIONS,
 }

@@ -106,9 +106,17 @@ function ComparisonTable({ rows, onOpen }: { rows: any[] | null; onOpen: (id: st
   )
 }
 
-export function CreateTenantModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+/**
+ * Owner tenant creation. Government Outreach reuses it with the entity's data
+ * prefilled (`initial`), its own submit (the entity endpoint, which refuses
+ * duplicates) and extra fields such as the "not a duplicate" confirmation.
+ */
+export function CreateTenantModal({ onClose, onCreated, initial, onSubmit, extra, hideAdmin }: {
+  onClose: () => void; onCreated: (id: string) => void
+  initial?: Record<string, any>; onSubmit?: (dto: any) => Promise<any>; extra?: React.ReactNode; hideAdmin?: boolean
+}) {
   const { t } = useLang()
-  const [form, setForm] = useState<any>({ organizationName: '', organizationNameAr: '', officialWebsite: '', country: 'Saudi Arabia', sector: '', organizationType: 'GOVERNMENT', frameworkType: 'NORA', locale: 'AR', slug: '', adminEmail: '', adminFullName: '', startDiscovery: true })
+  const [form, setForm] = useState<any>({ organizationName: '', organizationNameAr: '', officialWebsite: '', country: 'Saudi Arabia', sector: '', organizationType: 'GOVERNMENT', frameworkType: 'NORA', locale: 'AR', slug: '', adminEmail: '', adminFullName: '', startDiscovery: true, ...(initial || {}) })
   const [more, setMore] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -126,7 +134,7 @@ export function CreateTenantModal({ onClose, onCreated }: { onClose: () => void;
     const dto: any = {}
     for (const [k, v] of Object.entries(form)) if (v !== '' && v !== null) dto[k] = v
     if (!form.officialWebsite) dto.startDiscovery = false
-    try { setResult(await ownerApi.createTenant(dto)) } catch (err: any) { setError(err.message) } finally { setBusy(false) }
+    try { setResult(await (onSubmit ? onSubmit(dto) : ownerApi.createTenant(dto))) } catch (err: any) { setError(err.message) } finally { setBusy(false) }
   }
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={t('owner.create.title')}>
@@ -188,12 +196,15 @@ export function CreateTenantModal({ onClose, onCreated }: { onClose: () => void;
                   </div>
                 </div>
                 {field('slug', t('owner.create.slug'), { help: t('owner.create.slug_help') })}
-                <div className="grid-2" style={{ gap: 12 }}>
-                  {field('adminEmail', t('owner.create.admin_email'), { type: 'email' })}
-                  {field('adminFullName', t('owner.create.admin_name'))}
-                </div>
+                {!hideAdmin && (
+                  <div className="grid-2" style={{ gap: 12 }}>
+                    {field('adminEmail', t('owner.create.admin_email'), { type: 'email' })}
+                    {field('adminFullName', t('owner.create.admin_name'))}
+                  </div>
+                )}
               </div>
             )}
+            {extra}
             <div className="modal-actions">
               <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>{t('owner.cancel')}</button>
               <button type="submit" className="btn btn-primary" disabled={busy || !form.organizationName.trim()}>{t('owner.create.submit')}</button>
