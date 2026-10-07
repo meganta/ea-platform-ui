@@ -5,6 +5,7 @@ import HelpTip from '../components/HelpTip'
 import DynamicFilterBuilder, { ConditionGroup } from '../components/filterBuilder/DynamicFilterBuilder'
 import AssetProfileScreen from './repository/AssetProfileScreen'
 import AttributeField from './repository/AttributeField'
+import QuickEditModal from './repository/QuickEditModal'
 import { fromInputValue, toInputValue } from './repository/assetProfile'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
@@ -246,6 +247,8 @@ export default function RepositoryPage() {
   const [selectedAssetType, setSelectedAssetType] = useState<string>('ALL')
   const [groupByCycle, setGroupByCycle] = useState<boolean>(false)
   const [showAdd, setShowAdd] = useState(false)
+  // ✏ in the list opens a quick edit popup (attributes only); the full page keeps relationships.
+  const [quickEdit, setQuickEdit] = useState<any>(null)
   const [selectedAsset, setSelectedAsset] = useState<any>(null)
   // An opened object is shown as its own page (view or edit) in place of the list; the URL
   // (?asset=<id>[&mode=edit]) follows it, so the browser's Back returns to the list.
@@ -616,7 +619,7 @@ export default function RepositoryPage() {
                   <td style={{ fontSize: 12, fontFamily: 'var(--font-mono)' }}>{a._count?.attachments || 0}</td>
                   <td onClick={e => e.stopPropagation()}>
                     <div className="flex gap-1">
-                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); openAsset(a, true) }} aria-label={`${t('repository.profile.edit')} ${a.name}`}>✏</button>
+                      <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); setQuickEdit(a) }} aria-label={`${t('repository.profile.edit')} ${a.name}`}>✏</button>
                       <button onClick={() => deleteAsset(a.id)} style={{ background: 'none', border: '1px solid rgba(220,38,38,0.3)', borderRadius: 'var(--radius)', color: 'var(--danger)', padding: '3px 8px', fontSize: 11, cursor: 'pointer' }}>🗑</button>
                     </div>
                   </td>
@@ -640,6 +643,10 @@ export default function RepositoryPage() {
         )}
       </div>
 
+      {quickEdit && (
+        <QuickEditModal assetId={quickEdit.id} t={t} isAR={!!isAR} onClose={() => setQuickEdit(null)}
+          onSaved={() => { setQuickEdit(null); load() }} onOpenFull={() => { const a = quickEdit; setQuickEdit(null); openAsset(a, true) }} />
+      )}
       {showAdd && <AssetModal config={config} onClose={() => setShowAdd(false)} onSave={createAsset} t={t} api={api} />}
     </div>
   )

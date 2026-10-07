@@ -265,7 +265,69 @@ describe('RepositoryPage - CRUD', () => {
     });
   });
 
-  it('✏ opens the object as a page in edit mode; a legacy APPLICATIONS domain is normalised and its Application type kept', async () => {
+  it('✏ opens a quick edit popup with the object\'s fields and Meta Model attributes only - no relationships - and saves without leaving the list', async () => {
+    const a1 = asset({ assetType: 'Application', owner: 'IT', metadata: { criticality: 'LOW', legacyCode: 'X-1' } });
+    const profile = {
+      asset: a1, objectType: { id: 'ot', code: 'Application', name: 'Application' }, resolution: 'RESOLVED',
+      attributeGroups: [{ id: 'g1', name: 'Operations', isCollapsed: false, attributes: [
+        { code: 'criticality', name: 'Criticality', attributeType: 'ENUM', isRequired: false, isReadOnly: false, enumValues: [{ value: 'HIGH', label: 'High' }, { value: 'LOW', label: 'Low' }], value: 'LOW', hasValue: true },
+        { code: 'users', name: 'Users', attributeType: 'INTEGER', isRequired: false, isReadOnly: false, value: null, hasValue: false },
+      ] }],
+      otherAttributes: [{ key: 'legacyCode', value: 'X-1' }], completeness: { filled: 1, total: 2, requiredMissing: [] },
+      relationshipSlots: [{ definitionId: 'd1', code: 'APP_SUPPORTS', name: 'Supports', direction: 'OUTGOING', label: 'supports', otherType: null, forwardLabel: 'supports', cardinality: 'MANY_TO_MANY', single: false, isRequired: false, attributes: [], count: 1, items: [], truncated: false }],
+      otherRelationships: [], relationshipTotals: { linked: 1, truncated: false },
+    };
+    let listCalls = 0;
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {},
+      '/ea-repository/assets/a1/profile': profile,
+      '/ea-repository/assets/a1': (url: string, init: any) => (init?.method === 'PUT' ? { ...a1 } : a1),
+      '/ea-repository/assets': () => { listCalls++; return [a1]; },
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    const before = listCalls;
+    fireEvent.click(screen.getByText('✏'));
+    const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByLabelText('Criticality')).toHaveValue('LOW');
+    expect(within(dialog).getByLabelText('repository.profile.owner')).toHaveValue('IT');
+    // No relationships, domain or type in the quick edit; the URL is unchanged.
+    expect(within(dialog).queryByText('Supports')).toBeNull();
+    expect(within(dialog).queryByLabelText('repository.profile.domain')).toBeNull();
+    expect(mockSetSearchParams).not.toHaveBeenCalled();
+
+    fireEvent.change(within(dialog).getByLabelText('Criticality'), { target: { value: 'HIGH' } });
+    fireEvent.change(within(dialog).getByLabelText('Users'), { target: { value: '250' } });
+    fireEvent.click(within(dialog).getByText('repository.profile.save'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    const putCall = (global.fetch as jest.Mock).mock.calls.find((c: any) => c[1]?.method === 'PUT');
+    const body = JSON.parse(putCall[1].body);
+    expect(putCall[0]).toContain('/ea-repository/assets/a1');
+    expect(body.metadata).toEqual({ criticality: 'HIGH', users: 250, legacyCode: 'X-1' });
+    expect(body).not.toHaveProperty('domain');
+    expect(body).not.toHaveProperty('assetType');
+    expect(listCalls).toBeGreaterThan(before);
+  });
+
+  it('quick edit checks attribute values before saving and Cancel closes without saving', async () => {
+    const a1 = asset({ metadata: {} });
+    mockFetch({
+      '/ea-repository/framework-config': CONFIG, '/ea-repository/summary': {}, '/ea-repository/assets': [a1],
+      '/ea-repository/assets/a1/profile': { asset: a1, objectType: null, resolution: 'RESOLVED', attributeGroups: [{ id: 'g', name: 'G', isCollapsed: false, attributes: [{ code: 'users', name: 'Users', attributeType: 'INTEGER', isRequired: true, isReadOnly: false, value: null, hasValue: false }] }], otherAttributes: [], completeness: { filled: 0, total: 1, requiredMissing: ['users'] }, relationshipSlots: [], otherRelationships: [], relationshipTotals: { linked: 0, truncated: false } },
+    });
+    render(<RepositoryPage />);
+    await screen.findByText('Core Banking');
+    fireEvent.click(screen.getByText('✏'));
+    const dialog = await screen.findByRole('dialog');
+    await within(dialog).findByLabelText(/Users/);
+    fireEvent.click(within(dialog).getByText('repository.profile.save'));
+    expect(await within(dialog).findByText('repository.profile.fix_errors')).toBeInTheDocument();
+    expect((global.fetch as jest.Mock).mock.calls.some((c: any) => c[1]?.method === 'PUT')).toBe(false);
+    fireEvent.click(within(dialog).getByText('repository.profile.cancel'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('quick edit "Open full page" opens the object page in edit mode; a legacy APPLICATIONS domain is normalised and its Application type kept', async () => {
     const legacy = asset({ domain: 'APPLICATIONS', assetType: 'Application', metadata: {} });
     mockFetch({
       '/ea-repository/framework-config': LEGACY_APPLICATIONS_CONFIG,
@@ -276,6 +338,7 @@ describe('RepositoryPage - CRUD', () => {
     render(<RepositoryPage />);
     await screen.findByText('Core Banking');
     fireEvent.click(screen.getByText('✏'));
+    fireEvent.click(await screen.findByText('repository.quick.open_full'));
 
     const domainSelect = await screen.findByLabelText('repository.profile.domain') as HTMLSelectElement;
     expect(domainSelect.value).toBe('APPLICATION');
