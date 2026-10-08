@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 // Shared types and helpers for the Reference Architectures workspace.
 
 export type T = (k: string) => string
@@ -103,13 +104,13 @@ export function makeApi(base: string) {
     if (!r.ok) throw new Error(body?.message ? (Array.isArray(body.message) ? body.message.join(', ') : body.message) : `HTTP ${r.status}`)
     return body
   }
-  const json = (method: string) => (path: string, body?: any) => fetch(`${base}${path}`, { method, headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }).then(handle)
+  const json = (method: string) => (path: string, body?: any) => apiFetch(`${base}${path}`, { method, headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }).then(handle)
   return {
-    get: (path: string) => fetch(`${base}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(handle),
+    get: (path: string) => apiFetch(`${base}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(handle),
     post: json('POST'),
     patch: json('PATCH'),
-    del: (path: string) => fetch(`${base}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } }).then(handle),
-    upload: (path: string, file: File) => { const fd = new FormData(); fd.append('file', file); return fetch(`${base}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).then(handle) },
+    del: (path: string) => apiFetch(`${base}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } }).then(handle),
+    upload: (path: string, file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch(`${base}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).then(handle) },
   }
 }
 export type RefApi = ReturnType<typeof makeApi>

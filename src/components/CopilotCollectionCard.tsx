@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from './HelpTip'
@@ -25,7 +26,7 @@ export default function CopilotCollectionCard({ attachment: a }: { attachment: C
   const download = async () => {
     setBusy(true); setError(false)
     try {
-      const res = await fetch(`${API}/architecture-health/collections/${encodeURIComponent(a.collectionId)}/template`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+      const res = await apiFetch(`${API}/architecture-health/collections/${encodeURIComponent(a.collectionId)}/template`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
       if (!res.ok) throw new Error(String(res.status))
       saveBlob(await res.blob(), `ArchMind_collection_${a.domainCode}.xlsx`)
     } catch { setError(true) }

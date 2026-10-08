@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api, setToken } from '../lib/api'
@@ -43,7 +44,7 @@ export default function InviteAcceptPage() {
       setTimeout(async () => {
         let slug = ''
         try {
-          const tenantRes = await fetch(`${API_URL}/auth/tenant-by-user/${result.userId}`)
+          const tenantRes = await apiFetch(`${API_URL}/auth/tenant-by-user/${result.userId}`)
           if (tenantRes.ok) slug = (await tenantRes.json()).slug || ''
         } catch { /* fall through to the sign-in page */ }
         const host = hostForTenant(slug)

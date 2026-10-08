@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 // BCM Phase 2.1 UI: industry-aware model suggestions, sources & methodology,
@@ -10,7 +11,7 @@ const BASE = `${API}/business-capabilities`
 type LFn = (en: string, ar: string) => string
 
 export async function bcm(method: string, path: string, body?: any) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(`${BASE}${path}`, {
     method, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })

@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 // Client types and helpers for Architecture Health (backend architecture-health module).
 
 export type T = (k: string) => string
@@ -53,11 +54,11 @@ export function makeApi(base: string) {
     return body
   }
   return {
-    get: (path: string) => fetch(`${base}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(handle),
-    post: (path: string, body?: any) => fetch(`${base}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }).then(handle),
-    upload: (path: string, file: File) => { const fd = new FormData(); fd.append('file', file); return fetch(`${base}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).then(handle) },
+    get: (path: string) => apiFetch(`${base}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(handle),
+    post: (path: string, body?: any) => apiFetch(`${base}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) }).then(handle),
+    upload: (path: string, file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch(`${base}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).then(handle) },
     blob: async (path: string) => {
-      const r = await fetch(`${base}${path}`, { headers: { Authorization: `Bearer ${token()}` } })
+      const r = await apiFetch(`${base}${path}`, { headers: { Authorization: `Bearer ${token()}` } })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
       return r.blob()
     },

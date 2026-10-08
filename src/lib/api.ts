@@ -1,13 +1,12 @@
+import { apiFetch, getToken } from './session'
 export const API_BASE = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-let authToken: string | null = localStorage.getItem('ea_token')
-export const setToken = (t: string) => { authToken = t; localStorage.setItem('ea_token', t) }
-export const clearToken = () => { authToken = null; localStorage.removeItem('ea_token') }
-export const getToken = () => authToken
+export { setToken, setSession, clearToken, getToken } from './session'
 
 async function req(method: string, path: string, body?: any) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (authToken) headers['Authorization'] = `Bearer ${authToken}`
-  const res = await fetch(`${API_BASE}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined })
+  const token = getToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await apiFetch(`${API_BASE}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined })
   if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.message || `HTTP ${res.status}`) }
   if (res.status === 204) return null
   return res.json()
@@ -15,13 +14,14 @@ async function req(method: string, path: string, body?: any) {
 
 export const api = {
   login: (email: string, password: string, tenantSlug: string) => req('POST', '/auth/login', { email, password, tenantSlug }),
+  logout: (refreshToken: string) => req('POST', '/auth/logout', { refreshToken }),
   submitDemoRequest: (data: { fullName: string; organization: string; jobTitle: string; email: string; phone?: string; country: string; preferredLanguage: string; message: string }) =>
     req('POST', '/public/demo-requests', data),
   me: () => req('GET', '/auth/me'),
   exitOwnerAccess: () => req('POST', '/owner-access/exit'),
   getMe: () => req('GET', '/users/me'),
   updateMe: (data: any) => req('PUT', '/users/me', data),
-  changeMyPassword: (data: any) => req('PUT', '/users/me/password', data),
+  changeMyPassword: (data: { currentPassword: string; newPassword: string }) => req('PUT', '/users/me/password', data),
   getUsers: () => req('GET', '/users'),
   createUser: (data: any) => req('POST', '/users', data),
   updateUser: (id: string, data: any) => req('PUT', `/users/${id}`, data),

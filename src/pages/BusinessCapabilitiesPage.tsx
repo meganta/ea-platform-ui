@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
@@ -16,7 +17,7 @@ const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const BASE = `${API}/business-capabilities`
 
 async function call(method: string, path: string, body?: any) {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await apiFetch(`${BASE}${path}`, {
     method,
     headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,

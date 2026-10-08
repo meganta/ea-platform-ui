@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import { useAuth } from '../contexts/AuthContext'
@@ -39,7 +40,7 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
     let timer: any
     const load = async () => {
       try {
-        const res = await fetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+        const res = await apiFetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
         if (!res.ok) throw new Error(String(res.status))
         const body = await res.json()
         if (stop) return
@@ -57,7 +58,7 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
   const loadRadar = async () => {
     setRadarBusy(true); setRadarError(false)
     try {
-      const res = await fetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/radar-matches`, { headers: auth() })
+      const res = await apiFetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/radar-matches`, { headers: auth() })
       if (!res.ok) throw new Error(String(res.status))
       setRadar(await res.json())
     } catch { setRadarError(true) }
@@ -66,7 +67,7 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
   const sendToRadar = async (technologyId: string) => {
     setRadarBusy(true); setRadarError(false)
     try {
-      const res = await fetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/radar`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ technologyId }) })
+      const res = await apiFetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/radar`, { method: 'POST', headers: { ...auth(), 'Content-Type': 'application/json' }, body: JSON.stringify({ technologyId }) })
       if (!res.ok) throw new Error(String(res.status))
       setRadarResult(await res.json()); setRadar(null)
     } catch { setRadarError(true) }
@@ -76,7 +77,7 @@ export default function CopilotResearchCard({ attachment: a }: { attachment: Cop
   const send = async () => {
     setSending(true); setSendError(false)
     try {
-      const res = await fetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/decision-assessment`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+      const res = await apiFetch(`${API}/technology-research/${encodeURIComponent(a.researchId)}/decision-assessment`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
       if (!res.ok) throw new Error(String(res.status))
       const body = await res.json()
       setR((prev: any) => ({ ...prev, decisionAssessmentId: body.assessment.id }))

@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import InviteAcceptPage from './pages/InviteAcceptPage'
 import Layout from './components/Layout'
+import ChangePasswordPage from './pages/ChangePasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import AdmPage from './pages/AdmPage'
 import CopilotPage from './pages/CopilotPage'
@@ -136,6 +137,7 @@ export default function App() {
               <Route path="strategy" element={<ProtectedRoute permission="Strategy.View"><StrategyPage /></ProtectedRoute>} />
               <Route path="innovation" element={<ProtectedRoute permission="Innovation.View"><InnovationPage /></ProtectedRoute>} />
               <Route path="notifications" element={<NotificationsPage />} />
+              <Route path="account/password" element={<ChangePasswordPage />} />
               <Route path="billing" element={<ProtectedRoute permission="Settings.Manage"><BillingPage /></ProtectedRoute>} />
               <Route path="decision-evaluation" element={<ProtectedRoute permission="DecisionEvaluation.ViewAssessments"><DecisionEvaluationPage /></ProtectedRoute>} />
               <Route path="ea-planning" element={<ProtectedRoute permission="Repository.View"><EaPlanningPage /></ProtectedRoute>} />

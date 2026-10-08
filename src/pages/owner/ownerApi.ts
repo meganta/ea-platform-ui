@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 // Owner Console client (backend `/owner/*`, platform-owner only; see
 // ea-platform docs/platform-owner). The server enforces every permission;
 // this client only calls it.
@@ -22,7 +23,7 @@ export async function handle(r: Response) {
 export function call(method: string, path: string, body?: any) {
   const headers: Record<string, string> = { Authorization: `Bearer ${getToken() || ''}` }
   if (body !== undefined) headers['Content-Type'] = 'application/json'
-  return fetch(`${API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }).then(handle)
+  return apiFetch(`${API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) }).then(handle)
 }
 
 export const qs = (params: Record<string, string | undefined | null>) => {

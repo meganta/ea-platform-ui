@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
@@ -8,10 +9,10 @@ function useApi() {
   const { token } = useAuth() as any
   return useMemo(() => {
     const h = () => ({ Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' })
-    const get = (p: string) => fetch(`${API}${p}`, { headers: h() }).then(r => r.json())
-    const post = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
-    const put = (p: string, b: any) => fetch(`${API}${p}`, { method: 'PUT', headers: h(), body: JSON.stringify(b) }).then(r => r.json())
-    const del = (p: string) => fetch(`${API}${p}`, { method: 'DELETE', headers: h() }).then(r => r.ok)
+    const get = (p: string) => apiFetch(`${API}${p}`, { headers: h() }).then(r => r.json())
+    const post = (p: string, b?: any) => apiFetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
+    const put = (p: string, b: any) => apiFetch(`${API}${p}`, { method: 'PUT', headers: h(), body: JSON.stringify(b) }).then(r => r.json())
+    const del = (p: string) => apiFetch(`${API}${p}`, { method: 'DELETE', headers: h() }).then(r => r.ok)
     const tok = token || localStorage.getItem('ea_token') || ''
     return { get, post, put, del, tok }
   }, [token])
@@ -279,7 +280,7 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
   const importArchiMate = async (file: File) => {
     setSyncing(true)
     const fd = new FormData(); fd.append('file', file)
-    const res = await fetch(`${API}/connectors/${connector.id}/import/archimate`, {
+    const res = await apiFetch(`${API}/connectors/${connector.id}/import/archimate`, {
       method: 'POST', headers: { Authorization: `Bearer ${api.tok}` }, body: fd,
     })
     const data = await res.json()
@@ -288,7 +289,7 @@ function ConnectorDetail({ api, connector, onBack, onRefresh }: { api: any, conn
   }
 
   const exportArchiMate = async () => {
-    const res = await fetch(`${API}/connectors/${connector.id}/export/archimate`, { headers: { Authorization: `Bearer ${api.tok}` } })
+    const res = await apiFetch(`${API}/connectors/${connector.id}/export/archimate`, { headers: { Authorization: `Bearer ${api.tok}` } })
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = `ea-repository-${new Date().toISOString().slice(0, 10)}.xml`
@@ -537,7 +538,7 @@ function CsvExcelImportTab({ api, connector, onStaged }: { api: any, connector: 
     setFile(f); setPreviewing(true); setPreview(null); setResult(null)
     const fd = new FormData(); fd.append('file', f)
     const q = sheetName ? `?sheetName=${encodeURIComponent(sheetName)}` : ''
-    const res = await fetch(`${API}/connectors/${connector.id}/import/csv-excel/preview${q}`, {
+    const res = await apiFetch(`${API}/connectors/${connector.id}/import/csv-excel/preview${q}`, {
       method: 'POST', headers: { Authorization: `Bearer ${api.tok}` }, body: fd,
     })
     const data = await res.json()
@@ -587,7 +588,7 @@ function CsvExcelImportTab({ api, connector, onStaged }: { api: any, connector: 
       fd.append('objectTypeCode', objectTypeCode)
       if (sheetName) fd.append('sheetName', sheetName)
       if (idColumn) fd.append('idColumn', idColumn)
-      const stageRes = await fetch(`${API}/connectors/${connector.id}/import/csv-excel`, {
+      const stageRes = await apiFetch(`${API}/connectors/${connector.id}/import/csv-excel`, {
         method: 'POST', headers: { Authorization: `Bearer ${api.tok}` }, body: fd,
       })
       const staged = await stageRes.json()
@@ -1137,7 +1138,7 @@ function TeamsSubscriptionButton({ connectorId }: { connectorId: string }) {
     setStatus('loading')
     try {
       const token = localStorage.getItem('ea_token')
-      const res = await fetch(`${API}/copilot/meetings/${connectorId}/setup-teams-subscription`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      const res = await apiFetch(`${API}/copilot/meetings/${connectorId}/setup-teams-subscription`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Setup failed')
       setStatus('done')
@@ -1184,7 +1185,7 @@ function ArchiMatePanel({ api }: { api: any }) {
     if (!selectedId) return
     setImporting(true); setResult(null)
     const fd = new FormData(); fd.append('file', file)
-    const res = await fetch(`${API}/connectors/${selectedId}/import/archimate`, {
+    const res = await apiFetch(`${API}/connectors/${selectedId}/import/archimate`, {
       method: 'POST', headers: { Authorization: `Bearer ${api.tok}` }, body: fd,
     })
     const data = await res.json()
@@ -1195,7 +1196,7 @@ function ArchiMatePanel({ api }: { api: any }) {
   const doExport = async () => {
     if (!selectedId) return
     setExporting(true)
-    const res = await fetch(`${API}/connectors/${selectedId}/export/archimate`, { headers: { Authorization: `Bearer ${api.tok}` } })
+    const res = await apiFetch(`${API}/connectors/${selectedId}/export/archimate`, { headers: { Authorization: `Bearer ${api.tok}` } })
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = `ea-repository-${new Date().toISOString().slice(0, 10)}.xml`

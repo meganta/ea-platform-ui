@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom';
+import 'whatwg-fetch';
 
 // jsdom's test environment does not provide TextEncoder/TextDecoder
 // globally (unlike a real browser or Node's global scope outside jsdom) -

@@ -1,9 +1,10 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
-  fetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
+  apiFetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
 
 // Restructured (explicit direction): the old Step 1 (Profile & Framework,
 // including domains-in-scope) now lives in Settings > Organization -

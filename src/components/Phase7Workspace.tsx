@@ -1,10 +1,11 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState, useCallback } from 'react'
 import { useLang } from '../contexts/LangContext'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const token = () => localStorage.getItem('ea_token')
 const authFetch = (path: string, opts: any = {}) =>
-  fetch(`${API_URL}${path}`, {
+  apiFetch(`${API_URL}${path}`, {
     ...opts,
     cache: 'no-store',
     headers: {
@@ -505,7 +506,7 @@ function Step72({ admCycleId }: { admCycleId: string }) {
             if (filterApproval !== 'ALL') params.set('approvalStatus', filterApproval)
             if (filterType !== 'ALL') params.set('requirementType', filterType)
             if (filterPhase !== 'ALL') params.set('sourcePhase', filterPhase)
-            const res = await fetch(`${API_URL}/requirements/export/csv?${params}`, {
+            const res = await apiFetch(`${API_URL}/requirements/export/csv?${params}`, {
               cache: 'no-store',
               headers: { Authorization: `Bearer ${token()}` },
             })

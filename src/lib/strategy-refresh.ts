@@ -1,3 +1,4 @@
+import { apiFetch } from './session'
 import { API_BASE, getToken } from './api'
 
 export interface RefreshFinding {
@@ -73,7 +74,7 @@ export interface PublicationPreview {
 async function request<T>(path: string, body?: object | FormData): Promise<T> {
   const token = getToken()
   const isUpload = body instanceof FormData
-  const response = await fetch(`${API_BASE}/strategy-refreshes${path}`, {
+  const response = await apiFetch(`${API_BASE}/strategy-refreshes${path}`, {
     method: body ? 'POST' : 'GET',
     headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(!isUpload && body ? { 'Content-Type': 'application/json' } : {}) },
     body: isUpload ? body : body ? JSON.stringify(body) : undefined,
@@ -99,7 +100,7 @@ export const strategyRefreshApi = {
   /** The uploaded document, streamed through the API (tenant-scoped; no signed storage URL). */
   source: async (id: string, sourceId: string): Promise<Blob> => {
     const token = getToken()
-    const response = await fetch(`${API_BASE}/strategy-refreshes/${encodeURIComponent(id)}/documents/${encodeURIComponent(sourceId)}/content`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    const response = await apiFetch(`${API_BASE}/strategy-refreshes/${encodeURIComponent(id)}/documents/${encodeURIComponent(sourceId)}/content`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
     if (!response.ok) {
       const data = await response.json().catch(() => ({}))
       throw new Error(data.message || `HTTP ${response.status}`)

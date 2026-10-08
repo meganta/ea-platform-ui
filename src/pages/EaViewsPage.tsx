@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
@@ -26,14 +27,14 @@ const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 function useViewsApi() {
   const { token } = useAuth() as any
   const h = () => ({ Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' })
-  const get = (p: string) => fetch(`${API}${p}`, { headers: h() }).then(r => r.json())
-  const post = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
-  const put = (p: string, b: any) => fetch(`${API}${p}`, { method: 'PUT', headers: h(), body: JSON.stringify(b) }).then(r => r.json())
+  const get = (p: string) => apiFetch(`${API}${p}`, { headers: h() }).then(r => r.json())
+  const post = (p: string, b?: any) => apiFetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
+  const put = (p: string, b: any) => apiFetch(`${API}${p}`, { method: 'PUT', headers: h(), body: JSON.stringify(b) }).then(r => r.json())
   // Phase 5C: added for scenario authoring's PATCH endpoints
   // (setPropertyOverrides, setScenarioStatus) - matches put's exact
   // shape, since PATCH/PUT differ only in HTTP semantics, not in how
   // this client needs to send them.
-  const patch = (p: string, b: any) => fetch(`${API}${p}`, { method: 'PATCH', headers: h(), body: JSON.stringify(b) }).then(r => r.json())
+  const patch = (p: string, b: any) => apiFetch(`${API}${p}`, { method: 'PATCH', headers: h(), body: JSON.stringify(b) }).then(r => r.json())
   // Phase 5C: del gained an optional body - removeRelationship is
   // identified by its canonical (source, target, type) key, not a
   // single path id, so it's a body-based DELETE (a standard, valid HTTP
@@ -45,7 +46,7 @@ function useViewsApi() {
   // behavior) and a real JSON body (Phase 5C's new endpoints return
   // {delta, warnings}/{undone} - the warnings array is exactly what the
   // authoring UI needs to surface).
-  const del = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'DELETE', headers: h(), body: b ? JSON.stringify(b) : undefined })
+  const del = (p: string, b?: any) => apiFetch(`${API}${p}`, { method: 'DELETE', headers: h(), body: b ? JSON.stringify(b) : undefined })
     .then(r => r.json().catch(() => r.ok))
   return { get, post, put, patch, del }
 }

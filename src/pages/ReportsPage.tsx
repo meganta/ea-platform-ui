@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
@@ -7,7 +8,7 @@ import { getToken } from '../lib/api'
 const GOV_API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 async function govGet(path: string) {
-  const res = await fetch(GOV_API + path, { headers: { Authorization: 'Bearer ' + (getToken() || '') } })
+  const res = await apiFetch(GOV_API + path, { headers: { Authorization: 'Bearer ' + (getToken() || '') } })
   if (!res.ok) throw new Error('HTTP ' + res.status)
   return res.json()
 }
@@ -25,7 +26,7 @@ const STATUS_COLOR: Record<string, string> = {
 function ExportBtn({ url, label }: { url: string; label: string }) {
   const token = localStorage.getItem('ea_token') || ''
   const handleExport = async () => {
-    const res = await fetch(`${GOV_API}/${url}`, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await apiFetch(`${GOV_API}/${url}`, { headers: { Authorization: `Bearer ${token}` } })
     const blob = await res.blob()
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob)
     a.download = label.toLowerCase().replace(/ /g, '-') + '.csv'; a.click()
@@ -139,7 +140,7 @@ function SavingsReport() {
                       onChange={async e => {
                         const newStatus = e.target.value
                         const token = localStorage.getItem('ea_token') || ''
-                        await fetch(`${GOV_API}/governance/reviews/${item.reviewId}/findings/${item.id}`, {
+                        await apiFetch(`${GOV_API}/governance/reviews/${item.reviewId}/findings/${item.id}`, {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                           body: JSON.stringify({ status: newStatus }),

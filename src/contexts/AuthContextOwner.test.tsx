@@ -5,10 +5,11 @@ let mockToken: string | null = 'owner-token';
 jest.mock('../lib/api', () => ({
   api: { me: jest.fn(), login: jest.fn(), getMyPermissions: jest.fn(() => Promise.resolve([])), exitOwnerAccess: jest.fn(() => Promise.resolve({})) },
   setToken: jest.fn((t: string) => { mockToken = t; }),
+  setSession: jest.fn(),
   clearToken: jest.fn(() => { mockToken = null; }),
   getToken: jest.fn(() => mockToken),
 }));
-import { api, setToken, clearToken, getToken } from '../lib/api';
+import { api, setToken, setSession, clearToken, getToken } from '../lib/api';
 
 const OWNER = { userId: 'o', email: 'owner@x', role: 'ARCHITECT', tenantId: 'home', platformRole: 'PLATFORM_OWNER', delegatedAccess: null };
 const DELEGATED = { userId: 'o', email: 'owner@x', role: 'SUPERADMIN', tenantId: 't1', platformRole: null, delegatedAccess: { sessionId: 's1', actorUserId: 'o', homeTenantId: 'home', expiresAt: '2026-10-07T10:30:00Z' } };
@@ -31,6 +32,7 @@ beforeEach(() => {
   mockToken = 'owner-token';
   localStorage.clear();
   (setToken as jest.Mock).mockImplementation((t: string) => { mockToken = t; });
+  (setSession as jest.Mock).mockImplementation((t: string, r: string) => { mockToken = t; localStorage.setItem('ea_refresh_token', r); });
   (clearToken as jest.Mock).mockImplementation(() => { mockToken = null; });
   (getToken as jest.Mock).mockImplementation(() => mockToken);
   (api.getMyPermissions as jest.Mock).mockResolvedValue([]);
@@ -38,6 +40,7 @@ beforeEach(() => {
 });
 
 it('enter keeps the owner token aside and switches to the delegated session; exit restores the owner', async () => {
+  localStorage.setItem('ea_refresh_token', 'owner-refresh');
   (api.me as jest.Mock).mockResolvedValueOnce(OWNER).mockResolvedValueOnce(DELEGATED).mockResolvedValueOnce(OWNER);
   render(<AuthProvider><Probe /></AuthProvider>);
   await waitFor(() => expect(screen.getByTestId('owner')).toHaveTextContent('owner'));
@@ -46,6 +49,8 @@ it('enter keeps the owner token aside and switches to the delegated session; exi
   await waitFor(() => expect(screen.getByTestId('tenant')).toHaveTextContent('t1'));
   expect(localStorage.getItem(OWNER_TOKEN_KEY)).toBe('owner-token');
   expect(mockToken).toBe('delegated-token');
+  expect(localStorage.getItem('ea_refresh_token')).toBeNull();
+  expect(localStorage.getItem('ea_owner_refresh_token')).toBe('owner-refresh');
   // Inside the tenant the owner is not a platform owner but administers the tenant.
   expect(screen.getByTestId('owner')).toHaveTextContent('not-owner');
   expect(screen.getByTestId('admin')).toHaveTextContent('yes');
@@ -55,6 +60,8 @@ it('enter keeps the owner token aside and switches to the delegated session; exi
   expect(api.exitOwnerAccess).toHaveBeenCalled();
   expect(mockToken).toBe('owner-token');
   expect(localStorage.getItem(OWNER_TOKEN_KEY)).toBeNull();
+  expect(localStorage.getItem('ea_refresh_token')).toBe('owner-refresh');
+  expect(localStorage.getItem('ea_owner_refresh_token')).toBeNull();
 });
 
 it('exit without a kept owner token signs out instead of staying in the tenant', async () => {

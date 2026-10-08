@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import CompareTab from './decision/DecisionComparisonWorkspace'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useLang } from '../contexts/LangContext'
@@ -9,17 +10,17 @@ const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 function useApi() {
   return useMemo(() => {
     const token = () => localStorage.getItem('ea_token')
-    const get = (p: string) => fetch(`${API}${p}`, { headers: { Authorization: `Bearer ${token()}` } })
+    const get = (p: string) => apiFetch(`${API}${p}`, { headers: { Authorization: `Bearer ${token()}` } })
       .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || `HTTP ${r.status}`); return d })
-    const post = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined })
+    const post = (p: string, b?: any) => apiFetch(`${API}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: b ? JSON.stringify(b) : undefined })
       .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || `HTTP ${r.status}`); return d })
-    const patch = (p: string, b: any) => fetch(`${API}${p}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(b) })
+    const patch = (p: string, b: any) => apiFetch(`${API}${p}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(b) })
       .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || `HTTP ${r.status}`); return d })
     const postFile = (p: string, file: File, extraFields?: Record<string, string>) => {
       const form = new FormData()
       form.append('file', file)
       if (extraFields) Object.entries(extraFields).forEach(([k, v]) => form.append(k, v))
-      return fetch(`${API}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form })
+      return apiFetch(`${API}${p}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form })
         .then(async r => { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.message || `HTTP ${r.status}`); return d })
     }
     return { get, post, patch, postFile }
@@ -221,7 +222,7 @@ function AssessmentDetail({ id, onBack, api, isAR }: any) {
     setExporting(true)
     try {
       const token = localStorage.getItem('ea_token')
-      const res = await fetch(`${API}/decision-evaluation/${id}/export/word?lang=${isAR ? 'ar' : 'en'}`, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await apiFetch(`${API}/decision-evaluation/${id}/export/word?lang=${isAR ? 'ar' : 'en'}`, { headers: { Authorization: `Bearer ${token}` } })
       if (!res.ok) throw new Error('Export failed')
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)

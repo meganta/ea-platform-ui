@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
@@ -20,7 +21,7 @@ export default function AdmOutputViews({ outputId }: { outputId: string }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/view-pictures`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
+    apiFetch(`${API_URL}/adm-intelligence/outputs/${outputId}/view-pictures`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
       .then(r => (r.ok ? r.json() : []))
       .then(data => { if (!cancelled) setPictures(Array.isArray(data) ? data : []) })
       .catch(() => { if (!cancelled) setPictures([]) })

@@ -1,3 +1,4 @@
+import { apiFetch } from './session'
 import { API_BASE, getToken } from './api'
 
 export type AlignmentLevel = 'BUSINESS_GOAL' | 'BUSINESS_KPI' | 'DT_GOAL' | 'DT_KPI' | 'DT_INITIATIVE' | 'EA_GOAL' | 'EA_KPI' | 'EA_VALUE' | 'EA_FUNCTION' | 'EA_SERVICE' | 'EA_PROCEDURE' | 'OP_KPI'
@@ -28,7 +29,7 @@ export interface KpiReport { year: number; period: string; measured: number; mis
 
 async function call<T>(path: string, method = 'GET', body?: object): Promise<T> {
   const token = getToken()
-  const response = await fetch(`${API_BASE}${path}`, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
+  const response = await apiFetch(`${API_BASE}${path}`, { method, headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(Array.isArray(data.message) ? data.message.join('; ') : data.message || `HTTP ${response.status}`)
   return data as T
@@ -37,14 +38,14 @@ async function upload<T>(path: string, file: File): Promise<T> {
   const token = getToken()
   const form = new FormData()
   form.append('file', file)
-  const response = await fetch(`${API_BASE}${path}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
+  const response = await apiFetch(`${API_BASE}${path}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
   const data = await response.json().catch(() => ({}))
   if (!response.ok) throw new Error(Array.isArray(data.message) ? data.message.join('; ') : data.message || `HTTP ${response.status}`)
   return data as T
 }
 async function download(path: string, filename: string) {
   const token = getToken()
-  const response = await fetch(`${API_BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  const response = await apiFetch(`${API_BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
   if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.message || `HTTP ${response.status}`) }
   const url = URL.createObjectURL(await response.blob())
   const link = document.createElement('a')

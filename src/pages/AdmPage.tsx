@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState } from 'react'
 import { AdmReferencePanel } from '../components/ReferenceArchitecturePanels'
 import { useNavigate } from 'react-router-dom'
@@ -11,7 +12,7 @@ import DesignPicker from '../components/DesignPicker'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
-  fetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
+  apiFetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
 const scrollToElement = (id: string, block: ScrollLogicalPosition = 'center') => {
   const element = document.getElementById(id)
   if (element && typeof element.scrollIntoView === 'function') element.scrollIntoView({ behavior: 'smooth', block })
@@ -19,10 +20,10 @@ const scrollToElement = (id: string, block: ScrollLogicalPosition = 'center') =>
 
 function useApi() {
   const token = () => localStorage.getItem('ea_token')
-  const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
-  const post = (path: string, body?: any) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
-  const put = (path: string, body: any) => fetch(`${API_URL}${path}`, { method: 'PUT', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
-  const del = (path: string) => fetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
+  const get = (path: string) => apiFetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
+  const post = (path: string, body?: any) => apiFetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
+  const put = (path: string, body: any) => apiFetch(`${API_URL}${path}`, { method: 'PUT', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
+  const del = (path: string) => apiFetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
   return { get, post, put, del }
 }
 
@@ -75,7 +76,7 @@ function ArchitectureImpact({ outputId }: { outputId: string }) {
   const [activities, setActivities] = useState<any[]>([])
 
   useEffect(() => {
-    fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/architecture-integration`, {
+    apiFetch(`${API_URL}/adm-intelligence/outputs/${outputId}/architecture-integration`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` },
     })
       .then(async response => response.ok ? response.json() : null)
@@ -608,7 +609,7 @@ function SectionProgress({ outputId }: { outputId: string }) {
 
   useEffect(() => {
     const load = () => {
-      fetch(`${API_URL}/adm-intelligence/outputs/${outputId}/sections`, {
+      apiFetch(`${API_URL}/adm-intelligence/outputs/${outputId}/sections`, {
         headers: { Authorization: `Bearer ${token()}` }
       }).then(r => r.json()).then(data => {
         if (Array.isArray(data)) setSections(data)
@@ -692,7 +693,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit, initialMode }: any)
     if (!kbQuery.trim()) return
     setKbSearching(true)
     try {
-      const res = await fetch(`${API_URL}/adm-intelligence/inputs/${inp.id}/pull-from-kb`, {
+      const res = await apiFetch(`${API_URL}/adm-intelligence/inputs/${inp.id}/pull-from-kb`, {
         method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: kbQuery })
       })
@@ -705,7 +706,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit, initialMode }: any)
   const loadRepoAssets = async () => {
     setRepoLoading(true)
     try {
-      const res = await fetch(`${API_URL}/ea-repository/assets`, { headers: { Authorization: `Bearer ${token()}` } })
+      const res = await apiFetch(`${API_URL}/ea-repository/assets`, { headers: { Authorization: `Bearer ${token()}` } })
       const all = await res.json()
       setAllRepoAssets(all)
       // Default: show only assets from this ADM cycle + manual assets
@@ -716,7 +717,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit, initialMode }: any)
 
   const pullFromRepo = async (assetId: string) => {
     try {
-      const res = await fetch(`${API_URL}/adm-intelligence/inputs/${inp.id}/pull-from-repo`, {
+      const res = await apiFetch(`${API_URL}/adm-intelligence/inputs/${inp.id}/pull-from-repo`, {
         method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ assetId })
       })
@@ -740,7 +741,7 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit, initialMode }: any)
     try {
       const text = await uploadFile.text()
       // Save as input content
-      const res = await fetch(`${API_URL}/adm-intelligence/inputs/${inp.id}`, {
+      const res = await apiFetch(`${API_URL}/adm-intelligence/inputs/${inp.id}`, {
         method: 'PUT', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: text, source: 'PROVIDED' })
       })
@@ -751,20 +752,20 @@ function InputSourcePanel({ inp, cycleId, onUpdated, onEdit, initialMode }: any)
       // Optionally add to KB
       if (includeInKb) {
         const fd = new FormData(); fd.append('file', uploadFile); fd.append('type', 'REFERENCE_ARCHITECTURE')
-        await fetch(`${API_URL}/knowledge/documents/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
+        await apiFetch(`${API_URL}/knowledge/documents/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
       }
 
       // Optionally add to Repo
       if (includeInRepo) {
         const fd = new FormData(); fd.append('file', uploadFile)
         // Create an asset and attach file — use cycle phase as domain
-        const assetRes = await fetch(`${API_URL}/ea-repository/assets`, {
+        const assetRes = await apiFetch(`${API_URL}/ea-repository/assets`, {
           method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: uploadFile.name.replace(/\.[^.]+$/, ''), domain: 'CROSS_CUTTING', assetType: 'CUSTOM', status: 'DRAFT', source: 'UPLOAD' })
         })
         const asset = await assetRes.json()
         if (asset.id) {
-          await fetch(`${API_URL}/ea-repository/assets/${asset.id}/attachments`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
+          await apiFetch(`${API_URL}/ea-repository/assets/${asset.id}/attachments`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
         }
       }
 
@@ -920,7 +921,7 @@ export function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
 
   useEffect(() => {
     if (!outputKey) return
-    fetch(`${API_URL}/adm-templates/output/${outputKey}/mapping`, {
+    apiFetch(`${API_URL}/adm-templates/output/${outputKey}/mapping`, {
       headers: { Authorization: `Bearer ${token()}` }
     }).then(r => r.json()).then(d => {
       if (!d.error) setMapping(d)
@@ -930,7 +931,7 @@ export function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
   const openExport = async () => {
     setShowExport(true)
     if (!preferences) {
-      const res = await fetch(`${API_URL}/output-studio/templates`, { headers: { Authorization: `Bearer ${token()}` } })
+      const res = await apiFetch(`${API_URL}/output-studio/templates`, { headers: { Authorization: `Bearer ${token()}` } })
       if (res.ok) setPreferences(await res.json())
     }
   }
@@ -942,7 +943,7 @@ export function TemplatePanel({ phase, outputKey, outputId, cycle }: any) {
       const params = new URLSearchParams({ detail: options.detail, includeExecutiveSummary: String(options.includeExecutiveSummary), includeArchitectureVisuals: String(options.includeArchitectureVisuals), includeEvidenceAppendix: String(options.includeEvidenceAppendix), includeArchitectureImpact: String(options.includeArchitectureImpact), includeComparison: String(options.includeComparison) })
       if (templateId) params.set('templateId', templateId)
       if (format === 'PPTX' && (preferences?.templates || []).some((item: any) => item.id === templateId)) params.set('baseDesign', baseDesign)
-      const res = await fetch(`${API_URL}/output-studio/adm/outputs/${outputId}/export/${format.toLowerCase()}?${params}`, {
+      const res = await apiFetch(`${API_URL}/output-studio/adm/outputs/${outputId}/export/${format.toLowerCase()}?${params}`, {
         headers: { Authorization: `Bearer ${token()}` }
       })
       if (!res.ok) {
@@ -1017,7 +1018,7 @@ function OutputSourcePanel({ out, onUpdated }: any) {
     if (!kbQuery.trim()) return
     setKbSearching(true)
     try {
-      const res = await fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/pull-from-kb`, {
+      const res = await apiFetch(`${API_URL}/adm-intelligence/outputs/${out.id}/pull-from-kb`, {
         method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: kbQuery })
       })
@@ -1029,13 +1030,13 @@ function OutputSourcePanel({ out, onUpdated }: any) {
   const loadRepoAssets = async () => {
     setRepoLoading(true)
     try {
-      const res = await fetch(`${API_URL}/ea-repository/assets`, { headers: { Authorization: `Bearer ${token()}` } })
+      const res = await apiFetch(`${API_URL}/ea-repository/assets`, { headers: { Authorization: `Bearer ${token()}` } })
       setRepoAssets(await res.json())
     } finally { setRepoLoading(false) }
   }
 
   const pullFromRepo = async (assetId: string) => {
-    const res = await fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/pull-from-repo`, {
+    const res = await apiFetch(`${API_URL}/adm-intelligence/outputs/${out.id}/pull-from-repo`, {
       method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ assetId })
     })
@@ -1050,7 +1051,7 @@ function OutputSourcePanel({ out, onUpdated }: any) {
       const text = uploadFile.type.startsWith('text') || uploadFile.name.endsWith('.txt') || uploadFile.name.endsWith('.md')
         ? await uploadFile.text()
         : `Uploaded file: ${uploadFile.name} (${(uploadFile.size/1024).toFixed(1)} KB)`
-      const res = await fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/upload`, {
+      const res = await apiFetch(`${API_URL}/adm-intelligence/outputs/${out.id}/upload`, {
         method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ fileContent: text, fileName: uploadFile.name, includeInKb, includeInRepo })
       })
@@ -1148,7 +1149,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
     if (!kbQuery.trim()) return
     setKbSearching(true)
     try {
-      const res = await fetch(`${API_URL}/adm-intelligence/outputs/${outId}/pull-from-kb`, {
+      const res = await apiFetch(`${API_URL}/adm-intelligence/outputs/${outId}/pull-from-kb`, {
         method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: kbQuery })
       })
@@ -1161,7 +1162,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
   const loadRepoAssets = async () => {
     setRepoLoading(true)
     try {
-      const res = await fetch(`${API_URL}/ea-repository/assets`, { headers: { Authorization: `Bearer ${token()}` } })
+      const res = await apiFetch(`${API_URL}/ea-repository/assets`, { headers: { Authorization: `Bearer ${token()}` } })
       const all = await res.json()
       setAllRepoAssets(all)
       setRepoAssets(all.filter((a: any) => a.sourceRef === cycleId || a.source === 'MANUAL'))
@@ -1171,7 +1172,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
 
   const pullFromRepo = async (assetId: string) => {
     try {
-      const res = await fetch(`${API_URL}/adm-intelligence/outputs/${outId}/pull-from-repo`, {
+      const res = await apiFetch(`${API_URL}/adm-intelligence/outputs/${outId}/pull-from-repo`, {
         method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ assetId })
       })
@@ -1188,7 +1189,7 @@ function EvidenceFieldInput({ field, value, onChange, outId, cycleId }: { field:
       const text = await uploadFile.text()
       if (includeInKb) {
         const fd = new FormData(); fd.append('file', uploadFile); fd.append('type', 'REFERENCE_ARCHITECTURE')
-        await fetch(`${API_URL}/knowledge/documents/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
+        await apiFetch(`${API_URL}/knowledge/documents/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd })
       }
       appendContent(text)
       setUploadFile(null)
@@ -1325,7 +1326,7 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
   const token = () => localStorage.getItem('ea_token')
 
   useEffect(() => {
-    fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/evidence-def`, {
+    apiFetch(`${API_URL}/adm-intelligence/outputs/${out.id}/evidence-def`, {
       headers: { Authorization: `Bearer ${token()}` }
     })
       .then(r => r.json())
@@ -1336,7 +1337,7 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
   const handleSave = async () => {
     setSaving(true)
     try {
-      const res = await fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/evidence`, {
+      const res = await apiFetch(`${API_URL}/adm-intelligence/outputs/${out.id}/evidence`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ evidence })
@@ -1706,7 +1707,7 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, focus
                               <span style={{ fontSize: 10, color: 'var(--accent)' }}>⟳ {def?.behaviorType === 'DISCOVERY' ? 'Analyzing & structuring...' : 'Generating sections...'}</span>
                               <button className='btn btn-secondary btn-sm' style={{ fontSize: 10 }}
                                 onClick={async () => {
-                                  await fetch(`${API_URL}/adm-intelligence/outputs/${out.id}/reset`, {
+                                  await apiFetch(`${API_URL}/adm-intelligence/outputs/${out.id}/reset`, {
                                     method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }
                                   })
                                   window.location.reload()
@@ -1928,7 +1929,7 @@ function CycleRepositoryView({ cycle }: { cycle: any }) {
     setExporting(true)
     try {
       const params = new URLSearchParams(Object.entries(exportOptions).map(([k, v]) => [k, String(v)]))
-      const res = await fetch(`${API_URL}/adm-templates/cycle/${cycle.id}/export?${params}`, {
+      const res = await apiFetch(`${API_URL}/adm-templates/cycle/${cycle.id}/export?${params}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }
       })
       if (!res.ok) { alert('Export failed: ' + res.status); return }
@@ -2109,7 +2110,7 @@ export default function AdmPage() {
   }
 
   const load = async () => {
-    const res = await fetch(`${API_URL}/adm/cycles`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
+    const res = await apiFetch(`${API_URL}/adm/cycles`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
     const data = await res.json()
     setCycles(data)
     if (selected) setSelected(data.find((c: any) => c.id === selected.id) || null)
@@ -2120,13 +2121,13 @@ export default function AdmPage() {
 
   const deleteCycle = async (cycleId: string) => {
     if (!window.confirm('Delete this ADM cycle? This cannot be undone.')) return
-    await fetch(`${API_URL}/adm/cycles/${cycleId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
+    await apiFetch(`${API_URL}/adm/cycles/${cycleId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` } })
     setSelected(null)
     await load()
   }
 
   const create = async (data: any) => {
-    await fetch(`${API_URL}/adm/cycles`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+    await apiFetch(`${API_URL}/adm/cycles`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
     setShowCreate(false); await load()
   }
 

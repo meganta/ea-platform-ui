@@ -6,14 +6,15 @@ jest.mock('../lib/api', () => ({
   api: {
     me: jest.fn(),
     login: jest.fn(),
+    logout: jest.fn().mockResolvedValue(null),
     getMyPermissions: jest.fn(),
   },
-  setToken: jest.fn(),
+  setSession: jest.fn(),
   clearToken: jest.fn(),
   getToken: jest.fn(),
 }));
 
-import { api, getToken, setToken, clearToken } from '../lib/api';
+import { api, getToken, setSession, clearToken } from '../lib/api';
 
 const TestComponent = () => {
   const { user, loading, hasPermission, login, logout } = useAuth();
@@ -55,7 +56,7 @@ describe('AuthContext', () => {
   });
 
   it('login flow sets token and loads permissions', async () => {
-    (api.login as jest.Mock).mockResolvedValue({ accessToken: 'new-token' });
+    (api.login as jest.Mock).mockResolvedValue({ accessToken: 'new-token', refreshToken: 'refresh-token' });
     (api.me as jest.Mock).mockResolvedValue({ userId: 'u1', email: 'a@acme.com', role: 'ARCHITECT' });
     (api.getMyPermissions as jest.Mock).mockResolvedValue([{ code: 'Users.View' }]);
 
@@ -63,7 +64,7 @@ describe('AuthContext', () => {
     await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('ready'));
 
     act(() => { screen.getByTestId('login').click(); });
-    await waitFor(() => expect(setToken).toHaveBeenCalledWith('new-token'));
+    await waitFor(() => expect(setSession).toHaveBeenCalledWith('new-token', 'refresh-token'));
   });
 
   it('logout clears state', async () => {

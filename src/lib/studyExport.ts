@@ -1,3 +1,4 @@
+import { apiFetch } from './session'
 /**
  * Downloads an Innovation study export (Word / PowerPoint). A large study's
  * translation does not fit in one request: the API answers 202 "PREPARING"
@@ -18,7 +19,7 @@ export async function fetchStudyExport(
   const retryMs = opts.retryMs ?? EXPORT_RETRY_MS
   const maxWait = opts.maxWaitMs ?? MAX_WAIT_MS
   for (;;) {
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${token || ''}` } })
+    const res = await apiFetch(url, { headers: { Authorization: `Bearer ${token || ''}` } })
     if (res.status === 202) {
       const body = await res.json().catch(() => ({}))
       opts.onPreparing?.({ translated: Number(body.translated) || 0, total: Number(body.total) || 0 })
