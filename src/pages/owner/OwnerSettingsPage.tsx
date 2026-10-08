@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import { ownerApi } from './ownerApi'
+import KnowledgeLibraryCard from './KnowledgeLibraryCard'
 import { ErrorBox, fill, Header, Loading, Pill } from './ownerUi'
 
 export default function OwnerSettingsPage() {
@@ -33,6 +34,7 @@ export default function OwnerSettingsPage() {
               <dt>{t('owner.enrich.scopes')}</dt><dd>{me.capabilities.enrichmentScopes.map((s: string) => t(`owner.enrich.scope.${s}`)).join(', ')}</dd>
             </dl>
           </div>
+          <KnowledgeLibraryCard />
         </div>
       )}
     </div>

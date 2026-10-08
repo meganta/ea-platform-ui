@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../../components/HelpTip'
-import { ownerApi, PACK_ACTION_COLOR, PACK_ARCH_ROLES, PACK_INDUSTRIES } from './ownerApi'
+import { LIBRARY_CATEGORY_COLOR, ownerApi, PACK_ACTION_COLOR, PACK_ARCH_ROLES, PACK_INDUSTRIES } from './ownerApi'
 import { ErrorBox, fill, Header, Loading, Pill } from './ownerUi'
 
 const SOURCE_COLOR: Record<string, string> = { NORA_OFFICIAL: 'var(--success)', ARCHMIND_CURATED: 'var(--accent)', INDUSTRY_CATALOGUE: 'var(--warning)', TENANT_REPOSITORY: 'var(--success)', PACK_STRUCTURE: 'var(--text-dim)' }
@@ -152,7 +152,7 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
                           <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                             <input id={`owner-pack-doc-${d.id}`} type="checkbox" disabled={d.action !== 'COPY' || !withKnowledge} checked={d.action === 'COPY' && !skipDocs.has(d.id)}
                               onChange={e => setSkipDocs(s => { const n = new Set(s); if (e.target.checked) n.delete(d.id); else n.add(d.id); return n })} />
-                            <span>{d.name}<span className="oc-muted"> · {fill(t('owner.pack.lib.chunks'), { n: d.chunkCount })} · {t(`owner.pack.lib.doc.${d.action}`)}</span></span>
+                            <span>{d.name}{d.category && <> <Pill text={t(`owner.lib.category.${d.category}`)} color={LIBRARY_CATEGORY_COLOR[d.category]} /></>}<span className="oc-muted"> · {fill(t('owner.pack.lib.chunks'), { n: d.chunkCount })} · {t(`owner.pack.lib.doc.${d.action}`)}</span></span>
                           </label>
                         </li>
                       ))}

@@ -57,6 +57,8 @@ export const ownerApi = {
   endSession: (sessionId: string) => call('POST', `/owner/access-sessions/${sessionId}/end`),
   audit: (f: { tenantId?: string; action?: string; limit?: string } = {}) => call('GET', `/owner/audit${qs(f)}`),
   exitTenant: () => call('POST', '/owner-access/exit'),
+  knowledgeLibrary: () => call('GET', '/owner/knowledge-library'),
+  updateKnowledgeLibrary: (dto: { tenantSlug?: string | null; documents?: Record<string, 'SHARED' | 'PRIVATE' | 'AUTOMATIC'> }) => call('PUT', '/owner/knowledge-library', dto),
   referencePackBackfill: () => call('GET', '/owner/reference-pack/backfill'),
   runReferencePackBackfill: (dto: { tenantIds?: string[]; password: string }) => call('POST', '/owner/reference-pack/backfill', dto),
   referencePack: (id: string, f: { industry?: string } = {}) => call('GET', `/owner/tenants/${id}/reference-pack${qs(f)}`),
@@ -66,6 +68,8 @@ export const ownerApi = {
 /** Industries of the government reference pack (backend reference-pack/industry-catalogue.ts). */
 export const PACK_INDUSTRIES = ['GOV_LABOR_HR', 'GOV_HEALTH', 'GOV_EDUCATION', 'GOV_TRANSPORT', 'GOV_MUNICIPALITY', 'GOV_FINANCE', 'GOV_JUSTICE', 'GOV_REGULATORY', 'GOV_SOCIAL_DEVELOPMENT', 'GOV_STANDARDS_CONFORMITY', 'GOV_OTHER']
 export const PACK_ARCH_ROLES = ['BRM', 'ARM', 'DRM', 'TRM', 'SRM', 'BXRM', 'BUSINESS_RA', 'APPLICATION_RA', 'BENEFICIARY_RA']
+/** Knowledge library document categories (backend reference-pack/nora-library.ts classifyLibraryDocument). */
+export const LIBRARY_CATEGORY_COLOR: Record<string, string> = { NORA: 'var(--accent)', COMMON: 'var(--success)', ORGANIZATION_SPECIFIC: 'var(--warning)' }
 export const PACK_ACTION_COLOR: Record<string, string> = { CREATE: 'var(--accent)', ADD_MISSING: 'var(--warning)', UP_TO_DATE: 'var(--success)', SKIPPED: 'var(--text-dim)' }
 
 export const RUNNING_JOB_STATUSES = ['QUEUED', 'DISCOVERING', 'EXTRACTING', 'MAPPING', 'BUILDING_RELATIONSHIPS', 'PREPARING_VIEWS']

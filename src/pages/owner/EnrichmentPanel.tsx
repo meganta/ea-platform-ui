@@ -16,6 +16,9 @@ export function aiKnowledgeOnly(i: any): boolean {
   return found.length > 0 && found.every((e: any) => e.sourceKind === 'AI_KNOWLEDGE')
 }
 
+/** How many Meta Model attribute values discovery found for an item. */
+const metaCount = (i: any) => Object.entries(i.attributes || {}).filter(([k, v]: any) => k !== '_rejected' && v?.metaModel).length
+
 export default function EnrichmentPanel({ tenantId, website, webSearch, aiKnowledge, onCommitted }: { tenantId: string; website?: string | null; webSearch?: boolean; aiKnowledge?: boolean; onCommitted?: () => void }) {
   const { t, isAR } = useLang()
   const [jobs, setJobs] = useState<any[] | null>(null)
@@ -328,6 +331,7 @@ function ItemReview({ job, readOnly }: { job: any; readOnly: boolean }) {
                     <Pill text={t(`owner.class.${i.classification}`)} color={CLASSIFICATION_COLOR[i.classification]} />
                     {aiKnowledgeOnly(i) && <div style={{ marginTop: 4 }}><Pill text={t('owner.enrich.ai_knowledge_badge')} color="var(--warning)" /><div className="oc-muted">{t('owner.enrich.ai_knowledge_verify')}</div></div>}
                     <div className="oc-muted">{t(`owner.fact.${i.factType}`)} · {t('owner.enrich.confidence')} {pct(i.confidence)}</div>
+                    {metaCount(i) > 0 && <div className="oc-muted">{fill(t('owner.enrich.meta_count'), { n: metaCount(i) })}</div>}
                     <button type="button" className="btn btn-sm btn-secondary" style={{ marginTop: 4 }} aria-expanded={open === i.id} onClick={() => setOpen(open === i.id ? null : i.id)}>{t('owner.enrich.evidence')} ({(i.evidence || []).length})</button>
                     {open === i.id && (
                       <div>
@@ -337,8 +341,11 @@ function ItemReview({ job, readOnly }: { job: any; readOnly: boolean }) {
                             <div className="oc-muted">{e.sourceKind === 'AI_KNOWLEDGE' ? <span style={{ color: 'var(--warning)' }}>{t('owner.enrich.ai_knowledge_source')}</span> : e.url ? <a href={e.url} target="_blank" rel="noopener noreferrer">{e.title || e.url}</a> : e.sourceId} · {e.publisher} · {e.found ? t('owner.enrich.excerpt_found') : t('owner.enrich.excerpt_missing')}</div>
                           </div>
                         ))}
-                        {Object.entries(i.attributes || {}).filter(([k]) => k !== '_rejected').length > 0 && (
-                          <div className="oc-evidence"><strong>{t('owner.enrich.attributes')}:</strong> {Object.entries(i.attributes).filter(([k]) => k !== '_rejected').map(([k, v]: any) => `${k}: ${v.value}`).join(' · ')}</div>
+                        {Object.entries(i.attributes || {}).some(([k, v]: any) => k !== '_rejected' && v?.metaModel) && (
+                          <div className="oc-evidence"><strong>{t('owner.enrich.meta_attributes')}<HelpTip text={t('owner.enrich.meta_attributes_help')} />:</strong> {Object.entries(i.attributes).filter(([k, v]: any) => k !== '_rejected' && v?.metaModel).map(([k, v]: any) => `${(isAR && v.labelAr) || v.label || k}: ${Array.isArray(v.value) ? v.value.join(', ') : String(v.value)}${v.raw && String(v.raw) !== String(v.value) ? ` (${v.raw})` : ''}`).join(' · ')}</div>
+                        )}
+                        {Object.entries(i.attributes || {}).filter(([k, v]: any) => k !== '_rejected' && !v?.metaModel).length > 0 && (
+                          <div className="oc-evidence"><strong>{t('owner.enrich.attributes')}:</strong> {Object.entries(i.attributes).filter(([k, v]: any) => k !== '_rejected' && !v?.metaModel).map(([k, v]: any) => `${k}: ${v.value}`).join(' · ')}</div>
                         )}
                       </div>
                     )}
