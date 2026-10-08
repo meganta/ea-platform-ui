@@ -5,6 +5,7 @@ import HelpTip from '../../components/HelpTip'
 import { ownerApi, fmtDate, levelText, PACK_INDUSTRIES } from './ownerApi'
 import { ErrorBox, Header, Loading } from './ownerUi'
 import { TenantTable } from './OwnerDashboardPage'
+import ReferencePackBackfillModal from './ReferencePackBackfillModal'
 
 export default function OwnerTenantsPage() {
   const { t, isAR } = useLang()
@@ -28,12 +29,13 @@ export default function OwnerTenantsPage() {
     if (tab === 'compare' && !comparison) ownerApi.comparison().then(setComparison).catch((e: any) => setError(e.message))
   }, [tab, comparison])
 
+  const [backfill, setBackfill] = useState(false)
   const setCreating = (v: boolean) => { const p = new URLSearchParams(params); if (v) p.set('create', '1'); else p.delete('create'); setParams(p) }
 
   return (
     <div dir={isAR ? 'rtl' : 'ltr'}>
       <Header title={t('owner.tenants.title')} subtitle={t('owner.tenants.subtitle')} help={t('owner.tenants.help')}
-        actions={<button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>{t('owner.tenants.create')}</button>} />
+        actions={<><button type="button" className="btn btn-secondary" onClick={() => setBackfill(true)}>{t('owner.backfill.open')}</button><button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>{t('owner.tenants.create')}</button></>} />
       <div className="oc-tabs" role="tablist">
         <button type="button" role="tab" aria-selected={tab === 'list'} className={`oc-tab${tab === 'list' ? ' active' : ''}`} onClick={() => setTab('list')}>{t('owner.tenants.list')}</button>
         <button type="button" role="tab" aria-selected={tab === 'compare'} className={`oc-tab${tab === 'compare' ? ' active' : ''}`} onClick={() => setTab('compare')}>{t('owner.tenants.compare')}</button>
@@ -58,6 +60,7 @@ export default function OwnerTenantsPage() {
         </>
       )}
       {tab === 'compare' && <ComparisonTable rows={comparison} onOpen={id => nav(`/owner/tenants/${id}`)} />}
+      {backfill && <ReferencePackBackfillModal onClose={() => setBackfill(false)} />}
       {creating && <CreateTenantModal onClose={() => setCreating(false)} onCreated={id => nav(`/owner/tenants/${id}${'?tab=enrichment'}`)} />}
     </div>
   )

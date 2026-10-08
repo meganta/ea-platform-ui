@@ -125,6 +125,25 @@ describe('OwnerTenantsPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/owner/tenants/new?tab=enrichment');
   });
 
+  it('prepares existing organizations: only eligible ones can be chosen, with step-up', async () => {
+    api.tenants.mockResolvedValue([TENANT_ROW]);
+    api.referencePackBackfill.mockResolvedValue([
+      { tenantId: 'a', name: 'Empty Authority', slug: 'a', framework: 'NORA', businessCapabilities: 0, hasBusinessReferenceModel: false, hasBusinessReferenceArchitecture: false, eligible: true, reasons: ['ELIGIBLE'] },
+      { tenantId: 'b', name: 'Busy Ministry', slug: 'b', framework: 'NORA', businessCapabilities: 40, hasBusinessReferenceModel: false, hasBusinessReferenceArchitecture: false, eligible: false, reasons: ['HAS_BUSINESS_CAPABILITIES'] },
+    ]);
+    api.runReferencePackBackfill.mockResolvedValue({ results: [{ tenantId: 'a', name: 'Empty Authority', status: 'DONE', industry: 'GOV_OTHER', created: 9, capabilities: 80 }], skipped: [], remaining: 0 });
+    render(<OwnerTenantsPage />);
+    fireEvent.click(await screen.findByRole('button', { name: 'owner.backfill.open' }));
+    expect(await screen.findByText('Empty Authority')).toBeInTheDocument();
+    expect(screen.getByLabelText('Busy Ministry')).toBeDisabled();
+    expect(screen.getByText('owner.backfill.reason.HAS_BUSINESS_CAPABILITIES')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'owner.backfill.run' }));
+    fireEvent.change(screen.getByLabelText('owner.password'), { target: { value: 'pw' } });
+    fireEvent.click(screen.getByRole('button', { name: 'owner.backfill.confirm' }));
+    await waitFor(() => expect(api.runReferencePackBackfill).toHaveBeenCalledWith({ tenantIds: ['a'], password: 'pw' }));
+    expect(await screen.findByText('owner.backfill.done')).toBeInTheDocument();
+  });
+
   it('a government organization can be given its industry for its reference pack', async () => {
     api.tenants.mockResolvedValue([]);
     api.createTenant.mockResolvedValue({ tenant: { id: 'n', name: 'X', slug: 'x' }, provisioning: { referencePack: { status: 'DONE', detail: '9 reference models and architectures' } } });
@@ -331,9 +350,21 @@ describe('ReferencePackPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'owner.pack.prepare' }));
     await waitFor(() => expect(api.applyReferencePack).toHaveBeenCalled());
     const dto = api.applyReferencePack.mock.calls[0][1];
-    expect(dto.include).toEqual(['BRM', 'ARM', 'DRM', 'TRM', 'SRM', 'BXRM', 'BUSINESS_RA', 'APPLICATION_RA', 'BENEFICIARY_RA', 'NORA_KNOWLEDGE']);
+    expect(dto.include).toEqual(['BRM', 'ARM', 'DRM', 'TRM', 'SRM', 'BXRM', 'BUSINESS_RA', 'APPLICATION_RA', 'BENEFICIARY_RA', 'NORA_KNOWLEDGE', 'BUSINESS_CAPABILITIES']);
     expect(dto.documentIds).toEqual(['d1']);
     expect(await screen.findByText('owner.pack.lib.done')).toBeInTheDocument();
+  });
+
+  it('offers to load the business capabilities into the Repository and can leave them out', async () => {
+    api.referencePack.mockResolvedValue({ ...PACK_PLAN, capabilities: { typeCode: 'GovCapability', toCreate: 85, existing: 3, core: 20, limitations: [] } });
+    api.applyReferencePack.mockResolvedValue({ results: [], capabilities: { created: 85, reused: 3 } });
+    render(<OwnerTenantDetailPage />);
+    expect(await screen.findByText('owner.pack.caps.title')).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/owner.pack.caps.detail/));
+    fireEvent.click(screen.getByRole('button', { name: 'owner.pack.prepare' }));
+    await waitFor(() => expect(api.applyReferencePack).toHaveBeenCalled());
+    expect(api.applyReferencePack.mock.calls[0][1].include).not.toContain('BUSINESS_CAPABILITIES');
+    expect(await screen.findByText('owner.pack.caps.done')).toBeInTheDocument();
   });
 
   it('nothing to prepare disables the button', async () => {
@@ -523,6 +554,7 @@ describe('AR/EN coverage', () => {
       'owner.pack.source.': ['NORA_OFFICIAL', 'ARCHMIND_CURATED', 'INDUSTRY_CATALOGUE', 'TENANT_REPOSITORY', 'PACK_STRUCTURE'],
       'owner.pack.disposition.': ['ADOPTED', 'EXTENDED', 'PENDING_REVIEW', 'ADAPTED'],
       'owner.pack.lib.from.': ['NORA_BASELINE', 'PLATFORM_LIBRARY'],
+      'owner.backfill.reason.': ['ELIGIBLE', 'HAS_BUSINESS_CAPABILITIES', 'HAS_BUSINESS_REFERENCE_MODEL', 'HAS_BUSINESS_REFERENCE_ARCHITECTURE', 'NOT_NORA', 'PRIVATE_ORGANIZATION', 'NOT_ACTIVE', 'NO_PUBLISHED_META_MODEL', 'NO_CAPABILITY_TYPE', 'LIBRARY_WORKSPACE'],
       'owner.pack.lib.object.': ['CREATE', 'EXISTS', 'NO_TYPE'],
       'owner.pack.lib.doc.': ['COPY', 'EXISTS', 'NOT_READY'],
       'owner.detail.tab.': ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'recommendations', 'activity'],
