@@ -10,7 +10,13 @@ import { ErrorBox, fill, Loading, Pill, StepUpModal } from './ownerUi'
  * staged item with its evidence, decide, and commit. Nothing is written to
  * the repository before commit.
  */
-export default function EnrichmentPanel({ tenantId, website, webSearch, onCommitted }: { tenantId: string; website?: string | null; webSearch?: boolean; onCommitted?: () => void }) {
+/** True when only AI model knowledge (no real source) supports the item. */
+export function aiKnowledgeOnly(i: any): boolean {
+  const found = (i?.evidence || []).filter((e: any) => e.found)
+  return found.length > 0 && found.every((e: any) => e.sourceKind === 'AI_KNOWLEDGE')
+}
+
+export default function EnrichmentPanel({ tenantId, website, webSearch, aiKnowledge, onCommitted }: { tenantId: string; website?: string | null; webSearch?: boolean; aiKnowledge?: boolean; onCommitted?: () => void }) {
   const { t, isAR } = useLang()
   const [jobs, setJobs] = useState<any[] | null>(null)
   const [job, setJob] = useState<any>(null)
@@ -74,6 +80,7 @@ export default function EnrichmentPanel({ tenantId, website, webSearch, onCommit
             <label className="form-label" htmlFor="owner-enrich-website">{t('owner.enrich.website')}</label>
             <input id="owner-enrich-website" className="form-input" value={site} onChange={e => setSite(e.target.value)} placeholder="https://" />
             <div className="oc-muted">{webSearch ? t('owner.enrich.web_search_on') : t('owner.enrich.web_search_off')}</div>
+            {aiKnowledge && <div className="oc-muted">{t('owner.enrich.ai_knowledge_on')}<HelpTip text={t('owner.enrich.ai_knowledge_help')} /></div>}
           </div>
           <fieldset style={{ border: 'none' }}>
             <legend className="form-label">{t('owner.enrich.scopes')}</legend>
@@ -159,7 +166,7 @@ function JobView({ job, setJob, onCommitted }: { job: any; setJob: (j: any) => v
         <details style={{ marginTop: 8 }}>
           <summary style={{ cursor: 'pointer', fontSize: 13 }}>{t('owner.enrich.sources')} ({job.sources.length})</summary>
           <ul style={{ paddingInlineStart: 18, fontSize: 12 }}>
-            {job.sources.map((s: any) => <li key={s.id}><strong>{s.id}</strong> <a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a> <span className="oc-muted">· {s.publisher} · {s.tierLabel}</span></li>)}
+            {job.sources.map((s: any) => <li key={s.id}><strong>{s.id}</strong> {s.kind === 'AI_KNOWLEDGE' ? <span style={{ color: 'var(--warning)' }}>{t('owner.enrich.ai_knowledge_source')}</span> : <a href={s.url} target="_blank" rel="noopener noreferrer">{s.title}</a>} <span className="oc-muted">· {s.publisher} · {s.tierLabel}</span></li>)}
           </ul>
         </details>
       )}
@@ -258,7 +265,9 @@ function ItemReview({ job, readOnly }: { job: any; readOnly: boolean }) {
   }, [job.id, kind])
   useEffect(() => { load() }, [load])
 
-  const shown = useMemo(() => (items || []).filter(i => (!classification || i.classification === classification) && (!changeType || i.changeType === changeType) && (!decision || i.decision === decision)), [items, classification, changeType, decision])
+  const [basis, setBasis] = useState('')
+  const shown = useMemo(() => (items || []).filter(i => (!classification || i.classification === classification) && (!changeType || i.changeType === changeType) && (!decision || i.decision === decision)
+    && (!basis || (basis === 'AI_KNOWLEDGE' ? aiKnowledgeOnly(i) : !aiKnowledgeOnly(i)))), [items, classification, changeType, decision, basis])
   const decide = async (decisions: Array<{ itemId: string; decision: string; mergeTargetId?: string }>) => {
     setError('')
     try { await ownerApi.decide(job.id, decisions); load() } catch (e: any) { setError(e.message) }
@@ -289,6 +298,12 @@ function ItemReview({ job, readOnly }: { job: any; readOnly: boolean }) {
           <option value="">{t('owner.enrich.filter_all')}</option>
           {['PENDING', 'APPROVED', 'REJECTED', 'MERGE'].map(c => <option key={c} value={c}>{t(`owner.decision.${c}`)}</option>)}
         </select>
+        <label htmlFor="owner-items-basis" className="oc-muted">{t('owner.enrich.basis')}</label>
+        <select id="owner-items-basis" className="form-input" value={basis} onChange={e => setBasis(e.target.value)}>
+          <option value="">{t('owner.enrich.filter_all')}</option>
+          <option value="SOURCED">{t('owner.enrich.basis_sourced')}</option>
+          <option value="AI_KNOWLEDGE">{t('owner.enrich.basis_ai')}</option>
+        </select>
         {!readOnly && pendingVerified.length > 0 && (
           <button type="button" className="btn btn-sm btn-secondary" onClick={() => decide(pendingVerified.map(i => ({ itemId: i.id, decision: 'APPROVED' })))}>{t('owner.enrich.approve_verified')} ({pendingVerified.length})</button>
         )}
@@ -311,6 +326,7 @@ function ItemReview({ job, readOnly }: { job: any; readOnly: boolean }) {
                   <td className="oc-muted">{i.kind === 'OBJECT' ? <>{t(`owner.concept.${i.concept}`)}<br />{i.objectTypeCode || '—'}</> : (i.relationshipDefinitionCode || '—')}</td>
                   <td style={{ minWidth: 200 }}>
                     <Pill text={t(`owner.class.${i.classification}`)} color={CLASSIFICATION_COLOR[i.classification]} />
+                    {aiKnowledgeOnly(i) && <div style={{ marginTop: 4 }}><Pill text={t('owner.enrich.ai_knowledge_badge')} color="var(--warning)" /><div className="oc-muted">{t('owner.enrich.ai_knowledge_verify')}</div></div>}
                     <div className="oc-muted">{t(`owner.fact.${i.factType}`)} · {t('owner.enrich.confidence')} {pct(i.confidence)}</div>
                     <button type="button" className="btn btn-sm btn-secondary" style={{ marginTop: 4 }} aria-expanded={open === i.id} onClick={() => setOpen(open === i.id ? null : i.id)}>{t('owner.enrich.evidence')} ({(i.evidence || []).length})</button>
                     {open === i.id && (
@@ -318,7 +334,7 @@ function ItemReview({ job, readOnly }: { job: any; readOnly: boolean }) {
                         {(i.evidence || []).map((e: any, k: number) => (
                           <div key={k} className={`oc-evidence${e.found ? '' : ' missing'}`}>
                             “{e.excerpt}”
-                            <div className="oc-muted">{e.url ? <a href={e.url} target="_blank" rel="noopener noreferrer">{e.title || e.url}</a> : e.sourceId} · {e.publisher} · {e.found ? t('owner.enrich.excerpt_found') : t('owner.enrich.excerpt_missing')}</div>
+                            <div className="oc-muted">{e.sourceKind === 'AI_KNOWLEDGE' ? <span style={{ color: 'var(--warning)' }}>{t('owner.enrich.ai_knowledge_source')}</span> : e.url ? <a href={e.url} target="_blank" rel="noopener noreferrer">{e.title || e.url}</a> : e.sourceId} · {e.publisher} · {e.found ? t('owner.enrich.excerpt_found') : t('owner.enrich.excerpt_missing')}</div>
                           </div>
                         ))}
                         {Object.entries(i.attributes || {}).filter(([k]) => k !== '_rejected').length > 0 && (

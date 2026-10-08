@@ -490,5 +490,13 @@ export const OWNER_TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'owner.pack.lib.doc.COPY': { EN: 'will be copied', AR: 'ستُنسخ' },
   'owner.pack.lib.doc.EXISTS': { EN: 'already in the knowledge base', AR: 'موجودة في قاعدة المعرفة' },
   'owner.pack.lib.doc.NOT_READY': { EN: 'not processed yet', AR: 'لم تُعالج بعد' },
+  'owner.enrich.ai_knowledge_on': { EN: 'AI knowledge is on: what the AI model already knows about the organization is added as a draft to verify, marked as having no source.', AR: 'المعرفة الذاتية للذكاء الاصطناعي مفعّلة: يُضاف ما يعرفه النموذج مسبقاً عن الجهة كمسودة للتحقق، مع توضيح أنها بلا مصدر.' },
+  'owner.enrich.ai_knowledge_help': { EN: 'Gives you data to start with when the website and web search find little. These items come from the model\'s memory, not from a source: they are never verified, have low confidence, are never pre-approved and are added only when you approve each one.', AR: 'يوفّر بيانات أولية عندما لا يجد الموقع الرسمي والبحث في الويب ما يكفي. هذه العناصر من ذاكرة النموذج وليست من مصدر: لا تُعدّ موثّقة، ودرجة ثقتها منخفضة، ولا تُعتمد مسبقاً، ولا تُضاف إلا بعد اعتمادك لكل عنصر.' },
+  'owner.enrich.ai_knowledge_source': { EN: 'AI model knowledge (no source)', AR: 'معرفة النموذج الذاتية (بلا مصدر)' },
+  'owner.enrich.ai_knowledge_badge': { EN: 'AI knowledge - no source', AR: 'معرفة الذكاء الاصطناعي - بلا مصدر' },
+  'owner.enrich.ai_knowledge_verify': { EN: 'Check it against an official source before approving.', AR: 'تحقق منه بمصدر رسمي قبل الاعتماد.' },
+  'owner.enrich.basis': { EN: 'Basis', AR: 'الأساس' },
+  'owner.enrich.basis_sourced': { EN: 'With a source', AR: 'له مصدر' },
+  'owner.enrich.basis_ai': { EN: 'AI knowledge only', AR: 'معرفة الذكاء الاصطناعي فقط' },
   ...OUTREACH_TRANSLATIONS,
 }
