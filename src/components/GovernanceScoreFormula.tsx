@@ -72,11 +72,11 @@ export default function GovernanceScoreFormula({ breakdown }: { breakdown: Score
           <span key={c.key} style={{ padding: '3px 8px', borderRadius: 10, border: '1px solid var(--navy-light)', opacity: c.included ? 1 : 0.6, whiteSpace: 'nowrap' }}>
             {componentLabel(c.key, isAR)}{' '}
             {c.included
-              ? <><strong style={{ color: 'var(--text)' }}>{Math.round(c.score as number)}</strong> × {pct(c.appliedWeight)}</>
+              ? <><strong style={{ color: 'var(--text)' }}>{Number((c.score as number).toFixed(2))}</strong> × {pct(c.appliedWeight)}</>
               : <em>{isAR ? 'لم يُقيَّم' : 'not assessed'}</em>}
           </span>
         ))}
-        <span style={{ padding: '3px 8px', fontWeight: 700, color: 'var(--accent)' }}>= {Math.round(breakdown.overallScore)}</span>
+        <span style={{ padding: '3px 8px', fontWeight: 700, color: 'var(--accent)' }}>= {Number(breakdown.overallScore.toFixed(2))}</span>
       </div>
     </div>
   )

@@ -26,7 +26,7 @@ test('shows each part that counts with its score and share, a part not assessed 
   expect(text).toContain('Data Architecture not assessed')
   expect(text).not.toContain('Strategic')
   expect(text).not.toContain('Financial')
-  expect(text).toContain('= 62')
+  expect(text).toContain('= 61.5')
 })
 
 test('Arabic interface: Arabic labels and right-to-left', () => {
