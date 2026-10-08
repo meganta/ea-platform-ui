@@ -411,6 +411,15 @@ describe('EnrichmentPanel', () => {
     await waitFor(() => expect(api.commit).toHaveBeenCalledWith('j1', { password: 'pw', applyProfile: true }));
   });
 
+  it('can launch attribute filling for existing objects', async () => {
+    api.enrichmentJobs.mockResolvedValue([]);
+    api.launchEnrichment.mockResolvedValue({ id: 'j3' });
+    render(<EnrichmentPanel tenantId="t1" website="https://fund.sa" webSearch />);
+    fireEvent.click(await screen.findByLabelText('owner.enrich.scope.ATTRIBUTES'));
+    fireEvent.click(screen.getByRole('button', { name: 'owner.enrich.launch' }));
+    await waitFor(() => expect(api.launchEnrichment).toHaveBeenCalledWith('t1', expect.objectContaining({ scopes: ['ATTRIBUTES'] })));
+  });
+
   it('shows Meta Model attributes with their labels apart from other stated facts', async () => {
     api.enrichmentJobs.mockResolvedValue([JOB]);
     api.job.mockResolvedValue(JOB);
@@ -582,7 +591,7 @@ describe('AR/EN coverage', () => {
       'owner.change.': ['NEW', 'ENRICH_EXISTING', 'RELATIONSHIP', 'POSSIBLE_DUPLICATE', 'CONFLICT', 'NO_CHANGE'],
       'owner.decision.': ['PENDING', 'APPROVED', 'REJECTED', 'MERGE'],
       'owner.views.status.': ['READY', 'PARTIAL', 'RECOMMENDED_AFTER_ENRICHMENT', 'INSUFFICIENT_DATA', 'LIKELY_READY_AFTER_COMMIT', 'IMPROVED_AFTER_COMMIT'],
-      'owner.enrich.scope.': ['FULL', 'STRATEGY', 'BUSINESS', 'BENEFICIARY', 'APPLICATIONS', 'APPLICATION_MODULES', 'PROCESSES', 'CAPABILITIES', 'SERVICES', 'DATA', 'TECHNOLOGY', 'RELATIONSHIPS', 'MISSING'],
+      'owner.enrich.scope.': ['FULL', 'STRATEGY', 'BUSINESS', 'BENEFICIARY', 'APPLICATIONS', 'APPLICATION_MODULES', 'PROCESSES', 'CAPABILITIES', 'SERVICES', 'DATA', 'TECHNOLOGY', 'RELATIONSHIPS', 'MISSING', 'ATTRIBUTES'],
       'owner.maturity.level.': ['1', '2', '3', '4', '5'],
       'owner.priority.': ['HIGH', 'MEDIUM', 'LOW'],
       'owner.session.': ['ACTIVE', 'ENDED', 'EXPIRED'],

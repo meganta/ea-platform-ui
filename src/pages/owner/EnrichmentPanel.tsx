@@ -92,6 +92,7 @@ export default function EnrichmentPanel({ tenantId, website, webSearch, aiKnowle
                 <label key={s} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
                   <input id={`owner-scope-${s}`} type="checkbox" checked={scopes.includes(s)} onChange={() => toggleScope(s)} />
                   {t(`owner.enrich.scope.${s}`)}
+                  {s === 'ATTRIBUTES' && <HelpTip text={t('owner.enrich.scope_attributes_help')} />}
                 </label>
               ))}
             </div>

@@ -76,6 +76,7 @@ export const OWNER_TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'owner.dash.q.capabilitiesNotTraced': { EN: 'Capabilities not traced to strategy', AR: 'قدرات غير مرتبطة بالاستراتيجية' },
 
   // EA concepts
+  'owner.concept.ATTRIBUTES': { EN: 'Attributes of an existing object', AR: 'خصائص عنصر موجود' },
   'owner.concept.GOAL': { EN: 'Strategic goals', AR: 'الأهداف الاستراتيجية' },
   'owner.concept.OBJECTIVE': { EN: 'Strategic objectives', AR: 'الأهداف التفصيلية' },
   'owner.concept.INITIATIVE': { EN: 'Initiatives', AR: 'المبادرات' },
@@ -306,6 +307,8 @@ export const OWNER_TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'owner.enrich.scope.TECHNOLOGY': { EN: 'Technology', AR: 'التقنية' },
   'owner.enrich.scope.RELATIONSHIPS': { EN: 'Relationships', AR: 'العلاقات' },
   'owner.enrich.scope.MISSING': { EN: 'Missing repository information', AR: 'معلومات المستودع الناقصة' },
+  'owner.enrich.scope.ATTRIBUTES': { EN: 'Fill attributes of existing objects', AR: 'تعبئة خصائص العناصر الموجودة' },
+  'owner.enrich.scope_attributes_help': { EN: 'Searches the web for objects already in the Repository that have empty Meta Model attributes and proposes values with their source. Values only the AI model knows are kept apart, marked "AI knowledge - no source", for you to approve one by one. Only empty attributes are filled.', AR: 'يبحث في الإنترنت عن العناصر الموجودة في المستودع التي لديها خصائص فارغة في النموذج الوصفي ويقترح قيمًا مع مصدرها. تُفصل القيم التي يعرفها نموذج الذكاء الاصطناعي فقط وتُوسم "معرفة الذكاء الاصطناعي - بلا مصدر" لتعتمدها واحدة تلو الأخرى. تُعبأ الخصائص الفارغة فقط.' },
   'owner.stage.QUEUED': { EN: 'Queued', AR: 'في الانتظار' },
   'owner.stage.DISCOVERING': { EN: 'Discovering sources', AR: 'اكتشاف المصادر' },
   'owner.stage.EXTRACTING': { EN: 'Extracting', AR: 'الاستخراج' },
