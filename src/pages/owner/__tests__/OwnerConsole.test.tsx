@@ -380,6 +380,25 @@ describe('EnrichmentPanel', () => {
     await waitFor(() => expect(api.commit).toHaveBeenCalledWith('j1', { password: 'pw', applyProfile: true }));
   });
 
+  it('marks items known only from AI model knowledge and filters by basis', async () => {
+    const job = { ...JOB, sources: [...JOB.sources, { id: 'S2', url: 'archmind:ai-model-knowledge', title: 'AI model knowledge', publisher: 'AI model knowledge', tierLabel: 'AI model knowledge - not a source', kind: 'AI_KNOWLEDGE' }] };
+    api.enrichmentJobs.mockResolvedValue([job]);
+    api.job.mockResolvedValue(job);
+    api.items.mockResolvedValue([ITEMS[0], { ...ITEMS[0], id: 'i3', name: 'Tamheer Programme', concept: 'SERVICE', objectTypeCode: 'GovService', classification: 'INFERRED', confidence: 0.3, evidence: [{ sourceId: 'S2', url: 'archmind:ai-model-knowledge', publisher: 'AI model knowledge', excerpt: 'runs the Tamheer programme', found: true, sourceKind: 'AI_KNOWLEDGE' }] }]);
+    render(<EnrichmentPanel tenantId="t1" website="https://fund.sa" webSearch aiKnowledge />);
+    expect(await screen.findByText('Tamheer Programme')).toBeInTheDocument();
+    expect(screen.getAllByText('owner.enrich.ai_knowledge_badge')).toHaveLength(1);
+    expect(screen.getByText('owner.enrich.ai_knowledge_verify')).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: 'owner.enrich.evidence (1)' })[1]);
+    expect(screen.getAllByText('owner.enrich.ai_knowledge_source').length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText('owner.enrich.basis'), { target: { value: 'AI_KNOWLEDGE' } });
+    expect(screen.queryByText('Employers')).toBeNull();
+    expect(screen.getByText('Tamheer Programme')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('owner.enrich.basis'), { target: { value: 'SOURCED' } });
+    expect(screen.getByText('Employers')).toBeInTheDocument();
+    expect(screen.queryByText('Tamheer Programme')).toBeNull();
+  });
+
   it('launches discovery with the chosen scopes and follows the running job', async () => {
     const running = { ...JOB, id: 'j2', status: 'EXTRACTING', stage: 'EXTRACTING', progress: { stagesDone: ['DISCOVERING'] } };
     api.enrichmentJobs.mockResolvedValueOnce([]).mockResolvedValue([running]);

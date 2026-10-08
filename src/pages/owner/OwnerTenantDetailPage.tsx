@@ -60,7 +60,7 @@ export default function OwnerTenantDetailPage() {
       {tab === 'repository' && (assessment ? <><ConceptCounts concepts={assessment.conceptCounts} /><div className="oc-section"><HealthPanel health={assessment.health} /></div></> : <Loading />)}
       {tab === 'maturity' && (assessment ? <><MaturityPanel assessment={assessment} /><div className="oc-section oc-grid-2"><HealthPanel health={assessment.health} /><AdoptionPanel adoption={assessment.adoption} /></div></> : <Loading />)}
       {tab === 'beneficiaries' && (assessment ? <BeneficiaryPanel assessment={assessment} /> : <Loading />)}
-      {tab === 'enrichment' && <EnrichmentPanel tenantId={tenantId} website={detail.profile?.officialWebsite} webSearch={me?.capabilities?.webSearch} onCommitted={() => { setAssessment(null); load() }} />}
+      {tab === 'enrichment' && <EnrichmentPanel tenantId={tenantId} website={detail.profile?.officialWebsite} webSearch={me?.capabilities?.webSearch} aiKnowledge={me?.capabilities?.aiKnowledge} onCommitted={() => { setAssessment(null); load() }} />}
       {tab === 'reference' && <ReferencePackPanel tenantId={tenantId} />}
       {tab === 'views' && <ViewsPanel tenantId={tenantId} />}
       {tab === 'recommendations' && <RecommendationsPanel tenantId={tenantId} onNavigate={go} />}
