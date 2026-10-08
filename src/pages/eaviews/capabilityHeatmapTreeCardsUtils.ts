@@ -268,7 +268,7 @@ export interface CardContext {
 // Object + meaningful context, not an isolated inventory tile (Section
 // 5). Entirely derived from the already-fetched dataset - grouping real
 // relationships by type and listing the real related object names, never
-// a separate per-card fetch(Section 5's explicit "No N+1" requirement).
+// a separate per-card fetch (Section 5's explicit "No N+1" requirement).
 export function buildCardContext(dataset: any, objectId: string): CardContext {
   const objectById = new Map((dataset?.objects ?? []).map((o: any) => [o.id, o]))
   const byType = new Map<string, { label: string; names: string[] }>()

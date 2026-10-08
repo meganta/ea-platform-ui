@@ -95,3 +95,13 @@ it('wires password changes to the authenticated backend endpoint', async () => {
     body: JSON.stringify({ currentPassword: 'old-password', newPassword: 'new-password' }),
   }))
 })
+
+it('never renews delegated access using the saved owner refresh token', async () => {
+  localStorage.setItem('ea_owner_token', 'owner')
+  localStorage.setItem('ea_owner_refresh_token', 'owner-refresh')
+  localStorage.removeItem('ea_refresh_token')
+  mockFetch.mockResolvedValue(response(401))
+  expect((await apiFetch(`${base}/a`, { headers: { Authorization: 'Bearer delegated' } })).status).toBe(401)
+  expect(mockFetch).toHaveBeenCalledTimes(1)
+  expect(localStorage.getItem('ea_owner_token')).toBe('owner')
+})

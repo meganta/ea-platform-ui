@@ -80,6 +80,8 @@ export async function apiFetch(input: RequestInfo | URL, init?: RequestInit): Pr
   }
   const response = await send()
   if (response.status !== 401) return response
+  // Delegated access has a fixed lifetime and must never refresh into the owner's identity.
+  if (localStorage.getItem('ea_owner_token') && !localStorage.getItem(REFRESH_KEY)) return response
   if ((init?.signal || originalRequest?.signal)?.aborted) throw new DOMException('The request was aborted', 'AbortError')
   const currentToken = getToken()
   const nextToken = currentToken && currentToken !== token ? currentToken : await refreshSession(base!)
