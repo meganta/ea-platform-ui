@@ -411,6 +411,28 @@ describe('EnrichmentPanel', () => {
     await waitFor(() => expect(api.commit).toHaveBeenCalledWith('j1', { password: 'pw', applyProfile: true }));
   });
 
+  it('can launch attribute filling for existing objects', async () => {
+    api.enrichmentJobs.mockResolvedValue([]);
+    api.launchEnrichment.mockResolvedValue({ id: 'j3' });
+    render(<EnrichmentPanel tenantId="t1" website="https://fund.sa" webSearch />);
+    fireEvent.click(await screen.findByLabelText('owner.enrich.scope.ATTRIBUTES'));
+    fireEvent.click(screen.getByRole('button', { name: 'owner.enrich.launch' }));
+    await waitFor(() => expect(api.launchEnrichment).toHaveBeenCalledWith('t1', expect.objectContaining({ scopes: ['ATTRIBUTES'] })));
+  });
+
+  it('shows Meta Model attributes with their labels apart from other stated facts', async () => {
+    api.enrichmentJobs.mockResolvedValue([JOB]);
+    api.job.mockResolvedValue(JOB);
+    api.items.mockResolvedValue([{ ...ITEMS[0], attributes: { deliveryChannel: { value: 'ONLINE', raw: 'Online', metaModel: true, label: 'Delivery channel' }, audience: { value: 'employers' }, _rejected: [{ key: 'fee', reason: 'x' }] } }]);
+    render(<EnrichmentPanel tenantId="t1" website="https://fund.sa" webSearch={false} />);
+    expect(await screen.findByText('owner.enrich.meta_count')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'owner.enrich.evidence (1)' }));
+    expect(screen.getByText(/Delivery channel: ONLINE \(Online\)/)).toBeInTheDocument();
+    expect(screen.getByText(/owner.enrich.meta_attributes/)).toBeInTheDocument();
+    expect(screen.getByText(/audience: employers/)).toBeInTheDocument();
+    expect(screen.queryByText(/fee/)).toBeNull();
+  });
+
   it('marks items known only from AI model knowledge and filters by basis', async () => {
     const job = { ...JOB, sources: [...JOB.sources, { id: 'S2', url: 'archmind:ai-model-knowledge', title: 'AI model knowledge', publisher: 'AI model knowledge', tierLabel: 'AI model knowledge - not a source', kind: 'AI_KNOWLEDGE' }] };
     api.enrichmentJobs.mockResolvedValue([job]);
@@ -458,8 +480,38 @@ describe('Audit and settings', () => {
     await waitFor(() => expect(api.endSession).toHaveBeenCalledWith('s1'));
   });
 
+  it('settings show the knowledge library: workspace, classified documents, sharing changes', async () => {
+    api.me.mockResolvedValue({ email: 'owner@archmind.sa', homeTenantName: 'ArchMind', platformRole: 'PLATFORM_OWNER', capabilities: { webSearch: true, accessTtlMinutes: 30, enrichmentScopes: ['FULL'] } });
+    const LIB = {
+      library: { tenantId: 'tt', name: 'Human Resources Development Fund', slug: 'test-tenant', source: 'DEFAULT' }, configuredSlug: null, defaultSlug: 'test-tenant', envOverride: false,
+      counts: { total: 2, shared: 1, ready: 2 },
+      documents: [
+        { id: 'n1', name: 'NORA 2.0 Guide.pdf', type: 'REFERENCE_ARCHITECTURE', language: 'AR', status: 'READY', chunkCount: 10, category: 'NORA', reason: 'The title names NORA.', sharing: 'SHARED', sharingBasis: 'AUTOMATIC' },
+        { id: 'o1', name: 'HRDF Strategy.pdf', type: 'STRATEGY', language: 'EN', status: 'READY', chunkCount: 4, category: 'ORGANIZATION_SPECIFIC', reason: 'The title names the library organization (hrdf).', sharing: 'PRIVATE', sharingBasis: 'AUTOMATIC' },
+      ],
+    };
+    api.knowledgeLibrary.mockResolvedValue(LIB);
+    api.updateKnowledgeLibrary.mockImplementation(async (dto: any) => ({ ...LIB, configuredSlug: dto.tenantSlug ?? null }));
+    render(<OwnerSettingsPage />);
+    expect(await screen.findByText('Human Resources Development Fund')).toBeInTheDocument();
+    expect(screen.getByText(/owner.lib.source.DEFAULT/)).toBeInTheDocument();
+    expect(screen.getByText('owner.lib.category.NORA')).toBeInTheDocument();
+    expect(screen.getByText('owner.lib.category.ORGANIZATION_SPECIFIC')).toBeInTheDocument();
+    const save = screen.getByRole('button', { name: 'owner.lib.save_documents' });
+    expect(save).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('owner.lib.private', { selector: 'select' }), { target: { value: 'SHARED' } });
+    expect(save).not.toBeDisabled();
+    fireEvent.click(save);
+    await waitFor(() => expect(api.updateKnowledgeLibrary).toHaveBeenCalledWith({ documents: { o1: 'SHARED' } }));
+    expect(await screen.findByText('owner.lib.saved')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('owner.lib.slug'), { target: { value: 'archmind' } });
+    fireEvent.click(screen.getByRole('button', { name: 'owner.lib.save_workspace' }));
+    await waitFor(() => expect(api.updateKnowledgeLibrary).toHaveBeenLastCalledWith({ tenantSlug: 'archmind' }));
+  });
+
   it('settings show the owner identity and web search configuration', async () => {
     api.me.mockResolvedValue({ email: 'owner@archmind.sa', homeTenantName: 'ArchMind', platformRole: 'PLATFORM_OWNER', capabilities: { webSearch: false, accessTtlMinutes: 30, enrichmentScopes: ['FULL'] } });
+    api.knowledgeLibrary.mockResolvedValue({ library: { tenantId: null, name: null, slug: null, source: 'NONE' }, configuredSlug: null, defaultSlug: 'test-tenant', envOverride: false, counts: { total: 0, shared: 0, ready: 0 }, documents: [] });
     render(<OwnerSettingsPage />);
     expect(await screen.findByText('owner.settings.disabled')).toBeInTheDocument();
     expect(screen.getByText('owner.settings.grant')).toBeInTheDocument();
@@ -539,7 +591,7 @@ describe('AR/EN coverage', () => {
       'owner.change.': ['NEW', 'ENRICH_EXISTING', 'RELATIONSHIP', 'POSSIBLE_DUPLICATE', 'CONFLICT', 'NO_CHANGE'],
       'owner.decision.': ['PENDING', 'APPROVED', 'REJECTED', 'MERGE'],
       'owner.views.status.': ['READY', 'PARTIAL', 'RECOMMENDED_AFTER_ENRICHMENT', 'INSUFFICIENT_DATA', 'LIKELY_READY_AFTER_COMMIT', 'IMPROVED_AFTER_COMMIT'],
-      'owner.enrich.scope.': ['FULL', 'STRATEGY', 'BUSINESS', 'BENEFICIARY', 'APPLICATIONS', 'APPLICATION_MODULES', 'PROCESSES', 'CAPABILITIES', 'SERVICES', 'DATA', 'TECHNOLOGY', 'RELATIONSHIPS', 'MISSING'],
+      'owner.enrich.scope.': ['FULL', 'STRATEGY', 'BUSINESS', 'BENEFICIARY', 'APPLICATIONS', 'APPLICATION_MODULES', 'PROCESSES', 'CAPABILITIES', 'SERVICES', 'DATA', 'TECHNOLOGY', 'RELATIONSHIPS', 'MISSING', 'ATTRIBUTES'],
       'owner.maturity.level.': ['1', '2', '3', '4', '5'],
       'owner.priority.': ['HIGH', 'MEDIUM', 'LOW'],
       'owner.session.': ['ACTIVE', 'ENDED', 'EXPIRED'],
@@ -556,7 +608,11 @@ describe('AR/EN coverage', () => {
       'owner.pack.lib.from.': ['NORA_BASELINE', 'PLATFORM_LIBRARY'],
       'owner.backfill.reason.': ['ELIGIBLE', 'HAS_BUSINESS_CAPABILITIES', 'HAS_BUSINESS_REFERENCE_MODEL', 'HAS_BUSINESS_REFERENCE_ARCHITECTURE', 'NOT_NORA', 'PRIVATE_ORGANIZATION', 'NOT_ACTIVE', 'NO_PUBLISHED_META_MODEL', 'NO_CAPABILITY_TYPE', 'LIBRARY_WORKSPACE'],
       'owner.pack.lib.object.': ['CREATE', 'EXISTS', 'NO_TYPE'],
-      'owner.pack.lib.doc.': ['COPY', 'EXISTS', 'NOT_READY'],
+      'owner.pack.lib.doc.': ['COPY', 'EXISTS', 'NOT_READY', 'NOT_SHARED'],
+      'owner.lib.category.': ['NORA', 'COMMON', 'ORGANIZATION_SPECIFIC'],
+      'owner.lib.source.': ['ENV', 'SETTING', 'DEFAULT', 'OWNER_HOME', 'NONE'],
+      'owner.lib.choice.': ['SHARED', 'PRIVATE'],
+      'owner.create.step.': ['branding', 'profile', 'glossary', 'subscription', 'metaModel', 'referencePack', 'knowledgeLibrary', 'adminInvitation'],
       'owner.detail.tab.': ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'recommendations', 'activity'],
       'owner.create.step.': ['branding', 'profile', 'glossary', 'subscription', 'metaModel', 'referencePack', 'adminInvitation'],
     };
