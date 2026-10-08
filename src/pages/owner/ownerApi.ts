@@ -57,6 +57,8 @@ export const ownerApi = {
   endSession: (sessionId: string) => call('POST', `/owner/access-sessions/${sessionId}/end`),
   audit: (f: { tenantId?: string; action?: string; limit?: string } = {}) => call('GET', `/owner/audit${qs(f)}`),
   exitTenant: () => call('POST', '/owner-access/exit'),
+  referencePackBackfill: () => call('GET', '/owner/reference-pack/backfill'),
+  runReferencePackBackfill: (dto: { tenantIds?: string[]; password: string }) => call('POST', '/owner/reference-pack/backfill', dto),
   referencePack: (id: string, f: { industry?: string } = {}) => call('GET', `/owner/tenants/${id}/reference-pack${qs(f)}`),
   applyReferencePack: (id: string, dto: { industry?: string; include?: string[]; documentIds?: string[]; activateModels?: boolean; activateArchitectures?: boolean }) => call('POST', `/owner/tenants/${id}/reference-pack`, dto),
 }

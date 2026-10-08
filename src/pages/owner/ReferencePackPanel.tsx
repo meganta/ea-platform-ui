@@ -24,6 +24,7 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
   const [activateArchitectures, setActivateArchitectures] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
   const [withRepository, setWithRepository] = useState(true)
+  const [withCapabilities, setWithCapabilities] = useState(true)
   const [withKnowledge, setWithKnowledge] = useState(true)
   const [skipDocs, setSkipDocs] = useState<Set<string>>(new Set())
 
@@ -39,11 +40,12 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
   const chosenDocs = copyDocs.filter((d: any) => !skipDocs.has(d.id))
   const pending = (plan?.architectures || []).filter((a: any) => a.action === 'CREATE' || a.action === 'ADD_MISSING').length
     + (withRepository && newObjects.length ? 1 : 0) + (withKnowledge && chosenDocs.length ? 1 : 0)
+    + (withCapabilities && plan?.capabilities?.toCreate ? 1 : 0)
   const apply = async () => {
     setBusy(true); setError(''); setResult(null)
-    const parts = [...(withRepository ? ['NORA_REPOSITORY'] : []), ...(withKnowledge ? ['NORA_KNOWLEDGE'] : [])]
+    const parts = [...(withRepository ? ['NORA_REPOSITORY'] : []), ...(withKnowledge ? ['NORA_KNOWLEDGE'] : []), ...(withCapabilities ? ['BUSINESS_CAPABILITIES'] : [])]
     const dto: any = { ...(industry ? { industry } : {}), activateModels, activateArchitectures }
-    if (parts.length < 2) dto.include = [...PACK_ARCH_ROLES, ...parts]
+    if (parts.length < 3) dto.include = [...PACK_ARCH_ROLES, ...parts]
     if (withKnowledge && skipDocs.size) dto.documentIds = chosenDocs.map((d: any) => d.id)
     try {
       setResult(await ownerApi.applyReferencePack(tenantId, dto))
@@ -65,6 +67,7 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
       {result && (
         <div className="oc-ok" role="status">
           {fill(t('owner.pack.done'), { created: result.results.filter((r: any) => r.action === 'CREATED').length, added: result.results.filter((r: any) => r.action === 'ELEMENTS_ADDED').length })}
+          {result.capabilities && <div>{fill(t('owner.pack.caps.done'), { created: result.capabilities.created, reused: result.capabilities.reused })}</div>}
           {result.library && <div>{fill(t('owner.pack.lib.done'), { objects: result.library.objectsCreated, docs: result.library.documentsCopied })}</div>}
           {result.library?.failures?.length > 0 && <div className="oc-muted">{result.library.failures.join('; ')}</div>}
         </div>
@@ -102,6 +105,18 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
             <div className="oc-section">
               <div className="oc-section-title">{t('owner.pack.limitations')}</div>
               <ul style={{ paddingInlineStart: 18, fontSize: 13 }}>{plan.limitations.map((l: string, i: number) => <li key={i} className="oc-muted">{l}</li>)}</ul>
+            </div>
+          )}
+
+          {plan.capabilities && (
+            <div className="oc-section oc-card">
+              <h3>{t('owner.pack.caps.title')}<HelpTip text={t('owner.pack.caps.help')} /></h3>
+              {plan.capabilities.typeCode ? (
+                <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
+                  <input id="owner-pack-caps" type="checkbox" checked={withCapabilities} onChange={e => setWithCapabilities(e.target.checked)} />
+                  <span>{fill(t('owner.pack.caps.load'), { n: plan.capabilities.toCreate, type: plan.capabilities.typeCode })}<span className="oc-muted" style={{ display: 'block' }}>{fill(t('owner.pack.caps.detail'), { existing: plan.capabilities.existing, core: plan.capabilities.core })}</span></span>
+                </label>
+              ) : <div className="oc-muted">{(plan.capabilities.limitations || []).join(' ')}</div>}
             </div>
           )}
 
