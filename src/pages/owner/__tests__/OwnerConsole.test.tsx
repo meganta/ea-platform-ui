@@ -314,6 +314,28 @@ describe('ReferencePackPanel', () => {
     expect(await screen.findByText('owner.pack.done')).toBeInTheDocument();
   });
 
+  it('NORA library: lists national objects and documents; leaving parts out narrows what is prepared', async () => {
+    api.referencePack.mockResolvedValue({ ...PACK_PLAN, library: {
+      library: { tenantId: 'home', name: 'ArchMind', source: 'OWNER_HOME' },
+      objects: [{ key: 'baseline:NAFATH', name: 'Nafath - National Single Sign-On', nameAr: 'نفاذ', typeCode: 'NationalPlatform', source: 'NORA_BASELINE', action: 'CREATE' }, { key: 'baseline:GSB', name: 'Government Service Bus (GSB)', nameAr: '', typeCode: 'NationalPlatform', source: 'NORA_BASELINE', action: 'EXISTS' }],
+      documents: [{ id: 'd1', name: 'NORA 2.0 Guide.pdf', chunkCount: 40, action: 'COPY' }, { id: 'd2', name: 'NORA Principles.pdf', chunkCount: 12, action: 'COPY' }, { id: 'd3', name: 'Old.pdf', chunkCount: 3, action: 'EXISTS' }],
+      limitations: [],
+    } });
+    api.applyReferencePack.mockResolvedValue({ results: [], library: { objectsCreated: 0, documentsCopied: 1, failures: [] } });
+    render(<OwnerTenantDetailPage />);
+    expect(await screen.findByText('Nafath - National Single Sign-On')).toBeInTheDocument();
+    expect(screen.getByText('owner.pack.lib.source')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Old.pdf/)).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/NORA Principles.pdf/));
+    fireEvent.click(screen.getByLabelText(/owner.pack.lib.repository_help/));
+    fireEvent.click(screen.getByRole('button', { name: 'owner.pack.prepare' }));
+    await waitFor(() => expect(api.applyReferencePack).toHaveBeenCalled());
+    const dto = api.applyReferencePack.mock.calls[0][1];
+    expect(dto.include).toEqual(['BRM', 'ARM', 'DRM', 'TRM', 'SRM', 'BXRM', 'BUSINESS_RA', 'APPLICATION_RA', 'BENEFICIARY_RA', 'NORA_KNOWLEDGE']);
+    expect(dto.documentIds).toEqual(['d1']);
+    expect(await screen.findByText('owner.pack.lib.done')).toBeInTheDocument();
+  });
+
   it('nothing to prepare disables the button', async () => {
     api.referencePack.mockResolvedValueOnce({ ...PACK_PLAN, architectures: [PACK_PLAN.architectures[0]] });
     render(<OwnerTenantDetailPage />);
@@ -481,6 +503,9 @@ describe('AR/EN coverage', () => {
       'owner.pack.reason.': ['NO_PUBLISHED_META_MODEL', 'DOMAIN_NOT_IN_META_MODEL'],
       'owner.pack.source.': ['NORA_OFFICIAL', 'ARCHMIND_CURATED', 'INDUSTRY_CATALOGUE', 'TENANT_REPOSITORY', 'PACK_STRUCTURE'],
       'owner.pack.disposition.': ['ADOPTED', 'EXTENDED', 'PENDING_REVIEW', 'ADAPTED'],
+      'owner.pack.lib.from.': ['NORA_BASELINE', 'PLATFORM_LIBRARY'],
+      'owner.pack.lib.object.': ['CREATE', 'EXISTS', 'NO_TYPE'],
+      'owner.pack.lib.doc.': ['COPY', 'EXISTS', 'NOT_READY'],
       'owner.detail.tab.': ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'recommendations', 'activity'],
       'owner.create.step.': ['branding', 'profile', 'glossary', 'subscription', 'metaModel', 'referencePack', 'adminInvitation'],
     };

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../../components/HelpTip'
-import { ownerApi, PACK_ACTION_COLOR, PACK_INDUSTRIES } from './ownerApi'
+import { ownerApi, PACK_ACTION_COLOR, PACK_ARCH_ROLES, PACK_INDUSTRIES } from './ownerApi'
 import { ErrorBox, fill, Header, Loading, Pill } from './ownerUi'
 
 const SOURCE_COLOR: Record<string, string> = { NORA_OFFICIAL: 'var(--success)', ARCHMIND_CURATED: 'var(--accent)', INDUSTRY_CATALOGUE: 'var(--warning)', TENANT_REPOSITORY: 'var(--success)', PACK_STRUCTURE: 'var(--text-dim)' }
@@ -23,6 +23,9 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
   const [activateModels, setActivateModels] = useState(true)
   const [activateArchitectures, setActivateArchitectures] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
+  const [withRepository, setWithRepository] = useState(true)
+  const [withKnowledge, setWithKnowledge] = useState(true)
+  const [skipDocs, setSkipDocs] = useState<Set<string>>(new Set())
 
   const load = useCallback((code: string) => {
     setError('')
@@ -30,11 +33,20 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
   }, [tenantId])
   useEffect(() => { load(industry) }, [load, industry])
 
+  const lib = plan?.library || null
+  const newObjects = (lib?.objects || []).filter((o: any) => o.action === 'CREATE')
+  const copyDocs = (lib?.documents || []).filter((d: any) => d.action === 'COPY')
+  const chosenDocs = copyDocs.filter((d: any) => !skipDocs.has(d.id))
   const pending = (plan?.architectures || []).filter((a: any) => a.action === 'CREATE' || a.action === 'ADD_MISSING').length
+    + (withRepository && newObjects.length ? 1 : 0) + (withKnowledge && chosenDocs.length ? 1 : 0)
   const apply = async () => {
     setBusy(true); setError(''); setResult(null)
+    const parts = [...(withRepository ? ['NORA_REPOSITORY'] : []), ...(withKnowledge ? ['NORA_KNOWLEDGE'] : [])]
+    const dto: any = { ...(industry ? { industry } : {}), activateModels, activateArchitectures }
+    if (parts.length < 2) dto.include = [...PACK_ARCH_ROLES, ...parts]
+    if (withKnowledge && skipDocs.size) dto.documentIds = chosenDocs.map((d: any) => d.id)
     try {
-      setResult(await ownerApi.applyReferencePack(tenantId, { ...(industry ? { industry } : {}), activateModels, activateArchitectures }))
+      setResult(await ownerApi.applyReferencePack(tenantId, dto))
       load(industry)
     } catch (e: any) { setError(e.message) } finally { setBusy(false) }
   }
@@ -53,6 +65,8 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
       {result && (
         <div className="oc-ok" role="status">
           {fill(t('owner.pack.done'), { created: result.results.filter((r: any) => r.action === 'CREATED').length, added: result.results.filter((r: any) => r.action === 'ELEMENTS_ADDED').length })}
+          {result.library && <div>{fill(t('owner.pack.lib.done'), { objects: result.library.objectsCreated, docs: result.library.documentsCopied })}</div>}
+          {result.library?.failures?.length > 0 && <div className="oc-muted">{result.library.failures.join('; ')}</div>}
         </div>
       )}
       {!plan ? <Loading /> : (
@@ -88,6 +102,49 @@ export default function ReferencePackPanel({ tenantId }: { tenantId: string }) {
             <div className="oc-section">
               <div className="oc-section-title">{t('owner.pack.limitations')}</div>
               <ul style={{ paddingInlineStart: 18, fontSize: 13 }}>{plan.limitations.map((l: string, i: number) => <li key={i} className="oc-muted">{l}</li>)}</ul>
+            </div>
+          )}
+
+          {lib && (
+            <div className="oc-section oc-card">
+              <h3>{t('owner.pack.lib.title')}<HelpTip text={t('owner.pack.lib.help')} /></h3>
+              <div className="oc-muted" style={{ marginBottom: 8 }}>{lib.library.tenantId ? fill(t('owner.pack.lib.source'), { name: lib.library.name }) : t('owner.pack.lib.no_source')}</div>
+              <div className="oc-grid-2">
+                <div>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
+                    <input id="owner-pack-lib-repo" type="checkbox" checked={withRepository} onChange={e => setWithRepository(e.target.checked)} />
+                    <span>{fill(t('owner.pack.lib.repository'), { n: newObjects.length })}<span className="oc-muted" style={{ display: 'block' }}>{t('owner.pack.lib.repository_help')}</span></span>
+                  </label>
+                  <ul style={{ listStyle: 'none', fontSize: 13, marginTop: 6, display: 'grid', gap: 2 }}>
+                    {lib.objects.map((o: any) => (
+                      <li key={o.key}>
+                        {isAR && o.nameAr ? o.nameAr : o.name}
+                        <span className="oc-muted"> · {o.typeCode || '—'} · {t(`owner.pack.lib.from.${o.source}`)} · </span>
+                        <span style={{ color: o.action === 'CREATE' ? 'var(--accent)' : 'var(--text-dim)' }}>{t(`owner.pack.lib.object.${o.action}`)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
+                    <input id="owner-pack-lib-kb" type="checkbox" checked={withKnowledge} onChange={e => setWithKnowledge(e.target.checked)} />
+                    <span>{fill(t('owner.pack.lib.knowledge'), { n: chosenDocs.length })}<span className="oc-muted" style={{ display: 'block' }}>{t('owner.pack.lib.knowledge_help')}</span></span>
+                  </label>
+                  {lib.documents.length === 0 ? <div className="oc-muted" style={{ marginTop: 6 }}>{t('owner.pack.lib.no_documents')}</div> : (
+                    <ul style={{ listStyle: 'none', fontSize: 13, marginTop: 6, display: 'grid', gap: 4 }}>
+                      {lib.documents.map((d: any) => (
+                        <li key={d.id}>
+                          <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <input id={`owner-pack-doc-${d.id}`} type="checkbox" disabled={d.action !== 'COPY' || !withKnowledge} checked={d.action === 'COPY' && !skipDocs.has(d.id)}
+                              onChange={e => setSkipDocs(s => { const n = new Set(s); if (e.target.checked) n.delete(d.id); else n.add(d.id); return n })} />
+                            <span>{d.name}<span className="oc-muted"> · {fill(t('owner.pack.lib.chunks'), { n: d.chunkCount })} · {t(`owner.pack.lib.doc.${d.action}`)}</span></span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
