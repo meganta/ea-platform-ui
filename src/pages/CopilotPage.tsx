@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useState, useRef, useEffect, useCallback, useMemo, ReactNode } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
@@ -14,9 +15,9 @@ function useApi() {
   const { token } = useAuth() as any
   return useMemo(() => {
     const h = () => ({ Authorization: `Bearer ${token || localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' })
-    const get = (p: string) => fetch(`${API}${p}`, { headers: h() }).then(r => r.json())
-    const post = (p: string, b?: any) => fetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
-    const del = (p: string) => fetch(`${API}${p}`, { method: 'DELETE', headers: h() })
+    const get = (p: string) => apiFetch(`${API}${p}`, { headers: h() }).then(r => r.json())
+    const post = (p: string, b?: any) => apiFetch(`${API}${p}`, { method: 'POST', headers: h(), body: b ? JSON.stringify(b) : undefined }).then(r => r.json())
+    const del = (p: string) => apiFetch(`${API}${p}`, { method: 'DELETE', headers: h() })
     return { get, post, del, token: token || localStorage.getItem('ea_token') || '' }
   }, [token])
 }
@@ -281,7 +282,7 @@ function MeetingAssistant({ api, architects }: { api: any, architects: any[] }) 
     fd.append('language', transcriptLang)
     setAnalyzing(true)
     const token = localStorage.getItem('ea_token') || ''
-    const res = await fetch(`${process.env.REACT_APP_API_URL||'https://archmindworks.com/api/v1'}/copilot/meetings/${selected.id}/transcript/audio`, { method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:fd })
+    const res = await apiFetch(`${process.env.REACT_APP_API_URL||'https://archmindworks.com/api/v1'}/copilot/meetings/${selected.id}/transcript/audio`, { method:'POST', headers:{ Authorization:`Bearer ${token}` }, body:fd })
     const data = await res.json()
     if (data?.content) {
       const updated = await api.get(`/copilot/meetings/${selected.id}`)
@@ -861,7 +862,7 @@ export default function CopilotPage() {
 
   // ── Stream SSE helper ─────────────────────────────────────────────────────
   const streamSse = useCallback(async (endpoint: string, body: any, onChunk: (d: any) => void) => {
-    const res = await fetch(`${API}${endpoint}`, {
+    const res = await apiFetch(`${API}${endpoint}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${api.token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -926,7 +927,7 @@ export default function CopilotPage() {
       if (voiceLanguage) fd.append('language', voiceLanguage)
       fd.append('ttsEnabled', ttsEnabled ? 'true' : 'false')
 
-      const res = await fetch(`${API}/copilot/voice/turn`, {
+      const res = await apiFetch(`${API}/copilot/voice/turn`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${api.token}` },
         body: fd,

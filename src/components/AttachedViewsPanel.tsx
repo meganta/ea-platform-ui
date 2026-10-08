@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import React, { useState, useEffect } from 'react'
 
 const S_LOCAL = {
@@ -11,7 +12,7 @@ const S_LOCAL = {
 // time." Attaches at the review level (not per-finding in this round -
 // the backend supports findingId scoping, a per-finding UI is a natural
 // follow-up but a separate, smaller addition once this base flow is in
-// place). Uses this page's own raw fetch(apiUrl, token) convention
+// place). Uses this page's own raw apiFetch(apiUrl, token) convention
 // rather than the shared api helper used elsewhere in this app, to stay
 // consistent with the rest of GovernancePage.tsx/ReportView, which
 // already does the same.
@@ -26,7 +27,7 @@ export function AttachedViewsPanel({ reviewId, apiUrl, token, isAR }: { reviewId
 
   const load = () => {
     setLoading(true)
-    fetch(`${apiUrl}/governance/reviews/${reviewId}/attached-views`, { headers: { Authorization: `Bearer ${token()}` } })
+    apiFetch(`${apiUrl}/governance/reviews/${reviewId}/attached-views`, { headers: { Authorization: `Bearer ${token()}` } })
       .then(r => r.json())
       .then((d: any) => setAttachments(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false))
@@ -35,7 +36,7 @@ export function AttachedViewsPanel({ reviewId, apiUrl, token, isAR }: { reviewId
 
   const openPicker = () => {
     setShowPicker(true)
-    fetch(`${apiUrl}/ea-views`, { headers: { Authorization: `Bearer ${token()}` } })
+    apiFetch(`${apiUrl}/ea-views`, { headers: { Authorization: `Bearer ${token()}` } })
       .then(r => r.json())
       .then((d: any) => setAvailableViews(Array.isArray(d) ? d : []))
   }
@@ -44,7 +45,7 @@ export function AttachedViewsPanel({ reviewId, apiUrl, token, isAR }: { reviewId
     if (!selectedViewId) return
     setAttaching(true)
     try {
-      await fetch(`${apiUrl}/governance/reviews/${reviewId}/attached-views`, {
+      await apiFetch(`${apiUrl}/governance/reviews/${reviewId}/attached-views`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
         body: JSON.stringify({ viewId: selectedViewId, note: note.trim() || undefined }),
@@ -60,7 +61,7 @@ export function AttachedViewsPanel({ reviewId, apiUrl, token, isAR }: { reviewId
 
   const detach = async (attachmentId: string) => {
     if (!window.confirm(isAR ? 'إزالة هذا المرفق؟' : 'Remove this attached view?')) return
-    await fetch(`${apiUrl}/governance/reviews/${reviewId}/attached-views/${attachmentId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
+    await apiFetch(`${apiUrl}/governance/reviews/${reviewId}/attached-views/${attachmentId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
     load()
   }
 

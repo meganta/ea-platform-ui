@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 import { useEffect, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../../components/HelpTip'
@@ -13,7 +14,7 @@ const PROVIDER_NAME: Record<string, string> = { ANTHROPIC: 'Anthropic', OPENAI: 
 const isOverride = (p: Provider) => p === 'ANTHROPIC' || p === 'OPENAI'
 
 async function call(path: string, init: RequestInit = {}) {
-  const r = await fetch(`${SETTINGS_API_URL}${path}`, { ...init, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' } })
+  const r = await apiFetch(`${SETTINGS_API_URL}${path}`, { ...init, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' } })
   const body = await r.json().catch(() => null)
   if (!r.ok) throw new Error(body?.message ? (Array.isArray(body.message) ? body.message.join(', ') : body.message) : `HTTP ${r.status}`)
   return body

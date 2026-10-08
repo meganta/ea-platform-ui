@@ -1,3 +1,4 @@
+import { apiFetch } from '../../../lib/session'
 // Government Outreach client (backend `/owner/outreach/*`, platform owners
 // only; see ea-platform docs/platform-owner/outreach). The server enforces
 // every permission and every outreach gate; this client only calls it.
@@ -18,12 +19,12 @@ export const outreachApi = {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('makeDefault', String(makeDefault))
-    return fetch(`${API_BASE}/owner/outreach/materials`, { method: 'POST', headers: { Authorization: `Bearer ${getToken() || ''}` }, body: fd }).then(handle)
+    return apiFetch(`${API_BASE}/owner/outreach/materials`, { method: 'POST', headers: { Authorization: `Bearer ${getToken() || ''}` }, body: fd }).then(handle)
   },
   setDefaultMaterial: (id: string) => call('PUT', `/owner/outreach/materials/${id}/default`),
   archiveMaterial: (id: string) => call('DELETE', `/owner/outreach/materials/${id}`),
   downloadMaterial: async (id: string, fileName: string) => {
-    const r = await fetch(`${API_BASE}/owner/outreach/materials/${id}/content`, { headers: { Authorization: `Bearer ${getToken() || ''}` } })
+    const r = await apiFetch(`${API_BASE}/owner/outreach/materials/${id}/content`, { headers: { Authorization: `Bearer ${getToken() || ''}` } })
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     const url = URL.createObjectURL(await r.blob())
     const a = document.createElement('a')

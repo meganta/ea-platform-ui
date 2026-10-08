@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 /** Client and types for an EA Repository object's Meta Model-driven profile (view + edit). */
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
@@ -34,7 +35,7 @@ export interface AssetProfile {
 
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = localStorage.getItem('ea_token')
-  const res = await fetch(`${API_URL}${path}`, { ...init, headers: { Authorization: `Bearer ${token || ''}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(init.headers || {}) } })
+  const res = await apiFetch(`${API_URL}${path}`, { ...init, headers: { Authorization: `Bearer ${token || ''}`, ...(init.body ? { 'Content-Type': 'application/json' } : {}), ...(init.headers || {}) } })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(Array.isArray(data.message) ? data.message.join('; ') : data.message || `HTTP ${res.status}`)
   return data as T

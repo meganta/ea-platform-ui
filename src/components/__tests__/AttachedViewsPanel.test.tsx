@@ -96,8 +96,8 @@ describe('AttachedViewsPanel', () => {
       expect(postCall).toBeDefined();
       expect(JSON.parse(postCall[1].body)).toEqual({ viewId: 'v1', note: 'For reference' });
     });
+    await waitFor(() => expect(screen.queryByText('Select a view...')).not.toBeInTheDocument());
     expect(await screen.findByText('App Landscape')).toBeInTheDocument();
-    expect(screen.queryByText('Select a view...')).not.toBeInTheDocument(); // picker closed
   });
 
   it('removing an attachment asks for confirmation and does not call DELETE when cancelled', async () => {

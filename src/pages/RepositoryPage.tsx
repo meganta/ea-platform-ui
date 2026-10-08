@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
@@ -113,15 +114,15 @@ function getRepositoryAssetTypes(config: any, domain: string): string[] {
 function useApi() {
   return useMemo(() => {
     const token = () => localStorage.getItem('ea_token')
-    const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
-    const post = (path: string, body: any) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
-    const put = (path: string, body: any) => fetch(`${API_URL}${path}`, { method: 'PUT', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
-    const del = (path: string) => fetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
+    const get = (path: string) => apiFetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
+    const post = (path: string, body: any) => apiFetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
+    const put = (path: string, body: any) => apiFetch(`${API_URL}${path}`, { method: 'PUT', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(r => r.json())
+    const del = (path: string) => apiFetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
     const upload = (path: string, file: File) => {
       const fd = new FormData(); fd.append('file', file)
-      return fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).then(r => r.json())
+      return apiFetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: fd }).then(r => r.json())
     }
-    const download = (path: string, name: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.blob()).then(blob => {
+    const download = (path: string, name: string) => apiFetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.blob()).then(blob => {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url; a.download = name; a.click()
       URL.revokeObjectURL(url)

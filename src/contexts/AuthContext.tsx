@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { api, setToken, clearToken, getToken } from '../lib/api'
+import { api, setToken, setSession, clearToken, getToken } from '../lib/api'
+import { SESSION_ENDED } from '../lib/session'
 
 export interface User {
   userId: string
@@ -43,6 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [permissions, setPermissions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  useEffect(() => {
+    const ended = () => { setUser(null); setPermissions([]) }
+    const storage = (event: StorageEvent) => { if (event.key === 'ea_token' && !event.newValue) ended() }
+    window.addEventListener(SESSION_ENDED, ended)
+    window.addEventListener('storage', storage)
+    return () => { window.removeEventListener(SESSION_ENDED, ended); window.removeEventListener('storage', storage) }
+  }, [])
 
   const loadPermissions = useCallback(async () => {
     try {
@@ -68,20 +76,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadPermissions])
 
   const login = async (email: string, password: string, tenantSlug: string) => {
-    const { accessToken } = await api.login(email, password, tenantSlug)
+    const { accessToken, refreshToken } = await api.login(email, password, tenantSlug)
     localStorage.removeItem(OWNER_TOKEN_KEY)
-    setToken(accessToken)
+    localStorage.removeItem('ea_owner_refresh_token')
+    setSession(accessToken, refreshToken)
     const me = await api.me()
     setUser(me)
     await loadPermissions()
     return me
   }
 
-  const logout = () => { clearToken(); localStorage.removeItem(OWNER_TOKEN_KEY); setUser(null); setPermissions([]) }
+  const logout = () => {
+    const refreshToken = localStorage.getItem('ea_refresh_token') || localStorage.getItem('ea_owner_refresh_token')
+    clearToken(); localStorage.removeItem(OWNER_TOKEN_KEY); localStorage.removeItem('ea_owner_refresh_token'); setUser(null); setPermissions([])
+    if (refreshToken) api.logout(refreshToken).catch(() => {})
+  }
 
   const enterTenant = async (delegatedToken: string) => {
     const ownerToken = getToken()
     if (ownerToken && !localStorage.getItem(OWNER_TOKEN_KEY)) localStorage.setItem(OWNER_TOKEN_KEY, ownerToken)
+    const ownerRefresh = localStorage.getItem('ea_refresh_token')
+    if (ownerRefresh) localStorage.setItem('ea_owner_refresh_token', ownerRefresh)
+    localStorage.removeItem('ea_refresh_token')
     setToken(delegatedToken)
     const me = await api.me()
     setUser(me)
@@ -91,9 +107,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const exitTenant = async () => {
     try { await api.exitOwnerAccess() } catch { /* session may already be over: the server refuses the token anyway */ }
     const ownerToken = localStorage.getItem(OWNER_TOKEN_KEY)
+    const ownerRefresh = localStorage.getItem('ea_owner_refresh_token')
     localStorage.removeItem(OWNER_TOKEN_KEY)
+    localStorage.removeItem('ea_owner_refresh_token')
     if (!ownerToken) { logout(); return }
-    setToken(ownerToken)
+    if (ownerRefresh) setSession(ownerToken, ownerRefresh)
+    else setToken(ownerToken)
     try {
       const me = await api.me()
       setUser(me)

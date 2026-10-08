@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import { useAuth } from './AuthContext'
 import { API_BASE, getToken } from '../lib/api'
@@ -48,7 +49,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const load = useCallback(() => {
     if (!user) { setBranding(null); return }
     setLoading(true)
-    fetch(`${API_BASE}/branding`, { headers: { Authorization: `Bearer ${getToken()}` } })
+    apiFetch(`${API_BASE}/branding`, { headers: { Authorization: `Bearer ${getToken()}` } })
       .then(r => r.ok ? r.json() : null)
       .then((b: Branding | null) => {
         setBranding(b)

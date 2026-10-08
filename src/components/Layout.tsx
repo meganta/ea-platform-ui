@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
@@ -76,7 +77,7 @@ export default function Layout() {
     if (setupChecked || location.pathname === '/getting-started') return
     const token = localStorage.getItem('ea_token')
     if (!token) return
-    fetch(`${API_URL}/setup/profile`, { headers: { Authorization: `Bearer ${token}` } })
+    apiFetch(`${API_URL}/setup/profile`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(profile => {
         setSetupChecked(true)
@@ -206,6 +207,7 @@ export default function Layout() {
           <button onClick={()=>setLocale(locale==='EN'?'AR':'EN')} style={{width:'100%',padding:'6px',background:'rgba(3,105,161,0.1)',border:'1px solid var(--border)',borderRadius:'var(--radius)',color:'var(--accent)',fontSize:12,marginBottom:6,cursor:'pointer'}}>
             🌐 {locale==='EN'?'العربية':'English'}
           </button>
+          <NavLink to="/account/password" className="nav-item" style={{ marginBottom: 6 }}>{locale === 'AR' ? 'تغيير كلمة المرور' : 'Change password'}</NavLink>
           <button className="logout-btn" onClick={()=>{logout();nav('/login')}}>{t('auth.signout')}</button>
         </div>
       </div>

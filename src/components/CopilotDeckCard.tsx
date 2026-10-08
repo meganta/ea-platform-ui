@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from './HelpTip'
@@ -36,7 +37,7 @@ export default function CopilotDeckCard({ attachment: a, conversationId }: { att
     if (!conversationId) { setError(t('copilot.deck.no_conversation')); return }
     setBusy(true); setError(null)
     try {
-      const res = await fetch(`${API}/copilot/conversations/${encodeURIComponent(conversationId)}/decks/${encodeURIComponent(a.id)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+      const res = await apiFetch(`${API}/copilot/conversations/${encodeURIComponent(conversationId)}/decks/${encodeURIComponent(a.id)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
       if (!res.ok) throw new Error(String(res.status))
       saveBlob(await res.blob(), exportFileName(a.title, 'ArchMind_deck', a.language === 'AR' ? 'ar' : 'en', 'pptx'))
     } catch {

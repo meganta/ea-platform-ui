@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { API_BASE } from '../lib/api'
@@ -31,7 +32,7 @@ export default function SharedViewPage() {
 
   useEffect(() => {
     if (!token) return
-    fetch(`${API_BASE}/ea-views/shared/${encodeURIComponent(token)}`)
+    apiFetch(`${API_BASE}/ea-views/shared/${encodeURIComponent(token)}`)
       .then(async r => {
         if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.message || 'This share link is invalid or has expired.') }
         return r.json()

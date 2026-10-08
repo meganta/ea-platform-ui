@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 import { useEffect, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import { useBranding } from '../../contexts/BrandingContext'
@@ -5,7 +6,7 @@ import HelpTip from '../../components/HelpTip'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
-  fetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
+  apiFetch(`${API_URL}${path}`, { ...opts, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json', ...(opts.headers || {}) } }).then(r => r.json())
 
 // The legacy "Sector" selector was removed (BCM Phase 1.1): it mixed
 // organization type with industry and silently saved GOVERNMENT for any
@@ -333,7 +334,7 @@ function OrgBrandingSection() {
     try {
       const body = new FormData()
       body.append('file', file)
-      const res = await fetch(`${API_URL}/branding/${kind}`, {
+      const res = await apiFetch(`${API_URL}/branding/${kind}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }, // no Content-Type — browser sets multipart boundary itself
         body,

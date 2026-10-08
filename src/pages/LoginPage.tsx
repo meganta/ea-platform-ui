@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useState, FormEvent, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -38,7 +39,7 @@ export default function LoginPage() {
     if (debounceRef.current) clearTimeout(debounceRef.current)
     if (!slug) { setOrgBranding(null); return }
     debounceRef.current = setTimeout(() => {
-      fetch(`${API_BASE}/public/branding/${encodeURIComponent(slug)}`)
+      apiFetch(`${API_BASE}/public/branding/${encodeURIComponent(slug)}`)
         .then(r => r.ok ? r.json() : null)
         .then(b => { setOrgBranding(b); setLogoFailed(false) })
         .catch(() => setOrgBranding(null))

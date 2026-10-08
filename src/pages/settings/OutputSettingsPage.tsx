@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 import { useState, useEffect } from 'react'
 import { authFetch, SETTINGS_API_URL } from './shared'
 
@@ -37,7 +38,7 @@ function TemplateSection() {
     setBusy(true); setMsg('')
     try {
       const body = new FormData(); body.append('file', file); body.append('format', format); body.append('name', file.name.replace(/\.(pptx|docx)$/i, ''))
-      const res = await fetch(`${SETTINGS_API_URL}/output-studio/templates/upload`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }, body })
+      const res = await apiFetch(`${SETTINGS_API_URL}/output-studio/templates/upload`, { method: 'POST', headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}` }, body })
       if (!res.ok) throw new Error((await res.json().catch(() => null))?.message || 'Upload failed')
       setFile(null); setMsg('Template uploaded and set as the tenant default.'); await load()
     } catch (e: any) { setMsg(e.message) } finally { setBusy(false) }

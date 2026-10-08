@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState, useRef } from 'react'
 import { useLang } from '../contexts/LangContext'
 import { api } from '../lib/api'
@@ -33,7 +34,7 @@ export default function KnowledgePage() {
     try {
       const token = localStorage.getItem('ea_token')
       if (!token) throw new Error('Not authenticated — please log in again')
-      const res = await fetch(`${API_URL}/knowledge/documents/upload`, {
+      const res = await apiFetch(`${API_URL}/knowledge/documents/upload`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: fd,
@@ -58,7 +59,7 @@ export default function KnowledgePage() {
     setDeleting(id)
     try {
       const token = localStorage.getItem('ea_token')
-      await fetch(`${API_URL}/knowledge/documents/${id}`, {
+      await apiFetch(`${API_URL}/knowledge/documents/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` },
       })

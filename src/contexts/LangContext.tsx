@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 /**
  * LOCALIZATION PROVIDER
  * 
@@ -2557,7 +2558,7 @@ export function LangProvider({ children }: { children: React.ReactNode }) {
     try {
       const token = localStorage.getItem('ea_token')
       if (!token) return
-      const res = await fetch(`${API_URL}/localization/ui-dictionary`, {
+      const res = await apiFetch(`${API_URL}/localization/ui-dictionary`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       if (res.ok) {

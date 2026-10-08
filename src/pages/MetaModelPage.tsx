@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
@@ -29,10 +30,10 @@ function makeMetaApi(token?: string) {
     if (!res.ok) throw new Error((data && data.message) || `HTTP ${res.status}`)
     return data
   }
-  const get = (path: string) => fetch(`${API}${path}`, { headers: authHeader }).then(handle)
-  const post = (path: string, body?: any) => fetch(`${API}${path}`, { method: 'POST', headers: authHeader, body: body ? JSON.stringify(body) : undefined }).then(handle)
-  const put = (path: string, body: any) => fetch(`${API}${path}`, { method: 'PUT', headers: authHeader, body: JSON.stringify(body) }).then(handle)
-  const del = (path: string) => fetch(`${API}${path}`, { method: 'DELETE', headers: authHeader }).then(handle)
+  const get = (path: string) => apiFetch(`${API}${path}`, { headers: authHeader }).then(handle)
+  const post = (path: string, body?: any) => apiFetch(`${API}${path}`, { method: 'POST', headers: authHeader, body: body ? JSON.stringify(body) : undefined }).then(handle)
+  const put = (path: string, body: any) => apiFetch(`${API}${path}`, { method: 'PUT', headers: authHeader, body: JSON.stringify(body) }).then(handle)
+  const del = (path: string) => apiFetch(`${API}${path}`, { method: 'DELETE', headers: authHeader }).then(handle)
   return { get, post, put, del }
 }
 
@@ -1058,7 +1059,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
     setLoading(true)
     const fd = new FormData(); fd.append('file', file)
     const token = localStorage.getItem('ea_token') || ''
-    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/meta-model/import/validate`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+    const res = await apiFetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/meta-model/import/validate`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
     const data = await res.json()
     setValidationResult(data)
     setStep('validate')
@@ -1070,7 +1071,7 @@ function ImportWizard({ api, onDone }: { api: any, onDone: () => void }) {
     setLoading(true)
     const fd = new FormData(); fd.append('file', file); fd.append('mode', mode)
     const token = localStorage.getItem('ea_token') || ''
-    const res = await fetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/meta-model/import`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
+    const res = await apiFetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/meta-model/import`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd })
     const data = await res.json()
     setResult(data); setStep('done')
     setLoading(false)
@@ -1215,7 +1216,7 @@ function ExportPanel({ api }: { api: any }) {
   const download = async (fmt: 'json' | 'csv') => {
     const token = localStorage.getItem('ea_token') || ''
     const base = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    const res = await fetch(`${base}/meta-model/export/${fmt}`, { headers: { Authorization: `Bearer ${token}` } })
+    const res = await apiFetch(`${base}/meta-model/export/${fmt}`, { headers: { Authorization: `Bearer ${token}` } })
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = `meta-model.${fmt}`; document.body.appendChild(a); a.click()

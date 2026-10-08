@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 import { useState, useEffect } from 'react'
 import { authFetch } from './shared'
 
@@ -40,7 +41,7 @@ function NotificationsSection() {
     if (!form.webhookUrl) { setMsg({ type: 'error', text: 'Enter a webhook URL first' }); return }
     setTesting(true); setMsg(null)
     try {
-      await fetch(form.webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'test', platform: 'ArchMind EA', timestamp: new Date().toISOString() }) })
+      await apiFetch(form.webhookUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'test', platform: 'ArchMind EA', timestamp: new Date().toISOString() }) })
       setMsg({ type: 'success', text: 'Test webhook sent' })
     } catch { setMsg({ type: 'error', text: 'Webhook delivery failed — check the URL' }) }
     finally { setTesting(false) }

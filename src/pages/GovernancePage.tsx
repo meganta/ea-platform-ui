@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import GovernanceExportDialog, { GovernanceExportFormat } from '../components/GovernanceExportDialog'
 import React, { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -15,11 +16,11 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/
 
 function useApi() {
   const token = () => localStorage.getItem('ea_token')
-  const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
-  const post = (path: string, body?: any) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
-  const patch = (path: string, body?: any) => fetch(`${API_URL}${path}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
-  const postFile = (path: string, form: FormData) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form }).then(r => r.json())
-  const del = (path: string) => fetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
+  const get = (path: string) => apiFetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
+  const post = (path: string, body?: any) => apiFetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
+  const patch = (path: string, body?: any) => apiFetch(`${API_URL}${path}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
+  const postFile = (path: string, form: FormData) => apiFetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form }).then(r => r.json())
+  const del = (path: string) => apiFetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
   return { get, post, patch, postFile, del }
 }
 
@@ -296,7 +297,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
     try {
       const token = localStorage.getItem('ea_token') || ''
       const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-      const res = await fetch(`${apiUrl}/governance/reviews/${reviewId}/evidence?findingId=${f.id}`, { headers: { Authorization: `Bearer ${token}` } })
+      const res = await apiFetch(`${apiUrl}/governance/reviews/${reviewId}/evidence?findingId=${f.id}`, { headers: { Authorization: `Bearer ${token}` } })
       const data = await res.json().catch(() => [])
       setEvidence(Array.isArray(data) ? data : [])
       setEvidenceOpen(true)
@@ -311,7 +312,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
     try {
       const token = localStorage.getItem('ea_token') || ''
       const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-      await fetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
+      await apiFetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(draft),
       })
@@ -327,7 +328,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
     // Mark as REJECTED in DB — rescore excludes REJECTED findings
-    await fetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
+    await apiFetch(`${apiUrl}/governance/reviews/${reviewId}/findings/${f.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ status: 'REJECTED' }),
     }).catch(() => {})
@@ -797,7 +798,7 @@ export default function GovernancePage() {
 
     try {
       const url = API_URL + '/governance/reviews/' + review?.id + '/export/' + format + (langParam ? '?lang=' + langParam : '')
-      const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
+      const res = await apiFetch(url, { headers: { Authorization: 'Bearer ' + token }, cache: 'no-store' })
       clearInterval(progressTimer)
       if (!res.ok) {
         const errText = await res.text().catch(() => res.status.toString())
@@ -831,7 +832,7 @@ export default function GovernancePage() {
     try {
       const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
       const t = localStorage.getItem('ea_token') || ''
-      await fetch(`${apiUrl}/governance/reviews/${review?.id}/run`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } })
+      await apiFetch(`${apiUrl}/governance/reviews/${review?.id}/run`, { method: 'POST', headers: { Authorization: `Bearer ${t}` } })
       setView('progress')
     } catch { alert('Failed to re-run review') }
   }
@@ -1575,7 +1576,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
   React.useEffect(() => {
     let live = true
     if (report.reportView || !review?.reviewType) return
-    fetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/governance/report-profiles/${review.reviewType}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+    apiFetch(`${process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'}/governance/report-profiles/${review.reviewType}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
       .then(r => (r.ok ? r.json() : null)).then(p => { if (live && p && Array.isArray(p.excluded)) setProfile(p) }).catch(() => {})
     return () => { live = false }
   }, [review?.reviewType, report.reportView])
@@ -1601,7 +1602,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setSaving(true)
     try {
       // fieldPath can be 'executiveSummary' or 'complianceMatrix' etc
-      await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+      await apiFetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
         body: JSON.stringify({ [fieldPath]: value }),
@@ -1668,7 +1669,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setRescoreError(false)
     setRescoring(true)
     try {
-      const res = await fetch(`${apiUrl}/governance/reviews/${review.id}/rescore`, {
+      const res = await apiFetch(`${apiUrl}/governance/reviews/${review.id}/rescore`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token()}` },
       })
@@ -1717,7 +1718,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setOppDraft({})
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ financialOpportunities: { ...report.financialOpportunities, opportunities: newOpps } }),
     }).catch(() => {})
@@ -1728,7 +1729,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalOpps(newOpps)
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ financialOpportunities: { ...report.financialOpportunities, opportunities: newOpps } }),
     }).catch(() => {})
@@ -1739,7 +1740,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalCompliance(newItems)
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
     }).catch(() => {})
@@ -1750,7 +1751,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalCompliance(newItems)
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ complianceMatrix: { ...report.complianceMatrix, items: newItems } }),
     }).catch(() => {})
@@ -1771,7 +1772,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalObjectives(newObjs)
     const t2 = localStorage.getItem('ea_token') || ''
     const apiUrl2 = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
     }).catch(() => {})
@@ -1782,7 +1783,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalObjectives(newObjs)
     const t2 = localStorage.getItem('ea_token') || ''
     const apiUrl2 = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ strategicAlignment: { ...report.strategicAlignment, objectives: newObjs } }),
     }).catch(() => {})
@@ -1795,7 +1796,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalFutureAreas(newAreas)
     const t2 = localStorage.getItem('ea_token') || ''
     const apiUrl2 = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
     }).catch(() => {})
@@ -1806,7 +1807,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalFutureAreas(newAreas)
     const t2 = localStorage.getItem('ea_token') || ''
     const apiUrl2 = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl2}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t2}` },
       body: JSON.stringify({ futureStateAlignment: { ...report.futureStateAlignment, alignmentAreas: newAreas } }),
     }).catch(() => {})
@@ -1818,7 +1819,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalRisks(newRisks)
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
     }).catch(() => {})
@@ -1829,7 +1830,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
     setLocalRisks(newRisks)
     const token = localStorage.getItem('ea_token') || ''
     const apiUrl = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-    await fetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
+    await apiFetch(`${apiUrl}/governance/reviews/${review.id}/report`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ riskRegister: { ...report.riskRegister, risks: newRisks } }),
     }).catch(() => {})

@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useState, FormEvent } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
@@ -42,7 +43,7 @@ export default function RegisterPage() {
     if (!org.slug || org.slug.length < 3) return
     setSlugStatus('checking')
     try {
-      const r = await fetch(`${API_BASE}/registration/check-slug?slug=${org.slug}`)
+      const r = await apiFetch(`${API_BASE}/registration/check-slug?slug=${org.slug}`)
       const data = await r.json()
       setSlugStatus(data.available ? 'available' : 'taken')
     } catch {
@@ -70,7 +71,7 @@ export default function RegisterPage() {
     }
     setError(''); setLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/registration`, {
+      const res = await apiFetch(`${API_BASE}/registration`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

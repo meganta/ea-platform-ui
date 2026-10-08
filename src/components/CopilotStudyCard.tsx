@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 import HelpTip from './HelpTip'
@@ -67,7 +68,7 @@ export default function CopilotStudyCard({ attachment: a }: { attachment: Copilo
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/innovation/studies/${encodeURIComponent(a.studyId)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
+      const res = await apiFetch(`${API}/innovation/studies/${encodeURIComponent(a.studyId)}`, { headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}` } })
       if (res.ok) setStudy(await res.json())
     } catch { /* keep the last known state; the next poll retries */ }
     setNow(Date.now())

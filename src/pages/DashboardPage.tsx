@@ -1,3 +1,4 @@
+import { apiFetch } from '../lib/session'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
@@ -85,10 +86,10 @@ export default function DashboardPage() {
     if (canViewReviews) {
       const token = getToken() || ''
       // Load reviews list for recent reviews section
-      fetch(GOV_API + '/governance/reviews?page=1&limit=10', { headers: { Authorization: 'Bearer ' + token } })
+      apiFetch(GOV_API + '/governance/reviews?page=1&limit=10', { headers: { Authorization: 'Bearer ' + token } })
         .then(r => r.json()).then((r: any) => setReviews(Array.isArray(r?.data) ? r.data : (Array.isArray(r) ? r : []))).catch(() => {})
       // Load aggregated stats from dedicated endpoint
-      fetch(GOV_API + '/governance/stats', { headers: { Authorization: 'Bearer ' + token } })
+      apiFetch(GOV_API + '/governance/stats', { headers: { Authorization: 'Bearer ' + token } })
         .then(r => r.json()).then(setGovStats).catch(() => {})
     }
     // Each module below uses the SAME verified endpoint its own page
@@ -98,7 +99,7 @@ export default function DashboardPage() {
     // guessed) - never a new, unverified endpoint invented for this
     // dashboard specifically.
     const token = getToken() || ''
-    const authGet = (path: string) => fetch(GOV_API + path, { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json())
+    const authGet = (path: string) => apiFetch(GOV_API + path, { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json())
     if (canViewRepository) {
       authGet('/innovation/ideas').then((d: any) => setInnovationIdeas(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
       authGet('/ea-planning/dashboard').then(setPlanningDashboard).catch(() => {})

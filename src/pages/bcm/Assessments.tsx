@@ -1,3 +1,4 @@
+import { apiFetch } from '../../lib/session'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { useAuth } from '../../contexts/AuthContext'
@@ -11,7 +12,7 @@ import { ReportsPanel } from './Insights'
 const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 export async function api(method: string, path: string, body?: any) {
-  const res = await fetch(`${API}${path}`, {
+  const res = await apiFetch(`${API}${path}`, {
     method, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token')}`, 'Content-Type': 'application/json' },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   })
