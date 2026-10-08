@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../../components/HelpTip'
-import { ownerApi, fmtDate, levelText } from './ownerApi'
+import { ownerApi, fmtDate, levelText, PACK_INDUSTRIES } from './ownerApi'
 import { ErrorBox, Header, Loading } from './ownerUi'
 import { TenantTable } from './OwnerDashboardPage'
 
@@ -116,7 +116,7 @@ export function CreateTenantModal({ onClose, onCreated, initial, onSubmit, extra
   initial?: Record<string, any>; onSubmit?: (dto: any) => Promise<any>; extra?: React.ReactNode; hideAdmin?: boolean
 }) {
   const { t } = useLang()
-  const [form, setForm] = useState<any>({ organizationName: '', organizationNameAr: '', officialWebsite: '', country: 'Saudi Arabia', sector: '', organizationType: 'GOVERNMENT', frameworkType: 'NORA', locale: 'AR', slug: '', adminEmail: '', adminFullName: '', startDiscovery: true, ...(initial || {}) })
+  const [form, setForm] = useState<any>({ organizationName: '', organizationNameAr: '', officialWebsite: '', country: 'Saudi Arabia', sector: '', organizationType: 'GOVERNMENT', frameworkType: 'NORA', locale: 'AR', slug: '', adminEmail: '', adminFullName: '', startDiscovery: true, industry: '', referencePack: true, ...(initial || {}) })
   const [more, setMore] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -134,6 +134,7 @@ export function CreateTenantModal({ onClose, onCreated, initial, onSubmit, extra
     const dto: any = {}
     for (const [k, v] of Object.entries(form)) if (v !== '' && v !== null) dto[k] = v
     if (!form.officialWebsite) dto.startDiscovery = false
+    if (form.frameworkType !== 'NORA' || form.organizationType === 'PRIVATE') { delete dto.industry; delete dto.referencePack }
     try { setResult(await (onSubmit ? onSubmit(dto) : ownerApi.createTenant(dto))) } catch (err: any) { setError(err.message) } finally { setBusy(false) }
   }
   return (
@@ -171,6 +172,23 @@ export function CreateTenantModal({ onClose, onCreated, initial, onSubmit, extra
                 {['GOVERNMENT', 'SEMI_GOVERNMENT', 'PRIVATE'].map(o => <option key={o} value={o}>{t(`owner.create.org_type.${o}`)}</option>)}
               </select>
             </div>
+            {form.frameworkType === 'NORA' && form.organizationType !== 'PRIVATE' && (
+              <>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="owner-create-industry">{t('owner.create.industry')}<HelpTip text={t('owner.create.industry_help')} /></label>
+                  <select id="owner-create-industry" className="form-input" value={form.industry} onChange={e => set('industry', e.target.value)}>
+                    <option value="">{t('owner.pack.industry_detect')}</option>
+                    {PACK_INDUSTRIES.map(c => <option key={c} value={c}>{t(`owner.pack.industry.${c}`)}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
+                    <input id="owner-create-pack" type="checkbox" checked={form.referencePack} onChange={e => set('referencePack', e.target.checked)} />
+                    <span>{t('owner.create.reference_pack')}<span className="oc-muted" style={{ display: 'block' }}>{t('owner.create.reference_pack_help')}</span></span>
+                  </label>
+                </div>
+              </>
+            )}
             <div className="form-group">
               <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13 }}>
                 <input id="owner-create-discover" type="checkbox" checked={form.startDiscovery} onChange={e => set('startDiscovery', e.target.checked)} />

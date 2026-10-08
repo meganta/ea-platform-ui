@@ -28,7 +28,7 @@ export default function OwnerSettingsPage() {
             <h3>{t('owner.enrich.title')}</h3>
             <dl className="oc-kv">
               <dt>{t('owner.settings.web_search')}</dt>
-              <dd><Pill text={me.capabilities.webSearch ? t('owner.settings.enabled') : t('owner.settings.disabled')} color={me.capabilities.webSearch ? 'var(--success)' : 'var(--text-dim)'} /></dd>
+              <dd><Pill text={me.capabilities.webSearch ? t('owner.settings.enabled') : t('owner.settings.disabled')} color={me.capabilities.webSearch ? 'var(--success)' : 'var(--text-dim)'} />{me.capabilities.webSearchDetail && <div className="oc-muted" style={{ marginTop: 4 }}>{me.capabilities.webSearchDetail}</div>}</dd>
               <dt>{t('owner.settings.ttl')}</dt><dd>{fill(t('owner.settings.minutes'), { n: me.capabilities.accessTtlMinutes })}</dd>
               <dt>{t('owner.enrich.scopes')}</dt><dd>{me.capabilities.enrichmentScopes.map((s: string) => t(`owner.enrich.scope.${s}`)).join(', ')}</dd>
             </dl>
