@@ -118,10 +118,38 @@ describe('OwnerTenantsPage', () => {
     fireEvent.change(screen.getByLabelText('owner.create.website'), { target: { value: 'new.gov.sa' } });
     fireEvent.click(screen.getByRole('button', { name: 'owner.create.submit' }));
     await waitFor(() => expect(api.createTenant).toHaveBeenCalled());
-    expect(api.createTenant.mock.calls[0][0]).toMatchObject({ organizationName: 'New Authority', officialWebsite: 'new.gov.sa', startDiscovery: true, frameworkType: 'NORA' });
+    expect(api.createTenant.mock.calls[0][0]).toMatchObject({ organizationName: 'New Authority', officialWebsite: 'new.gov.sa', startDiscovery: true, frameworkType: 'NORA', referencePack: true });
+    expect(api.createTenant.mock.calls[0][0].industry).toBeUndefined();
     expect(await screen.findByText(/NORA_2_0 published/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'owner.create.open' }));
     expect(mockNavigate).toHaveBeenCalledWith('/owner/tenants/new?tab=enrichment');
+  });
+
+  it('a government organization can be given its industry for its reference pack', async () => {
+    api.tenants.mockResolvedValue([]);
+    api.createTenant.mockResolvedValue({ tenant: { id: 'n', name: 'X', slug: 'x' }, provisioning: { referencePack: { status: 'DONE', detail: '9 reference models and architectures' } } });
+    mockSearch = new URLSearchParams('create=1');
+    render(<OwnerTenantsPage />);
+    fireEvent.change(screen.getByLabelText('owner.create.name'), { target: { value: 'Health Org' } });
+    fireEvent.change(screen.getByLabelText(/owner.create.industry/, { selector: 'select' }), { target: { value: 'GOV_HEALTH' } });
+    fireEvent.click(screen.getByRole('button', { name: 'owner.create.submit' }));
+    await waitFor(() => expect(api.createTenant).toHaveBeenCalled());
+    expect(api.createTenant.mock.calls[0][0]).toMatchObject({ industry: 'GOV_HEALTH', referencePack: true });
+    expect(await screen.findByText(/9 reference models and architectures/)).toBeInTheDocument();
+  });
+
+  it('hides the reference pack choice for a private organization and does not send it', async () => {
+    api.tenants.mockResolvedValue([]);
+    api.createTenant.mockResolvedValue({ tenant: { id: 'n', name: 'X', slug: 'x' }, provisioning: {} });
+    mockSearch = new URLSearchParams('create=1');
+    render(<OwnerTenantsPage />);
+    fireEvent.change(screen.getByLabelText('owner.create.name'), { target: { value: 'X Co' } });
+    fireEvent.change(screen.getByLabelText('owner.create.org_type'), { target: { value: 'PRIVATE' } });
+    expect(screen.queryByLabelText(/owner.create.industry/, { selector: 'select' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'owner.create.submit' }));
+    await waitFor(() => expect(api.createTenant).toHaveBeenCalled());
+    expect(api.createTenant.mock.calls[0][0]).not.toHaveProperty('referencePack');
+    expect(api.createTenant.mock.calls[0][0]).not.toHaveProperty('industry');
   });
 
   it('does not ask for discovery without a portal', async () => {
@@ -231,6 +259,72 @@ describe('OwnerTenantDetailPage', () => {
     render(<OwnerTenantDetailPage />);
     expect(await screen.findByText(/6 journeys/)).toBeInTheDocument();
     expect(screen.getByText('10 of 12 applications have no link to a capability.')).toBeInTheDocument();
+  });
+});
+
+const PACK_PLAN = {
+  pack: { code: 'GOV_REFERENCE_PACK', version: '1.0' },
+  industry: { code: 'GOV_LABOR_HR', name: 'Labor / Human Resources', nameAr: 'العمل', basis: 'KEYWORDS', matched: ['human resources'] },
+  beneficiarySource: 'INDUSTRY_DEFAULT',
+  limitations: ['6 element(s) need a Meta Model concept the published Meta Model does not define'],
+  industries: [],
+  architectures: [
+    { role: 'BRM', code: 'NORA_BRM', kind: 'REFERENCE_MODEL', authorityLevel: 'NATIONAL', provenance: 'OFFICIAL_STANDARD', domainCode: 'BUSINESS', name: 'NORA Business Reference Model', nameAr: 'النموذج المرجعي للأعمال', description: 'Official map', descriptionAr: '', derivedFromCode: null, action: 'UP_TO_DATE', reason: null, counts: { elements: 2, resolved: 1, configurationRequired: 0, structural: 1 }, toWrite: 0,
+      elements: [{ stableKey: 'nora-adm', parentKey: null, kind: 'AREA', name: 'Administrative', nameAr: 'الإدارية', metaModelTypeCodes: [], metaModelStatus: 'STRUCTURAL', source: 'NORA_OFFICIAL', disposition: null, isNew: false }, { stableKey: 'nora-adm-str', parentKey: 'nora-adm', kind: 'CAPABILITY', name: 'Strategy', nameAr: 'الاستراتيجية', metaModelTypeCodes: ['GovCapability'], metaModelStatus: 'RESOLVED', source: 'NORA_OFFICIAL', disposition: null, isNew: false }] },
+    { role: 'BUSINESS_RA', code: 'ORG_BUSINESS_RA', kind: 'REFERENCE_ARCHITECTURE', authorityLevel: 'ORGANIZATION', provenance: 'ORGANIZATION_TAILORED', domainCode: 'BUSINESS', name: 'Fund Business Reference Architecture', nameAr: '', description: 'Tailors', descriptionAr: '', derivedFromCode: 'NORA_BRM', action: 'CREATE', reason: null, counts: { elements: 1, resolved: 1, configurationRequired: 0, structural: 0 }, toWrite: 1,
+      elements: [{ stableKey: 'lab-emp', parentKey: null, kind: 'CAPABILITY', name: 'Employment Support', nameAr: 'دعم التوظيف', metaModelTypeCodes: ['GovCapability'], metaModelStatus: 'RESOLVED', source: 'INDUSTRY_CATALOGUE', disposition: 'EXTENDED', isNew: true }] },
+    { role: 'BENEFICIARY_RA', code: 'ORG_BENEFICIARY_RA', kind: 'REFERENCE_ARCHITECTURE', authorityLevel: 'ORGANIZATION', provenance: 'ORGANIZATION_TAILORED', domainCode: 'BENEFICIARY', name: 'Fund Beneficiary Reference Architecture', nameAr: '', description: '', descriptionAr: '', derivedFromCode: 'NORA_BXRM_BASELINE', action: 'SKIPPED', reason: 'LATEST_VERSION_ACTIVE', counts: { elements: 0, resolved: 0, configurationRequired: 0, structural: 0 }, toWrite: 0, elements: [] },
+  ],
+};
+
+describe('ReferencePackPanel', () => {
+  beforeEach(() => {
+    mockParams = { tenantId: 't1', tab: 'reference' };
+    api.tenant.mockResolvedValue(DETAIL);
+    api.me.mockResolvedValue({ capabilities: { webSearch: true } });
+  });
+
+  it('shows the plan with the detected industry, sources and what will happen', async () => {
+    api.referencePack.mockResolvedValue(PACK_PLAN);
+    render(<OwnerTenantDetailPage />);
+    expect(await screen.findByText('NORA Business Reference Model')).toBeInTheDocument();
+    expect(api.referencePack).toHaveBeenCalledWith('t1', { industry: undefined });
+    expect(screen.getAllByText('owner.pack.industry.GOV_LABOR_HR').length).toBeGreaterThan(0);
+    expect(screen.getByText(/owner.pack.basis.KEYWORDS \(human resources\)/)).toBeInTheDocument();
+    expect(screen.getByText('owner.pack.beneficiaries.INDUSTRY_DEFAULT')).toBeInTheDocument();
+    expect(screen.getByText('owner.pack.provenance.OFFICIAL_STANDARD')).toBeInTheDocument();
+    expect(screen.getByText('owner.pack.action.CREATE')).toBeInTheDocument();
+    expect(screen.getByText('owner.pack.action.SKIPPED: owner.pack.reason.LATEST_VERSION')).toBeInTheDocument();
+    expect(screen.getByText(/6 element\(s\) need a Meta Model concept/)).toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '▾' })[1]);
+    expect(await screen.findByText('Employment Support')).toBeInTheDocument();
+    expect(screen.getByText(/owner.pack.source.INDUSTRY_CATALOGUE/)).toBeInTheDocument();
+  });
+
+  it('choosing an industry re-plans; preparing sends the industry and activation choices', async () => {
+    api.referencePack.mockResolvedValue(PACK_PLAN);
+    api.applyReferencePack.mockResolvedValue({ results: [{ action: 'CREATED' }, { action: 'ELEMENTS_ADDED' }, { action: 'UP_TO_DATE' }] });
+    render(<OwnerTenantDetailPage />);
+    await screen.findByText('NORA Business Reference Model');
+    fireEvent.change(screen.getByLabelText(/owner.pack.industry_help|owner.pack.industry/, { selector: 'select' }), { target: { value: 'GOV_EDUCATION' } });
+    await waitFor(() => expect(api.referencePack).toHaveBeenLastCalledWith('t1', { industry: 'GOV_EDUCATION' }));
+    fireEvent.click(screen.getByLabelText(/owner.pack.activate_archs/));
+    fireEvent.click(screen.getByRole('button', { name: 'owner.pack.prepare' }));
+    await waitFor(() => expect(api.applyReferencePack).toHaveBeenCalledWith('t1', { industry: 'GOV_EDUCATION', activateModels: true, activateArchitectures: true }));
+    expect(await screen.findByText('owner.pack.done')).toBeInTheDocument();
+  });
+
+  it('nothing to prepare disables the button', async () => {
+    api.referencePack.mockResolvedValueOnce({ ...PACK_PLAN, architectures: [PACK_PLAN.architectures[0]] });
+    render(<OwnerTenantDetailPage />);
+    await screen.findByText('NORA Business Reference Model');
+    expect(screen.getByRole('button', { name: 'owner.pack.prepare' })).toBeDisabled();
+  });
+
+  it('reports a planning failure', async () => {
+    api.referencePack.mockRejectedValue(new Error('Tenant not found'));
+    render(<OwnerTenantDetailPage />);
+    expect(await screen.findByText(/Tenant not found/)).toBeInTheDocument();
   });
 });
 
@@ -378,6 +472,17 @@ describe('AR/EN coverage', () => {
       'owner.priority.': ['HIGH', 'MEDIUM', 'LOW'],
       'owner.session.': ['ACTIVE', 'ENDED', 'EXPIRED'],
       'owner.status.': ['ACTIVE', 'SUSPENDED', 'OFFBOARDED'],
+      'owner.pack.industry.': ['GOV_LABOR_HR', 'GOV_HEALTH', 'GOV_EDUCATION', 'GOV_TRANSPORT', 'GOV_MUNICIPALITY', 'GOV_FINANCE', 'GOV_JUSTICE', 'GOV_REGULATORY', 'GOV_SOCIAL_DEVELOPMENT', 'GOV_STANDARDS_CONFORMITY', 'GOV_OTHER'],
+      'owner.pack.basis.': ['OWNER_CHOICE', 'PROFILE_CODE', 'KEYWORDS', 'DEFAULT'],
+      'owner.pack.beneficiaries.': ['REPOSITORY', 'INDUSTRY_DEFAULT'],
+      'owner.pack.kind.': ['REFERENCE_MODEL', 'REFERENCE_ARCHITECTURE'],
+      'owner.pack.provenance.': ['OFFICIAL_STANDARD', 'ARCHMIND_CURATED', 'ORGANIZATION_TAILORED'],
+      'owner.pack.action.': ['CREATE', 'ADD_MISSING', 'UP_TO_DATE', 'SKIPPED'],
+      'owner.pack.reason.': ['NO_PUBLISHED_META_MODEL', 'DOMAIN_NOT_IN_META_MODEL'],
+      'owner.pack.source.': ['NORA_OFFICIAL', 'ARCHMIND_CURATED', 'INDUSTRY_CATALOGUE', 'TENANT_REPOSITORY', 'PACK_STRUCTURE'],
+      'owner.pack.disposition.': ['ADOPTED', 'EXTENDED', 'PENDING_REVIEW', 'ADAPTED'],
+      'owner.detail.tab.': ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'recommendations', 'activity'],
+      'owner.create.step.': ['branding', 'profile', 'glossary', 'subscription', 'metaModel', 'referencePack', 'adminInvitation'],
     };
     const missing = Object.entries(families).flatMap(([p, ks]) => ks.map(k => p + k)).filter(k => !OWNER_TRANSLATIONS[k]);
     expect(missing).toEqual([]);

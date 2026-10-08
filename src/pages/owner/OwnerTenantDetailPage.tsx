@@ -7,9 +7,10 @@ import { ownerApi, fmtDate, VIEW_STATUS_COLOR } from './ownerApi'
 import { ErrorBox, fill, Header, Loading, Pill, StepUpModal } from './ownerUi'
 import { AdoptionPanel, BeneficiaryPanel, ConceptCounts, HealthPanel, MaturityPanel } from './AssessmentPanels'
 import EnrichmentPanel from './EnrichmentPanel'
+import ReferencePackPanel from './ReferencePackPanel'
 import { AuditTable, SessionsTable } from './OwnerAuditPage'
 
-export const DETAIL_TABS = ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'views', 'recommendations', 'activity'] as const
+export const DETAIL_TABS = ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'recommendations', 'activity'] as const
 
 export default function OwnerTenantDetailPage() {
   const { tenantId = '', tab: pathTab } = useParams()
@@ -60,6 +61,7 @@ export default function OwnerTenantDetailPage() {
       {tab === 'maturity' && (assessment ? <><MaturityPanel assessment={assessment} /><div className="oc-section oc-grid-2"><HealthPanel health={assessment.health} /><AdoptionPanel adoption={assessment.adoption} /></div></> : <Loading />)}
       {tab === 'beneficiaries' && (assessment ? <BeneficiaryPanel assessment={assessment} /> : <Loading />)}
       {tab === 'enrichment' && <EnrichmentPanel tenantId={tenantId} website={detail.profile?.officialWebsite} webSearch={me?.capabilities?.webSearch} onCommitted={() => { setAssessment(null); load() }} />}
+      {tab === 'reference' && <ReferencePackPanel tenantId={tenantId} />}
       {tab === 'views' && <ViewsPanel tenantId={tenantId} />}
       {tab === 'recommendations' && <RecommendationsPanel tenantId={tenantId} onNavigate={go} />}
       {tab === 'activity' && <ActivityPanel tenantId={tenantId} />}
