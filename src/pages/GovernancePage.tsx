@@ -15,7 +15,10 @@ const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/
 
 function useApi() {
   const token = () => localStorage.getItem('ea_token')
-  const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => r.json())
+  const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => {
+    if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status })
+    return r.json()
+  })
   const post = (path: string, body?: any) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
   const patch = (path: string, body?: any) => fetch(`${API_URL}${path}`, { method: 'PATCH', headers: { Authorization: `Bearer ${token()}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }).then(r => r.json())
   const postFile = (path: string, form: FormData) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form }).then(r => r.json())
@@ -735,6 +738,7 @@ export default function GovernancePage() {
   const [review, setReview] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [listError, setListError] = useState('')
   const [tab, setTab] = useState<'summary' | 'domains' | 'strategic' | 'compliance' | 'risk' | 'future' | 'financial'>('summary')
   const [findings, setFindings] = useState<any[]>([])
   const [report, setReport] = useState<any>(null)
@@ -864,12 +868,18 @@ export default function GovernancePage() {
   const LOAD_LIMIT = 100
   const loadReviews = async () => {
     setLoading(true)
+    setListError('')
     try {
       const res = await api.get('/governance/reviews?page=1&limit=' + LOAD_LIMIT)
+      if (!Array.isArray(res?.data)) throw new Error('Invalid review list')
       setReviews(res?.data || [])
       setReviewsTotal(res?.total ?? (res?.data || []).length)
     }
-    catch (e) { setError('Failed to load reviews') }
+    catch (e: any) {
+      setListError(e.status === 401
+        ? (isAR ? 'انتهت جلسة تسجيل الدخول. يرجى تسجيل الدخول مجددًا لعرض المراجعات.' : 'Your session has expired. Sign in again to view reviews.')
+        : (isAR ? 'تعذر تحميل المراجعات. يرجى المحاولة مجددًا.' : 'Unable to load reviews. Please try again.'))
+    }
     finally { setLoading(false) }
   }
 
@@ -1012,7 +1022,11 @@ export default function GovernancePage() {
         <button className='btn-primary' onClick={() => { setView('create'); setForm({ title: '', description: '', reviewType: 'HLD_REVIEW', framework: 'NORA_2_0', aiMode: 'AUTOMATED', projectName: '', notes: '', aggressiveness: 'STANDARD' }); setInputs([]); setWizardStep(1); setExtractedMeta(null); setShowMeta(false) }}>+ New Review</button>
       </div>
       {loading && <div style={{ color: 'var(--text-muted)', padding: 40, textAlign: 'center' }}>Loading...</div>}
-      {reviews.length === 0 && !loading && (
+      {listError && <div role="alert" style={{ padding: 16, marginBottom: 16, color: 'var(--danger)' }}>
+        {listError}{' '}
+        <button onClick={loadReviews} disabled={loading}>{isAR ? 'إعادة المحاولة' : 'Retry'}</button>
+      </div>}
+      {reviews.length === 0 && !loading && !listError && (
         <div style={{ textAlign: 'center', padding: 60, color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🏛️</div>
           <div style={{ fontSize: 16, marginBottom: 8 }}>No reviews yet</div>
