@@ -67,6 +67,22 @@ function mockReportView(review: any, report: any, findings: any[] = []) {
 }
 
 describe('GovernancePage - list view', () => {
+  it('shows an expired-session error instead of claiming there are no reviews', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ message: 'Unauthorized' }) });
+    render(<GovernancePage />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your session has expired');
+    expect(screen.queryByText('No reviews yet')).not.toBeInTheDocument();
+  });
+
+  it('can retry a failed review list and show the recovered reviews', async () => {
+    global.fetch = jest.fn().mockResolvedValueOnce({ ok: false, status: 503 }).mockResolvedValue({ ok: true, json: async () => ({ data: [makeReview()], total: 1 }) });
+    render(<GovernancePage />);
+    await screen.findByRole('alert');
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Payment Gateway HLD Review')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
   it('loads and displays reviews on mount', async () => {
     mockApiGet([makeReview()]);
     render(<GovernancePage />);
