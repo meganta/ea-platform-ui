@@ -1,0 +1,27 @@
+/* Financial Value Intelligence. App shell tokens only; reuses rp-* (page/card) and ah-* (tiles, tables, chips). */
+.fv-buckets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 900px) { .fv-buckets { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .fv-buckets { grid-template-columns: minmax(0, 1fr); } }
+.fv-realized { border-color: rgba(22, 163, 74, .5) !important; }
+.fv-chip { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); white-space: nowrap; }
+.fv-tone-good { color: #16a34a; border-color: rgba(22, 163, 74, .45); }
+.fv-tone-bad { color: #dc2626; border-color: rgba(220, 38, 38, .4); }
+.fv-tone-go { color: var(--accent); border-color: var(--accent); }
+.fv-tone-neutral { color: var(--text-dim); }
+.fv-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.fv-toolbar .form-input { max-width: 220px; }
+.fv-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; align-items: end; }
+.fv-form .form-group { margin: 0; }
+.fv-form-wide { grid-column: 1 / -1; }
+.fv-lines { display: grid; gap: 6px; }
+.fv-line { display: grid; grid-template-columns: 2fr 1fr 1fr 0.7fr 1fr auto; gap: 6px; align-items: center; }
+.fv-line .form-input { font-size: 12px; padding: 4px 6px; min-width: 0; }
+@media (max-width: 760px) { .fv-line { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.fv-blockers { margin: 4px 0 0; padding-inline-start: 18px; font-size: 11.5px; color: var(--warning); }
+.fv-action-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-start; }
+.fv-action { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 180px; flex: 1 1 200px; }
+.fv-kv { display: grid; grid-template-columns: minmax(140px, max-content) minmax(0, 1fr); gap: 4px 12px; font-size: 12.5px; }
+.fv-kv dt { color: var(--text-dim); }
+.fv-kv dd { margin: 0; overflow-wrap: anywhere; }
+.fv-note { padding: 10px 12px; border-radius: 8px; border: 1px dashed var(--border); font-size: 12px; color: var(--text-dim); margin-top: 10px; }
+.fv-back { margin-bottom: 12px; }
