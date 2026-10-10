@@ -6,260 +6,159 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }), { virtual: true });
 
+let mockIsAR = false;
 jest.mock('../../contexts/LangContext', () => ({
-  useLang: () => ({
-    t: (key: string) => key,
-    isAR: false,
-  }),
+  useLang: () => ({ t: (key: string) => key, isAR: mockIsAR }),
 }));
 
 const mockHasPermission = jest.fn((_code: string) => true);
-let mockUser: any = { role: 'SUPERADMIN' };
 jest.mock('../../contexts/AuthContext', () => ({
-  useAuth: () => ({
-    hasPermission: (code: string) => mockHasPermission(code),
-    user: mockUser,
-  }),
+  useAuth: () => ({ hasPermission: (code: string) => mockHasPermission(code), user: { role: 'ARCHITECT' } }),
 }));
 
-const mockGetCycles = jest.fn();
-const mockGetCapabilities = jest.fn();
-const mockGetDocuments = jest.fn();
-jest.mock('../../lib/api', () => ({
-  api: {
-    getCycles: () => mockGetCycles(),
-    getCapabilities: () => mockGetCapabilities(),
-    getDocuments: () => mockGetDocuments(),
-  },
-  getToken: () => 'fake-token',
+jest.mock('../../contexts/BrandingContext', () => ({
+  useBranding: () => ({ branding: { organizationNameEn: 'HRDF', organizationNameAr: 'صندوق الموارد' } }),
 }));
 
+jest.mock('../../lib/api', () => ({ getToken: () => 'fake-token' }));
+
+const HEALTH = {
+  domains: [
+    { domain: { code: 'BUSINESS', name: 'Business', nameAr: 'الأعمال' }, objectCount: 100, completeness: 50, relationshipCompleteness: 40, referenceCoverage: null,
+      maturity: { score: 30, level: 2, targetLevel: 3, gapPoints: 10 } },
+    { domain: { code: 'APPLICATION', name: 'Application' }, objectCount: 300, completeness: 70, relationshipCompleteness: 60, referenceCoverage: 80,
+      maturity: { score: 70, level: 4, targetLevel: 3, gapPoints: 0 } },
+  ],
+  topActions: [{ code: 'OWNERS', priority: 'CRITICAL', problem: 'Applications have no owner', action: 'Record owners' }],
+};
+const INSIGHTS = { insights: [
+  { key: 'i1', kind: 'GAP', severity: 'HIGH', title: 'Servers lack lifecycle' },
+  { key: 'i2', kind: 'PROGRESS', severity: 'POSITIVE', title: 'Completeness rose 5 points' },
+] };
+const GOV = {
+  summary: { completedReviews: 4, avgOverallScore: 72, criticalOpenFindings: 2 },
+  decisions: { APPROVED: 2, REJECTED: 1, REQUIRES_CHANGES: 1 },
+  findingsBySeverity: { CRITICAL: 2, HIGH: 5 },
+  monthlyTrend: [{ label: 'Sep', count: 3, avgScore: 70 }],
+};
+const SUMMARY = { total: 400, byStatus: [{ status: 'APPROVED', count: 250 }, { status: 'DEPRECATED', count: 12 }], byDomain: [{ domain: 'APPLICATION', operatingDomainDisplayName: 'Application', count: 300 }] };
+
+let responses: Record<string, any>;
 beforeEach(() => {
   jest.clearAllMocks();
+  mockIsAR = false;
   mockHasPermission.mockReturnValue(true);
-  mockUser = { role: 'SUPERADMIN' };
-  mockGetCycles.mockResolvedValue([]);
-  mockGetCapabilities.mockResolvedValue([]);
-  mockGetDocuments.mockResolvedValue([]);
+  responses = {
+    '/ea-repository/summary': SUMMARY,
+    '/architecture-health/enterprise': HEALTH,
+    '/architecture-health/insights': INSIGHTS,
+    '/governance/stats': GOV,
+    '/governance/reviews': { data: [{ id: 'r1', title: 'CRM review', reviewType: 'SOLUTION_DESIGN', status: 'COMPLETED', decision: 'APPROVED', overallScore: 81, createdAt: '2026-09-01' }] },
+    '/ea-planning/dashboard': { total: 3, active: 2, highRisk: 1, avgProgress: 45, byStatus: { ACTIVE: 2, DRAFT: 1 } },
+    '/adm/cycles': [{ id: 'c1', name: 'NORA cycle', frameworkType: 'NORA', phases: [{ status: 'COMPLETE' }, { status: 'IN_PROGRESS' }] }],
+  };
   global.fetch = jest.fn().mockImplementation((url: string) => {
-    if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve({ data: [] }) });
-    if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve(null) });
-    return Promise.resolve({ json: () => Promise.resolve({}) });
+    const key = Object.keys(responses).find(k => url.includes(k));
+    const body = key ? responses[key] : null;
+    return Promise.resolve({ ok: body != null, json: () => Promise.resolve(body) });
   }) as any;
 });
 
+const fetched = () => (global.fetch as jest.Mock).mock.calls.map(c => c[0] as string);
+
 describe('DashboardPage', () => {
-  it('renders platform stat cards populated from the loaded data', async () => {
-    mockGetCycles.mockResolvedValue([{ status: 'ACTIVE' }, { status: 'ACTIVE' }, { status: 'COMPLETED' }]);
-    mockGetCapabilities.mockResolvedValue([{ id: '1' }, { id: '2' }, { id: '3' }, { id: '4' }, { id: '5' }, { id: '6' }, { id: '7' }]);
-    mockGetDocuments.mockResolvedValue([{ status: 'READY' }, { status: 'PROCESSING' }, { status: 'PROCESSING' }, { status: 'PROCESSING' }, { status: 'PROCESSING' }]);
+  it('shows the headline KPIs computed from the platform records', async () => {
     render(<DashboardPage />);
-
-    await waitFor(() => expect(screen.getByText('3')).toBeInTheDocument()); // 3 cycles total
-    expect(screen.getByText('2 dash.active')).toBeInTheDocument(); // 2 active cycles
-    expect(screen.getByText('7')).toBeInTheDocument(); // 7 capabilities
-    expect(screen.getByText('1 dash.indexed')).toBeInTheDocument(); // 1 ready doc
+    await screen.findByText('dashboard.kpi.objects');
+    expect(screen.getByText('400')).toBeInTheDocument();
+    // object-weighted maturity: (30*100 + 70*300) / 400 = 60 -> level 4
+    expect(screen.getByText('dashboard.kpi.maturity_value')).toBeInTheDocument();
+    // object-weighted completeness: (50*100 + 70*300) / 400 = 65
+    expect(screen.getByText('65%')).toBeInTheDocument();
+    expect(screen.getByText('72/100')).toBeInTheDocument();
+    expect(screen.getAllByText('45%').length).toBeGreaterThan(0);
+    expect(screen.getByText(/HRDF/)).toBeInTheDocument();
   });
 
-  it('does not crash when any individual data source fails to load - each is caught independently', async () => {
-    mockGetCycles.mockRejectedValue(new Error('cycles endpoint down'));
-    mockGetCapabilities.mockResolvedValue([{ id: '1' }]);
+  it('lists domains furthest from target first and opens a domain in Architecture Health', async () => {
     render(<DashboardPage />);
-    await waitFor(() => expect(screen.getAllByText('1').length).toBeGreaterThan(0));
+    const rows = await screen.findAllByRole('row');
+    expect(rows[1]).toHaveTextContent('Business');
+    expect(rows[2]).toHaveTextContent('Application');
+    expect(rows[1]).toHaveTextContent('—'); // reference coverage not measurable
+    fireEvent.click(rows[1]);
+    expect(mockNavigate).toHaveBeenCalledWith('/architecture-health?domain=BUSINESS');
   });
 
-  it('prefers the dedicated governance stats endpoint totals over manually counting the reviews list when both are available', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve({ data: [{ status: 'COMPLETED' }] }) }); // manual count would say 1
-      if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve({ summary: { totalReviews: 50, completedReviews: 40, inProgressReviews: 10 } }) });
-      return Promise.resolve({ json: () => Promise.resolve({}) });
-    });
+  it('puts critical items first in Needs attention and keeps good news apart', async () => {
     render(<DashboardPage />);
-    // 50 legitimately appears in two places on a real render (the top-level
-    // reviews stat card and the governance dashboard's own KPI grid, both
-    // derived from the same statsTotal value) - getAllByText confirms it's
-    // present at all, using the stats-endpoint number rather than the
-    // manually-counted 1.
-    await waitFor(() => expect(screen.getAllByText('50').length).toBeGreaterThan(0));
-    expect(screen.queryByText('1')).not.toBeInTheDocument(); // the manually-counted value never appears
+    await screen.findByText('Applications have no owner');
+    const items = screen.getAllByRole('listitem').map(li => li.textContent || '');
+    const owners = items.findIndex(x => x.includes('Applications have no owner'));
+    const servers = items.findIndex(x => x.includes('Servers lack lifecycle'));
+    expect(owners).toBeLessThan(servers);
+    expect(screen.getByText('dashboard.attention.critical_findings')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.attention.good_news')).toBeInTheDocument();
+    expect(screen.getByText(/Completeness rose 5 points/)).toBeInTheDocument();
   });
 
-  it('falls back to manually counting the reviews list when the stats endpoint returns nothing', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve({ data: [{ status: 'COMPLETED' }, { status: 'DRAFT' }, { status: 'DRAFT' }] }) });
-      if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve(null) });
-      return Promise.resolve({ json: () => Promise.resolve({}) });
-    });
+  it('shows governance decisions, findings, trend and the latest reviews', async () => {
     render(<DashboardPage />);
-    // 3 total reviews manually counted from the reviews list, scoped to the reviews stat card specifically
-    await waitFor(() => {
-      const reviewsCard = screen.getByText('gov.reviews').closest('.stat-card')!;
-      expect(reviewsCard.querySelector('.stat-value')).toHaveTextContent('3');
-    });
+    await screen.findByText('CRM review');
+    expect(screen.getByText('dashboard.gov.decisions')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.gov.findings')).toBeInTheDocument();
+    expect(screen.getByText('dashboard.gov.trend')).toBeInTheDocument();
+    expect(screen.getByText('81')).toBeInTheDocument();
   });
 
-  it('handles a reviews response that is a bare array (not wrapped in {data: [...]})', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve([{ status: 'COMPLETED' }]) }); // bare array
-      if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve(null) });
-      return Promise.resolve({ json: () => Promise.resolve({}) });
-    });
+  it('shows delivery with plan counts and ADM cycle phase progress', async () => {
     render(<DashboardPage />);
-    await waitFor(() => expect(screen.getAllByText('1').length).toBeGreaterThan(0));
-  });
-
-  it('navigates to /governance when the reviews stat card is clicked', async () => {
-    render(<DashboardPage />);
-    await waitFor(() => expect(screen.getByText('gov.reviews')).toBeInTheDocument());
-    fireEvent.click(screen.getByText('gov.reviews').closest('.stat-card')!);
-    expect(mockNavigate).toHaveBeenCalledWith('/governance');
-  });
-
-  it('only shows the governance dashboard KPI section once there is at least one review', async () => {
-    // Note: t('gov.dashboard') text itself also appears unconditionally in a
-    // separate "Quick Actions" shortcut list, so check for gov.view_all - the
-    // "View all" link inside the conditional governance section specifically.
-    render(<DashboardPage />);
-    await waitFor(() => expect(screen.queryByText('gov.view_all')).not.toBeInTheDocument());
-  });
-
-  it('shows the governance dashboard section once reviews exist', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve({ data: [{ status: 'COMPLETED' }] }) });
-      if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve({ summary: { totalReviews: 1 } }) });
-      return Promise.resolve({ json: () => Promise.resolve({}) });
-    });
-    render(<DashboardPage />);
-    expect(await screen.findByText('gov.dashboard')).toBeInTheDocument();
-  });
-
-  // Confirmed real gap, found while improving this page: "Open Findings",
-  // "X critical"/"none critical", and "(last 6 months)" were hardcoded
-  // English literals, not routed through t() - inconsistent with every
-  // other label on this page and with the platform's AR/EN convention.
-  it('uses translated labels for open-findings/critical-count/score-trend-period, not hardcoded English literals', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve({ data: [{ status: 'COMPLETED', title: 'R1', createdAt: new Date().toISOString() }] }) });
-      if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve({
-        summary: { totalReviews: 1, completedReviews: 1, openFindings: 3, criticalOpenFindings: 1 },
-        monthlyTrend: [{ label: 'Jan', count: 1, avgScore: 80 }],
-      }) });
-      return Promise.resolve({ json: () => Promise.resolve({}) });
-    });
-    render(<DashboardPage />);
-    expect(await screen.findByText('gov.open_findings')).toBeInTheDocument();
-    expect(screen.getByText((_, el) => el?.textContent === '1 common.critical'.toLowerCase() || el?.textContent === '1 common.critical')).toBeInTheDocument();
-    expect(screen.getByText(/gov.score_trend/)).toHaveTextContent('gov.last_6_months');
-  });
-
-  // Standing policy: every new page or feature includes a help tip
-  // explaining the feature in plain language - retrofitted here since
-  // the governance dashboard section had none.
-  it('shows a help tip explaining the governance dashboard stats, once the section renders', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/governance/reviews')) return Promise.resolve({ json: () => Promise.resolve({ data: [{ status: 'COMPLETED' }] }) });
-      if (url.includes('/governance/stats')) return Promise.resolve({ json: () => Promise.resolve({ summary: { totalReviews: 1 } }) });
-      return Promise.resolve({ json: () => Promise.resolve({}) });
-    });
-    render(<DashboardPage />);
-    await screen.findByText('gov.open_findings');
-    expect(screen.getAllByRole('button', { name: 'common.more_info' }).length).toBeGreaterThanOrEqual(1);
-  });
-
-  // "Put into consideration rbac for showing data" — the core of this
-  // round of changes: a user without a module's permission should never
-  // see (or have their browser fetch) that module's data here, matching
-  // the exact permission codes Layout.tsx's sidebar already gates
-  // module visibility by.
-  it('does not fetch or display repository-gated data (cycles/capabilities/documents) when the user lacks Repository.View', async () => {
-    mockHasPermission.mockImplementation((code: string) => code !== 'Repository.View');
-    render(<DashboardPage />);
-    await waitFor(() => expect(mockGetCycles).not.toHaveBeenCalled());
-    expect(mockGetCapabilities).not.toHaveBeenCalled();
-    expect(mockGetDocuments).not.toHaveBeenCalled();
-    expect(screen.queryByText('dash.adm_cycles')).not.toBeInTheDocument();
-    expect(screen.queryByText('dash.active_cycles')).not.toBeInTheDocument();
-  });
-
-  it('does not fetch or display governance review data when the user lacks Reviews.View', async () => {
-    mockHasPermission.mockImplementation((code: string) => code !== 'Reviews.View');
-    const fetchSpy = global.fetch as jest.Mock;
-    render(<DashboardPage />);
-    await waitFor(() => expect(mockGetCycles).toHaveBeenCalled()); // repository data still loads
-    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/governance/reviews'), expect.anything());
-    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/governance/stats'), expect.anything());
-    expect(screen.queryByText('gov.reviews')).not.toBeInTheDocument();
-  });
-
-  it('"Your Modules" only shows modules the user has permission for, filtering out the rest — same codes as the sidebar nav', async () => {
-    mockHasPermission.mockImplementation((code: string) => code === 'Repository.View');
-    render(<DashboardPage />);
-    expect(await screen.findByText('dash.your_modules')).toBeInTheDocument();
-    expect(screen.getByText('nav.adm')).toBeInTheDocument(); // Repository.View — shown
-    expect(screen.queryByText('nav.governance')).not.toBeInTheDocument(); // Reviews.View — hidden
-    expect(screen.queryByText('nav.meta_model')).not.toBeInTheDocument(); // MetaModel.View — hidden
-  });
-
-  it('a user with every permission sees every module in "Your Modules"', async () => {
-    render(<DashboardPage />);
-    expect(await screen.findByText('dash.your_modules')).toBeInTheDocument();
-    expect(screen.getByText('nav.adm')).toBeInTheDocument();
-    expect(screen.getByText('nav.governance')).toBeInTheDocument();
-    expect(screen.getByText('nav.meta_model')).toBeInTheDocument();
-    expect(screen.getByText('nav.ea_views')).toBeInTheDocument();
-  });
-
-  it('clicking a module card navigates to its page', async () => {
-    render(<DashboardPage />);
-    const admCard = await screen.findByText('nav.adm');
-    fireEvent.click(admCard);
+    await screen.findByText('NORA cycle');
+    expect(screen.getByText(/dashboard\.delivery\.phase/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('NORA cycle'));
     expect(mockNavigate).toHaveBeenCalledWith('/adm');
   });
 
-  // Confirmed real gap, found and fixed while adding module state: the
-  // filter previously checked only hasPermission(), ignoring
-  // superadminOnly entirely - unlike Layout.tsx's own sidebar nav,
-  // which checks both. A non-superadmin user with Repository.View could
-  // have seen Strategy/Connector-Hub cards the sidebar itself would
-  // hide for that same user.
-  it('hides superadminOnly modules (Strategy, Decision & Evaluation, Connectors) for a non-superadmin user, even with the underlying permission granted', async () => {
-    mockUser = { role: 'TENANT_ADMIN' };
+  it('fetches only the sources the user may see', async () => {
+    mockHasPermission.mockImplementation((code: string) => code === 'Reviews.View');
     render(<DashboardPage />);
-    await screen.findByText('dash.your_modules');
-    expect(screen.queryByText('nav.strategy')).not.toBeInTheDocument();
-    expect(screen.queryByText('nav.decision_evaluation')).not.toBeInTheDocument();
-    expect(screen.queryByText('nav.connector_hub')).not.toBeInTheDocument();
-    // Non-superadmin-only modules are unaffected
-    expect(screen.getByText('nav.adm')).toBeInTheDocument();
+    await screen.findByText('CRM review');
+    expect(fetched().some(u => u.includes('/governance/stats'))).toBe(true);
+    expect(fetched().some(u => u.includes('/architecture-health'))).toBe(false);
+    expect(fetched().some(u => u.includes('/ea-repository/summary'))).toBe(false);
+    expect(screen.queryByText('dashboard.domains.title')).not.toBeInTheDocument();
+    expect(screen.queryByText('dashboard.qa.repository')).not.toBeInTheDocument();
   });
 
-  it('shows superadminOnly modules for an actual SUPERADMIN user with the underlying permission', async () => {
-    mockUser = { role: 'SUPERADMIN' };
+  it('keeps working when a source fails', async () => {
+    responses['/architecture-health/enterprise'] = null;
     render(<DashboardPage />);
-    await screen.findByText('dash.your_modules');
-    expect(screen.getByText('nav.strategy')).toBeInTheDocument();
-    expect(screen.getByText('nav.connector_hub')).toBeInTheDocument();
+    await screen.findByText('dashboard.domains.title');
+    expect(screen.getByText('dashboard.unavailable')).toBeInTheDocument();
+    expect(screen.getByText('400')).toBeInTheDocument();
   });
 
-  // "Build the dashboard state for all modules based on rbac" — the
-  // module cards now show real counts from each module's own verified
-  // endpoint (the same one its own page fetches), not just a link.
-  it('shows real module state (a count fetched from each module\'s own endpoint) once loaded, for an RBAC-visible module', async () => {
-    (global.fetch as jest.Mock).mockImplementation((url: string) => {
-      if (url.includes('/innovation/ideas')) return Promise.resolve({ json: () => Promise.resolve([{ id: '1' }, { id: '2' }, { id: '3' }]) });
-      return Promise.resolve({ json: () => Promise.resolve({}) });
-    });
+  it('says so when no review has been completed', async () => {
+    responses['/governance/stats'] = { summary: { completedReviews: 0 } };
     render(<DashboardPage />);
-    await screen.findByText('dash.your_modules');
-    expect(await screen.findByText((_, el) => el?.textContent === '3 dash.mod_ideas')).toBeInTheDocument();
+    expect(await screen.findByText('dashboard.gov.none')).toBeInTheDocument();
+    expect(screen.queryByText('dashboard.kpi.governance')).not.toBeInTheDocument();
   });
 
-  it('does not fetch a superadminOnly module\'s state for a non-superadmin user, even with the underlying permission', async () => {
-    mockUser = { role: 'TENANT_ADMIN' };
-    const fetchSpy = global.fetch as jest.Mock;
+  it('renders right-to-left with Arabic domain names', async () => {
+    mockIsAR = true;
+    const { container } = render(<DashboardPage />);
+    await screen.findByText('الأعمال');
+    expect(container.querySelector('.dsh')).toHaveAttribute('dir', 'rtl');
+  });
+
+  it('quick actions and refresh', async () => {
     render(<DashboardPage />);
-    await screen.findByText('dash.your_modules');
-    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/strategy'), expect.anything());
-    expect(fetchSpy).not.toHaveBeenCalledWith(expect.stringContaining('/connectors/stats'), expect.anything());
+    await screen.findByText('dashboard.kpi.objects');
+    fireEvent.click(screen.getByText('dashboard.qa.copilot'));
+    expect(mockNavigate).toHaveBeenCalledWith('/copilot');
+    const before = (global.fetch as jest.Mock).mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'dashboard.refresh' }));
+    await waitFor(() => expect((global.fetch as jest.Mock).mock.calls.length).toBeGreaterThan(before));
   });
 });

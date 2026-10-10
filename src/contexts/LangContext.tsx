@@ -15,6 +15,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { OWNER_TRANSLATIONS } from '../pages/owner/ownerStrings'
 import { METAMODEL_TRANSLATIONS } from '../pages/metamodel/metaModelStrings'
+import { DASHBOARD_TRANSLATIONS } from '../pages/dashboard/dashboardStrings'
 
 export type Locale = 'AR' | 'EN'
 
@@ -22,6 +23,7 @@ export type Locale = 'AR' | 'EN'
 // Keys map to both locales. NEVER use English as fallback for Arabic.
 const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   ...OWNER_TRANSLATIONS,
+  ...DASHBOARD_TRANSLATIONS,
   ...METAMODEL_TRANSLATIONS,
   'strategy.refresh.previous_evidence': { EN: 'Approved previous strategy evidence', AR: 'أدلة الاستراتيجية السابقة المعتمدة' },
   'strategy.refresh.open_baseline': { EN: 'Open approved baseline version', AR: 'فتح الإصدار المرجعي المعتمد' },

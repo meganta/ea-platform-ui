@@ -41,6 +41,12 @@ button { cursor: pointer; font-family: var(--font-body) }
 .sidebar .sidebar-logo { padding-top:8px }
 .sidebar .nav-item { text-align:start }
 @media (prefers-reduced-motion: reduce) { .sidebar { transition:none } }
+/* Wide screens: the menu is docked beside the working area (open by default, the page narrows to make room); closed, it is hidden and the Modules button brings it back. */
+.layout-docked .sidebar { position:relative; inset:auto; z-index:auto; transform:none; visibility:visible; transition:none; width:260px; height:100%; box-shadow:none }
+.layout-docked .sidebar:not(.open) { display:none }
+.layout-docked .sidebar-backdrop { display:none }
+.layout-docked.sidebar-visible .mobile-menu-btn { display:none }
+.layout-docked.sidebar-visible .main-content { padding-top:8px }
 
 /* ── Reusable responsive stat/score grids ─────────────────────────────── */
 /* Use these instead of an inline gridTemplateColumns for any row of equal-

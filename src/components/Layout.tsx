@@ -29,6 +29,16 @@ const SETTINGS_CHILDREN: NavItem[] = [
   { to: '/settings/api-billing', label: 'API & Billing', icon: '🔑', permission: null },
 ]
 
+const WIDE_QUERY = '(min-width: 900px)'
+const DOCKED_KEY = 'ea_sidebar_docked'
+const isWideScreen = () => typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia(WIDE_QUERY).matches
+function readDockedPreference(): boolean {
+  try { return localStorage.getItem(DOCKED_KEY) !== 'closed' } catch { return true }
+}
+function writeDockedPreference(open: boolean) {
+  try { localStorage.setItem(DOCKED_KEY, open ? 'open' : 'closed') } catch { /* preference only */ }
+}
+
 export default function Layout() {
   const { user, logout, hasPermission } = useAuth()
   const { t, locale, setLocale } = useLang()
@@ -36,7 +46,17 @@ export default function Layout() {
   const [logoFailed, setLogoFailed] = useState(false)
   const [showSetupModal, setShowSetupModal] = useState(false)
   const [setupChecked, setSetupChecked] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  // Wide screens: the menu is docked beside the page, open by default and
+  // remembered when closed. Narrow screens: a drawer over the page.
+  const [docked, setDocked] = useState(isWideScreen)
+  const [dockedOpen, setDockedOpen] = useState(() => readDockedPreference())
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const sidebarOpen = docked ? dockedOpen : drawerOpen
+  const setSidebarOpen = (next: boolean | ((open: boolean) => boolean)) => {
+    if (docked) setDockedOpen(open => { const v = typeof next === 'function' ? next(open) : next; writeDockedPreference(v); return v })
+    else setDrawerOpen(next)
+  }
+  const overlay = !docked && drawerOpen
   const menuButton = useRef<HTMLButtonElement>(null)
   const sidebar = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
@@ -50,9 +70,16 @@ export default function Layout() {
   const location = useLocation()
   const orgName = locale === 'AR' ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
 
-  useEffect(() => { setSidebarOpen(false) }, [location.pathname])
   useEffect(() => {
-    if (!sidebarOpen) return
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const query = window.matchMedia(WIDE_QUERY)
+    const onChange = () => { setDocked(query.matches); setDrawerOpen(false) }
+    query.addEventListener?.('change', onChange)
+    return () => query.removeEventListener?.('change', onChange)
+  }, [])
+  useEffect(() => { setDrawerOpen(false) }, [location.pathname])
+  useEffect(() => {
+    if (!overlay) return
     const panel = sidebar.current
     const main = content.current
     const trigger = menuButton.current
@@ -60,7 +87,7 @@ export default function Layout() {
     const focusable = () => Array.from(panel?.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), [tabindex="0"]') || [])
     focusable()[0]?.focus()
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); setSidebarOpen(false) }
+      if (e.key === 'Escape') { e.preventDefault(); setDrawerOpen(false) }
       if (e.key === 'Tab') {
         const items = focusable(), first = items[0], last = items[items.length - 1]
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus() }
@@ -69,7 +96,7 @@ export default function Layout() {
     }
     document.addEventListener('keydown', onKey)
     return () => { main?.removeAttribute('inert'); document.removeEventListener('keydown', onKey); trigger?.focus() }
-  }, [sidebarOpen])
+  }, [overlay])
   useEffect(() => { if (location.pathname.startsWith('/settings')) setSettingsExpanded(true) }, [location.pathname])
 
   useEffect(() => {
@@ -129,18 +156,18 @@ export default function Layout() {
   const adminNav = visibleNav.filter(n => ['/access-governance', '/settings', '/getting-started'].includes(n.to))
 
   return (
-    <div className="layout" dir={locale === 'AR' ? 'rtl' : 'ltr'}>
+    <div className={`layout${docked ? ' layout-docked' : ''}${docked && sidebarOpen ? ' sidebar-visible' : ''}`} dir={locale === 'AR' ? 'rtl' : 'ltr'}>
       <button ref={menuButton} type="button" className="mobile-menu-btn" aria-label={menuLabel} title={locale === 'AR' ? 'افتح القائمة للوصول إلى وحدات المنصة' : 'Open the menu to access platform modules'} aria-expanded={sidebarOpen} aria-controls="platform-modules" onClick={() => setSidebarOpen(o => !o)}><span aria-hidden="true">☰</span><span>{locale === 'AR' ? 'الوحدات' : 'Modules'}</span></button>
-      <div className={`sidebar-backdrop${sidebarOpen ? ' open' : ''}`} aria-hidden="true" onClick={() => setSidebarOpen(false)} />
-      <div ref={sidebar} id="platform-modules" role={sidebarOpen ? 'dialog' : undefined} aria-modal={sidebarOpen || undefined} aria-label={menuLabel} className={`sidebar${sidebarOpen ? ' open' : ''}`}>
-        <button type="button" className="sidebar-close" aria-label={locale === 'AR' ? 'إغلاق قائمة الوحدات' : 'Close modules menu'} onClick={() => setSidebarOpen(false)}>×</button>
+      <div className={`sidebar-backdrop${overlay ? ' open' : ''}`} aria-hidden="true" onClick={() => setDrawerOpen(false)} />
+      <div ref={sidebar} id="platform-modules" role={overlay ? 'dialog' : 'complementary'} aria-modal={overlay || undefined} aria-label={menuLabel} className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+        <button type="button" className="sidebar-close" aria-label={locale === 'AR' ? 'إغلاق قائمة الوحدات' : 'Close modules menu'} title={docked ? (locale === 'AR' ? 'إخفاء القائمة لتوسيع مساحة العمل' : 'Hide the menu to widen the working area') : undefined} onClick={() => setSidebarOpen(false)}>×</button>
         <div className="sidebar-logo">
           {logoUrl && !logoFailed
             ? <img src={logoUrl} alt={orgName || 'Logo'} style={{ maxHeight: 32, maxWidth: 160, objectFit: 'contain' }} onError={() => setLogoFailed(true)} />
             : <div className="logo-text">{orgName || 'EA Platform'}</div>}
           <div className="logo-sub">{locale === 'AR' ? 'هندسة المؤسسات' : 'Enterprise Architecture'}</div>
         </div>
-        <nav className="sidebar-nav" aria-label={menuLabel} onClick={e => { if ((e.target as HTMLElement).closest('a')) setSidebarOpen(false) }}>
+        <nav className="sidebar-nav" aria-label={menuLabel} onClick={e => { if ((e.target as HTMLElement).closest('a')) setDrawerOpen(false) }}>
           {user?.platformRole === 'PLATFORM_OWNER' && !user?.delegatedAccess && (
             <NavLink to="/owner/dashboard" className="nav-item" style={{ background: '#0B1F33', color: '#FBBF24', fontWeight: 600, marginBottom: 6 }}>
               🛡 {t('owner.nav.open_console')}

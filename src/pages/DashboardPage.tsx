@@ -1,400 +1,403 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
 import { useAuth } from '../contexts/AuthContext'
-import { api, getToken } from '../lib/api'
+import { useBranding } from '../contexts/BrandingContext'
+import { getToken } from '../lib/api'
 import HelpTip from '../components/HelpTip'
+import {
+  AttentionItem, DECISION_ORDER, GovStats, HealthDomain, Insight, SEVERITY_ORDER, TopAction,
+  attentionItems, decisionShares, enterpriseCompleteness, enterpriseMaturity, pct, rankDomains,
+} from './dashboard/dashboardModel'
+import './dashboard/Dashboard.css'
 
-const GOV_API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
+const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
-const DECISION_COLOR: Record<string, string> = {
-  APPROVED: '#2ecc71',
-  APPROVED_WITH_CONDITIONS: '#f39c12',
-  REQUIRES_CHANGES: '#e67e22',
-  REJECTED: '#e74c3c',
-  REQUIRES_EXCEPTION: '#9b59b6',
-  PENDING: '#64748B',
+// Status colours (validated as a set for colour-vision deficiency): best -> worst outcome.
+const DECISION_COLOR: Record<string, string> = { APPROVED: '#15803D', APPROVED_WITH_CONDITIONS: '#D9A300', REQUIRES_CHANGES: '#E8590C', REJECTED: '#9F1239' }
+const SEVERITY_COLOR: Record<string, string> = { CRITICAL: '#9F1239', HIGH: '#E8590C', MEDIUM: '#D9A300', LOW: '#64748B', POSITIVE: '#15803D' }
+
+interface Data {
+  summary: any | null
+  health: { domains: HealthDomain[]; topActions?: TopAction[] } | null
+  insights: Insight[] | null
+  gov: GovStats | null
+  reviews: any[] | null
+  plans: any | null
+  cycles: any[] | null
 }
+const EMPTY: Data = { summary: null, health: null, insights: null, gov: null, reviews: null, plans: null, cycles: null }
 
-// Confirmed real gap, found while adding platform-wide module stats:
-// this dashboard fetched and displayed ADM/repository/knowledge and
-// governance data unconditionally, with no check against the same
-// permission codes Layout.tsx's own sidebar nav already gates module
-// visibility by. A user without a module's permission would still have
-// their browser fetch and render that module's data here, on the very
-// first page after login - the one place RBAC should be applied before
-// anywhere else, not after. Same permission codes as Layout.tsx's
-// navItems, not duplicated by guessing - kept in sync deliberately, not
-// independently invented, since a mismatch here would silently show or
-// hide the wrong modules relative to the sidebar the user actually sees.
-const MODULE_LINKS: Array<{ to: string; labelKey: string; icon: string; permission: string | null; superadminOnly?: boolean }> = [
-  { to: '/adm',               labelKey: 'nav.adm',         icon: '⚙',  permission: 'Repository.View' },
-  { to: '/governance',        labelKey: 'nav.governance',  icon: '🏛', permission: 'Reviews.View' },
-  { to: '/ea-planning',       labelKey: 'nav.ea_planning',  icon: '🗓', permission: 'Repository.View' },
-  { to: '/innovation',        labelKey: 'nav.innovation',  icon: '🔭', permission: 'Repository.View' },
-  { to: '/strategy',          labelKey: 'nav.strategy',     icon: '🎯', permission: 'Repository.View', superadminOnly: true },
-  { to: '/decision-evaluation', labelKey: 'nav.decision_evaluation', icon: '⚖', permission: 'Reviews.View', superadminOnly: true },
-  { to: '/meta-model',        labelKey: 'nav.meta_model',   icon: '🧩', permission: 'MetaModel.View' },
-  { to: '/ea-views',          labelKey: 'nav.ea_views',     icon: '🗺', permission: 'Views.View' },
-  { to: '/connector-hub',     labelKey: 'nav.connector_hub', icon: '🔌', permission: 'Repository.View', superadminOnly: true },
-  { to: '/repository',        labelKey: 'nav.repository',  icon: '🗄', permission: 'Repository.View' },
-  { to: '/knowledge',         labelKey: 'nav.knowledge',   icon: '📚', permission: 'Repository.View' },
-]
+function fill(text: string, vars: Record<string, string | number>) {
+  return text.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? '').toString())
+}
 
 export default function DashboardPage() {
   const nav = useNavigate()
   const { t, isAR } = useLang()
-  const { hasPermission, user } = useAuth()
-  const [cycles, setCycles] = useState<any[]>([])
-  const [capabilities, setCapabilities] = useState<any[]>([])
-  const [docs, setDocs] = useState<any[]>([])
-  const [reviews, setReviews] = useState<any[]>([])
-  const [govStats, setGovStats] = useState<any>(null)
-  // One state slot per module beyond governance/repository, each filled
-  // only when the user actually has that module's permission (and, for
-  // superadmin-only modules, only when the user IS superadmin) - see
-  // moduleState below for the exact per-module gating and fetch.
-  const [innovationIdeas, setInnovationIdeas] = useState<any[] | null>(null)
-  const [strategyObjectives, setStrategyObjectives] = useState<any[] | null>(null)
-  const [decisions, setDecisions] = useState<any[] | null>(null)
-  const [metaModelTypes, setMetaModelTypes] = useState<any[] | null>(null)
-  const [eaViewsStats, setEaViewsStats] = useState<any>(null)
-  const [connectorStats, setConnectorStats] = useState<any>(null)
-  const [planningDashboard, setPlanningDashboard] = useState<any>(null)
+  const { hasPermission } = useAuth()
+  const { branding } = useBranding()
+  const [data, setData] = useState<Data>(EMPTY)
+  const [loading, setLoading] = useState(true)
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
 
-  const canViewRepository = hasPermission('Repository.View')
-  const canViewReviews = hasPermission('Reviews.View')
-  const isSuperadmin = user?.role === 'SUPERADMIN'
-  const canViewStrategy = canViewRepository && isSuperadmin // matches Layout.tsx: Repository.View + superadminOnly
-  const canViewDecisionEval = canViewReviews && isSuperadmin // matches Layout.tsx: Reviews.View + superadminOnly
-  const canViewConnectors = canViewRepository && isSuperadmin // matches Layout.tsx: Repository.View + superadminOnly
-  const canViewMetaModel = hasPermission('MetaModel.View')
-  const canViewEaViews = hasPermission('Views.View')
+  const can = useMemo(() => ({
+    repository: hasPermission('Repository.View'),
+    health: hasPermission('ArchitectureHealth.View'),
+    reviews: hasPermission('Reviews.View'),
+    copilot: hasPermission('AIArchitect.Use'),
+    views: hasPermission('Views.View'),
+  }), [hasPermission])
 
-  useEffect(() => {
-    // RBAC applied before fetching, not only before displaying - a user
-    // without a module's permission never has their browser request
-    // that module's data in the first place, matching Layout.tsx's own
-    // sidebar visibility rules rather than relying on the backend alone
-    // to reject an unauthorized request after the fact.
-    if (canViewRepository) {
-      api.getCycles().then(setCycles).catch(() => {})
-      api.getCapabilities().then(setCapabilities).catch(() => {})
-      api.getDocuments().then(setDocs).catch(() => {})
-    }
-    if (canViewReviews) {
-      const token = getToken() || ''
-      // Load reviews list for recent reviews section
-      fetch(GOV_API + '/governance/reviews?page=1&limit=10', { headers: { Authorization: 'Bearer ' + token } })
-        .then(r => r.json()).then((r: any) => setReviews(Array.isArray(r?.data) ? r.data : (Array.isArray(r) ? r : []))).catch(() => {})
-      // Load aggregated stats from dedicated endpoint
-      fetch(GOV_API + '/governance/stats', { headers: { Authorization: 'Bearer ' + token } })
-        .then(r => r.json()).then(setGovStats).catch(() => {})
-    }
-    // Each module below uses the SAME verified endpoint its own page
-    // fetches (InnovationPage/StrategyPage/DecisionEvaluationPage/
-    // MetaModelPage/EaViewsPage/ConnectorHubPage/EaPlanningPage - checked
-    // directly against each page's own code before wiring this, not
-    // guessed) - never a new, unverified endpoint invented for this
-    // dashboard specifically.
-    const token = getToken() || ''
-    const authGet = (path: string) => fetch(GOV_API + path, { headers: { Authorization: 'Bearer ' + token } }).then(r => r.json())
-    if (canViewRepository) {
-      authGet('/innovation/ideas').then((d: any) => setInnovationIdeas(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
-      authGet('/ea-planning/dashboard').then(setPlanningDashboard).catch(() => {})
-    }
-    if (canViewStrategy) {
-      authGet('/strategy').then((d: any) => setStrategyObjectives(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
-    }
-    if (canViewDecisionEval) {
-      authGet('/decision-evaluation').then((d: any) => setDecisions(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
-    }
-    if (canViewMetaModel) {
-      authGet('/meta-model/object-types').then((d: any) => setMetaModelTypes(Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []))).catch(() => {})
-    }
-    if (canViewEaViews) {
-      authGet('/ea-views/stats').then(setEaViewsStats).catch(() => {})
-    }
-    if (canViewConnectors) {
-      authGet('/connectors/stats').then(setConnectorStats).catch(() => {})
-    }
-  }, [canViewRepository, canViewReviews, canViewStrategy, canViewDecisionEval, canViewMetaModel, canViewEaViews, canViewConnectors])
+  // Each source is fetched only with its module's permission (the menu's rules), and a failing source never blanks the page.
+  const load = useCallback(async () => {
+    setLoading(true)
+    const get = (path: string) => fetch(API + path, { headers: { Authorization: 'Bearer ' + (getToken() || '') } }).then(r => (r.ok ? r.json() : null)).catch(() => null)
+    const asList = (d: any) => (Array.isArray(d) ? d : Array.isArray(d?.data) ? d.data : null)
+    const [summary, health, insights, gov, reviews, plans, cycles] = await Promise.all([
+      can.repository ? get('/ea-repository/summary') : null,
+      can.health ? get('/architecture-health/enterprise') : null,
+      can.health ? get('/architecture-health/insights') : null,
+      can.reviews ? get('/governance/stats') : null,
+      can.reviews ? get('/governance/reviews?page=1&limit=5') : null,
+      can.repository ? get('/ea-planning/dashboard') : null,
+      can.repository ? get('/adm/cycles') : null,
+    ])
+    setData({
+      summary, health: health && Array.isArray(health.domains) ? health : null,
+      insights: insights && Array.isArray(insights.insights) ? insights.insights : null,
+      gov, reviews: asList(reviews), plans, cycles: asList(cycles),
+    })
+    setUpdatedAt(new Date())
+    setLoading(false)
+  }, [can])
+  useEffect(() => { load() }, [load])
 
-  // Real per-module state, not fabricated placeholders - null (not
-  // shown at all) for a module never fetched (no permission), a real
-  // number once its fetch resolves. Limited to modules that don't
-  // already have a dedicated card in the "Platform stats" row above
-  // (ADM/repository/knowledge/governance) - showing the same count
-  // twice on one page would be redundant, not more informative.
-  const moduleState: Record<string, { value: string; sub?: string } | null> = {
-    '/innovation':           innovationIdeas === null ? null : { value: String(innovationIdeas.length), sub: t('dash.mod_ideas') },
-    '/strategy':             strategyObjectives === null ? null : { value: String(strategyObjectives.length), sub: t('dash.mod_objectives') },
-    '/decision-evaluation':  decisions === null ? null : { value: String(decisions.length), sub: t('dash.mod_decisions') },
-    '/meta-model':           metaModelTypes === null ? null : { value: String(metaModelTypes.length), sub: t('dash.mod_object_types') },
-    '/ea-views':             eaViewsStats === null ? null : { value: String(eaViewsStats.total ?? 0), sub: t('dash.mod_views') },
-    '/connector-hub':        connectorStats === null ? null : { value: String(connectorStats.pendingConflicts ?? 0), sub: t('dash.mod_conflicts') },
-    '/ea-planning':          planningDashboard === null ? null : { value: String(planningDashboard.total ?? 0), sub: t('dash.mod_plans') },
-  }
-
-  const activeCycles = cycles.filter(c => c.status === 'ACTIVE').length
-  const readyDocs = docs.filter(d => d.status === 'READY').length
-
-  // Use stats endpoint data when available, fall back to manual calculation
-  const statsTotal    = govStats?.summary?.totalReviews     ?? reviews.length
-  const statsComplete = govStats?.summary?.completedReviews ?? reviews.filter(r => r.status === 'COMPLETED').length
-  const statsPending  = govStats?.summary?.inProgressReviews ?? reviews.filter(r => ['DRAFT','IN_PROGRESS','PROCESSING'].includes(r.status)).length
-  const statsAvgScore = govStats?.summary?.avgOverallScore  ?? 0
-  const statsCriticalOpen = govStats?.summary?.criticalOpenFindings ?? 0
-  const statsOpenFindings = govStats?.summary?.openFindings ?? 0
-  const decisionCounts = govStats?.decisions ?? {}
-  const monthlyTrend  = govStats?.monthlyTrend ?? []
-  const findingsBySev = govStats?.findingsBySeverity ?? {}
-  const scoreAvgs     = govStats?.scoreAverages ?? null
-
-  // Keep for pending alert
-  const pendingReviews = reviews.filter(r => ['DRAFT', 'IN_PROGRESS'].includes(r.status))
+  const domains = data.health?.domains || []
+  const maturity = enterpriseMaturity(domains)
+  const completeness = enterpriseCompleteness(domains)
+  const attention = attentionItems({ insights: data.insights || [], topActions: data.health?.topActions, gov: data.gov })
+  const orgName = isAR ? (branding?.organizationNameAr || branding?.organizationNameEn) : (branding?.organizationNameEn || branding?.organizationNameAr)
+  // Latin digits in both languages, so counts, percentages and scores read the same way everywhere on the page.
+  const numLocale = isAR ? 'ar-SA-u-nu-latn' : 'en-US'
+  const fmtNum = (n: number) => n.toLocaleString(numLocale)
 
   return (
-    <div>
-      <div className="page-header" style={{ paddingBottom: 24 }}>
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="page-title">{t('dash.title')}</div>
-            <div className="page-subtitle">{t('dash.subtitle')}</div>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--success)', fontFamily: 'var(--font-mono)' }}>{t('dash.status')}</div>
+    <div className="dsh" dir={isAR ? 'rtl' : 'ltr'}>
+      <header className="dsh-hero">
+        <div className="dsh-hero-text">
+          <h1 className="dsh-title">{t('dashboard.title')}</h1>
+          <p className="dsh-subtitle">{orgName ? `${orgName} · ` : ''}{t('dashboard.subtitle')}</p>
         </div>
-      </div>
-      <div className="page-body">
+        <div className="dsh-hero-actions">
+          {can.copilot && <button type="button" className="btn btn-primary btn-sm" onClick={() => nav('/copilot')}>{t('dashboard.qa.copilot')}</button>}
+          {can.repository && <button type="button" className="btn btn-secondary btn-sm" onClick={() => nav('/repository')}>{t('dashboard.qa.repository')}</button>}
+          {can.views && <button type="button" className="btn btn-secondary btn-sm" onClick={() => nav('/ea-views')}>{t('dashboard.qa.views')}</button>}
+          {can.reviews && <button type="button" className="btn btn-secondary btn-sm" onClick={() => nav('/governance')}>{t('dashboard.qa.review')}</button>}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={load} disabled={loading} aria-label={t('dashboard.refresh')}>⟳ {t('dashboard.refresh')}</button>
+        </div>
+        {updatedAt && <div className="dsh-updated">{t('dashboard.updated')}: {updatedAt.toLocaleTimeString(numLocale, { hour: '2-digit', minute: '2-digit' })}</div>}
+      </header>
 
-        {/* Platform stats */}
-        <div className="grid-4 mb-6">
-          {canViewRepository && <>
-            <div className="stat-card"><div className="stat-value">{cycles.length}</div><div className="stat-label">{t('dash.adm_cycles')}</div><div className="stat-delta">{activeCycles} {t('dash.active')}</div></div>
-            <div className="stat-card"><div className="stat-value">{capabilities.length}</div><div className="stat-label">{t('dash.capabilities')}</div></div>
-            <div className="stat-card"><div className="stat-value">{docs.length}</div><div className="stat-label">{t('dash.documents')}</div><div className="stat-delta">{readyDocs} {t('dash.indexed')}</div></div>
-          </>}
-          {canViewReviews && (
-            <div className="stat-card" style={{ cursor: 'pointer' }} onClick={() => nav('/governance')}>
-              <div className="stat-value">{statsTotal}</div>
-              <div className="stat-label">{t('gov.reviews')}</div>
-              <div className="stat-delta" style={{ color: statsPending > 0 ? '#f39c12' : 'var(--success)' }}>
-                {statsPending} {t('gov.pending')}
-              </div>
-            </div>
+      {loading && !updatedAt && <div className="dsh-loading" aria-busy="true">{t('dashboard.loading')}</div>}
+
+      {updatedAt && <>
+        <section className="dsh-kpis" aria-label={t('dashboard.title')}>
+          {can.repository && data.summary && (
+            <Kpi label={t('dashboard.kpi.objects')} help={t('dashboard.kpi.objects_help')} value={fmtNum(data.summary.total ?? 0)} onOpen={() => nav('/repository')}
+              sub={fill(t('dashboard.kpi.objects_sub'), { approved: fmtNum(statusCount(data.summary, 'APPROVED')), deprecated: fmtNum(statusCount(data.summary, 'DEPRECATED')) })} />
           )}
-        </div>
+          {can.health && maturity && (
+            <Kpi label={t('dashboard.kpi.maturity')} help={t('dashboard.kpi.maturity_help')} value={fill(t('dashboard.kpi.maturity_value'), { level: maturity.level })} onOpen={() => nav('/architecture-health')}
+              meter={{ value: maturity.score, target: maturity.targetLevel ? (maturity.targetLevel - 1) * 20 : null }}
+              sub={fill(t('dashboard.kpi.maturity_sub'), { score: Math.round(maturity.score), target: maturity.targetLevel ?? '—', below: maturity.belowTarget, measured: maturity.measured })} />
+          )}
+          {can.health && completeness != null && (
+            <Kpi label={t('dashboard.kpi.completeness')} help={t('dashboard.kpi.completeness_help')} value={pct(completeness)} meter={{ value: completeness, target: null }} sub={t('dashboard.kpi.completeness_sub')} onOpen={() => nav('/architecture-health')} />
+          )}
+          {can.reviews && data.gov?.summary && (data.gov.summary.completedReviews ?? 0) > 0 && (
+            <Kpi label={t('dashboard.kpi.governance')} help={t('dashboard.kpi.governance_help')} value={`${data.gov.summary.avgOverallScore ?? '—'}/100`} onOpen={() => nav('/governance')}
+              tone={(data.gov.summary.criticalOpenFindings ?? 0) > 0 ? 'critical' : undefined}
+              sub={fill(t('dashboard.kpi.governance_sub'), { critical: fmtNum(data.gov.summary.criticalOpenFindings ?? 0) })} />
+          )}
+          {can.repository && data.plans && (data.plans.total ?? 0) > 0 && (
+            <Kpi label={t('dashboard.kpi.plans')} help={t('dashboard.kpi.plans_help')} value={pct(data.plans.avgProgress)} meter={{ value: data.plans.avgProgress ?? 0, target: null }} onOpen={() => nav('/ea-planning')}
+              sub={fill(t('dashboard.kpi.plans_sub'), { active: data.plans.active ?? 0, risk: data.plans.highRisk ?? 0 })} />
+          )}
+        </section>
 
-        {/* Your Modules — RBAC-aware overview: only modules the current
-            account has permission to access, matching the sidebar's own
-            visibility rules exactly (same permission codes, kept in
-            sync deliberately). */}
-        <div className="card mb-6">
-          <div className="flex items-center justify-between" style={{ marginBottom: 12 }}>
-            <div className="section-title">{t('dash.your_modules')}<HelpTip text={t('dash.your_modules_help')} /></div>
-          </div>
-          <div className="stat-grid-4">
-            {MODULE_LINKS
-              .filter(m => (m.permission === null || hasPermission(m.permission)) && (!m.superadminOnly || isSuperadmin))
-              .map(m => {
-                const state = moduleState[m.to]
-                return (
-                  <div key={m.to} onClick={() => nav(m.to)} style={{
-                    cursor: 'pointer', background: 'var(--navy-dark)', borderRadius: 8, padding: '12px 14px',
-                    display: 'flex', alignItems: 'center', gap: 10,
-                  }}>
-                    <span style={{ fontSize: 18 }}>{m.icon}</span>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 500 }}>{t(m.labelKey)}</div>
-                      {state && <div style={{ fontSize: 11, color: 'var(--text-dim)', marginTop: 1 }}>{state.value} {state.sub}</div>}
-                    </div>
-                  </div>
-                )
-              })}
-          </div>
-        </div>
-
-        {/* Governance Dashboard */}
-        {canViewReviews && statsTotal > 0 && (
-          <div className="card mb-6">
-            <div className="flex items-center justify-between" style={{ marginBottom: 16 }}>
-              <div className="section-title">🏛 {t('gov.dashboard')}<HelpTip text={t('gov.dashboard_help')} /></div>
-              <button onClick={() => nav('/governance')} style={{ fontSize: 12, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer' }}>
-                {t('gov.view_all')} →
-              </button>
-            </div>
-
-            {/* Governance KPIs */}
-            <div className="stat-grid-3" style={{ marginBottom: 16 }}>
-              {[
-                { label: t('gov.total_reviews'), value: statsTotal, sub: statsComplete + ' completed', color: '#64748B' },
-                { label: t('gov.avg_score'), value: statsAvgScore || '—', sub: scoreAvgs ? `C:${scoreAvgs.compliance} S:${scoreAvgs.strategic} R:${scoreAvgs.risk}` : '', color: statsAvgScore >= 70 ? '#2ecc71' : statsAvgScore >= 50 ? '#f39c12' : '#e74c3c' },
-                { label: t('gov.open_findings'), value: statsOpenFindings, sub: statsCriticalOpen > 0 ? statsCriticalOpen + ' ' + t('common.critical').toLowerCase() : t('gov.none_critical'), color: statsCriticalOpen > 0 ? '#e74c3c' : '#2ecc71' },
-              ].map((s: any) => (
-                <div key={s.label} style={{ background: 'var(--navy-dark)', borderRadius: 8, padding: '12px 14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontWeight: 700, color: s.color }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{s.label}</div>
-                  {s.sub && <div style={{ fontSize: 10, color: s.color + 'aa', marginTop: 2 }}>{s.sub}</div>}
+        {can.health && (
+          <div className="dsh-row dsh-row-main">
+            <section className="card dsh-card">
+              <CardHead title={t('dashboard.domains.title')} help={t('dashboard.domains.help')} action={{ label: t('dashboard.open'), onClick: () => nav('/architecture-health') }} />
+              {!data.health ? <p className="dsh-muted">{t('dashboard.unavailable')}</p> : domains.length === 0 ? <p className="dsh-muted">{t('dashboard.domains.empty')}</p> : (
+                <div className="dsh-table-wrap">
+                  <table className="dsh-table">
+                    <thead><tr>
+                      <th scope="col">{t('dashboard.domains.domain')}</th>
+                      <th scope="col" className="num">{t('dashboard.domains.objects')}</th>
+                      <th scope="col">{t('dashboard.domains.maturity')}</th>
+                      <th scope="col">{t('dashboard.domains.completeness')}</th>
+                      <th scope="col">{t('dashboard.domains.relationships')}</th>
+                      <th scope="col">{t('dashboard.domains.reference')}</th>
+                    </tr></thead>
+                    <tbody>
+                      {rankDomains(domains).map(d => {
+                        const name = (isAR && d.domain.nameAr) || d.domain.name
+                        const m = d.maturity
+                        const below = m.level != null && m.targetLevel != null && m.level < m.targetLevel
+                        return (
+                          <tr key={d.domain.code} className="dsh-clickable" tabIndex={0} onClick={() => nav(`/architecture-health?domain=${d.domain.code}`)}
+                            onKeyDown={e => { if (e.key === 'Enter') nav(`/architecture-health?domain=${d.domain.code}`) }}>
+                            <th scope="row">{name}</th>
+                            <td className="num">{fmtNum(d.objectCount)}</td>
+                            <td>
+                              <div className="dsh-cell-bar">
+                                <Bar value={m.score} target={m.targetLevel ? (m.targetLevel - 1) * 20 : null} label={`${name}: ${Math.round(m.score ?? 0)}`} />
+                                <span className={`dsh-level${below ? ' below' : ''}`}>{m.level != null ? fill(t('dashboard.domains.level'), { level: m.level, target: m.targetLevel ?? '—' }) : '—'}</span>
+                              </div>
+                            </td>
+                            <td><BarCell value={d.completeness} name={name} /></td>
+                            <td><BarCell value={d.relationshipCompleteness} name={name} /></td>
+                            <td><BarCell value={d.referenceCoverage} name={name} /></td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
-            </div>
+              )}
+            </section>
 
-            {/* Findings by severity */}
-            {(findingsBySev.CRITICAL > 0 || findingsBySev.HIGH > 0) && (
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                {[['CRITICAL','#e74c3c'],['HIGH','#e67e22'],['MEDIUM','#f39c12'],['LOW','#3498db']].map(([sev,col]) =>
-                  findingsBySev[sev] ? (
-                    <div key={sev} style={{ padding: '3px 10px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: col + '22', color: col, border: '1px solid ' + col + '44' }}>
-                      {findingsBySev[sev]} {sev}
-                    </div>
-                  ) : null
-                )}
-              </div>
-            )}
-
-            {/* Monthly trend */}
-            {monthlyTrend.length > 0 && monthlyTrend.some((m: any) => m.count > 0) && (
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>Monthly Reviews & Avg Score</div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 64 }}>
-                  {monthlyTrend.map((m: any, i: number) => {
-                    const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any)=>x.count), 1)) * 48))
-                    const scoreColor = m.avgScore >= 70 ? '#2ecc71' : m.avgScore >= 50 ? '#f39c12' : m.avgScore ? '#e74c3c' : '#64748B'
-                    return (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                        {m.avgScore && <div style={{ fontSize: 9, color: scoreColor, fontWeight: 600 }}>{m.avgScore}</div>}
-                        <div style={{ width: '100%', height: h, background: m.count > 0 ? scoreColor + '88' : 'var(--navy-light)', borderRadius: 3, border: '1px solid ' + (m.count > 0 ? scoreColor : 'var(--navy-light)') }} title={m.count + ' reviews'} />
-                        <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{m.label}</div>
-                      </div>
-                    )
-                  })}
+            <section className="card dsh-card">
+              <CardHead title={t('dashboard.attention.title')} help={t('dashboard.attention.help')} />
+              {attention.items.length === 0 ? <p className="dsh-muted">{t('dashboard.attention.none')}</p> : (
+                <ul className="dsh-attention">
+                  {attention.items.map(item => <AttentionRow key={item.key} item={item} t={t} fmtNum={fmtNum} onOpen={() => nav(item.link)} />)}
+                </ul>
+              )}
+              {attention.more > 0 && <button type="button" className="dsh-link" onClick={() => nav('/architecture-health')}>{fill(t('dashboard.attention.more'), { count: attention.more })} →</button>}
+              {attention.positive.length > 0 && (
+                <div className="dsh-good">
+                  <div className="dsh-mini-title">{t('dashboard.attention.good_news')}</div>
+                  <ul>{attention.positive.slice(0, 3).map(p => <li key={p.key}><span aria-hidden="true">▲</span> {p.title}</li>)}</ul>
                 </div>
-              </div>
-            )}
-
-            {/* Decision breakdown */}
-            {statsComplete > 0 && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.decision_breakdown')}</div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {Object.entries(decisionCounts).map(([d, n]: any) => (
-                    <div key={d} style={{
-                      padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                      background: (DECISION_COLOR[d] || '#64748B') + '22',
-                      color: DECISION_COLOR[d] || '#64748B',
-                      border: '1px solid ' + (DECISION_COLOR[d] || '#64748B') + '44'
-                    }}>{n} {d.replace(/_/g, ' ')}</div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Score trend from monthly stats */}
-            {monthlyTrend.length > 0 && monthlyTrend.some((m: any) => m.count > 0) && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.score_trend')} ({t('gov.last_6_months')})</div>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', height: 60 }}>
-                  {monthlyTrend.map((m: any, i: number) => {
-                    const h = Math.max(4, ((m.count / Math.max(...monthlyTrend.map((x:any) => x.count), 1)) * 48))
-                    const color = m.avgScore >= 70 ? '#2ecc71' : m.avgScore >= 50 ? '#f39c12' : m.avgScore ? '#e74c3c' : '#64748B'
-                    return (
-                      <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
-                        {m.avgScore && <div style={{ fontSize: 9, color, fontWeight: 600 }}>{m.avgScore}</div>}
-                        <div style={{ width: '100%', height: h, background: m.count > 0 ? color + '88' : 'var(--navy-light)', borderRadius: 3, border: '1px solid ' + (m.count > 0 ? color : 'var(--navy-light)') }} title={m.count + ' reviews'} />
-                        <div style={{ fontSize: 8, color: 'var(--text-muted)' }}>{m.label}</div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Recent reviews */}
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 8 }}>{t('gov.recent_reviews')}</div>
-              {reviews.slice(0, 5).map((r: any) => (
-                <div key={r.id} onClick={() => nav('/governance')} style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0',
-                  borderBottom: '1px solid var(--navy-light)', cursor: 'pointer'
-                }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 500 }}>{r.title}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>
-                      {r.reviewType?.replace(/_/g, ' ')} · {new Date(r.createdAt).toLocaleDateString(isAR ? 'ar-SA' : 'en-US')}
-                    </div>
-                  </div>
-                  {r.overallScore != null && r.status === 'COMPLETED' && (
-                    <div style={{ fontSize: 13, fontWeight: 700, color: r.overallScore >= 75 ? '#2ecc71' : r.overallScore >= 60 ? '#f39c12' : '#e74c3c', minWidth: 30, textAlign: 'right' }}>
-                      {Math.round(r.overallScore)}
-                    </div>
-                  )}
-                  <div style={{
-                    padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                    background: (r.status === 'COMPLETED' ? (DECISION_COLOR[r.decision] || '#2ecc71') : '#f39c12') + '22',
-                    color: r.status === 'COMPLETED' ? (DECISION_COLOR[r.decision] || '#2ecc71') : '#f39c12',
-                  }}>{r.status === 'COMPLETED' ? (r.decision?.replace(/_/g, ' ') || 'COMPLETED') : r.status}</div>
-                </div>
-              ))}
-            </div>
+              )}
+            </section>
           </div>
         )}
 
-        {/* Pending reviews alert */}
-        {pendingReviews.length > 0 && (
-          <div style={{ background: '#f39c1211', border: '1px solid #f39c1244', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <span style={{ fontSize: 20 }}>⏳</span>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#f39c12' }}>{pendingReviews.length} {t('gov.reviews_pending_action')}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{pendingReviews.map((r: any) => r.title).join(', ')}</div>
-            </div>
-            <button onClick={() => nav('/governance')} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #f39c12', background: 'transparent', color: '#f39c12', fontSize: 12, cursor: 'pointer' }}>{t('gov.review_now')}</button>
-          </div>
-        )}
-
-        <div className="grid-2 mb-6">
-          {canViewRepository && (
-            <div className="card">
-              <div className="section-title">⚙ {t('dash.active_cycles')}</div>
-              {cycles.length === 0
-                ? <div className="empty" style={{ padding: '24px 0' }}><div className="empty-title">{t('dash.no_cycles')}</div><button className="btn btn-primary btn-sm mt-4" onClick={() => nav('/adm')}>{t('dash.create_cycle')}</button></div>
-                : cycles.slice(0, 4).map(c => (
-                  <div key={c.id} className="flex items-center justify-between" style={{ padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-                    <div><div style={{ fontSize: 13, fontWeight: 500 }}>{c.name}</div><div style={{ fontSize: 11, color: 'var(--text-dim)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>Phase {c.currentPhase} · {c.frameworkType}</div></div>
-                    <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
-                  </div>
-                ))
-              }
-            </div>
+        <div className="dsh-row dsh-row-split">
+          {can.reviews && (
+            <section className="card dsh-card">
+              <CardHead title={t('dashboard.gov.title')} help={t('dashboard.gov.help')} action={{ label: t('dashboard.view_all'), onClick: () => nav('/governance') }} />
+              {!data.gov?.summary || !(data.gov.summary.completedReviews ?? 0) ? <p className="dsh-muted">{t('dashboard.gov.none')}</p> : <Governance gov={data.gov} reviews={data.reviews || []} t={t} isAR={isAR} fmtNum={fmtNum} onOpen={() => nav('/governance')} />}
+            </section>
           )}
-          <div className="card">
-            <div className="section-title">{t('dash.quick_actions')}</div>
-            {[
-              { icon: '⚙', label: t('qa.adm'), sub: t('qa.adm_sub'), path: '/adm', permission: 'Repository.View' },
-              { icon: '💬', label: t('qa.copilot'), sub: t('qa.copilot_sub'), path: '/copilot', permission: 'AIArchitect.Use' },
-              { icon: '🗄', label: t('qa.repo'), sub: t('qa.repo_sub'), path: '/repository', permission: 'Repository.View' },
-              { icon: '🏛', label: t('gov.dashboard'), sub: t('gov.start_review'), path: '/governance', permission: 'Reviews.View' },
-            ].filter(a => hasPermission(a.permission)).map(a => (
-              <button key={a.path} onClick={() => nav(a.path)} style={{ width: '100%', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none', padding: '10px 0', borderBottom: '1px solid var(--border)', cursor: 'pointer', textAlign: 'start', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <span style={{ fontSize: 20 }}>{a.icon}</span>
-                <div><div style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{a.label}</div><div style={{ fontSize: 11, color: 'var(--text-dim)' }}>{a.sub}</div></div>
-              </button>
+          <div className="dsh-stack">
+            {can.repository && data.summary?.byDomain?.length > 0 && (
+              <section className="card dsh-card">
+                <CardHead title={t('dashboard.repo.title')} help={t('dashboard.repo.help')} action={{ label: t('dashboard.open'), onClick: () => nav('/repository') }} />
+                <RepositoryBars rows={data.summary.byDomain} fmtNum={fmtNum} />
+              </section>
+            )}
+            {can.repository && (data.plans || data.cycles) && (
+              <section className="card dsh-card">
+                <CardHead title={t('dashboard.delivery.title')} help={t('dashboard.delivery.help')} />
+                <Delivery plans={data.plans} cycles={data.cycles || []} t={t} onPlans={() => nav('/ea-planning')} onCycles={() => nav('/adm')} />
+              </section>
+            )}
+          </div>
+        </div>
+      </>}
+    </div>
+  )
+}
+
+function statusCount(summary: any, status: string): number {
+  return (summary?.byStatus || []).find((s: any) => s.status === status)?.count ?? 0
+}
+
+function CardHead({ title, help, action }: { title: string; help: string; action?: { label: string; onClick: () => void } }) {
+  return (
+    <div className="dsh-card-head">
+      <h2 className="dsh-card-title">{title}<HelpTip text={help} /></h2>
+      {action && <button type="button" className="dsh-link" onClick={action.onClick}>{action.label} →</button>}
+    </div>
+  )
+}
+
+function Kpi({ label, value, sub, help, onOpen, meter, tone }: { label: string; value: string; sub?: string; help: string; onOpen: () => void; meter?: { value: number; target: number | null }; tone?: 'critical' }) {
+  return (
+    <div className={`dsh-kpi${tone ? ` ${tone}` : ''}`}>
+      <span className="dsh-kpi-label">{label}<HelpTip text={help} /></span>
+      <button type="button" className="dsh-kpi-body" onClick={onOpen} aria-label={`${label}: ${value}`}>
+        <span className="dsh-kpi-value">{value}</span>
+        {meter && <Bar value={meter.value} target={meter.target} label={`${label}: ${Math.round(meter.value)}`} />}
+        {sub && <span className="dsh-kpi-sub">{sub}</span>}
+      </button>
+    </div>
+  )
+}
+
+/** A 0-100 bar on a recessive track, with an optional target tick. */
+function Bar({ value, target, label }: { value: number | null | undefined; target?: number | null; label: string }) {
+  const v = value == null ? 0 : Math.max(0, Math.min(100, value))
+  return (
+    <span className="dsh-bar" role="img" aria-label={label} title={label}>
+      <span className="dsh-bar-fill" style={{ width: `${v}%` }} />
+      {target != null && <span className="dsh-bar-target" style={{ insetInlineStart: `${Math.min(100, target)}%` }} />}
+    </span>
+  )
+}
+
+function BarCell({ value, name }: { value: number | null; name: string }) {
+  if (value == null) return <span className="dsh-muted">—</span>
+  return <div className="dsh-cell-bar"><Bar value={value} label={`${name}: ${pct(value)}`} /><span className="dsh-pct">{pct(value)}</span></div>
+}
+
+function AttentionRow({ item, t, fmtNum, onOpen }: { item: AttentionItem; t: (k: string) => string; fmtNum: (n: number) => string; onOpen: () => void }) {
+  const title = item.source === 'GOVERNANCE' ? fill(t('dashboard.attention.critical_findings'), { count: fmtNum(Number(item.title)) }) : item.title
+  return (
+    <li>
+      <button type="button" className="dsh-attention-item" onClick={onOpen}>
+        <span className="dsh-sev" style={{ background: SEVERITY_COLOR[item.severity] || SEVERITY_COLOR.LOW }}>{t(`dashboard.severity.${item.severity}`)}</span>
+        <span className="dsh-attention-text">
+          <span className="dsh-attention-title">{title}</span>
+          {item.detail && <span className="dsh-attention-detail">{item.detail}</span>}
+        </span>
+      </button>
+    </li>
+  )
+}
+
+function Governance({ gov, reviews, t, isAR, fmtNum, onOpen }: { gov: GovStats; reviews: any[]; t: (k: string) => string; isAR: boolean; fmtNum: (n: number) => string; onOpen: () => void }) {
+  const shares = decisionShares(gov.decisions)
+  const sev = gov.findingsBySeverity || {}
+  const sevMax = Math.max(1, ...SEVERITY_ORDER.map(s => sev[s] || 0))
+  const trend = (gov.monthlyTrend || [])
+  const trendMax = Math.max(1, ...trend.map(m => m.count))
+  return (
+    <div className="dsh-gov">
+      {shares.total > 0 && (
+        <div>
+          <div className="dsh-mini-title">{t('dashboard.gov.decisions')}</div>
+          <div className="dsh-stack-bar" role="img" aria-label={shares.parts.map(p => `${t(`dashboard.decision.${p.key}`)} ${p.count}`).join(', ')}>
+            {shares.parts.filter(p => p.count > 0).map(p => (
+              <span key={p.key} style={{ width: `${p.pct}%`, background: DECISION_COLOR[p.key] }} title={`${t(`dashboard.decision.${p.key}`)}: ${p.count} (${p.pct}%)`} />
             ))}
           </div>
+          <ul className="dsh-legend">
+            {DECISION_ORDER.map(d => (
+              <li key={d}><span className="dsh-swatch" style={{ background: DECISION_COLOR[d] }} />{t(`dashboard.decision.${d}`)} <strong>{fmtNum(gov.decisions?.[d] || 0)}</strong></li>
+            ))}
+          </ul>
         </div>
-
-        {cycles[0] && cycles[0].frameworkType === 'NORA' && (
-          <div className="card">
-            <div className="section-title">{t('dash.latest_cycle')} — {cycles[0].name}</div>
-            <div className="phase-track">
-              {['1', '2', '3', '4', '5', '6', '7'].map(p => {
-                const ph = cycles[0].phases?.find((x: any) => x.phase === p); const s = ph?.status || 'NOT_STARTED'
-                return <div key={p} className="phase-step"><div className={`phase-dot${s === 'COMPLETE' ? ' done' : s === 'IN_PROGRESS' ? ' active' : ''}`}>{p}</div><div className="phase-label">{s === 'COMPLETE' ? '✓' : s === 'IN_PROGRESS' ? '→' : '·'}</div></div>
-              })}
+      )}
+      <div className="dsh-gov-grid">
+        <div>
+          <div className="dsh-mini-title">{t('dashboard.gov.findings')}</div>
+          <ul className="dsh-hbars">
+            {SEVERITY_ORDER.map(s => (
+              <li key={s} title={`${t(`dashboard.severity.${s}`)}: ${sev[s] || 0}`}>
+                <span className="dsh-hbar-label">{t(`dashboard.severity.${s}`)}</span>
+                <span className="dsh-hbar-track"><span className="dsh-hbar-fill" style={{ width: `${((sev[s] || 0) / sevMax) * 100}%`, background: SEVERITY_COLOR[s] }} /></span>
+                <span className="dsh-hbar-value">{fmtNum(sev[s] || 0)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        {trend.some(m => m.count > 0) && (
+          <div>
+            <div className="dsh-mini-title">{t('dashboard.gov.trend')}</div>
+            <div className="dsh-columns" role="img" aria-label={trend.map(m => `${m.label}: ${m.count}`).join(', ')}>
+              {trend.map(m => (
+                <div key={m.label} className="dsh-column" title={`${m.label}: ${m.count}${m.avgScore != null ? ` · ${fill(t('dashboard.gov.trend_avg'), { score: m.avgScore })}` : ''}`}>
+                  <span className="dsh-column-value">{m.count || ''}</span>
+                  <span className="dsh-column-bar" style={{ height: `${Math.max(m.count ? 4 : 0, (m.count / trendMax) * 64)}px` }} />
+                  <span className="dsh-column-label">{m.label}</span>
+                </div>
+              ))}
             </div>
           </div>
+        )}
+      </div>
+      {reviews.length > 0 && (
+        <div>
+          <div className="dsh-mini-title">{t('dashboard.gov.recent')}</div>
+          <ul className="dsh-list">
+            {reviews.slice(0, 5).map(r => (
+              <li key={r.id}>
+                <button type="button" className="dsh-list-item" onClick={onOpen}>
+                  <span className="dsh-list-main">
+                    <span className="dsh-list-title">{r.title}</span>
+                    <span className="dsh-list-sub">{String(r.reviewType || '').replace(/_/g, ' ')} · {new Date(r.createdAt).toLocaleDateString(isAR ? 'ar-SA-u-nu-latn' : 'en-US')}</span>
+                  </span>
+                  {r.status === 'COMPLETED' && r.decision && <span className="dsh-chip" style={{ borderColor: DECISION_COLOR[r.decision] || '#64748B' }}><span className="dsh-swatch" style={{ background: DECISION_COLOR[r.decision] || '#64748B' }} />{t(`dashboard.decision.${r.decision}`) !== `dashboard.decision.${r.decision}` ? t(`dashboard.decision.${r.decision}`) : String(r.decision).replace(/_/g, ' ')}</span>}
+                  {r.status === 'COMPLETED' && r.overallScore != null && <span className="dsh-score">{Math.round(r.overallScore)}</span>}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function RepositoryBars({ rows, fmtNum }: { rows: Array<{ domain: string; operatingDomainDisplayName?: string; count: number }>; fmtNum: (n: number) => string }) {
+  const sorted = [...rows].sort((a, b) => b.count - a.count)
+  const max = Math.max(1, ...sorted.map(r => r.count))
+  return (
+    <ul className="dsh-hbars">
+      {sorted.map(r => (
+        <li key={r.domain} title={`${r.operatingDomainDisplayName || r.domain}: ${r.count}`}>
+          <span className="dsh-hbar-label">{r.operatingDomainDisplayName || r.domain}</span>
+          <span className="dsh-hbar-track"><span className="dsh-hbar-fill" style={{ width: `${(r.count / max) * 100}%` }} /></span>
+          <span className="dsh-hbar-value">{fmtNum(r.count)}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function Delivery({ plans, cycles, t, onPlans, onCycles }: { plans: any; cycles: any[]; t: (k: string) => string; onPlans: () => void; onCycles: () => void }) {
+  return (
+    <div className="dsh-delivery">
+      {plans && (plans.total ?? 0) > 0 && (
+        <button type="button" className="dsh-delivery-block" onClick={onPlans}>
+          <span className="dsh-mini-title">{t('dashboard.delivery.plans')}</span>
+          <span className="dsh-plan-counts">
+            {['ACTIVE', 'DRAFT', 'COMPLETED'].map(s => <span key={s}><strong>{plans.byStatus?.[s] ?? 0}</strong> {t(`dashboard.delivery.plan_status.${s}`)}</span>)}
+          </span>
+          <span className="dsh-cell-bar"><Bar value={plans.avgProgress ?? 0} label={`${t('dashboard.delivery.avg_progress')}: ${pct(plans.avgProgress)}`} /><span className="dsh-pct">{pct(plans.avgProgress)}</span></span>
+        </button>
+      )}
+      <div className="dsh-delivery-block">
+        <span className="dsh-mini-title">{t('dashboard.delivery.cycles')}</span>
+        {cycles.length === 0 ? (
+          <span className="dsh-muted">{t('dashboard.delivery.no_cycles')} <button type="button" className="dsh-link" onClick={onCycles}>{t('dashboard.delivery.start_cycle')} →</button></span>
+        ) : (
+          <ul className="dsh-list">
+            {cycles.slice(0, 4).map(c => {
+              const phases: any[] = Array.isArray(c.phases) ? c.phases : []
+              const total = phases.length
+              const done = phases.filter(p => p.status === 'COMPLETE').length
+              return (
+                <li key={c.id}>
+                  <button type="button" className="dsh-list-item" onClick={onCycles}>
+                    <span className="dsh-list-main">
+                      <span className="dsh-list-title">{c.name}</span>
+                      <span className="dsh-list-sub">{c.frameworkType}{total > 0 ? ` · ${fill(t('dashboard.delivery.phase'), { done, total })}` : ''}</span>
+                    </span>
+                    {total > 0 && <span className="dsh-cell-bar dsh-cycle-bar"><Bar value={(done / total) * 100} label={`${c.name}: ${done}/${total}`} /></span>}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
         )}
       </div>
     </div>
   )
 }
-

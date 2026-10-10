@@ -80,3 +80,38 @@ describe('the menu follows the roles in Access Governance', () => {
     expect(links()).not.toContain('/demo-requests');
   });
 });
+
+describe('on a wide screen the menu is docked beside the page', () => {
+  const original = window.matchMedia;
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({ matches: true, media: query, addEventListener: jest.fn(), removeEventListener: jest.fn(), addListener: jest.fn(), removeListener: jest.fn() })) as any;
+  });
+  afterEach(() => { window.matchMedia = original; });
+
+  it('is open by default, side by side with the page (no dialog, page not inert)', () => {
+    const { container } = render(<Layout />);
+    expect(container.firstChild).toHaveClass('layout-docked', 'sidebar-visible');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Platform modules' })).toHaveClass('open');
+    expect(screen.getByText('Platform homepage').parentElement).not.toHaveAttribute('inert');
+  });
+
+  it('stays closed once closed, and the Modules button opens it again', () => {
+    const { container, unmount } = render(<Layout />);
+    fireEvent.click(screen.getByRole('button', { name: 'Close modules menu' }));
+    expect(localStorage.getItem('ea_sidebar_docked')).toBe('closed');
+    expect(container.firstChild).not.toHaveClass('sidebar-visible');
+    unmount();
+    const second = render(<Layout />);
+    expect(second.container.firstChild).not.toHaveClass('sidebar-visible');
+    fireEvent.click(screen.getByRole('button', { name: 'Platform modules' }));
+    expect(second.container.firstChild).toHaveClass('sidebar-visible');
+    expect(localStorage.getItem('ea_sidebar_docked')).toBe('open');
+  });
+
+  it('selecting a module keeps the docked menu open', () => {
+    const { container } = render(<Layout />);
+    fireEvent.click(screen.getByRole('link', { name: /nav.copilot/ }));
+    expect(container.firstChild).toHaveClass('sidebar-visible');
+  });
+});
