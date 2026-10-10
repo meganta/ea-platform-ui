@@ -10,6 +10,7 @@ import PrincipleCompliancePanel from '../components/PrincipleCompliancePanel'
 import { GovernanceReferencePanel } from '../components/ReferenceArchitecturePanels'
 import StrategyAlignmentPanel, { usesStrategyAlignment } from '../components/StrategyAlignmentPanel'
 import PipelineStepList, { PipelineStep, stepsRatio } from '../components/PipelineStepList'
+import GovernanceRiskContent, { riskDisplayText } from '../components/GovernanceRiskContent'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
@@ -2855,16 +2856,10 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
               <div key={riskIdx} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: 14, marginBottom: 10 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                   <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[risk.severity] + '33', color: SEV_COLOR[risk.severity] }}>{risk.severity}</span>
-                  <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{risk.riskTitle}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{riskDisplayText(risk).title}</div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{risk.riskCategory?.replace(/_/g, ' ')}</div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
-                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Probability: </span>{risk.probability}</div>
-                  <div style={{ fontSize: 12 }}><span style={{ color: 'var(--text-muted)' }}>Owner: </span>{risk.owner}</div>
-                </div>
-                {risk.impact && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>Impact: {risk.impact}</div>}
-                {risk.mitigation && <div style={{ fontSize: 12, color: 'var(--accent)', marginBottom: 4 }}>Mitigation: {risk.mitigation}</div>}
-                {risk.evidence && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Evidence: {risk.evidence}</div>}
+                <GovernanceRiskContent risk={risk} isAR={isAR} />
                 <div style={{ marginTop: 8, display: 'flex', gap: 6, borderTop: '1px solid var(--navy-light)', paddingTop: 8 }}>
                   <select value={risk.severity} onChange={async e => { await updateRisk(riskIdx, { severity: e.target.value }) }}
                     style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, border: '1px solid ' + (SEV_COLOR[risk.severity] || '#64748B') + '44', background: (SEV_COLOR[risk.severity] || '#64748B') + '18', color: SEV_COLOR[risk.severity] || '#64748B', cursor: 'pointer' }}>
