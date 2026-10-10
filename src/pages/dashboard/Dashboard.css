@@ -1,0 +1,124 @@
+/* Dashboard (DashboardPage). Design-system tokens only; status colours come inline from the page. */
+.dsh { display: flex; flex-direction: column; gap: 16px; max-width: 1480px; margin: 0 auto; width: 100% }
+
+.dsh-hero { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; padding: 20px 24px; background: var(--navy-light); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); border-inline-start: 4px solid var(--accent) }
+.dsh-hero-text { min-width: 0; flex: 1 1 360px }
+.dsh-title { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -0.01em }
+.dsh-subtitle { margin: 6px 0 0; font-size: 13px; color: var(--text-dim); line-height: 1.5 }
+.dsh-hero-actions { display: flex; flex-wrap: wrap; gap: 8px }
+.dsh-updated { flex-basis: 100%; font-size: 11px; color: var(--text-dim) }
+.dsh-loading { padding: 48px; text-align: center; color: var(--text-dim) }
+
+/* KPI tiles */
+.dsh-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px }
+.dsh-kpi { display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--navy-light); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); color: var(--text); transition: box-shadow .15s, border-color .15s; min-width: 0 }
+.dsh-kpi:hover { border-color: var(--accent); box-shadow: var(--shadow-md) }
+.dsh-kpi-body { display: flex; flex-direction: column; gap: 8px; align-items: stretch; flex: 1; padding: 0; background: none; border: none; text-align: start; font: inherit; color: inherit; cursor: pointer }
+.dsh-kpi-body:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px }
+.dsh-kpi.critical { border-top: 3px solid var(--danger) }
+.dsh-kpi-label { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em }
+.dsh-kpi-value { font-family: var(--font-display); font-size: 28px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums }
+.dsh-kpi-sub { font-size: 12px; color: var(--text-dim); line-height: 1.4 }
+
+/* Rows and cards */
+.dsh-row { display: grid; gap: 16px; align-items: start }
+.dsh-row-main { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) }
+.dsh-row-split { grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) }
+.dsh-stack { display: flex; flex-direction: column; gap: 16px; min-width: 0 }
+.dsh-card { padding: 18px 20px; min-width: 0; margin: 0 }
+.dsh-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px }
+.dsh-card-title { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 15px; font-weight: 700; color: var(--text) }
+.dsh-link { background: none; border: none; padding: 0; color: var(--accent); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap }
+.dsh-link:hover { text-decoration: underline }
+.dsh-muted { color: var(--text-dim); font-size: 13px; margin: 0 }
+.dsh-mini-title { display: block; font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px }
+
+/* Domain table */
+.dsh-table-wrap { overflow-x: auto; margin: 0 -4px }
+.dsh-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px }
+.dsh-table th, .dsh-table td { padding: 9px 8px; text-align: start; border-bottom: 1px solid var(--border); vertical-align: middle }
+.dsh-table thead th { font-size: 11px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; white-space: nowrap }
+.dsh-table tbody th { font-weight: 600; color: var(--text) }
+.dsh-table .num { text-align: end; font-variant-numeric: tabular-nums }
+.dsh-clickable { cursor: pointer }
+.dsh-clickable:hover { background: var(--navy-mid) }
+.dsh-clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px }
+.dsh-cell-bar { display: flex; align-items: center; gap: 8px; min-width: 110px }
+.dsh-cell-bar .dsh-bar { flex: 1 }
+.dsh-level, .dsh-pct { font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 36px; text-align: end; color: var(--text) }
+.dsh-level.below { color: var(--danger); font-weight: 600 }
+
+/* 0-100 bar */
+.dsh-bar { position: relative; display: block; height: 6px; border-radius: 3px; background: var(--navy-mid); overflow: visible }
+.dsh-bar-fill { position: absolute; inset-block: 0; inset-inline-start: 0; border-radius: 3px; background: var(--accent) }
+.dsh-bar-target { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-inline-start: -1px; background: var(--text); border-radius: 1px }
+
+/* Needs attention */
+.dsh-attention { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px }
+.dsh-attention-item { display: flex; align-items: flex-start; gap: 10px; width: 100%; padding: 8px 10px; background: var(--navy); border: 1px solid var(--border); border-radius: 6px; text-align: start; font: inherit; color: var(--text); cursor: pointer }
+.dsh-attention-item:hover { border-color: var(--accent) }
+.dsh-sev { flex: none; padding: 2px 8px; border-radius: 10px; color: #fff; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; margin-top: 1px }
+.dsh-attention-text { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
+.dsh-attention-title { font-size: 13px; font-weight: 600; line-height: 1.35 }
+.dsh-attention-detail { font-size: 12px; color: var(--text-dim); line-height: 1.4 }
+.dsh-card > .dsh-link { margin-top: 10px; display: inline-block }
+.dsh-good { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border) }
+.dsh-good ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px }
+.dsh-good span { color: var(--success) }
+
+/* Governance */
+.dsh-gov { display: flex; flex-direction: column; gap: 18px }
+.dsh-gov-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px }
+.dsh-stack-bar { display: flex; gap: 2px; height: 14px; border-radius: 4px; overflow: hidden; background: var(--navy-mid) }
+.dsh-stack-bar > span { display: block; min-width: 3px }
+.dsh-legend { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--text) }
+.dsh-legend li { display: flex; align-items: center; gap: 6px }
+.dsh-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; flex: none }
+.dsh-hbars { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px }
+.dsh-hbars li { display: grid; grid-template-columns: minmax(70px, 38%) 1fr auto; align-items: center; gap: 8px; font-size: 12px }
+.dsh-hbar-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text) }
+.dsh-hbar-track { display: block; height: 8px; background: var(--navy-mid); border-radius: 4px; overflow: hidden }
+.dsh-hbar-fill { display: block; height: 100%; background: var(--accent); border-radius: 4px }
+.dsh-hbar-value { font-variant-numeric: tabular-nums; font-weight: 600; min-width: 28px; text-align: end }
+.dsh-columns { display: flex; align-items: flex-end; gap: 6px; height: 100px; padding-bottom: 2px; border-bottom: 1px solid var(--border) }
+.dsh-column { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; min-width: 0; height: 100% }
+.dsh-column-value { font-size: 10px; color: var(--text-dim); font-variant-numeric: tabular-nums }
+.dsh-column-bar { display: block; width: 100%; max-width: 22px; background: var(--accent); border-radius: 3px 3px 0 0 }
+.dsh-column-label { font-size: 10px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100% }
+
+/* Lists */
+.dsh-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column }
+.dsh-list-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 4px; background: none; border: none; border-bottom: 1px solid var(--border); text-align: start; font: inherit; color: var(--text); cursor: pointer }
+.dsh-list li:last-child .dsh-list-item { border-bottom: none }
+.dsh-list-item:hover { background: var(--navy) }
+.dsh-list-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0 }
+.dsh-list-title { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.dsh-list-sub { font-size: 11px; color: var(--text-dim); text-transform: capitalize }
+.dsh-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 10px; font-size: 11px; white-space: nowrap; flex: none }
+.dsh-score { flex: none; min-width: 34px; text-align: center; padding: 3px 6px; border-radius: 6px; background: var(--navy-mid); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums }
+
+/* Delivery */
+.dsh-delivery { display: flex; flex-direction: column; gap: 16px }
+.dsh-delivery-block { display: flex; flex-direction: column; gap: 8px; width: 100%; padding: 0; background: none; border: none; text-align: start; font: inherit; color: var(--text) }
+button.dsh-delivery-block { cursor: pointer }
+.dsh-plan-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--text-dim) }
+.dsh-plan-counts strong { color: var(--text); font-size: 16px; margin-inline-end: 3px }
+.dsh-cycle-bar { flex: none; width: 90px; min-width: 90px }
+
+/* Arabic letters must stay joined: no letter spacing or case transforms in RTL. */
+.dsh[dir='rtl'] .dsh-kpi-label, .dsh[dir='rtl'] .dsh-table thead th, .dsh[dir='rtl'] .dsh-mini-title, .dsh[dir='rtl'] .dsh-sev, .dsh[dir='rtl'] .dsh-title { letter-spacing: 0; text-transform: none }
+
+@media (max-width: 1100px) {
+  .dsh-row-main, .dsh-row-split { grid-template-columns: minmax(0, 1fr) }
+}
+@media (max-width: 700px) {
+  .dsh-hero { padding: 16px }
+  .dsh-title { font-size: 19px }
+  .dsh-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .dsh-kpi-value { font-size: 22px }
+  .dsh-gov-grid { grid-template-columns: minmax(0, 1fr) }
+  .dsh-card { padding: 14px }
+}
+@media (max-width: 420px) {
+  .dsh-kpis { grid-template-columns: minmax(0, 1fr) }
+}
