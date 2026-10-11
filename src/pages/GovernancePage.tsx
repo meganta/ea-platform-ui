@@ -8,6 +8,7 @@ import { AttachedViewsPanel } from '../components/AttachedViewsPanel'
 import { exportFileName } from '../lib/exportFileName'
 import PrincipleCompliancePanel from '../components/PrincipleCompliancePanel'
 import { GovernanceReferencePanel } from '../components/ReferenceArchitecturePanels'
+import { GovernanceTargetPanel } from '../components/RoadmapContextPanels'
 import StrategyAlignmentPanel, { usesStrategyAlignment } from '../components/StrategyAlignmentPanel'
 import PipelineStepList, { PipelineStep, stepsRatio } from '../components/PipelineStepList'
 import GovernanceRiskContent, { riskDisplayText } from '../components/GovernanceRiskContent'
@@ -2637,6 +2638,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
           <div>
             <PrincipleCompliancePanel section={principleSection} />
             <GovernanceReferencePanel reviewId={review.id} />
+            <GovernanceTargetPanel reviewId={review.id} />
             {/* Visual status breakdown */}
             {total > 0 && (
               <div style={{ marginBottom: 20 }}>

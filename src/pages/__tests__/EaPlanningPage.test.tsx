@@ -4,6 +4,9 @@ import EaPlanningPage from '../EaPlanningPage';
 jest.mock('../../contexts/LangContext', () => ({
   useLang: () => ({ t: (key: string) => key }),
 }));
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: () => false, user: { role: 'ARCHITECT' } }),
+}));
 
 beforeEach(() => {
   jest.clearAllMocks();
