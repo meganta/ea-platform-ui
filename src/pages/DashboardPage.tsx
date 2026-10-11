@@ -10,6 +10,7 @@ import {
   attentionItems, decisionShares, enterpriseCompleteness, enterpriseMaturity, pct, rankDomains,
 } from './dashboard/dashboardModel'
 import './dashboard/Dashboard.css'
+import { DashboardRoadmapCard } from '../components/RoadmapContextPanels'
 
 const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
@@ -195,6 +196,7 @@ export default function DashboardPage() {
             </section>
           )}
           <div className="dsh-stack">
+            <DashboardRoadmapCard onOpen={() => nav('/ea-planning?tab=target')} />
             {can.repository && data.summary?.byDomain?.length > 0 && (
               <section className="card dsh-card">
                 <CardHead title={t('dashboard.repo.title')} help={t('dashboard.repo.help')} action={{ label: t('dashboard.open'), onClick: () => nav('/repository') }} />

@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import HelpTip from '../components/HelpTip'
 import { useLang } from '../contexts/LangContext'
+import { useAuth } from '../contexts/AuthContext'
+import ArchitectureRoadmap from './planning/ArchitectureRoadmap'
 
 const API = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
@@ -42,7 +44,10 @@ const PRIORITY_COLOR: Record<string, string> = { HIGH: '#e74c3c', MEDIUM: '#f39c
 export default function EaPlanningPage() {
   const api = useApi()
   const { t } = useLang()
-  const [tab, setTab] = useState<'dashboard'|'plans'|'roadmap'>('dashboard')
+  const { hasPermission } = useAuth()
+  const canTarget = hasPermission('Roadmap.View')
+  // ?tab=target opens the enterprise roadmap directly (dashboard, Architecture Health and Copilot link here).
+  const [tab, setTab] = useState<'dashboard'|'plans'|'roadmap'|'target'>(() => (canTarget && new URLSearchParams(window.location.search).get('tab') === 'target' ? 'target' : 'dashboard'))
   const [dashboard, setDashboard] = useState<any>(null)
   const [planTypes, setPlanTypes] = useState<any[]>([])
   const [selected, setSelected] = useState<any>(null)
@@ -68,6 +73,7 @@ export default function EaPlanningPage() {
       </div>
       <div style={S.tabs}>
         <button style={S.tab(tab === 'dashboard')} onClick={() => setTab('dashboard')}>📊 Dashboard</button>
+        {canTarget && <button style={S.tab(tab === 'target')} onClick={() => setTab('target')}>{t('roadmap.tab')}</button>}
         <button style={S.tab(tab === 'plans')} onClick={() => setTab('plans')}>📋 All Plans</button>
         <button style={S.tab(tab === 'roadmap')} onClick={() => setTab('roadmap')}>{t('planning.tab_roadmap')}</button>
       </div>
@@ -75,6 +81,7 @@ export default function EaPlanningPage() {
         {tab === 'dashboard' && <DashboardTab dashboard={dashboard} onOpenPlans={() => setTab('plans')} />}
         {tab === 'plans' && <PlansListTab api={api} onOpen={openPlan} />}
         {tab === 'roadmap' && <RoadmapTab api={api} t={t} />}
+        {tab === 'target' && <ArchitectureRoadmap />}
       </div>
     </div>
   )
