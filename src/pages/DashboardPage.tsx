@@ -336,7 +336,7 @@ function Governance({ gov, reviews, t, isAR, fmtNum, onOpen }: { gov: GovStats; 
                     <span className="dsh-list-sub">{String(r.reviewType || '').replace(/_/g, ' ')} · {new Date(r.createdAt).toLocaleDateString(isAR ? 'ar-SA-u-nu-latn' : 'en-US')}</span>
                   </span>
                   {r.status === 'COMPLETED' && r.decision && <span className="dsh-chip" style={{ borderColor: DECISION_COLOR[r.decision] || '#64748B' }}><span className="dsh-swatch" style={{ background: DECISION_COLOR[r.decision] || '#64748B' }} />{t(`dashboard.decision.${r.decision}`) !== `dashboard.decision.${r.decision}` ? t(`dashboard.decision.${r.decision}`) : String(r.decision).replace(/_/g, ' ')}</span>}
-                  {r.status === 'COMPLETED' && r.overallScore != null && <span className="dsh-score">{Math.round(r.overallScore)}</span>}
+                  {r.status === 'COMPLETED' && r.overallScore != null && <span className="dsh-score">{r.reviewType === 'HLD_REVIEW' ? Math.round(r.overallScore) : r.overallScore}</span>}
                 </button>
               </li>
             ))}

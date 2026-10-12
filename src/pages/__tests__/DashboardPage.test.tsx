@@ -67,6 +67,16 @@ beforeEach(() => {
 const fetched = () => (global.fetch as jest.Mock).mock.calls.map(c => c[0] as string);
 
 describe('DashboardPage', () => {
+  it('preserves a non-HLD score below a threshold while retaining HLD display behavior', async () => {
+    responses['/governance/reviews'] = { data: [
+      { id: 'rfp', title: 'RFP precision check', reviewType: 'RFP_SOW', status: 'COMPLETED', decision: 'REQUIRES_CHANGES', overallScore: 59.5, createdAt: '2026-10-12' },
+      { id: 'hld', title: 'HLD unchanged check', reviewType: 'HLD_REVIEW', status: 'COMPLETED', decision: 'REQUIRES_CHANGES', overallScore: 59.5, createdAt: '2026-10-12' },
+    ] };
+    render(<DashboardPage />);
+    expect((await screen.findByRole('button', { name: /RFP precision check/ })).querySelector('.dsh-score')).toHaveTextContent('59.5');
+    expect((await screen.findByRole('button', { name: /HLD unchanged check/ })).querySelector('.dsh-score')).toHaveTextContent('60');
+  });
+
   it('shows the headline KPIs computed from the platform records', async () => {
     render(<DashboardPage />);
     await screen.findByText('dashboard.kpi.objects');
