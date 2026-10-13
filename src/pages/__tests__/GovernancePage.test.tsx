@@ -1,6 +1,12 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import GovernancePage from '../GovernancePage';
 
+let mockGovernanceUser: any = null;
+let mockGovernancePermissions: string[] = [];
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: () => ({ user: mockGovernanceUser, permissions: mockGovernancePermissions }),
+}));
+
 jest.mock('react-router-dom', () => ({
   useLocation: () => ({ state: null }),
 }), { virtual: true });
@@ -27,6 +33,8 @@ function makeReview(overrides: Partial<Record<string, any>> = {}) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockGovernanceUser = null;
+  mockGovernancePermissions = [];
   localStorage.setItem('ea_token', 'fake-token');
 });
 
@@ -67,6 +75,20 @@ function mockReportView(review: any, report: any, findings: any[] = []) {
 }
 
 describe('GovernancePage - list view', () => {
+  it.each([
+    ['TENANT_ADMIN', [], true],
+    ['SUPERADMIN', [], true],
+    ['ARCHITECT', ['Tenant.Administer'], true],
+    ['ARCHITECT', ['Governance.View'], false],
+    ['REVIEWER', [], false],
+  ])('matches backend deletion authorization for %s with %j', async (role, permissions, allowed) => {
+    mockGovernanceUser = { role };
+    mockGovernancePermissions = permissions as string[];
+    mockApiGet([makeReview()]);
+    render(<GovernancePage />);
+    await screen.findByText('Payment Gateway HLD Review');
+    expect(!!screen.queryByRole('button', { name: 'Delete review: Payment Gateway HLD Review' })).toBe(allowed);
+  });
   it('shows an expired-session error instead of claiming there are no reviews', async () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ message: 'Unauthorized' }) });
     render(<GovernancePage />);
