@@ -1,3 +1,5 @@
+import GovernanceReviewActions from '../components/GovernanceReviewActions'
+import { useAuth } from '../contexts/AuthContext'
 import GovernanceExportDialog, { GovernanceExportFormat } from '../components/GovernanceExportDialog'
 import React, { useEffect, useState, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -17,6 +19,7 @@ import { governanceExportError } from '../lib/governanceExportError'
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
 function useApi() {
+  return React.useMemo(() => {
   const token = () => localStorage.getItem('ea_token')
   const get = (path: string) => fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token()}` } }).then(r => {
     if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status })
@@ -27,6 +30,7 @@ function useApi() {
   const postFile = (path: string, form: FormData) => fetch(`${API_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token()}` }, body: form }).then(r => r.json())
   const del = (path: string) => fetch(`${API_URL}${path}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token()}` } })
   return { get, post, patch, postFile, del }
+  }, [])
 }
 
 const REVIEW_TYPES = [
@@ -723,6 +727,8 @@ function MetadataPreview({ meta }: { meta: any }) {
 }
 
 export default function GovernancePage() {
+  const { user } = useAuth()
+  const canDeleteReview = user?.role === 'TENANT_ADMIN'
   const api = useApi()
   const { isAR } = useLang()
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
@@ -1103,7 +1109,7 @@ export default function GovernancePage() {
 
       <div style={{ display: 'grid', gap: 12 }}>
         {paginatedReviews.map(r => (
-          <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div key={r.id} onClick={() => openReview(r)} style={{ background: 'var(--navy-mid)', border: '1px solid var(--navy-light)', borderRadius: 10, padding: '16px 20px', cursor: 'pointer', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16 }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)', marginBottom: 4 }}>{r.title}</div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{REVIEW_TYPES.find(t => t.value === r.reviewType)?.label} · {r.framework} · {new Date(r.createdAt).toLocaleDateString()}</div>
@@ -1111,6 +1117,7 @@ export default function GovernancePage() {
             {r.overallScore != null && <ScoreCircle score={r.overallScore} label='Score' />}
             <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, fontWeight: 600, background: DECISION_COLOR[r.decision] + '22', color: DECISION_COLOR[r.decision] }}>{r.decision?.replace(/_/g, ' ')}</div>
             <div style={{ padding: '4px 12px', borderRadius: 12, fontSize: 12, background: 'var(--navy-light)', color: 'var(--text-muted)' }}>{r.status}</div>
+            <GovernanceReviewActions reviewId={r.id} title={r.title} canDelete={canDeleteReview} isAR={isAR} onDeleted={() => { setReviews(current => current.filter(item => item.id !== r.id)); setReviewsTotal(total => Math.max(0, total - 1)); setPage(1) }} />
           </div>
         ))}
       </div>
@@ -1503,6 +1510,7 @@ export default function GovernancePage() {
         <button onClick={() => { setExportLang(isAR ? 'ar' : 'en'); setShowExportModal(true) }} style={{ background: 'none', border: '1px solid var(--navy-light)', borderRadius: 8, padding: '6px 14px', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 12 }}>{isAR ? 'تصدير' : 'Export'}</button>
         <button onClick={() => setShowRerunModal(true)} style={{ background: 'none', border: '1px solid var(--accent)', borderRadius: 8, padding: '6px 14px', color: 'var(--accent)', cursor: 'pointer', fontSize: 12 }}>🔄 Re-run</button>
       </div>
+      {review && <GovernanceReviewActions key={review.id} reviewId={review.id} title={review.title} canDelete={canDeleteReview} isAR={isAR} onDeleted={() => { setReview(null); setView('list'); loadReviews() }} />}
       {/* Export Progress Modal */}
       {exporting && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', zIndex: 1001, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
