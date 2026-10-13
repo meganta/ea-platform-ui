@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import ReferenceDiagram from './refarch/ReferenceDiagram'
 import ElementDrawer from './refarch/ElementDrawer'
 import ImportWizard from './refarch/ImportWizard'
-import { ElementConformance, RefApi, RefElement, STATUS_COLOR, STATUS_ORDER, T, localName, makeApi } from './refarch/refArch'
+import { ElementConformance, RefApi, RefElement, STATUS_COLOR, STATUS_ORDER, T, isContextOnly, localName, makeApi } from './refarch/refArch'
 import './repository/AssetProfile.css'
 import './refarch/ReferenceArchitecture.css'
 
@@ -179,7 +179,7 @@ function Workspace({ id, api, t, isAR, metaModel, onBack }: { id: string; api: R
                 {draft && <AddElement api={api} t={t} versionId={version.id} elements={elements} metaModel={metaModel} onAdded={refresh} />}
               </div>
               {selectedEl && (
-                <ElementDrawer key={selectedEl.stableKey} architectureId={arch.id} element={selectedEl} parentName={parentName} conformance={isModel(arch) ? undefined : confByKey[selectedEl.stableKey]} editable={draft} referenceModel={isModel(arch)}
+                <ElementDrawer key={selectedEl.stableKey} architectureId={arch.id} element={selectedEl} parentName={parentName} conformance={isModel(arch) ? undefined : confByKey[selectedEl.stableKey]} editable={draft} referenceModel={isModel(arch)} contextOnly={isContextOnly(selectedEl.stableKey, elements)}
                   versionId={version.id} metaModelTypes={metaModel?.objectTypes || []} realization={metaModel?.realization} architectureDomain={arch.domainCode || null} api={api} t={t} isAR={isAR} onChanged={loadVersion} onClose={() => setSelected(null)} />
               )}
             </div>

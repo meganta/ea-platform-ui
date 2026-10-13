@@ -100,6 +100,36 @@ describe('Reference Architectures page', () => {
     await waitFor(() => expect(calls(f, 'GET', '/reference-architectures/a1/links?elementKey=portal').length).toBe(1))
   })
 
+  it('removes a recorded implementation from the element drawer (retired, after confirmation)', async () => {
+    mockParams = new URLSearchParams('ra=a1')
+    window.confirm = jest.fn(() => true)
+    const f = workspaceFetch({ '/reference-architectures/links/l1/decision': { id: 'l1', status: 'RETIRED' } }); global.fetch = f as any
+    render(<ReferenceArchitecturesPage />)
+    await screen.findByTestId('ra-coverage')
+    fireEvent.click(screen.getByRole('tab', { name: 'refarch.tab.architecture' }))
+    fireEvent.click(within(await screen.findByTestId('ra-diagram')).getByRole('button', { name: /Digital portal - refarch\.conf\.ALIGNED/ }))
+    const drawer = await screen.findByTestId('ra-drawer')
+    fireEvent.click(within(drawer).getByRole('button', { name: 'refarch.el.retire: HRDF Website' }))
+    await waitFor(() => expect(calls(f, 'POST', '/reference-architectures/links/l1/decision').length).toBe(1))
+    expect(JSON.parse(calls(f, 'POST', '/reference-architectures/links/l1/decision')[0][1].body)).toEqual({ decision: 'RETIRE' })
+    expect(window.confirm).toHaveBeenCalled()
+  })
+
+  it('an element shown for context only (or inside one) is read-only: no implementations, links or decisions', async () => {
+    mockParams = new URLSearchParams('ra=a1')
+    const elements = ELEMENTS.map(e => (e.stableKey === 'access' ? { ...e, metadata: { contextOnly: true } } : e))
+    const f = workspaceFetch({ '/reference-architectures/versions/v1': { id: 'v1', version: '1.0', status: 'ACTIVE', elements, metaModelRequirements: [] } }); global.fetch = f as any
+    render(<ReferenceArchitecturesPage />)
+    await screen.findByTestId('ra-coverage')
+    fireEvent.click(screen.getByRole('tab', { name: 'refarch.tab.architecture' }))
+    fireEvent.click(within(await screen.findByTestId('ra-diagram')).getByRole('button', { name: /Kiosk/ }))
+    const drawer = await screen.findByTestId('ra-drawer')
+    expect(within(drawer).getByTestId('ra-context-only-note')).toHaveTextContent('refarch.el.context_only')
+    expect(within(drawer).queryByText('refarch.el.link_object')).toBeNull()
+    expect(within(drawer).queryByText('refarch.el.decide')).toBeNull()
+    expect(calls(f, 'GET', '/reference-architectures/a1/links?elementKey=kiosk').length).toBe(1)
+  })
+
   it('links a capability to an object of another domain the Meta Model permits (REALIZED_BY), expected types first, never a type that cannot realize', async () => {
     mockParams = new URLSearchParams('ra=a1')
     const MM = {
