@@ -1490,6 +1490,8 @@ export default function GovernancePage() {
 
   if (view === 'progress') return (
     <div style={{ padding: '24px 32px', maxWidth: 800 }}>
+      <button className="btn btn-secondary" onClick={() => { setView('list'); loadReviews() }}>{isAR ? 'العودة إلى المراجعات' : 'Back to reviews'}</button>
+      {review && <GovernanceReviewActions key={review.id} reviewId={review.id} title={review.title} canDelete={canDeleteReview} isAR={isAR} onDeleted={() => { setReview(null); setView('list'); loadReviews() }} />}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)' }}>{review?.title}</div>
       </div>
