@@ -727,8 +727,8 @@ function MetadataPreview({ meta }: { meta: any }) {
 }
 
 export default function GovernancePage() {
-  const { user } = useAuth()
-  const canDeleteReview = user?.role === 'TENANT_ADMIN'
+  const { user, permissions } = useAuth()
+  const canDeleteReview = !!user && (user.role === 'TENANT_ADMIN' || user.role === 'SUPERADMIN' || !!permissions?.includes('Tenant.Administer'))
   const api = useApi()
   const { isAR } = useLang()
   const [view, setView] = useState<'list' | 'create' | 'progress' | 'report'>('list')
