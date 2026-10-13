@@ -23,6 +23,19 @@ export interface RefElement {
   authority?: string
   reviewStatus?: string
   changeClass?: string | null
+  /** contextOnly: shown for context only - detailed in its own reference architecture, never implemented here. */
+  metadata?: Record<string, any> | null
+}
+
+/** An element shown for context only (it or a parent): drawn, never assessed or linked here. */
+export function isContextOnly(key: string, elements: Array<Pick<RefElement, 'stableKey' | 'parentKey' | 'metadata'>>): boolean {
+  const byKey = new Map(elements.map(e => [e.stableKey, e]))
+  let cur = byKey.get(key)
+  for (let guard = 0; cur && guard < 50; guard++) {
+    if (cur.metadata?.contextOnly) return true
+    cur = cur.parentKey ? byKey.get(cur.parentKey) : undefined
+  }
+  return false
 }
 
 export interface LinkedObject {
