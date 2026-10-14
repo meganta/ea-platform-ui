@@ -18,6 +18,7 @@ import { METAMODEL_TRANSLATIONS } from '../pages/metamodel/metaModelStrings'
 import { DASHBOARD_TRANSLATIONS } from '../pages/dashboard/dashboardStrings'
 import { FINVALUE_TRANSLATIONS } from '../pages/finvalue/finValueStrings'
 import { ROADMAP_TRANSLATIONS } from '../pages/planning/roadmapStrings'
+import { ROLE_UPDATE_TRANSLATIONS } from '../pages/access/roleUpdateStrings'
 
 export type Locale = 'AR' | 'EN'
 
@@ -28,6 +29,7 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   ...DASHBOARD_TRANSLATIONS,
   ...FINVALUE_TRANSLATIONS,
   ...ROADMAP_TRANSLATIONS,
+  ...ROLE_UPDATE_TRANSLATIONS,
   ...METAMODEL_TRANSLATIONS,
   'strategy.refresh.previous_evidence': { EN: 'Approved previous strategy evidence', AR: 'أدلة الاستراتيجية السابقة المعتمدة' },
   'strategy.refresh.open_baseline': { EN: 'Open approved baseline version', AR: 'فتح الإصدار المرجعي المعتمد' },
