@@ -67,7 +67,7 @@ function SummaryTab({ o, c, cur, t, api, rights, act }: TabProps) {
   const [users, setUsers] = useState<any[]>([])
   useEffect(() => { api.get('/users').then((d: any) => setUsers(Array.isArray(d) ? d : [])).catch(() => setUsers([])) }, [api])
   const editable = rights.MANAGE_OPPORTUNITIES && !['REJECTED', 'CANCELLED', 'REALIZED', 'CLOSED_WITHOUT_SAVINGS'].includes(o.status)
-  const sourceLink = (s: any) => s.kind === 'GOVERNANCE_FINDING' && s.reviewId ? `/governance?review=${encodeURIComponent(s.reviewId)}` : s.kind === 'ARCHITECTURE_HEALTH' && s.domainCode ? `/architecture-health?domain=${encodeURIComponent(s.domainCode)}` : s.kind === 'REPOSITORY' ? `/repository?asset=${encodeURIComponent(s.id)}` : null
+  const sourceLink = (s: any) => s.kind === 'GOVERNANCE_FINDING' && s.reviewId ? `/governance?review=${encodeURIComponent(s.reviewId)}` : s.kind === 'ARCHITECTURE_HEALTH' && s.domainCode ? `/architecture-health?domain=${encodeURIComponent(s.domainCode)}` : s.kind === 'REPOSITORY' ? `/repository?asset=${encodeURIComponent(s.id)}` : s.kind === 'REFERENCE_ARCHITECTURE' && s.id ? `/reference-architectures?ra=${encodeURIComponent(String(s.id).split(':')[0])}` : null
   return (
     <>
       <div className="ah-tiles">
@@ -89,7 +89,7 @@ function SummaryTab({ o, c, cur, t, api, rights, act }: TabProps) {
           <ul className="ah-list">{o.sources.map((s: any, i: number) => {
             const href = sourceLink(s)
             return <li key={i}>{href ? <a href={href}>{s.label}</a> : s.label}{s.detail ? <div className="ah-dim">{s.detail}</div> : null}
-              {s.live && <div className="ah-dim">{Object.entries(s.live).filter(([k]) => k !== 'reviewId').map(([k, v]) => `${t(`fv.live.${k}`)}: ${v ?? '—'}`).join(' · ')}</div>}</li>
+              {s.live && <div className="ah-dim">{Object.entries(s.live).filter(([k]) => k !== 'reviewId' && k !== 'architectureId').map(([k, v]) => `${t(`fv.live.${k}`)}: ${v ?? '—'}`).join(' · ')}</div>}</li>
           })}</ul>
         </div>
         <div className="rp-card">

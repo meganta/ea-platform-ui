@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import HelpTip from '../components/HelpTip'
 import UsersPage from './UsersPage'
+import RoleTemplateUpdates from './access/RoleTemplateUpdates'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
@@ -228,6 +229,7 @@ function RolesTab({ api, isAdmin }: any) {
 
   return (
     <div>
+      {isAdmin && <RoleTemplateUpdates api={api} onApplied={load} />}
       {isAdmin && (
         <div style={{ marginBottom: 16 }}>
           {!creating ? <button style={S.btn('primary')} onClick={() => setCreating(true)}>+ Create Role</button> : (
