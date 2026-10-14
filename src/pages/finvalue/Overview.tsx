@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import HelpTip from '../../components/HelpTip'
-import { FvApi, FvRights, T, VALUE_STAGES, day, money, num, saveBlob, statusTone } from './fvApi'
+import { FvApi, FvRights, T, VALUE_STAGES, day, money, num, openPrintable, saveBlob, statusTone } from './fvApi'
+import { BenchmarksCard } from './IntelligencePanels'
 
 type View = 'EXECUTIVE' | 'ARCHITECTURE' | 'FINANCE'
 
@@ -37,7 +38,10 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
       .catch(e => setMsg(e.message))
       .finally(() => setRunning(false))
   }
-  const download = (path: string, name: string) => api.blob(`${path}?lang=${isAR ? 'AR' : 'EN'}`).then(b => saveBlob(b, name)).catch(e => setMsg(e.message))
+  const [year, setYear] = useState(new Date().getFullYear() + 1)
+  const lang = isAR ? 'AR' : 'EN'
+  const download = (path: string, name: string) => api.blob(`${path}${path.includes('?') ? '&' : '?'}lang=${lang}`).then(b => saveBlob(b, name)).catch(e => setMsg(e.message))
+  const print = () => openPrintable(api, `/financial-value/reports/executive.html?lang=${lang}`).catch(e => setMsg(e.message))
 
   if (error) return <div className="rp-card" role="alert">{error}</div>
   if (!data) return <div className="rp-card">{t('common.loading')}</div>
@@ -55,6 +59,19 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
         <span style={{ flex: 1 }} />
         <button type="button" className="ah-btn" onClick={() => download('/financial-value/reports/executive.docx', 'financial-optimization-executive-report.docx')}>📄 {t('fv.report.executive')}</button>
         <button type="button" className="ah-btn" onClick={() => download('/financial-value/reports/register.xlsx', 'savings-opportunity-register.xlsx')}>📊 {t('fv.report.register')}</button>
+        <details className="fv-more">
+          <summary className="ah-btn">{t('fv.report.more')}</summary>
+          <div className="fv-more-menu" data-testid="fv-more-reports">
+            <button type="button" className="ah-link-btn" onClick={() => download('/financial-value/reports/executive.pptx', 'financial-optimization-executive.pptx')}>📽 {t('fv.report.pptx')}</button>
+            <button type="button" className="ah-link-btn" onClick={print}>🖨 {t('fv.report.print')}</button>
+            <button type="button" className="ah-link-btn" onClick={() => download('/financial-value/reports/cost-avoidance.docx', 'cost-avoidance-report.docx')}>📄 {t('fv.report.avoidance')}</button>
+            <span className="fv-toolbar" style={{ margin: 0 }}>
+              <label className="ah-dim" htmlFor="fv-plan-year">{t('fv.report.plan_year')}</label>
+              <input id="fv-plan-year" type="number" className="form-input" style={{ maxWidth: 90 }} value={year} onChange={e => setYear(Number(e.target.value))} />
+              <button type="button" className="ah-link-btn" onClick={() => download(`/financial-value/reports/annual-plan.docx?year=${year}`, `annual-savings-plan-${year}.docx`)}>📄 {t('fv.report.plan')}</button>
+            </span>
+          </div>
+        </details>
       </div>
       {msg && <div className="rp-banner" role="status">{msg}</div>}
 
@@ -69,7 +86,8 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
         <Tile className="fv-realized" label={t('fv.realized')} value={money(data.realized.amount, cur)} sub={`${data.realized.verifiedRealizations} ${t('fv.verified_measurements')}`} help={t('fv.realized.help')} />
         <Tile label={t('fv.realization_rate')} value={data.realizationRate === null ? t('fv.na') : `${data.realizationRate}%`} help={t('fv.realization_rate.help')} />
         <Tile label={t('fv.avoidance')} value={money(data.costAvoidance.APPROVED.amount + data.costAvoidance.IMPLEMENTED.amount, cur)} sub={`${t('fv.stage.POTENTIAL')}: ${money(data.costAvoidance.POTENTIAL.amount, cur)} · ${t('fv.stage.VALIDATED')}: ${money(data.costAvoidance.VALIDATED.amount, cur)}`} help={t('fv.avoidance.help')} />
-        <Tile label={t('fv.productivity')} value={String(data.productivity.count)} sub={t('fv.productivity.sub')} help={t('fv.productivity.help')} />
+        <Tile label={t('fv.productivity')} value={data.productivity.hoursPerYear ? `${Math.round(data.productivity.hoursPerYear).toLocaleString('en-US')} ${t('fv.hours_year')}` : String(data.productivity.count)}
+          sub={`${data.productivity.count} ${t('fv.opportunities')}${data.productivity.value ? ` · ${t('fv.productivity.value')} ${money(data.productivity.value, cur)}` : ''} · ${t('fv.productivity.sub')}`} help={t('fv.productivity.help')} />
       </div>
 
       {view === 'EXECUTIVE' && (
@@ -85,8 +103,10 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
                 <tbody>{data.byCapability.map((c: any) => <tr key={c.id}><td>{c.name}</td><td>{c.count}</td><td>{money(c.netAnnualSaving, cur)}</td><td>{money(c.realized, cur)}</td></tr>)}</tbody></table></div>
             </div>
           )}
+          <Departments data={data} cur={cur} t={t} />
           <TopList data={data} cur={cur} t={t} onOpen={onOpen} />
           <Milestones data={data} t={t} onOpen={onOpen} />
+          <BenchmarksCard api={api} t={t} />
         </>
       )}
 
@@ -111,6 +131,7 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
             ) : <div className="ah-dim" style={{ marginTop: 8 }}>{t('fv.discovery.never')}</div>}
           </div>
           <Breakdown title={t('fv.by_engine')} rows={data.byEngine} cur={cur} t={t} label={k => t(`fv.engine.${k}`)} />
+          <DataGaps data={data} t={t} onTab={onTab} />
           <TopList data={data} cur={cur} t={t} onOpen={onOpen} />
         </>
       )}
@@ -124,6 +145,9 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
             <button type="button" className="rp-stat" onClick={() => onTab('requests')}><div className="rp-stat-label">{t('fv.q.open_requests')}</div><div className="rp-stat-value">{q.openDataRequests ?? 0}</div></button>
           </div>
           <Renewals data={data} cur={cur} t={t} />
+          <Departments data={data} cur={cur} t={t} />
+          <DataGaps data={data} t={t} onTab={onTab} />
+          <BenchmarksCard api={api} t={t} />
           {(rights.VIEW_FINANCIAL_DATA || rights.VERIFY_SAVINGS) && (
             <button type="button" className="ah-btn" onClick={() => download('/financial-value/reports/verification.docx', 'finance-verification-report.docx')}>📄 {t('fv.report.verification')}</button>
           )}
@@ -185,6 +209,35 @@ function Renewals({ data, cur, t }: { data: any; cur: string; t: T }) {
         <div className="rp-table-wrap"><table className="ah-table" data-testid="fv-renewals"><thead><tr><th>{t('fv.contract')}</th><th>{t('fv.vendor')}</th><th>{t('fv.renewal_date')}</th><th>{t('fv.notice_by')}</th><th>{t('fv.annual_value')}</th></tr></thead>
           <tbody>{data.renewals.map((c: any) => <tr key={c.id}><td>{c.title}</td><td>{c.vendor || '—'}</td><td>{day(c.renewalDate)}</td><td>{day(c.noticeBy)}</td><td>{money(c.annualValue, c.currency || cur)}</td></tr>)}</tbody></table></div>
       )}
+    </div>
+  )
+}
+
+function Departments({ data, cur, t }: { data: any; cur: string; t: T }) {
+  return (
+    <div className="rp-card rp-card-gap" data-testid="fv-departments">
+      <div className="rp-card-title">{t('fv.by_department')}<HelpTip text={t('fv.by_department.help')} /></div>
+      {!data.byDepartment?.length ? <div className="ah-dim">{t('fv.by_department.none')}</div> : (
+        <div className="rp-table-wrap"><table className="ah-table"><thead><tr><th>{t('fv.department')}</th><th>{t('fv.opportunities')}</th><th>{t('fv.net_annual')}</th><th>{t('fv.realized')}</th></tr></thead>
+          <tbody>{data.byDepartment.map((d: any) => <tr key={d.key}><td>{d.key === 'UNASSIGNED' ? t('fv.unassigned') : d.key}</td><td>{d.count}</td><td>{money(d.netAnnualSaving, cur)}</td><td>{money(d.realized, cur)}</td></tr>)}</tbody></table></div>
+      )}
+    </div>
+  )
+}
+
+function DataGaps({ data, t, onTab }: { data: any; t: T; onTab: (tab: string) => void }) {
+  const g = data.dataGaps
+  if (!g) return null
+  const pct = g.objects ? Math.round((1000 * g.withCost) / g.objects) / 10 : null
+  return (
+    <div className="rp-card rp-card-gap" data-testid="fv-data-gaps">
+      <div className="rp-card-title">{t('fv.gaps.title')}<HelpTip text={t('fv.gaps.help')} /></div>
+      <div>{t('fv.gaps.summary').replace('{n}', String(g.withCost)).replace('{m}', String(g.objects)).replace('{pct}', pct === null ? '—' : String(pct))}</div>
+      {g.byType?.length > 0 && (
+        <div className="rp-table-wrap" style={{ marginTop: 8 }}><table className="ah-table"><thead><tr><th>{t('fv.gaps.type')}</th><th>{t('fv.gaps.objects')}</th><th>{t('fv.gaps.with_cost')}</th><th>{t('fv.gaps.missing')}</th></tr></thead>
+          <tbody>{g.byType.map((x: any) => <tr key={x.code}><td>{x.name}</td><td>{x.objects}</td><td>{x.withCost}</td><td>{x.objects - x.withCost}</td></tr>)}</tbody></table></div>
+      )}
+      <button type="button" className="ah-link-btn" style={{ marginTop: 6 }} onClick={() => onTab('data')}>{t('fv.gaps.record')}</button>
     </div>
   )
 }

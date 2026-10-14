@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { FvApi, FvRights, T } from './fvApi'
 
+const USAGE_NUMBERS = ['infraIdleDays', 'cpuAvgThresholdPct', 'cpuPeakThresholdPct', 'memPeakThresholdPct', 'targetPeakUtilizationPct', 'nonProdHoursPerWeek', 'processMinHoursPerYear']
 const CRITERIA = ['FINANCIAL_BENEFIT', 'FINANCIAL_CONFIDENCE', 'IMPLEMENTATION_COST', 'IMPLEMENTATION_COMPLEXITY', 'TECHNICAL_FEASIBILITY', 'BUSINESS_IMPACT', 'SECURITY_COMPLIANCE', 'TIME_TO_REALIZE', 'DEPENDENCY_COMPLEXITY', 'STRATEGIC_ALIGNMENT', 'ARCHITECTURE_ALIGNMENT']
 
 /** Tenant settings of the module, read and saved through the Tenant Settings API (/config/financial-value). */
@@ -19,6 +20,7 @@ export default function SettingsPanel({ api, t, rights }: { api: FvApi; t: T; ri
       exchangeRates, exchangeRatesValuationDate: s.exchangeRatesValuationDate || null, discountRatePct: Number(s.discountRatePct), escalationRatePct: Number(s.escalationRatePct), horizonYears: Number(s.horizonYears),
       renewalAlertDays: Number(s.renewalAlertDays), licenseUnusedThresholdPct: Number(s.licenseUnusedThresholdPct), licenseMinUnusedUnits: Number(s.licenseMinUnusedUnits), utilizationMaxAgeDays: Number(s.utilizationMaxAgeDays),
       strategicThreshold: Number(s.strategicThreshold), segregationOfDuties: !!s.segregationOfDuties, continuousDiscovery: !!s.continuousDiscovery,
+      ...Object.fromEntries(USAGE_NUMBERS.map(k => [k, Number(s[k])])), benchmarkingOptIn: !!s.benchmarkingOptIn, costOverlayInViews: !!s.costOverlayInViews,
       criteriaWeights: Object.fromEntries(CRITERIA.map(c => [c, Number(s.criteriaWeights[c])])),
     }).then(r => { setS(r); setMsg(t('fv.saved')) }).catch(e => setMsg(e.message))
   }
@@ -43,6 +45,17 @@ export default function SettingsPanel({ api, t, rights }: { api: FvApi; t: T; ri
           {num('renewalAlertDays', t('fv.set.renewal_days'))}{num('licenseUnusedThresholdPct', t('fv.set.unused_pct'))}{num('licenseMinUnusedUnits', t('fv.set.unused_units'))}{num('utilizationMaxAgeDays', t('fv.set.utilization_age'))}
           <div className="form-group"><label className="ah-dim" htmlFor="fv-s-cont"><input id="fv-s-cont" type="checkbox" disabled={ro} checked={!!s.continuousDiscovery} onChange={e => set('continuousDiscovery', e.target.checked)} /> {t('fv.set.continuous')}</label></div>
           <div className="form-group"><label className="ah-dim" htmlFor="fv-s-sod"><input id="fv-s-sod" type="checkbox" disabled={ro} checked={!!s.segregationOfDuties} onChange={e => set('segregationOfDuties', e.target.checked)} /> {t('fv.set.sod')}</label><HelpTip text={t('fv.set.sod.help')} /></div>
+        </div>
+      </div>
+      <div className="rp-card rp-card-gap" data-testid="fv-settings-usage">
+        <div className="rp-card-title">{t('fv.set.usage')}<HelpTip text={t('fv.set.usage.help')} /></div>
+        <div className="fv-form">{USAGE_NUMBERS.map(k => num(k, t(`fv.set.${k}`)))}</div>
+      </div>
+      <div className="rp-card rp-card-gap">
+        <div className="rp-card-title">{t('fv.set.sharing')}</div>
+        <div className="fv-form">
+          <div className="form-group"><label className="ah-dim" htmlFor="fv-s-bench"><input id="fv-s-bench" type="checkbox" disabled={ro} checked={!!s.benchmarkingOptIn} onChange={e => set('benchmarkingOptIn', e.target.checked)} /> {t('fv.set.benchmarking')}</label><HelpTip text={t('fv.set.benchmarking.help')} /></div>
+          <div className="form-group"><label className="ah-dim" htmlFor="fv-s-overlay"><input id="fv-s-overlay" type="checkbox" disabled={ro} checked={!!s.costOverlayInViews} onChange={e => set('costOverlayInViews', e.target.checked)} /> {t('fv.set.overlay')}</label><HelpTip text={t('fv.set.overlay.help')} /></div>
         </div>
       </div>
       <div className="rp-card rp-card-gap">

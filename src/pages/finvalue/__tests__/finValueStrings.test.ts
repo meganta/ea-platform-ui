@@ -2,6 +2,9 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { FINVALUE_TRANSLATIONS } from '../finValueStrings'
 import { ACTIONS, BASES, BENEFITS, COST_CATEGORIES, ENGINES, EVIDENCE_KINDS, ONE_TIME_CATEGORIES, STATUSES } from '../fvApi'
+import { ALT_COSTS, ALT_GATES, ALT_SCORES, PRICE_BASES, REVIEW_STATUSES } from '../OpportunityExtras'
+import { AGENT_CODES, AGENT_FIGURES, OBSERVATION_ACTORS } from '../IntelligencePanels'
+import { ENVIRONMENTS, INFRA_METRICS, INGEST_SOURCES, PROCESS_METRICS, REDUNDANCY_ROLES, USAGE_KINDS } from '../UsagePanel'
 
 const DIR = path.resolve(__dirname, '..')
 const sources = [path.resolve(DIR, '../FinancialValuePage.tsx'), ...fs.readdirSync(DIR).filter(f => f.endsWith('.tsx')).map(f => path.join(DIR, f))].map(f => fs.readFileSync(f, 'utf8')).join('\n')
@@ -31,8 +34,14 @@ describe('Financial Value strings', () => {
       'fv.crit.': ['FINANCIAL_BENEFIT', 'FINANCIAL_CONFIDENCE', 'IMPLEMENTATION_COST', 'IMPLEMENTATION_COMPLEXITY', 'TECHNICAL_FEASIBILITY', 'BUSINESS_IMPACT', 'SECURITY_COMPLIANCE', 'TIME_TO_REALIZE', 'DEPENDENCY_COMPLEXITY', 'STRATEGIC_ALIGNMENT', 'ARCHITECTURE_ALIGNMENT'],
       'fv.sim.': ['CONSERVATIVE', 'EXPECTED', 'OPTIMISTIC', 'var.REDUCTION', 'var.ONE_TIME_COST', 'var.DELAY'], 'fv.realstatus.': ['SUBMITTED', 'VERIFIED', 'REJECTED'],
       'fv.research.status.': ['RUNNING', 'COMPLETED', 'FAILED', 'NOT_CONFIGURED'], 'fv.run.': ['RUNNING', 'COMPLETED', 'FAILED'], 'fv.milestone.': ['TARGET_IMPLEMENTATION', 'SAVINGS_START'],
-      'fv.view.': ['EXECUTIVE', 'ARCHITECTURE', 'FINANCE'], 'fv.tab.': ['overview', 'opportunities', 'data', 'requests', 'verification', 'settings'], 'fv.ws.': ['summary', 'financials', 'evidence', 'decisions', 'execution', 'history'],
+      'fv.view.': ['EXECUTIVE', 'ARCHITECTURE', 'FINANCE'], 'fv.tab.': ['overview', 'opportunities', 'agents', 'scenarios', 'data', 'usage', 'requests', 'verification', 'settings'], 'fv.ws.': ['summary', 'financials', 'alternatives', 'evidence', 'decisions', 'execution', 'history'],
       'fv.live.': ['findingStatus', 'validationStatus', 'reviewStatus', 'reviewDecision', 'researchStatus', 'lifecycleStatus'],
+      'fv.alt.cost.': [...ALT_COSTS], 'fv.alt.gate.': [...ALT_GATES], 'fv.alt.score.': [...ALT_SCORES], 'fv.pbasis.': [...PRICE_BASES], 'fv.alt.elig.': ['ELIGIBLE', 'EXCLUDED', 'UNVERIFIED'],
+      'fv.comp.status.': [...REVIEW_STATUSES], 'fv.agent.': [...AGENT_CODES, ...AGENT_CODES.map(c => `${c}.help`)], 'fv.agents.actor.': [...OBSERVATION_ACTORS], 'fv.agents.sev.': ['HIGH', 'MEDIUM', 'LOW'], 'fv.agents.fig.': [...AGENT_FIGURES],
+      'fv.bench.m.': ['realizationRatePct', 'licenseUtilizationPct', 'approvedSavingsShareOfRunCostPct', 'medianPaybackMonths', 'costCoveragePct'],
+      'fv.usage.kind.': [...USAGE_KINDS], 'fv.usage.env.': [...ENVIRONMENTS, 'QA'], 'fv.usage.role.': [...REDUNDANCY_ROLES, 'SECONDARY'], 'fv.usage.m.': [...INFRA_METRICS, ...PROCESS_METRICS, 'alwaysOn', 'automationCandidate'],
+      'fv.usage.src.': ['MANUAL', ...INGEST_SOURCES], 'fv.ingest.status.': ['CREATED', 'UPDATED', 'UNCHANGED', 'REJECTED'], 'fv.ingest.rule.': ['1', '2', '3', '4'],
+      'fv.set.': ['infraIdleDays', 'cpuAvgThresholdPct', 'cpuPeakThresholdPct', 'memPeakThresholdPct', 'targetPeakUtilizationPct', 'nonProdHoursPerWeek', 'processMinHoursPerYear'],
       'fv.answer.': ['category', 'annualAmount', 'currency', 'basis', 'description', 'label', 'amount', 'year'],
     }
     const missing = Object.entries(families).flatMap(([prefix, values]) => values.map(v => prefix + v)).filter(k => !has(k))

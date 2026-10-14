@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { BASES, EVIDENCE_KINDS, FvApi, FvRights, ONE_TIME_CATEGORIES, T, day, money, num, saveBlob } from './fvApi'
 import { StatusChip } from './Overview'
+import { AlternativesPanel, AssumptionSuggestions, CompliancePanel, NarrativeCard, PrintableBusinessCase, ScenarioClaims } from './OpportunityExtras'
 
-type Tab = 'summary' | 'financials' | 'evidence' | 'decisions' | 'execution' | 'history'
-const TABS: Tab[] = ['summary', 'financials', 'evidence', 'decisions', 'execution', 'history']
+type Tab = 'summary' | 'financials' | 'alternatives' | 'evidence' | 'decisions' | 'execution' | 'history'
+const TABS: Tab[] = ['summary', 'financials', 'alternatives', 'evidence', 'decisions', 'execution', 'history']
 
 function Kv({ rows }: { rows: Array<[string, React.ReactNode]> }) {
   return <dl className="fv-kv">{rows.map(([k, v], i) => <div key={i} style={{ display: 'contents' }}><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
@@ -43,7 +44,9 @@ export default function OpportunityWorkspace({ api, t, rights, isAR, id, onBack 
       {msg && <div className="rp-banner" role="status" style={{ marginTop: 12 }}>{msg}</div>}
       <div style={{ marginTop: 16 }}>
         {tab === 'summary' && <SummaryTab o={o} c={c} cur={cur} t={t} api={api} rights={rights} act={act} />}
+        {tab === 'summary' && <NarrativeCard o={o} t={t} api={api} rights={rights} act={act} isAR={isAR} />}
         {tab === 'financials' && <FinancialsTab o={o} c={c} cur={cur} t={t} api={api} rights={rights} act={act} />}
+        {tab === 'alternatives' && <AlternativesPanel o={o} t={t} api={api} rights={rights} act={act} cur={cur} />}
         {tab === 'evidence' && <EvidenceTab o={o} c={c} t={t} api={api} rights={rights} act={act} />}
         {tab === 'decisions' && <DecisionsTab o={o} t={t} api={api} rights={rights} act={act} isAR={isAR} />}
         {tab === 'execution' && <ExecutionTab o={o} cur={cur} t={t} api={api} rights={rights} act={act} />}
@@ -178,6 +181,7 @@ function FinancialsTab({ o, c, cur = 'SAR', t, api, rights, act }: TabProps) {
                 <td>{claim ? `${claim.allocatedPct}%` : '—'}{claim?.sharedWith?.length ? <div className="ah-dim">{t('fv.claims.shared').replace('{titles}', claim.sharedWith.map((s: any) => s.title).join(', '))}</div> : null}</td></tr>) })}</tbody></table></div>
         )}
         {editable && costs && costs.length > 0 && <button type="button" className="btn btn-secondary btn-sm" style={{ marginTop: 10 }} onClick={saveClaims}>{t('fv.claims.save')}</button>}
+        {editable && <ScenarioClaims o={o} t={t} api={api} onUse={(proposed, rows) => { setClaims(cl => ({ ...cl, ...proposed })); setCosts(cs => [...(cs || []), ...rows.filter(r => !(cs || []).some(x => x.id === r.costItemId)).map(r => ({ id: r.costItemId, category: r.category, description: r.description, basis: r.basis, annualAmount: r.annualAmount, currency: r.currency, status: r.status, asset: { name: r.assetName } }))]) }} />}
       </div>
 
       <div className="rp-card rp-card-gap">
@@ -186,6 +190,9 @@ function FinancialsTab({ o, c, cur = 'SAR', t, api, rights, act }: TabProps) {
           <div className="form-group"><label className="form-label" htmlFor="fv-m-start">{t('fv.model.start_month')}</label><input id="fv-m-start" type="number" min={0} className="form-input" value={startMonth} disabled={!editable} onChange={e => setStartMonth(Number(e.target.value))} /></div>
           <div className="form-group"><label className="ah-dim" htmlFor="fv-m-noone"><input id="fv-m-noone" type="checkbox" checked={noOneTime} disabled={!editable} onChange={e => setNoOneTime(e.target.checked)} /> {t('fv.model.no_one_time')}</label></div>
         </div>
+        {editable && <AssumptionSuggestions o={o} t={t} api={api} onAdd={sg => (sg.kind === 'RECURRING'
+          ? setNewRecurring(l => [...l, { label: sg.label, currency: cur, basis: 'AI_SUGGESTED', startMonth: 0 }])
+          : setOneTime(l => [...l, { label: sg.label, currency: cur, basis: 'AI_SUGGESTED', category: sg.category, year: 0 }]))} />}
         <LineEditor title={t('fv.model.one_time')} lines={oneTime} setLines={setOneTime} kind="oneTime" t={t} cur={cur} disabled={!editable} />
         <LineEditor title={t('fv.model.new_recurring')} lines={newRecurring} setLines={setNewRecurring} kind="newRecurring" t={t} cur={cur} disabled={!editable} />
         <LineEditor title={t('fv.model.avoided')} lines={avoided} setLines={setAvoided} kind="avoided" t={t} cur={cur} disabled={!editable} />
@@ -330,6 +337,7 @@ function DecisionsTab({ o, t, api, rights, act, isAR }: TabProps & { isAR: boole
           })}
         </div>
       </div>
+      <CompliancePanel o={o} t={t} api={api} rights={rights} act={act} isAR={isAR} />
       <div className="rp-card rp-card-gap">
         <div className="rp-card-title">{t('fv.actions.title')}<HelpTip text={t('fv.actions.help')} /></div>
         {o.actions.length === 0 ? <div className="ah-dim">{t('fv.actions.none')}</div> : (
@@ -350,6 +358,7 @@ function DecisionsTab({ o, t, api, rights, act, isAR }: TabProps & { isAR: boole
           </div>
         )}
         {o.businessCase && <button type="button" className="ah-btn" style={{ marginTop: 12 }} onClick={() => api.blob(`/financial-value/opportunities/${o.id}/business-case.docx?lang=${isAR ? 'AR' : 'EN'}`).then(b => saveBlob(b, `business-case-${o.title}.docx`))}>📄 {t('fv.business_case.download')} (v{o.businessCaseVersion})</button>}
+        {o.businessCase && <PrintableBusinessCase o={o} t={t} api={api} isAR={isAR} />}
         {o.settings?.segregationOfDuties && <div className="fv-note">{t('fv.sod_note')}</div>}
       </div>
     </>

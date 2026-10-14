@@ -76,3 +76,12 @@ export function saveBlob(blob: Blob, fileName: string) {
   document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 2000)
 }
+
+/** Opens a printable HTML report from the API in a new tab (the browser's print dialog saves it as PDF); fetched with the token, never a public URL. */
+export async function openPrintable(api: FvApi, path: string) {
+  const blob = await api.blob(path)
+  const url = URL.createObjectURL(new Blob([blob], { type: 'text/html' }))
+  const w = window.open(url, '_blank')
+  if (!w) saveBlob(blob, 'report.html')
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+}
