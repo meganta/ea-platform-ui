@@ -12,6 +12,7 @@ import CopilotPage from './pages/CopilotPage'
 import RepositoryPage from './pages/RepositoryPage'
 import ReferenceArchitecturesPage from './pages/ReferenceArchitecturesPage'
 import ArchitectureHealthPage from './pages/ArchitectureHealthPage'
+import FinancialValuePage from './pages/FinancialValuePage'
 import KnowledgePage from './pages/KnowledgePage'
 import OrganizationSettingsPage from './pages/settings/OrganizationSettingsPage'
 import AiSettingsPage from './pages/settings/AiSettingsPage'
@@ -111,6 +112,7 @@ export default function App() {
               <Route path="copilot" element={<ProtectedRoute permission="AIArchitect.Use"><CopilotPage /></ProtectedRoute>} />
               <Route path="reference-architectures" element={<ProtectedRoute permission="ReferenceArchitecture.View"><ReferenceArchitecturesPage /></ProtectedRoute>} />
               <Route path="architecture-health" element={<ProtectedRoute permission="ArchitectureHealth.View"><ArchitectureHealthPage /></ProtectedRoute>} />
+              <Route path="financial-value" element={<ProtectedRoute permission="FinancialValue.View"><FinancialValuePage /></ProtectedRoute>} />
               <Route path="repository" element={<ProtectedRoute permission="Repository.View"><RepositoryPage /></ProtectedRoute>} />
               <Route path="knowledge" element={<ProtectedRoute permission="Repository.View"><KnowledgePage /></ProtectedRoute>} />
               <Route path="glossary" element={<ProtectedRoute permission="Repository.View"><GlossaryPage /></ProtectedRoute>} />

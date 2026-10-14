@@ -123,6 +123,7 @@ export default function Layout() {
     { to: '/strategy', label: '🎯 ' + t('strategy.refresh.heading'), icon: '', permission: 'Strategy.View' },
     { to: '/ea-planning', label: '🗓 EA Planning', icon: '', permission: 'Repository.View' },
     { to: '/innovation', label: '🔭 ' + t('nav.innovation'), icon: '', permission: 'Innovation.View' },
+    { to: '/financial-value', label: '💰 ' + t('nav.finvalue'), icon: '', permission: 'FinancialValue.View' },
     { to: '/notifications', label: '🔔 ' + t('nav.notifications'), icon: '', permission: null },
     { to: '/meta-model', label: '🧩 Meta-Model', icon: '', permission: 'MetaModel.View' },
     { to: '/ea-views', label: '🗺 EA Views', icon: '', permission: 'Views.View' },
