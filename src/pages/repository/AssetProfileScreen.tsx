@@ -7,6 +7,7 @@ import { AssetProfile, localName } from './assetProfile'
 import { metaModelLabel } from './OriginTag'
 import './AssetProfile.css'
 import { AssetReferenceAlignment } from '../../components/ReferenceArchitecturePanels'
+import { AssetFutureState } from '../../components/RoadmapContextPanels'
 
 type T = (k: string) => string
 type Tab = 'overview' | 'attributes' | 'relationships' | 'attachments'
@@ -146,6 +147,7 @@ export default function AssetProfileScreen({ asset: initial, startInEdit, t, isA
                   <div className="rp-stat"><div className="rp-stat-label">{t('repository.profile.stat.findings')}</div><div className="rp-stat-value">{findingsLoading ? '…' : findings.length}</div></div>
                 </div>
                 <AssetReferenceAlignment assetId={asset.id} />
+                <AssetFutureState assetId={asset.id} />
                 <section className="ap-section">
                   <dl className="ap-facts" style={{ margin: 0 }}>
                     {fact(t('repository.profile.type'), typeName)}

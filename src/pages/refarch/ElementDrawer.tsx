@@ -18,7 +18,7 @@ const CAPABILITY_LINKS = ['REALIZED_BY', 'SUPPORTED_BY', 'DEPENDS_ON', 'DEVIATES
  * Repository objects of any domain the Meta Model permits (realization rules
  * come from the backend); its expected types only sort the search results.
  */
-export default function ElementDrawer({ architectureId, element, parentName, conformance, editable, referenceModel = false, metaModelTypes, realization, architectureDomain, api, t, isAR, onChanged, onClose }: {
+export default function ElementDrawer({ architectureId, element, parentName, conformance, editable, referenceModel = false, contextOnly = false, metaModelTypes, realization, architectureDomain, api, t, isAR, onChanged, onClose }: {
   architectureId: string
   element: RefElement
   parentName: string | null
@@ -26,6 +26,8 @@ export default function ElementDrawer({ architectureId, element, parentName, con
   editable: boolean
   /** A reference model is never implemented: the drawer only gives information (no implementations, links or decisions). */
   referenceModel?: boolean
+  /** Shown for context only (it or a parent is detailed in its own reference architecture): nothing is linked or assessed here. */
+  contextOnly?: boolean
   versionId: string
   metaModelTypes: Array<{ code: string; name: string; domain: string | null }>
   realization?: RealizationRules
@@ -47,6 +49,7 @@ export default function ElementDrawer({ architectureId, element, parentName, con
   const [types, setTypes] = useState<string[]>(element.metaModelTypeCodes || [])
   const [configRequired, setConfigRequired] = useState(element.metaModelStatus === 'CONFIGURATION_REQUIRED')
   const [obligation, setObligation] = useState(element.obligation || 'RECOMMENDED')
+  const [ownContextOnly, setOwnContextOnly] = useState(!!element.metadata?.contextOnly)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const p = element.provenance || {}
   const key = element.stableKey
@@ -71,6 +74,13 @@ export default function ElementDrawer({ architectureId, element, parentName, con
       setCandidates([...ok].sort((a, b) => expected(a) - expected(b)).slice(0, 20))
     }).catch(() => setCandidates([]))
   }
+  // A recorded link is retired, not deleted: it stops counting and stays in the history.
+  const removeLink = (linkId: string, name: string | null) => {
+    if (window.confirm(t('refarch.el.retire_confirm').replace('{name}', name || ''))) run(() => api.post(`/reference-architectures/links/${linkId}/decision`, { decision: 'RETIRE' }))
+  }
+  const removeButton = (linkId: string, name: string | null) => !referenceModel && (
+    <button type="button" className="btn btn-secondary btn-sm" aria-label={`${t('refarch.el.retire')}: ${name || ''}`} onClick={() => removeLink(linkId, name)}>{t('refarch.el.retire')}</button>
+  )
   const linkedList = (items: LinkedObject[]) => (
     <ul className="ra-list">{items.map(r => (
       <li key={r.linkId}>
@@ -78,6 +88,7 @@ export default function ElementDrawer({ architectureId, element, parentName, con
         <span className="flex gap-2">
           {r.targetDomain && <span className="ra-chip" title={r.crossDomain ? t('refarch.el.cross_domain_tip') : undefined}>{r.targetDomain}{r.crossDomain ? ` · ${t('refarch.el.cross_domain')}` : ''}</span>}
           <span className="ra-chip">{t(`refarch.link.${r.linkType}`)}{!r.present ? ' · ✕' : ''}</span>
+          {removeButton(r.linkId, r.name)}
         </span>
       </li>
     ))}</ul>
@@ -122,14 +133,14 @@ export default function ElementDrawer({ architectureId, element, parentName, con
         </div>
       )}
 
-      {!referenceModel && (<>
+      {!referenceModel && !contextOnly && (<>
       <div className="ap-section">
         <div className="ap-section-title">{t('refarch.el.implementations')}<HelpTip text={t('refarch.el.realization_help')} /></div>
         {(conformance?.realizedBy || []).length === 0 ? <p className="ap-empty" style={{ margin: 0 }}>{t('refarch.el.no_impl')}</p> : linkedList(conformance!.realizedBy)}
         {(conformance?.supportedBy || []).length > 0 && (<><div className="ap-section-title" style={{ marginTop: 10 }}>{t('refarch.el.supported_by')}</div>{linkedList(conformance!.supportedBy!)}</>)}
         {(conformance?.dependsOn || []).length > 0 && (<><div className="ap-section-title" style={{ marginTop: 10 }}>{t('refarch.el.depends_on')}</div>{linkedList(conformance!.dependsOn!)}</>)}
-        {(conformance?.deviations || []).length > 0 && (<><div className="ap-section-title" style={{ marginTop: 10 }}>{t('refarch.el.deviations')}</div><ul className="ra-list">{conformance!.deviations.map(d => <li key={d.linkId}>{d.name}</li>)}</ul></>)}
-        {(conformance?.exceptions || []).length > 0 && (<><div className="ap-section-title" style={{ marginTop: 10 }}>{t('refarch.el.exceptions')}</div><ul className="ra-list">{conformance!.exceptions.map(x => <li key={x.linkId}><span>{x.name}</span>{x.expiresAt && <span className="text-dim">{x.expiresAt.slice(0, 10)}{x.expired ? ' ✕' : ''}</span>}</li>)}</ul></>)}
+        {(conformance?.deviations || []).length > 0 && (<><div className="ap-section-title" style={{ marginTop: 10 }}>{t('refarch.el.deviations')}</div><ul className="ra-list">{conformance!.deviations.map(d => <li key={d.linkId}><span>{d.name}</span>{removeButton(d.linkId, d.name)}</li>)}</ul></>)}
+        {(conformance?.exceptions || []).length > 0 && (<><div className="ap-section-title" style={{ marginTop: 10 }}>{t('refarch.el.exceptions')}</div><ul className="ra-list">{conformance!.exceptions.map(x => <li key={x.linkId}><span>{x.name}</span><span className="flex gap-2">{x.expiresAt && <span className="text-dim">{x.expiresAt.slice(0, 10)}{x.expired ? ' ✕' : ''}</span>}{removeButton(x.linkId, x.name)}</span></li>)}</ul></>)}
         {proposed.length > 0 && (
           <>
             <div className="ap-section-title" style={{ marginTop: 10 }}>{t('refarch.el.proposed')}</div>
@@ -148,10 +159,10 @@ export default function ElementDrawer({ architectureId, element, parentName, con
 
       </>)}
 
-      {!referenceModel && confirmedTraces.length > 0 && (
+      {!referenceModel && !contextOnly && confirmedTraces.length > 0 && (
         <div className="ap-section">
           <div className="ap-section-title">{t('refarch.el.traces')}</div>
-          <ul className="ra-list">{confirmedTraces.map(l => <li key={l.id}><span>{l.targetName}</span><span className="ra-chip">{t(`refarch.link.${l.linkType}`)}</span></li>)}</ul>
+          <ul className="ra-list">{confirmedTraces.map(l => <li key={l.id}><span>{l.targetName}</span><span className="flex gap-2"><span className="ra-chip">{t(`refarch.link.${l.linkType}`)}</span>{removeButton(l.id, l.targetName)}</span></li>)}</ul>
         </div>
       )}
       {conformance?.decision && (
@@ -183,11 +194,12 @@ export default function ElementDrawer({ architectureId, element, parentName, con
               {['MANDATORY', 'RECOMMENDED', 'OPTIONAL'].map(o => <option key={o} value={o}>{t(`refarch.form.obligation.${o}`)}</option>)}
             </select>
           </div>
-          <button type="button" className="btn btn-primary btn-sm" onClick={() => run(() => api.patch(`/reference-architectures/versions/${(element as any).versionId}/elements/${encodeURIComponent(key)}`, { metaModelTypeCodes: configRequired ? [] : types, configurationRequired: configRequired, obligation }))}>{t('common.save')}</button>
+          <label className="ap-toggle" htmlFor="ra-el-context"><input id="ra-el-context" type="checkbox" checked={ownContextOnly} onChange={e => setOwnContextOnly(e.target.checked)} />{t('refarch.form.context_only')}<HelpTip text={t('refarch.form.context_only_help')} /></label>
+          <button type="button" className="btn btn-primary btn-sm" onClick={() => run(() => api.patch(`/reference-architectures/versions/${(element as any).versionId}/elements/${encodeURIComponent(key)}`, { metaModelTypeCodes: configRequired ? [] : types, configurationRequired: configRequired, obligation, metadata: { ...(element.metadata || {}), contextOnly: ownContextOnly } }))}>{t('common.save')}</button>
         </div>
       )}
 
-      {!referenceModel && (<>
+      {!referenceModel && !contextOnly && (<>
       <div className="ap-section">
         <div className="ap-section-title">{t('refarch.el.link_object')}<HelpTip text={t('refarch.coverage.help')} /></div>
         <div className="form-group">
@@ -245,6 +257,7 @@ export default function ElementDrawer({ architectureId, element, parentName, con
       </div>
       </>)}
       {referenceModel && <p className="text-dim" style={{ fontSize: 12 }} data-testid="ra-model-drawer-note">{t('refarch.model.element_note')}</p>}
+      {!referenceModel && contextOnly && <p className="text-dim" style={{ fontSize: 12 }} data-testid="ra-context-only-note">{t('refarch.el.context_only')}</p>}
     </aside>
   )
 }

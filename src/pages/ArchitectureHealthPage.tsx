@@ -4,6 +4,7 @@ import HelpTip from '../components/HelpTip'
 import { useLang } from '../contexts/LangContext'
 import { HealthApi, HealthAssessment, HealthItem, REFERENCE_CLASSES, T, fmt, heatColor, makeApi } from './health/health'
 import CollectionsPanel from './health/CollectionsPanel'
+import { HealthDomainRoadmap } from '../components/RoadmapContextPanels'
 import { BacklogPanel, EnterpriseIntelligencePanel, InsightsPanel, RationalisationPanel } from './health/ArchitectPanels'
 import './repository/AssetProfile.css'
 import './health/ArchitectureHealth.css'
@@ -231,6 +232,7 @@ function DomainView({ api, t, isAR, code }: { api: HealthApi; t: T; isAR: boolea
         )}
       </div>
 
+      <HealthDomainRoadmap domainCode={a.domain.code} />
       <CollectionsPanel api={api} t={t} code={a.domain.code} canCollect={a.collectionPlan.itemKeys.length > 0} onExecuted={() => load(true)} />
       <BacklogPanel api={api} t={t} code={a.domain.code} />
       <RationalisationPanel api={api} t={t} code={a.domain.code} />
