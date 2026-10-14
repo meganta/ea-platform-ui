@@ -58,6 +58,11 @@ export default function SettingsPanel({ api, t, rights }: { api: FvApi; t: T; ri
           <div className="form-group"><label className="ah-dim" htmlFor="fv-s-overlay"><input id="fv-s-overlay" type="checkbox" disabled={ro} checked={!!s.costOverlayInViews} onChange={e => set('costOverlayInViews', e.target.checked)} /> {t('fv.set.overlay')}</label><HelpTip text={t('fv.set.overlay.help')} /></div>
         </div>
       </div>
+      <div className="rp-card rp-card-gap" data-testid="fv-settings-notifications">
+        <div className="rp-card-title">{t('fv.set.notifications')}<HelpTip text={t('fv.set.notifications.help')} /></div>
+        <div className="ah-dim">{t('fv.set.notifications.text')}</div>
+        <a className="ah-link-btn" href="/notifications">{t('fv.set.notifications.open')}</a>
+      </div>
       <div className="rp-card rp-card-gap">
         <div className="rp-card-title">{t('fv.set.weights')}<HelpTip text={t('fv.set.weights.help')} /></div>
         <div className="fv-form">{CRITERIA.map(c => <div className="form-group" key={c}><label className="form-label" htmlFor={`fv-w-${c}`}>{t(`fv.crit.${c}`)}</label><input id={`fv-w-${c}`} type="number" min={0} max={100} className="form-input" disabled={ro} value={s.criteriaWeights[c] ?? 0} onChange={e => setS((x: any) => ({ ...x, criteriaWeights: { ...x.criteriaWeights, [c]: e.target.value } }))} /></div>)}</div>

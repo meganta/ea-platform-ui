@@ -11,13 +11,14 @@ import DataRequestsPanel from './finvalue/DataRequestsPanel'
 import VerificationPanel from './finvalue/VerificationPanel'
 import SettingsPanel from './finvalue/SettingsPanel'
 import UsagePanel from './finvalue/UsagePanel'
+import BenchmarkPanel from './finvalue/BenchmarkPanel'
 import { AgentsPanel, ScenarioCostPanel } from './finvalue/IntelligencePanels'
 import './repository/AssetProfile.css'
 import './health/ArchitectureHealth.css'
 import './finvalue/FinancialValue.css'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
-const TABS = ['overview', 'opportunities', 'agents', 'scenarios', 'data', 'usage', 'requests', 'verification', 'settings'] as const
+const TABS = ['overview', 'opportunities', 'agents', 'scenarios', 'benchmarks', 'data', 'usage', 'requests', 'verification', 'settings'] as const
 type Tab = typeof TABS[number]
 
 function useApi() {
@@ -69,6 +70,7 @@ export default function FinancialValuePage() {
           : tab === 'opportunities' ? <OpportunityList api={api} t={t} rights={rights} onOpen={open} />
           : tab === 'agents' ? <AgentsPanel api={api} t={t} rights={rights} isAR={isAR} onOpen={open} />
           : tab === 'scenarios' ? <ScenarioCostPanel api={api} t={t} rights={rights} isAR={isAR} />
+          : tab === 'benchmarks' ? <BenchmarkPanel api={api} t={t} rights={rights} isAR={isAR} />
           : tab === 'data' ? <FinancialDataPanel api={api} t={t} rights={rights} />
           : tab === 'usage' ? <UsagePanel api={api} t={t} rights={rights} />
           : tab === 'requests' ? <DataRequestsPanel api={api} t={t} rights={rights} onOpen={open} />

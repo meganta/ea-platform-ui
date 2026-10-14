@@ -248,4 +248,40 @@ describe('Financial Value - usage, alternatives, compliance, agents, scenarios',
     await waitFor(() => expect(called(fetchMock, '/config/financial-value', 'PUT')).toHaveLength(1))
     expect(JSON.parse(called(fetchMock, '/config/financial-value', 'PUT')[0][1].body)).toEqual(expect.objectContaining({ infraIdleDays: 45, benchmarkingOptIn: true, costOverlayInViews: true, processMinHoursPerYear: 500 }))
   })
+
+  it('benchmarks the organization\'s own costs and looks up sourced market prices for a licence', async () => {
+    mockInitial = 'tab=benchmarks'
+    const internal = {
+      method: 'FVI-BENCH-INT-1', currency: 'SAR', notes: ['A group is benchmarked only with at least 3 data points.'],
+      unitCostByType: [{ type: 'App', typeName: 'Application', objects: 5, enoughData: true, p25: 100, median: 120, p75: 130, total: 1360, outliers: [{ id: 'e', name: 'Legacy ERP', annual: 900, timesMedian: 7.5 }] }],
+      licenseUtilization: { median: 90, measured: 3, notMeasured: 1, rows: [{ id: 'l1', productName: 'CRM', vendor: 'V', quantity: 100, used: 40, utilizationPct: 40, belowMedianBy: 50, unusedCost: 60000 }] },
+      priceVariance: [{ productName: 'Office E3', metric: 'USER', lowestUnitCost: 900, highestUnitCost: 1200, spreadPct: 33.3, gapToLowest: 30000, entries: [{ id: 'a', vendor: 'Reseller A', quantity: 100, unitCost: 1200 }] }],
+      vendorConcentration: { total: 1000, vendors: [{ vendor: 'ACME', annual: 750, sharePct: 75 }], topVendorSharePct: 75, hhi: 6250, concentration: 'HIGH' }, costCentres: [{ key: 'IT', annual: 1000, sharePct: 100 }],
+    }
+    const done = { id: 'm1', subject: 'CRM', status: 'COMPLETED', createdAt: '2026-10-14', figures: [{ label: 'Enterprise', value: 35, currency: 'USD', unit: 'per user', period: 'MONTH', sourceUrl: 'https://v.example/p', sourceTitle: 'Pricing', quote: 'USD 35 per user per month', grounding: 'VERIFIED', publishedAt: null }], dropped: [{ label: 'Pro', reason: 'No source' }], comparison: { ownAnnualUnitCost: 1890, currency: 'SAR', rows: [{ label: 'Enterprise', marketAnnual: 1575, differencePct: 20, note: null }], rule: 'Check the licence metric.' } }
+    const fetchMock = route({
+      '/financial-value/me': ALL, '/financial-value/benchmarks/internal': internal,
+      '/financial-value/benchmarks/market': (url: string, init: any) => (init?.method === 'POST' ? { ...done, status: 'RUNNING', figures: [], comparison: null } : []),
+      '/financial-value/benchmarks/market/m1': done,
+      '/financial-value/licenses': [{ id: 'l1', productName: 'CRM', vendor: 'V' }], '/financial-value/contracts': [], '/financial-value/benchmarks': { optedIn: false, minPeers: 5, metrics: [] },
+    })
+    global.fetch = fetchMock as any
+    jest.useFakeTimers()
+    render(<FinancialValuePage />)
+    expect(await within(await screen.findByTestId('fv-bench-types')).findByText('Legacy ERP')).toBeInTheDocument()
+    expect(within(screen.getByTestId('fv-bench-prices')).getByText(/30,000 SAR/)).toBeInTheDocument()
+    expect(within(screen.getByTestId('fv-bench-vendors')).getByText('fv.bi.conc.HIGH')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByLabelText('fv.bm.kind.LICENSE', { selector: 'select' }).querySelectorAll('option').length).toBe(2))
+    fireEvent.change(screen.getByLabelText('fv.bm.kind.LICENSE', { selector: 'select' }), { target: { value: 'l1' } })
+    fireEvent.click(screen.getByText('fv.bm.run'))
+    await waitFor(() => expect(called(fetchMock, '/financial-value/benchmarks/market')).toHaveLength(1))
+    expect(JSON.parse(called(fetchMock, '/financial-value/benchmarks/market')[0][1].body)).toEqual(expect.objectContaining({ subjectKind: 'LICENSE', subjectId: 'l1', language: 'EN' }))
+    expect(await screen.findByText('fv.bm.running')).toBeInTheDocument()
+    jest.advanceTimersByTime(4100)
+    jest.useRealTimers()
+    const compare = await screen.findByTestId('fv-bench-compare')
+    expect(compare).toHaveTextContent('1,575 SAR')
+    expect(screen.getByText('fv.bm.ground.VERIFIED')).toBeInTheDocument()
+    expect(screen.getByText('Pricing').closest('a')).toHaveAttribute('href', 'https://v.example/p')
+  })
 })
