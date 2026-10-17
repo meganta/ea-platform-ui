@@ -92,7 +92,8 @@ export default function AiModelCatalogueCard() {
                   <td>
                     {!m.isActive ? <Pill text={t('aipolicy.cat.inactive')} color="var(--text-dim)" />
                       : m.gatewaySupported === false ? <Pill text={t('aipolicy.cat.not_connected')} color="var(--warning)" />
-                        : <Pill text={t('aipolicy.cat.active')} color="var(--success)" />}
+                        : m.providerConfigured === false ? <><Pill text={t('aipolicy.cat.not_configured')} color="var(--warning)" />{m.providerNote && <div className="oc-muted" data-testid="cat-provider-note">{m.providerNote}</div>}</>
+                          : <Pill text={t('aipolicy.cat.active')} color="var(--success)" />}
                   </td>
                   <td><button type="button" className="btn btn-sm btn-secondary" onClick={() => setForm(toForm(m))}>{t('aipolicy.cat.edit')}</button></td>
                 </tr>

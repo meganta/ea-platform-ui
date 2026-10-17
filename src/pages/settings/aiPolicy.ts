@@ -8,10 +8,10 @@ export const AI_POLICY_MODULES = ['copilot', 'copilot_deep', 'governance', 'adm'
 export type AiPolicyModule = typeof AI_POLICY_MODULES[number]
 export const BUDGET_MODULES = ['copilot', 'governance', 'adm', 'strategy'] as const
 export type BudgetModule = typeof BUDGET_MODULES[number]
-export const CATALOGUE_PROVIDERS = ['anthropic', 'openai', 'azure_openai', 'google_vertex', 'aws_bedrock'] as const
+export const CATALOGUE_PROVIDERS = ['anthropic', 'openai', 'azure_openai', 'vertex_anthropic', 'bedrock_anthropic', 'bedrock', 'vertex_gemini'] as const
 export const KSA_STATUSES = ['AVAILABLE', 'NOT_AVAILABLE', 'UNVERIFIED'] as const
 export const NOTE_CODES = ['OWNER_MAX_LEVEL', 'MODEL_NOT_ALLOWED', 'MODEL_FALLBACK', 'MODEL_NOT_DEEP_CAPABLE', 'NO_ALLOWED_MODEL', 'BUDGET_STEP_DOWN', 'BUDGET_EXHAUSTED', 'OWNER_CEILING_REACHED', 'COPILOT_DEEP_DISABLED', 'PRICE_UNKNOWN'] as const
-export const MODEL_BLOCKS = ['INACTIVE', 'PROVIDER_NOT_SUPPORTED', 'PROVIDER_NOT_ALLOWED', 'MODEL_NOT_ALLOWED', 'NOT_KSA_HOSTED', 'NOT_IN_CATALOGUE'] as const
+export const MODEL_BLOCKS = ['INACTIVE', 'PROVIDER_NOT_SUPPORTED', 'PROVIDER_NOT_CONFIGURED', 'PROVIDER_NOT_ALLOWED', 'MODEL_NOT_ALLOWED', 'NOT_KSA_HOSTED', 'NOT_IN_CATALOGUE'] as const
 
 export interface DepthProfile { level: AiDepthLevel; maxSteps: number; maxToolCalls: number; effort: string; maxOutputTokens: number; critiquePasses: number; leadRole: boolean; timeLimitSec: number }
 
@@ -59,6 +59,9 @@ export interface CatalogueModel {
   isActive: boolean
   notes?: string | null
   gatewaySupported?: boolean
+  /** False when the platform has not set this provider up (credentials / region); the reason is in providerNote. */
+  providerConfigured?: boolean
+  providerNote?: string | null
 }
 
 export interface PolicyNote { code: string; by: 'OWNER' | 'ADMIN' | 'BUDGET' | 'CATALOGUE'; message: string }
