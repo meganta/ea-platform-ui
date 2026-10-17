@@ -6,6 +6,12 @@ import CopilotStudyCard, { isStudyAttachment } from './CopilotStudyCard'
 import CopilotDeckCard, { isDeckAttachment } from './CopilotDeckCard'
 import CopilotHealthCard, { isHealthAttachment } from './CopilotHealthCard'
 import CopilotResearchCard, { isResearchAttachment } from './CopilotResearchCard'
+import DeepWorkCard from './deepwork/DeepWorkCard'
+
+/** A deep-work run Copilot started (or whose result it posted): the card follows it. */
+export function isDeepWorkAttachment(a: any): a is { kind: 'DEEP_WORK'; id: string; runId: string; title: string; status: string } {
+  return !!a && a.kind === 'DEEP_WORK' && typeof a.runId === 'string'
+}
 import CopilotCollectionCard, { isCollectionAttachment } from './CopilotCollectionCard'
 
 /**
@@ -72,7 +78,7 @@ function ViewCard({ attachment: a, question }: { attachment: CopilotViewAttachme
 
 export default function CopilotViewAttachments({ attachments, question, conversationId }: { attachments?: unknown[] | null; question?: string; conversationId?: string | null }) {
   const { isAR } = useLang()
-  const valid = (attachments || []).filter(a => isViewAttachment(a) || isStudyAttachment(a) || isDeckAttachment(a) || isHealthAttachment(a) || isResearchAttachment(a) || isCollectionAttachment(a))
+  const valid = (attachments || []).filter(a => isViewAttachment(a) || isStudyAttachment(a) || isDeckAttachment(a) || isHealthAttachment(a) || isResearchAttachment(a) || isCollectionAttachment(a) || isDeepWorkAttachment(a))
   if (valid.length === 0) return null
   return (
     <div dir={isAR ? 'rtl' : 'ltr'} data-testid="copilot-view-attachments">
@@ -82,6 +88,8 @@ export default function CopilotViewAttachments({ attachments, question, conversa
           ? <CopilotDeckCard key={a.id} attachment={a} conversationId={conversationId} />
           : isHealthAttachment(a)
             ? <CopilotHealthCard key={a.id} attachment={a} />
+            : isDeepWorkAttachment(a)
+              ? <DeepWorkCard key={a.id} runId={a.runId} compact resultInMessage={a.status === 'COMPLETED'} />
             : isResearchAttachment(a)
               ? <CopilotResearchCard key={a.id} attachment={a} />
               : isCollectionAttachment(a)

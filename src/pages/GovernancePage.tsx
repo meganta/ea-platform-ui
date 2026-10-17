@@ -1,4 +1,5 @@
 import GovernanceReviewActions from '../components/GovernanceReviewActions'
+import DeepWorkLauncher from '../components/deepwork/DeepWorkLauncher'
 import { useAuth } from '../contexts/AuthContext'
 import GovernanceExportDialog, { GovernanceExportFormat } from '../components/GovernanceExportDialog'
 import React, { useEffect, useState, useRef } from 'react'
@@ -1988,6 +1989,10 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
       {/* Summary Tab */}
       {activeTab === 'summary' && (
         <div>
+          {/* Lead reviewer (deep work at the administrator's deep levels): advisory, never changes scores or the decision. */}
+          {report.domainSummaries?._leadReview && (
+            <DeepWorkLauncher module="governance" type={review.reviewType} subjectType="GOVERNANCE_REVIEW" subjectId={review.id} titleKey="deepwork.gov.title" helpKey="deepwork.gov.help" startKey="deepwork.gov.title" />
+          )}
           {/* Governance Review V2 (spec section 15): evidence coverage and
               extraction quality, shown only when this review actually ran
               through the V2 pipeline (rubricId is only ever set by

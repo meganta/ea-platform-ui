@@ -19,6 +19,7 @@ import { DASHBOARD_TRANSLATIONS } from '../pages/dashboard/dashboardStrings'
 import { FINVALUE_TRANSLATIONS } from '../pages/finvalue/finValueStrings'
 import { ROADMAP_TRANSLATIONS } from '../pages/planning/roadmapStrings'
 import { AI_POLICY_TRANSLATIONS } from '../pages/settings/aiPolicyStrings'
+import { DEEP_WORK_TRANSLATIONS } from '../components/deepwork/deepWorkStrings'
 
 export type Locale = 'AR' | 'EN'
 
@@ -30,6 +31,7 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   ...FINVALUE_TRANSLATIONS,
   ...ROADMAP_TRANSLATIONS,
   ...AI_POLICY_TRANSLATIONS,
+  ...DEEP_WORK_TRANSLATIONS,
   ...METAMODEL_TRANSLATIONS,
   'strategy.refresh.previous_evidence': { EN: 'Approved previous strategy evidence', AR: 'أدلة الاستراتيجية السابقة المعتمدة' },
   'strategy.refresh.open_baseline': { EN: 'Open approved baseline version', AR: 'فتح الإصدار المرجعي المعتمد' },
