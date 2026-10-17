@@ -2,10 +2,11 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import AiPolicySettingsCard from '../AiPolicySettingsCard'
+import AiSettingsPage from '../AiSettingsPage'
 import { AI_POLICY_TRANSLATIONS } from '../aiPolicyStrings'
 import { AI_DEPTH_LEVELS, AI_POLICY_MODULES, CATALOGUE_PROVIDERS, KSA_STATUSES, MODEL_BLOCKS, NOTE_CODES, amountOrNull, sar } from '../aiPolicy'
 
-jest.mock('../../../contexts/LangContext', () => ({ useLang: () => ({ t: (k: string) => k, isAR: false }) }))
+jest.mock('../../../contexts/LangContext', () => ({ useLang: () => ({ t: (k: string) => k, isAR: false, setLocale: jest.fn() }) }))
 jest.mock('../../../components/HelpTip', () => () => <span>?</span>)
 
 const ok = (body: any) => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) })
@@ -65,6 +66,49 @@ describe('AI depth and spending card', () => {
     expect(body.budgetMode).toBe('HARD')
   })
 
+  it('one panel holds every AI setting: the main model and answer language are saved first, then depth and spending, then web research only when changed', async () => {
+    const webCfg = { provider: 'AUTO', model: null, maxSearches: 5, allowedDomains: [], blockedDomains: [], effective: { provider: 'ANTHROPIC', model: 'claude-sonnet-5-5', source: 'AI_SETTINGS', reason: null } }
+    const fetchMock = jest.fn((url: string, init?: any) => {
+      if (url.endsWith('/config')) return ok({ ai: { provider: 'openai', model: 'gpt-4o', language: 'EN' } })
+      if (url.includes('/config/web-research')) return ok(init?.method === 'PUT' ? { ...webCfg, ...JSON.parse(init.body) } : webCfg)
+      if (url.endsWith('/config/ai')) return ok({ message: 'ok' })
+      return ok(view())
+    })
+    global.fetch = fetchMock as any
+    const onLanguageSaved = jest.fn()
+    render(<AiPolicySettingsCard onLanguageSaved={onLanguageSaved} />)
+    const model = await screen.findByLabelText('aipolicy.main.model')
+    // The current model is kept as an option even when the catalogue does not list it.
+    expect((model as HTMLSelectElement).value).toBe('openai:gpt-4o')
+    expect(screen.getByText('aipolicy.main.current')).toBeInTheDocument()
+    expect(await screen.findByTestId('web-research-settings')).toBeInTheDocument()
+    expect(screen.queryByText('settings.web.save')).toBeNull()
+
+    fireEvent.change(model, { target: { value: 'anthropic:claude-sonnet-5-5' } })
+    fireEvent.change(screen.getByLabelText('aipolicy.main.language'), { target: { value: 'AR' } })
+    fireEvent.click(screen.getByText('aipolicy.save'))
+    await screen.findByText('aipolicy.saved')
+    const puts = fetchMock.mock.calls.filter(c => c[1]?.method === 'PUT').map(c => c[0] as string)
+    expect(puts.map(u => u.replace(/^.*\/config/, '/config'))).toEqual(['/config/ai', '/config/ai-policy'])
+    expect(JSON.parse(fetchMock.mock.calls.find(c => String(c[0]).endsWith('/config/ai'))![1].body)).toEqual({ provider: 'anthropic', model: 'claude-sonnet-5-5', language: 'AR' })
+    expect(onLanguageSaved).toHaveBeenCalledWith('AR')
+
+    // A web research change rides the same Save; the unchanged main model is not sent again.
+    fireEvent.change(screen.getByLabelText('settings.web.max_searches'), { target: { value: '8' } })
+    fireEvent.click(screen.getByText('aipolicy.save'))
+    await waitFor(() => expect(fetchMock.mock.calls.filter(c => c[1]?.method === 'PUT')).toHaveLength(4))
+    const last = fetchMock.mock.calls.filter(c => c[1]?.method === 'PUT').slice(2).map(c => String(c[0]).replace(/^.*\/config/, '/config'))
+    expect(last).toEqual(['/config/ai-policy', '/config/web-research'])
+  })
+
+  it('the AI settings page shows only this panel', async () => {
+    global.fetch = jest.fn(() => ok(view())) as any
+    render(<AiSettingsPage />)
+    expect(await screen.findByTestId('ai-policy-settings')).toBeInTheDocument()
+    expect(screen.getAllByTestId('ai-policy-settings')).toHaveLength(1)
+    expect(screen.queryByText(/AI Configuration/)).toBeNull()
+  })
+
   it('refuses a negative or non-numeric budget before sending', async () => {
     const fetchMock = jest.fn(() => ok(view()))
     global.fetch = fetchMock as any
@@ -88,7 +132,7 @@ describe('AI depth and spending card', () => {
 describe('AI policy strings', () => {
   const has = (k: string) => { const v = AI_POLICY_TRANSLATIONS[k]; return !!v && v.EN.trim().length > 0 && v.AR.trim().length > 0 }
   const arabic = (k: string) => /[؀-ۿ]/.test(AI_POLICY_TRANSLATIONS[k]?.AR || '')
-  const files = ['../AiPolicySettingsCard.tsx', '../../owner/AiModelCatalogueCard.tsx', '../../owner/TenantAiPolicyPanel.tsx'].map(f => fs.readFileSync(path.resolve(__dirname, f), 'utf8')).join('\n')
+  const files = ['../AiPolicySettingsCard.tsx', '../AiSettingsPage.tsx', '../../owner/AiModelCatalogueCard.tsx', '../../owner/TenantAiPolicyPanel.tsx'].map(f => fs.readFileSync(path.resolve(__dirname, f), 'utf8')).join('\n')
 
   it('has EN and Arabic text for every static key the screens use', () => {
     const keys = Array.from(new Set(Array.from(files.matchAll(/t\('(aipolicy\.[\w.]+)'\)/g)).map(m => m[1])))
@@ -102,6 +146,7 @@ describe('AI policy strings', () => {
       ...AI_DEPTH_LEVELS.map(l => `aipolicy.level.${l}`), ...AI_POLICY_MODULES.flatMap(m => [`aipolicy.module.${m}`, `aipolicy.module.${m}.help`]),
       ...NOTE_CODES.map(c => `aipolicy.note.${c}`), ...MODEL_BLOCKS.map(b => `aipolicy.block.${b}`), ...KSA_STATUSES.map(s => `aipolicy.ksa.${s}`),
       ...CATALOGUE_PROVIDERS.map(p => `aipolicy.provider.${p}`), 'aipolicy.budget.mode.SOFT', 'aipolicy.budget.mode.HARD',
+      'aipolicy.main.lang.EN', 'aipolicy.main.lang.AR', 'aipolicy.main.lang.BILINGUAL',
     ]
     expect(keys.filter(k => !has(k))).toEqual([])
   })

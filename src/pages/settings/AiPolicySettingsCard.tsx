@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../../components/HelpTip'
 import { SETTINGS_API_URL } from './shared'
@@ -6,6 +6,7 @@ import {
   AI_DEPTH_LEVELS, AI_POLICY_MODULES, AiDepthLevel, AiPolicyModule, AiPolicySettings, AiPolicyView, BUDGET_MODULES, BudgetModule,
   CatalogueModel, EffectivePolicy, amountOrNull, sar,
 } from './aiPolicy'
+import WebResearchSettingsCard, { WebResearchSectionApi } from './WebResearchSettingsCard'
 
 async function call(path: string, init: RequestInit = {}) {
   const r = await fetch(`${SETTINGS_API_URL}${path}`, { ...init, headers: { Authorization: `Bearer ${localStorage.getItem('ea_token') || ''}`, 'Content-Type': 'application/json' } })
@@ -50,18 +51,29 @@ function EffectiveLine({ e }: { e: EffectivePolicy }) {
   )
 }
 
+/** Providers the everyday AI paths (Copilot chat, reviews, analyses) call directly; hosted ones serve deep work only. */
+const MAIN_PROVIDERS = ['anthropic', 'openai']
+const LANGUAGES = ['EN', 'AR', 'BILINGUAL'] as const
+interface MainAi { provider: string; model: string; language: string }
+
 /**
- * Settings > AI & Copilot: how deeply AI works in each module, which model each depth uses,
- * and how much the organization spends (SAR). The administrator decides; people using the
- * modules never choose a level. The platform owner's limits for this organization always win.
+ * Settings > AI & Copilot: every AI setting of the organization in one panel - the main AI model
+ * and the language of answers, how deeply AI works in each module, which model each depth uses,
+ * how much the organization spends (SAR), and internet research. One Save writes each part
+ * through its own settings API. The administrator decides; people using the modules never choose
+ * a level. The platform owner's limits for this organization always win.
  */
-export default function AiPolicySettingsCard() {
+export default function AiPolicySettingsCard({ onLanguageSaved }: { onLanguageSaved?: (language: string) => void } = {}) {
   const { t, isAR } = useLang()
   const [view, setView] = useState<AiPolicyView | null>(null)
   const [draft, setDraft] = useState<AiPolicySettings | null>(null)
   const [budgetText, setBudgetText] = useState<{ monthly: string; run: string; modules: Partial<Record<BudgetModule, string>> }>({ monthly: '', run: '', modules: {} })
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [main, setMain] = useState<MainAi | null>(null)
+  const [mainDirty, setMainDirty] = useState(false)
+  const web = useRef<WebResearchSectionApi | null>(null)
+  const registerWeb = useCallback((api: WebResearchSectionApi) => { web.current = api }, [])
 
   const load = (v: AiPolicyView) => {
     setView(v); setDraft(v.settings)
@@ -71,7 +83,10 @@ export default function AiPolicySettingsCard() {
     })
   }
 
-  useEffect(() => { call('/config/ai-policy').then(load).catch(e => setMsg({ ok: false, text: e.message })) }, [])
+  useEffect(() => {
+    call('/config/ai-policy').then(load).catch(e => setMsg({ ok: false, text: e.message }))
+    call('/config').then(c => setMain({ provider: c?.ai?.provider || 'openai', model: c?.ai?.model || 'gpt-4o', language: c?.ai?.language || 'EN' })).catch(() => setMain(null))
+  }, [])
 
   const save = async () => {
     if (!draft) return
@@ -82,6 +97,12 @@ export default function AiPolicySettingsCard() {
     if ([monthly, run, ...Object.values(modules)].some(v => Number.isNaN(v))) { setMsg({ ok: false, text: t('aipolicy.bad_amount') }); return }
     setSaving(true); setMsg(null)
     try {
+      // Main model first, so the depth section's "main AI model" reflects it when the policy comes back.
+      if (main && mainDirty) {
+        await call('/config/ai', { method: 'PUT', body: JSON.stringify(main) })
+        setMainDirty(false)
+        onLanguageSaved?.(main.language)
+      }
       const saved: AiPolicyView = await call('/config/ai-policy', {
         method: 'PUT',
         body: JSON.stringify({
@@ -91,6 +112,7 @@ export default function AiPolicySettingsCard() {
         }),
       })
       load(saved)
+      if (web.current?.isDirty()) await web.current.save()
       setMsg({ ok: true, text: t('aipolicy.saved') })
     } catch (e: any) { setMsg({ ok: false, text: e.message }) }
     finally { setSaving(false) }
@@ -115,6 +137,36 @@ export default function AiPolicySettingsCard() {
       {msg && <div role="status" className={msg.ok ? 'alert alert-info' : 'alert'} style={{ marginBottom: 12, color: msg.ok ? undefined : 'var(--danger)' }}>{msg.text}</div>}
       {!view || !draft ? <div className="spinner" /> : (
         <>
+          {main && (() => {
+            const options = view.models.filter(m => MAIN_PROVIDERS.includes(m.provider))
+            const current = `${main.provider}:${main.model}`
+            return (
+              <div className="aip-section" data-testid="aip-main">
+                <h4 className="aip-h">🤖 {t('aipolicy.main.title')}<HelpTip text={t('aipolicy.main.help')} /></h4>
+                <div className="aip-grid">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="aip-main-model">{t('aipolicy.main.model')}</label>
+                    <select id="aip-main-model" className="form-input" value={current} onChange={e => {
+                      const [provider, ...rest] = e.target.value.split(':')
+                      setMain({ ...main, provider, model: rest.join(':') }); setMainDirty(true)
+                    }}>
+                      {!options.some(m => m.key === current) && <option value={current}>{t('aipolicy.main.current').replace('{model}', main.model)}</option>}
+                      {options.map(m => <option key={m.key} value={m.key}>{modelOptionText(m, t)}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="aip-main-language">{t('aipolicy.main.language')}</label>
+                    <select id="aip-main-language" className="form-input" value={main.language} onChange={e => { setMain({ ...main, language: e.target.value }); setMainDirty(true) }}>
+                      {LANGUAGES.map(l => <option key={l} value={l}>{t(`aipolicy.main.lang.${l}`)}</option>)}
+                    </select>
+                    <div className="form-hint" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>{t('aipolicy.main.lang_note')}</div>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          <h4 className="aip-h">{t('aipolicy.spend_title')}</h4>
           <div className="stat-grid-5" style={{ marginBottom: 12 }} data-testid="aip-spend">
             <div className="stat-card"><div className="stat-label">{t('aipolicy.spend.month')}</div><div className="stat-value" style={{ fontSize: 18 }}>{sar(view.spend.monthSar)}</div></div>
             {BUDGET_MODULES.map(m => (
@@ -215,6 +267,8 @@ export default function AiPolicySettingsCard() {
               </label>
             ))}
           </fieldset>
+          <WebResearchSettingsCard embedded onRegister={registerWeb} />
+
           <button type="button" className="btn btn-primary mt-4" disabled={saving} onClick={save}>{saving ? t('aipolicy.saving') : t('aipolicy.save')}</button>
         </>
       )}

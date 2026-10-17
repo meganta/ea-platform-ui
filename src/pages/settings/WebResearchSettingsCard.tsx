@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../../components/HelpTip'
 import { SETTINGS_API_URL } from './shared'
@@ -21,11 +21,15 @@ async function call(path: string, init: RequestInit = {}) {
 
 const toList = (text: string) => text.split(/[\s,;]+/).map(s => s.trim()).filter(Boolean)
 
+/** What the panel that embeds this section calls on its single Save. */
+export interface WebResearchSectionApi { isDirty: () => boolean; save: () => Promise<void> }
+
 /**
  * Settings > AI & Copilot: internet research for technology research. By default it uses the same
  * provider and model as the AI settings; a provider can be chosen only as an override.
+ * `embedded`: shown as a section of the AI settings panel, saved by that panel's Save (no button of its own).
  */
-export default function WebResearchSettingsCard() {
+export default function WebResearchSettingsCard({ embedded = false, onRegister }: { embedded?: boolean; onRegister?: (api: WebResearchSectionApi) => void } = {}) {
   const { t, isAR } = useLang()
   const [cfg, setCfg] = useState<WebResearch | null>(null)
   const [allowed, setAllowed] = useState('')
@@ -33,33 +37,43 @@ export default function WebResearchSettingsCard() {
   const [saving, setSaving] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [savedProvider, setSavedProvider] = useState<Provider | null>(null)
+  const dirty = useRef(false)
+  const edit = <T,>(fn: (v: T) => void) => (v: T) => { dirty.current = true; fn(v) }
 
   useEffect(() => {
     call('/config/web-research').then((c: WebResearch) => { setCfg(c); setSavedProvider(c.provider); setAllowed((c.allowedDomains || []).join(', ')); setBlocked((c.blockedDomains || []).join(', ')) })
       .catch(e => setMsg({ ok: false, text: e.message }))
   }, [])
 
-  const save = async () => {
+  /** Saves the section; throws on a refusal so an embedding panel can report it. */
+  const persist = async () => {
     if (!cfg) return
+    const a = toList(allowed); const b = toList(blocked)
+    const saved: WebResearch = await call('/config/web-research', { method: 'PUT', body: JSON.stringify({ provider: cfg.provider, model: isOverride(cfg.provider) ? (cfg.model || '') : null, maxSearches: cfg.maxSearches, allowedDomains: a, blockedDomains: a.length ? [] : b }) })
+    setCfg(saved); setSavedProvider(saved.provider); setAllowed(saved.allowedDomains.join(', ')); setBlocked(saved.blockedDomains.join(', '))
+    dirty.current = false
+  }
+  const persistRef = useRef(persist)
+  persistRef.current = persist
+  useEffect(() => { onRegister?.({ isDirty: () => dirty.current, save: () => persistRef.current() }) }, [onRegister])
+
+  const save = async () => {
     setSaving(true); setMsg(null)
-    try {
-      const a = toList(allowed); const b = toList(blocked)
-      const saved: WebResearch = await call('/config/web-research', { method: 'PUT', body: JSON.stringify({ provider: cfg.provider, model: isOverride(cfg.provider) ? (cfg.model || '') : null, maxSearches: cfg.maxSearches, allowedDomains: a, blockedDomains: a.length ? [] : b }) })
-      setCfg(saved); setSavedProvider(saved.provider); setAllowed(saved.allowedDomains.join(', ')); setBlocked(saved.blockedDomains.join(', '))
-      setMsg({ ok: true, text: t('settings.web.saved') })
-    } catch (e: any) { setMsg({ ok: false, text: e.message }) }
+    try { await persist(); setMsg({ ok: true, text: t('settings.web.saved') }) } catch (e: any) { setMsg({ ok: false, text: e.message }) }
     finally { setSaving(false) }
   }
 
   return (
-    <div className="card" style={{ marginTop: 16 }} dir={isAR ? 'rtl' : 'ltr'} data-testid="web-research-settings">
-      <div className="section-title" style={{ display: 'flex', alignItems: 'center' }}>🌐 {t('settings.web.title')}<HelpTip text={t('settings.web.help')} /></div>
+    <div className={embedded ? 'aip-section' : 'card'} style={embedded ? undefined : { marginTop: 16 }} dir={isAR ? 'rtl' : 'ltr'} data-testid="web-research-settings">
+      {embedded
+        ? <h4 className="aip-h">🌐 {t('settings.web.title')}<HelpTip text={t('settings.web.help')} /></h4>
+        : <div className="section-title" style={{ display: 'flex', alignItems: 'center' }}>🌐 {t('settings.web.title')}<HelpTip text={t('settings.web.help')} /></div>}
       {msg && <div role="status" className={msg.ok ? 'alert alert-info' : 'alert'} style={{ marginBottom: 12, color: msg.ok ? undefined : 'var(--danger)' }}>{msg.text}</div>}
       {!cfg ? <div className="spinner" /> : (
         <>
           <div className="form-group">
             <label className="form-label" htmlFor="web-provider">{t('settings.web.provider')}</label>
-            <select id="web-provider" className="form-input" value={cfg.provider} onChange={e => setCfg({ ...cfg, provider: e.target.value as WebResearch['provider'], model: null })}>
+            <select id="web-provider" className="form-input" value={cfg.provider} onChange={e => edit(setCfg)({ ...cfg, provider: e.target.value as WebResearch['provider'], model: null })}>
               <option value="AUTO">{t('settings.web.provider.AUTO')}</option>
               <option value="ANTHROPIC">{t('settings.web.provider.ANTHROPIC')}</option>
               <option value="OPENAI">{t('settings.web.provider.OPENAI')}</option>
@@ -76,26 +90,26 @@ export default function WebResearchSettingsCard() {
             <>
               {isOverride(cfg.provider) && <div className="form-group">
                 <label className="form-label" htmlFor="web-model">{t('settings.web.model')}</label>
-                <input id="web-model" className="form-input" value={cfg.model || ''} placeholder={DEFAULT_MODEL[cfg.provider]} onChange={e => setCfg({ ...cfg, model: e.target.value })} />
+                <input id="web-model" className="form-input" value={cfg.model || ''} placeholder={DEFAULT_MODEL[cfg.provider]} onChange={e => edit(setCfg)({ ...cfg, model: e.target.value })} />
                 <div className="form-hint" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>{t('settings.web.model_hint').replace('{model}', DEFAULT_MODEL[cfg.provider])}</div>
               </div>}
               <div className="form-group">
                 <label className="form-label" htmlFor="web-searches">{t('settings.web.max_searches')}</label>
-                <input id="web-searches" className="form-input" type="number" min={1} max={20} value={cfg.maxSearches} onChange={e => setCfg({ ...cfg, maxSearches: Number(e.target.value) })} style={{ maxWidth: 140 }} />
+                <input id="web-searches" className="form-input" type="number" min={1} max={20} value={cfg.maxSearches} onChange={e => edit(setCfg)({ ...cfg, maxSearches: Number(e.target.value) })} style={{ maxWidth: 140 }} />
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="web-allowed">{t('settings.web.allowed')}</label>
-                <input id="web-allowed" className="form-input" value={allowed} placeholder="gartner.com, forrester.com" onChange={e => setAllowed(e.target.value)} />
+                <input id="web-allowed" className="form-input" value={allowed} placeholder="gartner.com, forrester.com" onChange={e => edit(setAllowed)(e.target.value)} />
               </div>
               <div className="form-group">
                 <label className="form-label" htmlFor="web-blocked">{t('settings.web.blocked')}</label>
-                <input id="web-blocked" className="form-input" value={blocked} disabled={toList(allowed).length > 0} onChange={e => setBlocked(e.target.value)} />
+                <input id="web-blocked" className="form-input" value={blocked} disabled={toList(allowed).length > 0} onChange={e => edit(setBlocked)(e.target.value)} />
                 <div className="form-hint" style={{ fontSize: 11.5, color: 'var(--text-dim)' }}>{t('settings.web.domains_hint')}</div>
               </div>
             </>
           )}
           <div className="alert alert-info" style={{ marginTop: 8 }}>{cfg.provider === 'NONE' ? t('settings.web.off') : t('settings.web.privacy')}</div>
-          <button type="button" className="btn btn-primary mt-4" disabled={saving} onClick={save}>{saving ? t('settings.web.saving') : t('settings.web.save')}</button>
+          {!embedded && <button type="button" className="btn btn-primary mt-4" disabled={saving} onClick={save}>{saving ? t('settings.web.saving') : t('settings.web.save')}</button>}
         </>
       )}
     </div>
