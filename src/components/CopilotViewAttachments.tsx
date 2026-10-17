@@ -7,12 +7,12 @@ import CopilotDeckCard, { isDeckAttachment } from './CopilotDeckCard'
 import CopilotHealthCard, { isHealthAttachment } from './CopilotHealthCard'
 import CopilotResearchCard, { isResearchAttachment } from './CopilotResearchCard'
 import DeepWorkCard from './deepwork/DeepWorkCard'
+import CopilotCollectionCard, { isCollectionAttachment } from './CopilotCollectionCard'
 
 /** A deep-work run Copilot started (or whose result it posted): the card follows it. */
 export function isDeepWorkAttachment(a: any): a is { kind: 'DEEP_WORK'; id: string; runId: string; title: string; status: string } {
   return !!a && a.kind === 'DEEP_WORK' && typeof a.runId === 'string'
 }
-import CopilotCollectionCard, { isCollectionAttachment } from './CopilotCollectionCard'
 
 /**
  * EA Views that Copilot ran to illustrate an answer, shown under the answer:
