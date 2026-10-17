@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../HelpTip'
-import { ACTIVE, DeepRun, EvidenceEntry, POLL_MS, deepWorkApi, runStage } from './deepWorkApi'
+import { ACTIVE, DeepRun, EvidenceEntry, POLL_MS, deepWorkApi, downloadDeepWorkDeck, runStage } from './deepWorkApi'
 import './DeepWork.css'
 
 const STAGE_COLOR: Record<string, string> = { QUEUED: 'var(--text-dim)', INVESTIGATING: 'var(--accent)', CHECKING: 'var(--warning)', LEAD: 'var(--gold, #c9a84c)', COMPLETED: 'var(--success)', FAILED: 'var(--danger)', CANCELLED: 'var(--text-dim)' }
@@ -32,6 +32,7 @@ export default function DeepWorkCard({ runId, compact = false, resultInMessage =
   const [openEvidence, setOpenEvidence] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(!compact)
   const [cancelling, setCancelling] = useState(false)
+  const [deckBusy, setDeckBusy] = useState(false)
   const finished = useRef(false)
 
   const accept = useCallback((r: DeepRun) => {
@@ -64,6 +65,11 @@ export default function DeepWorkCard({ runId, compact = false, resultInMessage =
     try { accept(await deepWorkApi.cancel(runId)) } catch (e: any) { setError(e.message) } finally { setCancelling(false) }
   }
 
+  const deck = async () => {
+    setDeckBusy(true); setError('')
+    try { await downloadDeepWorkDeck(runId, isAR ? 'AR' : 'EN') } catch (e: any) { setError(e.message) } finally { setDeckBusy(false) }
+  }
+
   if (error && !run) return <div className="dw-card" role="alert" data-testid="deep-work-card">{t('deepwork.load_failed')}: {error}</div>
   if (!run) return <div className="dw-card" data-testid="deep-work-card"><span className="spinner" style={{ width: 14, height: 14, display: 'inline-block' }} /> {t('deepwork.loading')}</div>
 
@@ -91,6 +97,9 @@ export default function DeepWorkCard({ runId, compact = false, resultInMessage =
             <span data-testid="deep-work-cost">{run.costSar.toLocaleString('en-US', { maximumFractionDigits: 2 })} SAR{run.unpricedTurns ? ` + ${t('deepwork.unpriced')}` : ''}</span>
           </div>
         </div>
+        {run.status === 'COMPLETED' && (run.result || run.draft) && (
+          <button type="button" className="btn btn-sm btn-secondary dw-deck" disabled={deckBusy} onClick={deck} title={t('deepwork.deck_help')} data-testid="deep-work-deck">{deckBusy ? t('deepwork.deck_preparing') : t('deepwork.deck')}</button>
+        )}
         <HelpTip text={t('deepwork.help')} />
       </div>
 

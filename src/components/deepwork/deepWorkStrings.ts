@@ -91,6 +91,10 @@ export const DEEP_WORK_TRANSLATIONS: Record<string, Entry> = {
   'deepwork.kind.SUPPORTED': e('Supported', 'مُسند'),
   'deepwork.kind.MISSING': e('Missing', 'ناقص'),
   'deepwork.kind.CONTRADICTION': e('Contradiction', 'تناقض'),
+  // Deck download
+  'deepwork.deck': e('Download deck', 'تنزيل العرض'),
+  'deepwork.deck_help': e('A PowerPoint of this result in your organization\'s presentation style: the summary and verdict first, then the findings with their evidence references, open questions, limits and the evidence used.', 'عرض PowerPoint لهذه النتيجة بنمط عروض جهتك: الخلاصة والحكم أولاً، ثم النتائج مع مراجع أدلتها، والأسئلة المفتوحة، والحدود، والأدلة المستخدمة.'),
+  'deepwork.deck_preparing': e('Preparing…', 'جارٍ الإعداد…'),
   // Lead review panels
   'deepwork.gov.title': e('Lead reviewer', 'المراجع القيادي'),
   'deepwork.gov.help': e('At the deep levels your administrator sets, a lead reviewer re-examines the scored review: it checks the findings against their evidence and the submitted documents, looks for what the review missed and gives an advisory verdict. It never changes the scores or the decision - those stay with the people who issue it.', 'في المستويات العميقة التي يحددها مسؤول جهتك، يعيد مراجع قيادي فحص المراجعة بعد احتساب درجاتها: يتحقق من النتائج مقابل أدلتها والوثائق المقدمة، ويبحث عما فات المراجعة، ويصدر حكماً استشارياً. ولا يغيّر الدرجات ولا القرار، فهما بيد من يصدره.'),

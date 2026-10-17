@@ -40,6 +40,15 @@ export const deepWorkApi = {
   startStrategy: (refreshId: string, language: 'EN' | 'AR'): Promise<DeepRun> => call('POST', `/strategy-refreshes/${refreshId}/lead-review`, { language }),
 }
 
+/** Downloads a finished run as a PowerPoint in the organization's presentation style. */
+export async function downloadDeepWorkDeck(id: string, language: 'EN' | 'AR') {
+  const r = await fetch(`${API_BASE}/deep-work/${id}/deck?language=${language}`, { headers: { Authorization: `Bearer ${getToken() || ''}` } })
+  if (!r.ok) { const d = await r.json().catch(() => null); throw new Error(d?.message ? String(d.message) : `HTTP ${r.status}`) }
+  const url = URL.createObjectURL(await r.blob())
+  const a = document.createElement('a'); a.href = url; a.download = `deep-work-${id.slice(0, 8)}-${language.toLowerCase()}.pptx`; a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 /** Which phase label a run is in (for the status pill). */
 export function runStage(r: Pick<DeepRun, 'status' | 'phase'>): string {
   if (r.status === 'QUEUED') return 'QUEUED'

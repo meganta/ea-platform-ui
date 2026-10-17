@@ -33,3 +33,4 @@
 .dw-history { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px }
 .dw-history button { font-size:11px }
 @media (max-width: 600px) { .dw-card, .dw-launcher { padding:10px } .dw-meta { gap:2px 8px } }
+.dw-deck { white-space:nowrap; font-size:11.5px }
