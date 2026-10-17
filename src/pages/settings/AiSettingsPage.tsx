@@ -3,6 +3,7 @@ import { useLang } from '../../contexts/LangContext'
 import HelpTip from '../../components/HelpTip'
 import { authFetch } from './shared'
 import WebResearchSettingsCard from './WebResearchSettingsCard'
+import AiPolicySettingsCard from './AiPolicySettingsCard'
 
 export default function AiSettingsPage() {
   const { setLocale } = useLang()
@@ -37,7 +38,7 @@ export default function AiSettingsPage() {
         <div className="page-title">AI & Copilot</div>
         <div className="page-subtitle">PROVIDER, MODEL & RESPONSE LANGUAGE</div>
       </div>
-      <div className="page-body" style={{ maxWidth: 720 }}>
+      <div className="page-body" style={{ maxWidth: 900 }}>
         {msg && (
           <div style={{ padding: '10px 16px', borderRadius: 'var(--radius)', marginBottom: 16, fontSize: 13, background: msg.type === 'success' ? 'rgba(22,163,74,0.1)' : 'rgba(220,38,38,0.1)', border: `1px solid ${msg.type === 'success' ? 'rgba(22,163,74,0.3)' : 'rgba(220,38,38,0.3)'}`, color: msg.type === 'success' ? 'var(--success)' : 'var(--danger)', display: 'flex', justifyContent: 'space-between' }}>
             <span>{msg.text}</span>
@@ -77,6 +78,7 @@ export default function AiSettingsPage() {
             {saving ? 'Saving...' : 'Save AI Configuration'}
           </button>
         </div>
+        <AiPolicySettingsCard />
         <WebResearchSettingsCard />
       </div>
     </div>
