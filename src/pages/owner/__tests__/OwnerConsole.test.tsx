@@ -51,6 +51,7 @@ const OWNER = { userId: 'o', email: 'owner@archmind.sa', role: 'ARCHITECT', tena
 beforeEach(() => {
   jest.clearAllMocks();
   for (const k of Object.keys(mockStore)) delete mockStore[k];
+  api.aiModels.mockResolvedValue([]);
   mockUser = OWNER;
   mockParams = {};
   mockSearch = new URLSearchParams();
@@ -613,7 +614,7 @@ describe('AR/EN coverage', () => {
       'owner.lib.source.': ['ENV', 'SETTING', 'DEFAULT', 'OWNER_HOME', 'NONE'],
       'owner.lib.choice.': ['SHARED', 'PRIVATE'],
       'owner.create.step.': ['branding', 'profile', 'glossary', 'subscription', 'metaModel', 'referencePack', 'knowledgeLibrary', 'adminInvitation'],
-      'owner.detail.tab.': ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'recommendations', 'activity'],
+      'owner.detail.tab.': ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'ai', 'recommendations', 'activity'],
       'owner.create.step.': ['branding', 'profile', 'glossary', 'subscription', 'metaModel', 'referencePack', 'adminInvitation'],
     };
     const missing = Object.entries(families).flatMap(([p, ks]) => ks.map(k => p + k)).filter(k => !OWNER_TRANSLATIONS[k]);

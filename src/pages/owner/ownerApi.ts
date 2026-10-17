@@ -62,6 +62,11 @@ export const ownerApi = {
   referencePackBackfill: () => call('GET', '/owner/reference-pack/backfill'),
   runReferencePackBackfill: (dto: { tenantIds?: string[]; password: string }) => call('POST', '/owner/reference-pack/backfill', dto),
   referencePack: (id: string, f: { industry?: string } = {}) => call('GET', `/owner/tenants/${id}/reference-pack${qs(f)}`),
+  aiModels: () => call('GET', '/owner/ai-models'),
+  createAiModel: (dto: any) => call('POST', '/owner/ai-models', dto),
+  updateAiModel: (id: string, dto: any) => call('PUT', `/owner/ai-models/${id}`, dto),
+  tenantAiPolicy: (id: string) => call('GET', `/owner/tenants/${id}/ai-policy`),
+  updateTenantAiPolicy: (id: string, dto: any) => call('PUT', `/owner/tenants/${id}/ai-policy`, dto),
   applyReferencePack: (id: string, dto: { industry?: string; include?: string[]; documentIds?: string[]; activateModels?: boolean; activateArchitectures?: boolean }) => call('POST', `/owner/tenants/${id}/reference-pack`, dto),
 }
 

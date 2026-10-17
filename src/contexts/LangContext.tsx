@@ -18,6 +18,9 @@ import { METAMODEL_TRANSLATIONS } from '../pages/metamodel/metaModelStrings'
 import { DASHBOARD_TRANSLATIONS } from '../pages/dashboard/dashboardStrings'
 import { FINVALUE_TRANSLATIONS } from '../pages/finvalue/finValueStrings'
 import { ROADMAP_TRANSLATIONS } from '../pages/planning/roadmapStrings'
+import { AI_POLICY_TRANSLATIONS } from '../pages/settings/aiPolicyStrings'
+import { DEEP_WORK_TRANSLATIONS } from '../components/deepwork/deepWorkStrings'
+import { PRESENTATION_STYLE_TRANSLATIONS } from '../pages/settings/presentationStyleStrings'
 
 export type Locale = 'AR' | 'EN'
 
@@ -28,6 +31,9 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   ...DASHBOARD_TRANSLATIONS,
   ...FINVALUE_TRANSLATIONS,
   ...ROADMAP_TRANSLATIONS,
+  ...AI_POLICY_TRANSLATIONS,
+  ...DEEP_WORK_TRANSLATIONS,
+  ...PRESENTATION_STYLE_TRANSLATIONS,
   ...METAMODEL_TRANSLATIONS,
   'strategy.refresh.previous_evidence': { EN: 'Approved previous strategy evidence', AR: 'أدلة الاستراتيجية السابقة المعتمدة' },
   'strategy.refresh.open_baseline': { EN: 'Open approved baseline version', AR: 'فتح الإصدار المرجعي المعتمد' },
