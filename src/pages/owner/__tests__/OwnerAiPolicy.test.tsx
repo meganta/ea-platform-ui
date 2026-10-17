@@ -12,7 +12,8 @@ jest.mock('../ownerApi', () => {
 
 const models = [
   { id: 'm1', provider: 'anthropic', modelId: 'claude-sonnet-5-5', displayName: 'Claude Sonnet 5.5', vendor: 'Anthropic', deepWorkCapable: true, ksaAvailability: 'UNVERIFIED', inputSarPerMTok: 7.5, outputSarPerMTok: 37.5, isActive: true, gatewaySupported: true },
-  { id: 'm2', provider: 'google_vertex', modelId: 'gemini-x', displayName: 'Gemini X', vendor: 'Google', deepWorkCapable: true, ksaAvailability: 'AVAILABLE', inputSarPerMTok: null, outputSarPerMTok: null, isActive: true, gatewaySupported: false },
+  { id: 'm2', provider: 'legacy_provider', modelId: 'gemini-x', displayName: 'Gemini X', vendor: 'Google', deepWorkCapable: true, ksaAvailability: 'AVAILABLE', inputSarPerMTok: null, outputSarPerMTok: null, isActive: true, gatewaySupported: false },
+  { id: 'm3', provider: 'vertex_gemini', modelId: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', vendor: 'Google', deepWorkCapable: true, ksaAvailability: 'UNVERIFIED', inputSarPerMTok: null, outputSarPerMTok: null, isActive: true, gatewaySupported: true, providerConfigured: false, providerNote: 'Vertex AI is not configured on the platform (VERTEX_AI_REGION is not set).' },
 ]
 const limits = { allowedProviders: [], allowedModelIds: [], ksaOnly: false, maxLevels: {}, monthlyCeilingSar: null, moduleCeilingsSar: {}, runCeilingSar: null, allowTenantKeys: true, priceMultiplier: 1, note: null }
 const ownerView = (over: any = {}) => ({
@@ -29,8 +30,11 @@ describe('AI model catalogue (Owner Console)', () => {
     render(<AiModelCatalogueCard />)
     await waitFor(() => expect(screen.getByText('Gemini X')).toBeInTheDocument())
     expect(screen.getByText('aipolicy.ksa.AVAILABLE')).toBeInTheDocument()
-    expect(screen.getByText('aipolicy.price_unknown')).toBeInTheDocument()
+    expect(screen.getAllByText('aipolicy.price_unknown')).toHaveLength(2)
     expect(screen.getByText('aipolicy.cat.not_connected')).toBeInTheDocument()
+    // A supported provider the platform has not set up says why.
+    expect(screen.getByText('aipolicy.cat.not_configured')).toBeInTheDocument()
+    expect(screen.getByTestId('cat-provider-note')).toHaveTextContent('VERTEX_AI_REGION')
   })
 
   it('adds a model with prices in SAR and refuses one without a name', async () => {
@@ -40,7 +44,7 @@ describe('AI model catalogue (Owner Console)', () => {
     fireEvent.click(await screen.findByText('aipolicy.cat.add'))
     fireEvent.click(screen.getByText('aipolicy.save'))
     expect(await screen.findByText('aipolicy.cat.required')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('aipolicy.cat.provider'), { target: { value: 'aws_bedrock' } })
+    fireEvent.change(screen.getByLabelText('aipolicy.cat.provider'), { target: { value: 'bedrock' } })
     fireEvent.change(screen.getByLabelText('aipolicy.cat.model_id'), { target: { value: 'meta.llama-x' } })
     fireEvent.change(screen.getByLabelText('aipolicy.cat.display_name'), { target: { value: 'Llama X' } })
     fireEvent.change(screen.getByLabelText('aipolicy.cat.vendor'), { target: { value: 'Meta' } })
@@ -48,7 +52,7 @@ describe('AI model catalogue (Owner Console)', () => {
     fireEvent.change(screen.getByLabelText('aipolicy.cat.input_price'), { target: { value: '2' } })
     fireEvent.click(screen.getByText('aipolicy.save'))
     await waitFor(() => expect(mockStore.createAiModel).toHaveBeenCalled())
-    expect(mockStore.createAiModel.mock.calls[0][0]).toMatchObject({ provider: 'aws_bedrock', modelId: 'meta.llama-x', vendor: 'Meta', ksaAvailability: 'AVAILABLE', inputSarPerMTok: 2, outputSarPerMTok: null })
+    expect(mockStore.createAiModel.mock.calls[0][0]).toMatchObject({ provider: 'bedrock', modelId: 'meta.llama-x', vendor: 'Meta', ksaAvailability: 'AVAILABLE', inputSarPerMTok: 2, outputSarPerMTok: null })
   })
 })
 
