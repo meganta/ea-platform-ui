@@ -129,6 +129,7 @@ export default function Layout() {
     { to: '/ea-views', label: '🗺 EA Views', icon: '', permission: 'Views.View' },
     { to: '/connector-hub', label: '🔌 Connectors', icon: '', permission: 'Connector.View' },
     { to: '/reports', label: '📊 ' + (locale === 'AR' ? 'التقارير' : 'Reports'), icon: '', permission: 'Repository.View' },
+    { to: '/deliverables', label: '📦 ' + t('nav.deliverables'), icon: '', permission: 'Repository.Export' },
     { to: '/repository', label: '🗄 ' + t('nav.repository'), icon: '', permission: 'Repository.View' },
     { to: '/reference-architectures', label: '🧭 ' + t('nav.refarch'), icon: '', permission: 'ReferenceArchitecture.View' },
     { to: '/architecture-health', label: '🩺 ' + t('nav.health'), icon: '', permission: 'ArchitectureHealth.View' },
