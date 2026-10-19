@@ -119,7 +119,7 @@ describe('deep-work strings', () => {
   it('every static key the components use has EN and Arabic', () => {
     const dir = path.resolve(__dirname, '..')
     const src = fs.readdirSync(dir).filter(f => f.endsWith('.tsx')).map(f => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n')
-      + ['../../../pages/AdmPage.tsx', '../../../pages/StrategyRefreshPage.tsx', '../../../pages/GovernancePage.tsx'].map(f => fs.readFileSync(path.resolve(__dirname, f), 'utf8')).join('\n')
+      + ['../../../pages/AdmPage.tsx', '../../../pages/StrategyRefreshPage.tsx', '../../../pages/GovernancePage.tsx', '../../GovernanceDeepReview.tsx'].map(f => fs.readFileSync(path.resolve(__dirname, f), 'utf8')).join('\n')
     const keys = Array.from(new Set(Array.from(src.matchAll(/['"`](deepwork\.[a-z_]+(?:\.[a-z_]+)?)['"`]/g)).map(m => m[1])))
     expect(keys.length).toBeGreaterThan(30)
     expect(keys.filter(k => !has(k))).toEqual([])
@@ -128,6 +128,7 @@ describe('deep-work strings', () => {
     const keys = [
       ...DEEP_WORK_STAGES.flatMap(s => [`deepwork.stage.${s}`, `deepwork.progress.${s}`]), ...DEEP_WORK_STATUSES.map(s => `deepwork.status.${s}`),
       ...DEEP_WORK_DECISIONS.map(d => `deepwork.decision.${d}`), ...DEEP_WORK_KINDS.map(k => `deepwork.kind.${k}`), ...['HIGH', 'MEDIUM', 'LOW'].map(c => `deepwork.conf.${c}`),
+      ...['added', 'lowered', 'withdrawn', 'confirmed'].map(c => `deepwork.gov.count.${c}`),
     ]
     expect(keys.filter(k => !has(k))).toEqual([])
   })

@@ -188,14 +188,14 @@ export default function AiPolicySettingsCard({ onLanguageSaved }: { onLanguageSa
             {AI_POLICY_MODULES.map((m: AiPolicyModule) => (
               <div key={m} className="form-group aip-module">
                 <label className="form-label" htmlFor={`aip-level-${m}`}>{t(`aipolicy.module.${m}`)}</label>
-                {m === 'copilot_deep' && (
-                  <label className="aip-check" htmlFor="aip-deep-enabled">
-                    <input id="aip-deep-enabled" type="checkbox" checked={draft.copilotDeepWorkEnabled} onChange={e => setDraft({ ...draft, copilotDeepWorkEnabled: e.target.checked })} />
-                    {' '}{t('aipolicy.deep_enabled')}
-                  </label>
-                )}
-                <select id={`aip-level-${m}`} className="form-input" value={draft.levels[m]} disabled={m === 'copilot_deep' && !draft.copilotDeepWorkEnabled}
-                  onChange={e => setDraft({ ...draft, levels: { ...draft.levels, [m]: e.target.value as AiDepthLevel } })}>
+                {/* Copilot deep work is one choice: Off, or the depth it runs at. */}
+                <select id={`aip-level-${m}`} className="form-input" value={m === 'copilot_deep' && !draft.copilotDeepWorkEnabled ? 'OFF' : draft.levels[m]}
+                  onChange={e => {
+                    const v = e.target.value
+                    if (m === 'copilot_deep') setDraft(v === 'OFF' ? { ...draft, copilotDeepWorkEnabled: false } : { ...draft, copilotDeepWorkEnabled: true, levels: { ...draft.levels, [m]: v as AiDepthLevel } })
+                    else setDraft({ ...draft, levels: { ...draft.levels, [m]: v as AiDepthLevel } })
+                  }}>
+                  {m === 'copilot_deep' && <option value="OFF">{t('aipolicy.level.OFF')}</option>}
                   {AI_DEPTH_LEVELS.map(l => (
                     <option key={l} value={l}>{t(`aipolicy.level.${l}`)}{levelAbove(l, limits?.maxLevels[m]) ? ` - ${t('aipolicy.above_limit')}` : ''}</option>
                   ))}
