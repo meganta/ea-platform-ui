@@ -3,7 +3,8 @@ import HelpTip from '../../components/HelpTip'
 import AttributeField from './AttributeField'
 import { arrow, slotDetail, slotLabel } from './AssetRelationshipsView'
 import OriginTag, { OriginLegend, metaModelLabel } from './OriginTag'
-import { AssetProfile, RelatedAsset, RelationshipSlot, assetProfileApi, fromInputValue, localName, toInputValue, validateValue } from './assetProfile'
+import { AssetProfile, NA_KEY, NotApplicableMark, RelatedAsset, RelationshipSlot, assetProfileApi, fromInputValue, localName, naAttrKey, naRelKey, toInputValue, validateValue } from './assetProfile'
+import { NotApplicableToggle } from './NotApplicable'
 
 type T = (k: string) => string
 const STATUSES = ['DRAFT', 'UNDER_REVIEW', 'APPROVED', 'DEPRECATED']
@@ -37,6 +38,10 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
   const [otherRemoved, setOtherRemoved] = useState<string[]>([])
   // Links that match no Meta Model definition: kept, or removed on Save.
   const [linksRemoved, setLinksRemoved] = useState<string[]>([])
+  // "Not applicable to this object" marks (attribute / relationship keys), saved in the metadata with the rest.
+  const initialNa = useMemo<Record<string, NotApplicableMark>>(() => { const raw = a.metadata?.[NA_KEY]; return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {} }, [a.metadata])
+  const [na, setNa] = useState<Record<string, NotApplicableMark>>(initialNa)
+  const setMark = (key: string, mark: NotApplicableMark | null) => setNa(all => { const next = { ...all }; if (mark) next[key] = mark; else delete next[key]; return next })
   const mm = metaModelLabel(profile, t)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -55,7 +60,8 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
     return { ...c, remove, add: [...add, { key: `${asset.id}-${Date.now()}`, asset, metadata: {} }] }
   })
 
-  const pendingCount = Object.values(changes).reduce((n, c) => n + c.add.length + c.remove.length + Object.keys(c.edit).length, 0) + linksRemoved.length
+  const naChanged = Object.keys({ ...initialNa, ...na }).filter(k => JSON.stringify(initialNa[k] ?? null) !== JSON.stringify(na[k] ?? null)).length
+  const pendingCount = Object.values(changes).reduce((n, c) => n + c.add.length + c.remove.length + Object.keys(c.edit).length, 0) + linksRemoved.length + naChanged
 
   const save = async () => {
     const errs: Record<string, string> = {}
@@ -80,6 +86,7 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
         metadata[o.key] = typeof o.value === 'number' && text.trim() !== '' && Number.isFinite(Number(text)) ? Number(text)
           : typeof o.value === 'boolean' && (text === 'true' || text === 'false') ? text === 'true' : text
       }
+      if (Object.keys(na).length) metadata[NA_KEY] = na; else delete metadata[NA_KEY]
       await assetProfileApi.updateAsset(a.id, {
         name: core.name.trim(), nameAr: core.nameAr, description: core.description, descriptionAr: core.descriptionAr,
         domain: core.domain, assetType: core.assetType, status: core.status, ...(core.lifecycleStatus ? { lifecycleStatus: core.lifecycleStatus } : {}),
@@ -164,13 +171,16 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
 
       {(profile.attributeGroups || []).map((g, gi) => (
         <section key={g.id || gi} className="ap-section">
-          <div className="ap-section-title">{localName(g, isAR) || t('repository.profile.attributes')}</div>
+          <div className="ap-section-title">{localName(g, isAR) || t('repository.profile.attributes')}{gi === 0 && <HelpTip text={t('repository.profile.na.help')} />}</div>
           <div className="ap-edit-grid">
             {g.attributes.map(attr => (
               <div key={attr.code} className={['LONG_TEXT', 'RICH_TEXT', 'JSON_DATA', 'MULTI_ENUM'].includes(attr.attributeType) ? 'ap-wide' : undefined}>
                 <AttributeField def={attr} idPrefix="ap-attr" isAR={isAR} t={t} value={values[attr.code]} error={errors[attr.code]}
                   tag={<OriginTag origin="meta" t={t} detail={[mm, attr.code, attr.attributeType].filter(Boolean).join(' · ')} />}
                   onChange={v => { setValues(vs => ({ ...vs, [attr.code]: v })); if (errors[attr.code]) setErrors(es => { const n = { ...es }; delete n[attr.code]; return n }) }} />
+                {!attr.isReadOnly && <NotApplicableToggle id={`ap-na-${attr.code}`} mark={na[naAttrKey(attr.code)]} t={t} disabled={saving}
+                  hasValue={values[attr.code] !== '' && values[attr.code] !== null && values[attr.code] !== undefined && !(Array.isArray(values[attr.code]) && !values[attr.code].length)}
+                  onChange={m => setMark(naAttrKey(attr.code), m)} />}
               </div>
             ))}
           </div>
@@ -202,11 +212,12 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
       )}
 
       <section className="ap-section">
-        <div className="ap-section-title">{t('repository.profile.relationships')}<HelpTip text={t('repository.profile.edit_relationships_help')} /></div>
+        <div className="ap-section-title">{t('repository.profile.relationships')}<HelpTip text={t('repository.profile.edit_relationships_help')} /><HelpTip text={t('repository.profile.na.help')} /></div>
         {typeChanged && <div className="ap-banner">{t('repository.profile.type_change_relationships')}</div>}
         {!(profile.relationshipSlots || []).length && <p className="ap-empty">{t('repository.profile.no_relationship_types')}</p>}
         {(profile.relationshipSlots || []).map(s => (
           <SlotEditor key={slotKey(s)} slot={s} mm={mm} assetId={a.id} changes={changesFor(s)} t={t} isAR={isAR} disabled={typeChanged || saving}
+            naMark={na[naRelKey(s.code, s.direction)]} onNa={m => setMark(naRelKey(s.code, s.direction), m)}
             onAdd={asset => addLink(s, asset)}
             onRemove={id => updateSlot(s, c => ({ ...c, remove: c.remove.includes(id) ? c.remove.filter(x => x !== id) : [...c.remove, id] }))}
             onCancelAdd={key => updateSlot(s, c => ({ ...c, add: c.add.filter(p => p.key !== key) }))}
@@ -243,8 +254,9 @@ export default function AssetEditor({ profile, domains, typesFor, t, isAR, onCan
   )
 }
 
-function SlotEditor({ slot: s, mm, assetId, changes, t, isAR, disabled, onAdd, onRemove, onCancelAdd, onEditAttr, onEditPendingAttr }: {
+function SlotEditor({ slot: s, mm, assetId, changes, t, isAR, disabled, naMark, onNa, onAdd, onRemove, onCancelAdd, onEditAttr, onEditPendingAttr }: {
   slot: RelationshipSlot; mm: string; assetId: string; changes: SlotChanges; t: T; isAR: boolean; disabled: boolean
+  naMark?: NotApplicableMark; onNa: (m: NotApplicableMark | null) => void
   onAdd: (a: RelatedAsset) => void; onRemove: (id: string) => void; onCancelAdd: (key: string) => void
   onEditAttr: (id: string, metadata: Record<string, any>) => void; onEditPendingAttr: (key: string, metadata: Record<string, any>) => void
 }) {
@@ -288,6 +300,7 @@ function SlotEditor({ slot: s, mm, assetId, changes, t, isAR, disabled, onAdd, o
         </button>
       </div>
       <div className="ap-slot-body">
+        <NotApplicableToggle id={`ap-na-${s.code}-${s.direction}`} mark={naMark} t={t} disabled={disabled} hasValue={s.count + changes.add.length - changes.remove.length > 0} onChange={onNa} />
         {open && (
           <div className="ap-picker" id={pickerId}>
             <label className="form-label" htmlFor={`${pickerId}-search`}>{t('repository.profile.find').replace('{type}', localName(s.otherType, isAR))}</label>

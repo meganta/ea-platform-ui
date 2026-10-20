@@ -6,7 +6,14 @@ export interface ProfileAttribute {
   code: string; name: string; nameAr?: string | null; description?: string | null; helpText?: string | null; helpTextAr?: string | null
   attributeType: string; isRequired: boolean; isReadOnly: boolean; placeholder?: string | null; defaultValue?: string | null
   validationRules?: any; displayConfig?: any; enumValues?: EnumOption[]; value: any; hasValue: boolean
+  /** Marked not applicable to this object: counts as complete when it has no value. */
+  notApplicable?: NotApplicableMark | null
 }
+/** A "not applicable" mark kept in the object's metadata under `_notApplicable` (key -> mark). */
+export interface NotApplicableMark { reason?: string | null; by?: string | null; at?: string | null }
+export const NA_KEY = '_notApplicable'
+export const naAttrKey = (code: string) => `attr:${code}`
+export const naRelKey = (definitionCode: string, direction: 'OUTGOING' | 'INCOMING') => `rel:${definitionCode}:${direction}`
 export interface ProfileGroup { id: string; name: string; nameAr?: string | null; isCollapsed: boolean; attributes: ProfileAttribute[] }
 export interface RelatedAsset { id: string; name: string; nameAr?: string | null; assetType: string; status?: string | null; lifecycleStatus?: string | null; typeLabel?: string | null }
 export interface RelationshipAttribute { code: string; name: string; nameAr?: string | null; attributeType: string; isRequired: boolean; enumValues?: EnumOption[] }
@@ -17,6 +24,8 @@ export interface RelationshipSlot {
   otherType: { id: string; code: string; name: string; nameAr?: string | null; icon?: string | null; color?: string | null } | null
   forwardLabel: string; cardinality: string; single: boolean; isRequired: boolean; attributes: RelationshipAttribute[]
   count: number; items: SlotItem[]; truncated: boolean
+  /** Marked not applicable to this object: counts as complete when it has no links. */
+  notApplicable?: NotApplicableMark | null
 }
 export interface AssetProfile {
   asset: any
@@ -26,7 +35,7 @@ export interface AssetProfile {
   metaModel?: { versionId: string; version: string | null; status: string | null } | null
   attributeGroups: ProfileGroup[]
   otherAttributes: Array<{ key: string; value: any }>
-  completeness: { filled: number; total: number; requiredMissing: string[] }
+  completeness: { filled: number; total: number; notApplicable?: number; requiredMissing: string[] }
   relationshipSlots: RelationshipSlot[]
   otherRelationships: Array<{ relationshipId: string; direction: 'OUTGOING' | 'INCOMING'; label: string; relationshipType: string; metadata: any; relatedAsset: RelatedAsset }>
   relationshipTotals: { linked: number; truncated: boolean }
