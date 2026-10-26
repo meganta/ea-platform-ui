@@ -16,6 +16,7 @@ import StrategyAlignmentPanel, { usesStrategyAlignment } from '../components/Str
 import PipelineStepList, { PipelineStep, stepsRatio } from '../components/PipelineStepList'
 import GovernanceRiskContent, { riskDisplayText } from '../components/GovernanceRiskContent'
 import { governanceExportError } from '../lib/governanceExportError'
+import { governanceExportReadiness } from '../lib/governanceExportReadiness'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 
@@ -1539,7 +1540,7 @@ export default function GovernancePage() {
         </div>
       )}
 
-      {showExportModal && <GovernanceExportDialog powerpointAvailable={review?.status === 'COMPLETED'} onClose={() => setShowExportModal(false)} onExport={(language, format) => {
+      {showExportModal && <GovernanceExportDialog {...governanceExportReadiness(review?.status, !!report)} onClose={() => setShowExportModal(false)} onExport={(language, format) => {
         setExportLang(language); setShowExportModal(false); exportWord(language, format)
       }} />}
 
