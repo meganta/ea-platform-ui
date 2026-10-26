@@ -285,3 +285,20 @@ describe('Financial Value - usage, alternatives, compliance, agents, scenarios',
     expect(screen.getByText('Pricing').closest('a')).toHaveAttribute('href', 'https://v.example/p')
   })
 })
+
+describe('Financial Value - stale candidates', () => {
+  it('dismisses stale discovery candidates with a reason', async () => {
+    const summary = { ...SUMMARY, queues: { ...SUMMARY.queues, staleCandidates: 4 } }
+    const fetchMock = route({ '/financial-value/me': ALL, '/financial-value/summary': summary, '/financial-value/discovery/dismiss-stale': { dismissed: 4, failed: [] }, '/financial-value/benchmarks': { optedIn: false, metrics: [] } })
+    global.fetch = fetchMock as any
+    render(<FinancialValuePage />)
+    await waitFor(() => expect(screen.getByTestId('fv-overview')).toBeInTheDocument())
+    fireEvent.click(screen.getByText('fv.view.ARCHITECTURE'))
+    const box = screen.getByTestId('fv-dismiss-stale')
+    expect(within(box).getByText('fv.stale.dismiss')).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('fv.reason'), { target: { value: 'Different tools, broad capability only' } })
+    fireEvent.click(within(box).getByText('fv.stale.dismiss'))
+    await waitFor(() => expect(called(fetchMock, '/financial-value/discovery/dismiss-stale')).toHaveLength(1))
+    expect(JSON.parse(called(fetchMock, '/financial-value/discovery/dismiss-stale')[0][1].body)).toEqual({ reason: 'Different tools, broad capability only' })
+  })
+})

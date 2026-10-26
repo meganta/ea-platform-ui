@@ -41,3 +41,21 @@ test('domainsScoreOf: the weighted average of the assessed domains, null without
   expect(domainsScoreOf(breakdown)).toBe(76)
   expect(domainsScoreOf(null)).toBeNull()
 })
+
+test('a capped score shows the weighted average and why the overall is lower (EN and AR)', () => {
+  const capped: ScoreBreakdown = { ...breakdown, overallScore: 54, cap: { limit: 54, reason: 'UNRESOLVED_CRITICAL', count: 3, uncappedScore: 61.5 } }
+  render(<GovernanceScoreFormula breakdown={capped} />)
+  expect(screen.getByTestId('score-formula-parts').textContent).toContain('= 61.5')
+  expect(screen.getByTestId('score-formula-cap').textContent).toContain('Overall capped at 54 while 3 critical findings are unresolved.')
+})
+
+test('the cap sentence in Arabic', () => {
+  mockArabic = true
+  render(<GovernanceScoreFormula breakdown={{ ...breakdown, overallScore: 71, cap: { limit: 71, reason: 'UNRESOLVED_HIGH', count: 1, uncappedScore: 80 } }} />)
+  expect(screen.getByTestId('score-formula-cap').textContent).toContain('الدرجة الإجمالية محدودة عند 71')
+})
+
+test('no cap line without a cap', () => {
+  render(<GovernanceScoreFormula breakdown={breakdown} />)
+  expect(screen.queryByTestId('score-formula-cap')).toBeNull()
+})

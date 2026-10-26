@@ -24,6 +24,7 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
   const [data, setData] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
+  const [staleReason, setStaleReason] = useState('')
   const [msg, setMsg] = useState<string | null>(null)
   const defaultView: View = rights.VERIFY_SAVINGS || rights.VALIDATE_FINANCE ? 'FINANCE' : rights.MANAGE_OPPORTUNITIES ? 'ARCHITECTURE' : 'EXECUTIVE'
   const [view, setView] = useState<View>(defaultView)
@@ -40,6 +41,9 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
   }
   const [year, setYear] = useState(new Date().getFullYear() + 1)
   const lang = isAR ? 'AR' : 'EN'
+  const dismissStale = () => api.post('/financial-value/discovery/dismiss-stale', { reason: staleReason.trim() })
+    .then((r: any) => { setMsg(t('fv.stale.done').replace('{n}', String(r?.dismissed ?? 0))); setStaleReason(''); load() })
+    .catch(e => setMsg(e.message))
   const download = (path: string, name: string) => api.blob(`${path}${path.includes('?') ? '&' : '?'}lang=${lang}`).then(b => saveBlob(b, name)).catch(e => setMsg(e.message))
   const print = () => openPrintable(api, `/financial-value/reports/executive.html?lang=${lang}`).catch(e => setMsg(e.message))
 
@@ -129,6 +133,16 @@ export default function Overview({ api, t, rights, isAR, onOpen, onTab }: { api:
                 {(data.lastDiscovery.summary?.limitations || []).length > 0 && <ul className="ah-list" style={{ marginTop: 6 }}>{data.lastDiscovery.summary.limitations.map((l: string, i: number) => <li key={i}>{l}</li>)}</ul>}
               </div>
             ) : <div className="ah-dim" style={{ marginTop: 8 }}>{t('fv.discovery.never')}</div>}
+            {rights.MANAGE_OPPORTUNITIES && (q.staleCandidates ?? 0) > 0 && (
+              <div className="fv-note" data-testid="fv-dismiss-stale">
+                <strong>{t('fv.stale.title').replace('{n}', String(q.staleCandidates))}</strong><HelpTip text={t('fv.stale.help')} />
+                <div className="fv-toolbar" style={{ marginTop: 6, marginBottom: 0 }}>
+                  <label className="ah-dim" htmlFor="fv-stale-reason">{t('fv.reason')}</label>
+                  <input id="fv-stale-reason" className="form-input" value={staleReason} onChange={e => setStaleReason(e.target.value)} placeholder={t('fv.stale.placeholder')} />
+                  <button type="button" className="btn btn-secondary btn-sm" disabled={staleReason.trim().length < 5} onClick={dismissStale}>{t('fv.stale.dismiss')}</button>
+                </div>
+              </div>
+            )}
           </div>
           <Breakdown title={t('fv.by_engine')} rows={data.byEngine} cur={cur} t={t} label={k => t(`fv.engine.${k}`)} />
           <DataGaps data={data} t={t} onTab={onTab} />

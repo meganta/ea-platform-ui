@@ -18,6 +18,7 @@ import { METAMODEL_TRANSLATIONS } from '../pages/metamodel/metaModelStrings'
 import { DASHBOARD_TRANSLATIONS } from '../pages/dashboard/dashboardStrings'
 import { FINVALUE_TRANSLATIONS } from '../pages/finvalue/finValueStrings'
 import { ROADMAP_TRANSLATIONS } from '../pages/planning/roadmapStrings'
+import { ROLE_UPDATE_TRANSLATIONS } from '../pages/access/roleUpdateStrings'
 import { AI_POLICY_TRANSLATIONS } from '../pages/settings/aiPolicyStrings'
 import { DEEP_WORK_TRANSLATIONS } from '../components/deepwork/deepWorkStrings'
 import { PRESENTATION_STYLE_TRANSLATIONS } from '../pages/settings/presentationStyleStrings'
@@ -32,6 +33,7 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   ...DASHBOARD_TRANSLATIONS,
   ...FINVALUE_TRANSLATIONS,
   ...ROADMAP_TRANSLATIONS,
+  ...ROLE_UPDATE_TRANSLATIONS,
   ...AI_POLICY_TRANSLATIONS,
   ...DEEP_WORK_TRANSLATIONS,
   ...PRESENTATION_STYLE_TRANSLATIONS,

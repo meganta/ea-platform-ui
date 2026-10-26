@@ -23,6 +23,8 @@ export interface ScoreBreakdown {
   method: 'CRITERIA' | 'DOMAIN_AVERAGE'
   overallScore: number
   components: ScoreComponent[]
+  /** Unresolved CRITICAL / HIGH findings hold the overall below the weighted average. */
+  cap?: { limit: number; reason: 'UNRESOLVED_CRITICAL' | 'UNRESOLVED_HIGH'; count: number; uncappedScore: number }
 }
 
 const LABEL: Record<string, [string, string]> = {
@@ -54,6 +56,12 @@ export function domainsScoreOf(breakdown: ScoreBreakdown | null | undefined): nu
   return w > 0 ? parts.reduce((s, c) => s + c.weight * (c.score as number), 0) / w : null
 }
 
+export function capSentence(cap: NonNullable<ScoreBreakdown['cap']>, isAR: boolean): string {
+  const critical = cap.reason === 'UNRESOLVED_CRITICAL'
+  if (isAR) return `الدرجة الإجمالية محدودة عند ${cap.limit} ما دامت ${cap.count} ${critical ? 'ملاحظة حرجة' : 'ملاحظة عالية الخطورة'} دون معالجة.`
+  return `Overall capped at ${cap.limit} while ${cap.count} ${critical ? 'critical' : 'high-severity'} finding${cap.count === 1 ? '' : 's'} ${cap.count === 1 ? 'is' : 'are'} unresolved.`
+}
+
 export default function GovernanceScoreFormula({ breakdown }: { breakdown: ScoreBreakdown }) {
   const { isAR } = useLang()
   const shown = (breakdown.components || []).filter(c => c.excludedBecause !== 'NOT_IN_REVIEW_TYPE' && c.excludedBecause !== 'NO_WEIGHT')
@@ -76,8 +84,16 @@ export default function GovernanceScoreFormula({ breakdown }: { breakdown: Score
               : <em>{isAR ? 'لم يُقيَّم' : 'not assessed'}</em>}
           </span>
         ))}
-        <span style={{ padding: '3px 8px', fontWeight: 700, color: 'var(--accent)' }}>= {Number(breakdown.overallScore.toFixed(2))}</span>
+        <span style={{ padding: '3px 8px', fontWeight: 700, color: 'var(--accent)' }}>= {Number((breakdown.cap ? breakdown.cap.uncappedScore : breakdown.overallScore).toFixed(2))}</span>
       </div>
+      {breakdown.cap && (
+        <div data-testid="score-formula-cap" style={{ marginTop: 6, textAlign: 'center', color: 'var(--danger, #e74c3c)', fontWeight: 600 }}>
+          {capSentence(breakdown.cap, isAR)}
+          <HelpTip text={isAR
+            ? 'لا يمكن أن تظهر درجة ناجحة بجانب ملاحظة تمنع الاعتماد: تُحدّ الدرجة الإجمالية عند 54 ما دامت هناك ملاحظة حرجة مفتوحة، وعند 71 ما دامت هناك ملاحظة عالية الخطورة مفتوحة. تعود الدرجة إلى المتوسط المرجح عند معالجة الملاحظات أو رفضها.'
+            : 'A passing score cannot sit next to a finding that blocks approval: the overall is held at 54 while a critical finding is open, and at 71 while a high-severity one is. It returns to the weighted average once those findings are resolved or rejected.'} />
+        </div>
+      )}
     </div>
   )
 }
