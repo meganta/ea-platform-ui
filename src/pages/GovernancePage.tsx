@@ -1,5 +1,6 @@
 import GovernanceReviewActions from '../components/GovernanceReviewActions'
 import GovernanceDeepReviewNote, { DeepReviewBadge } from '../components/GovernanceDeepReview'
+import GovernanceSynthesis from '../components/GovernanceSynthesis'
 import { useAuth } from '../contexts/AuthContext'
 import GovernanceExportDialog, { GovernanceExportFormat } from '../components/GovernanceExportDialog'
 import React, { useEffect, useState, useRef } from 'react'
@@ -1994,6 +1995,7 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
         <div>
           {/* Deep review (administrator's deep levels): ran inside the review before this report; its changes are already in the findings. */}
           {report.domainSummaries?._deepReview && <GovernanceDeepReviewNote record={report.domainSummaries._deepReview} />}
+          {report.domainSummaries?._synthesis && <GovernanceSynthesis record={report.domainSummaries._synthesis} />}
           {/* Governance Review V2 (spec section 15): evidence coverage and
               extraction quality, shown only when this review actually ran
               through the V2 pipeline (rubricId is only ever set by

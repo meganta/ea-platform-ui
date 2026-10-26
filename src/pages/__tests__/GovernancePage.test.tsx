@@ -567,3 +567,151 @@ describe('GovernancePage - report view: sections and scores follow the review ty
     expect(screen.queryByText('gov.financial')).toBeNull();
   });
 });
+
+describe('GovernancePage - new review wizard (5 steps)', () => {
+  function mockWizardApi(opts: { createOk?: boolean } = {}) {
+    const calls: Array<{ url: string; method: string; body: any }> = [];
+    global.fetch = jest.fn().mockImplementation((url: string, init?: any) => {
+      const method = init?.method || 'GET';
+      calls.push({ url, method, body: init?.body });
+      if (url.includes('/governance/reviews?')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ data: [], total: 0 }) });
+      if (url.includes('/governance/repository/context-check')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ standards: { available: true }, security_standards: { available: false } }) });
+      }
+      if (method === 'POST' && /\/governance\/reviews$/.test(url)) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(opts.createOk === false ? { message: 'Review type not allowed' } : { id: 'new-1', title: 'Portal HLD', reviewType: 'RFP_SOW', status: 'DRAFT' }) });
+      }
+      if (url.includes('/inputs/file')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 'in-1', extractionState: 'READY' }) });
+      if (url.includes('/inputs/metadata')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ solutionName: 'Portal' }) });
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) });
+    }) as any;
+    return calls;
+  }
+
+  async function openWizard() {
+    render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('+ New Review'));
+    await screen.findByText('New Governance Review');
+  }
+
+  function addFile(name = 'Portal_HLD.docx') {
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(['x'], name, { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })] } });
+  }
+
+  it('walks identity -> documents -> intelligence -> aggressiveness -> confirm, and launches with the chosen settings and the uploaded file', async () => {
+    const calls = mockWizardApi();
+    await openWizard();
+
+    // 1. Identity: a title is required; the review type is chosen on a card.
+    const next1 = screen.getByText('Next: Upload Documents →');
+    expect(next1).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText('e.g. Customer Portal HLD Review'), { target: { value: 'Portal HLD' } });
+    fireEvent.click(screen.getByText('RFP / Scope of Work Review'));
+    expect(next1).not.toBeDisabled();
+    fireEvent.click(next1);
+
+    // 2. Documents: at least one file; a file can be removed again.
+    const next2 = await screen.findByText('Next: Review Intelligence →');
+    expect(next2).toBeDisabled();
+    addFile();
+    expect(screen.getByText('1 file selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('×'));
+    expect(screen.getByText('Click or drag files here')).toBeInTheDocument();
+    addFile();
+    fireEvent.click(screen.getByText('Next: Review Intelligence →'));
+
+    // 3. Intelligence: the advisor checks the repository for this review type before Next is allowed.
+    const next3 = await screen.findByText('Next: Set Aggressiveness →');
+    expect(calls.some(c => c.url.includes('/governance/repository/context-check?reviewType=RFP_SOW'))).toBe(true);
+    expect(screen.getAllByText(/Not found — upload to Knowledge Base/).length).toBeGreaterThan(0);
+    fireEvent.click(next3);
+
+    // 4. Aggressiveness.
+    fireEvent.click(await screen.findByText('Strict'));
+    expect(screen.getByText('✓ Selected')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Next: Confirm & Launch →'));
+
+    // 5. Confirm shows what will be launched.
+    await screen.findByText('🚀 Confirm & Launch');
+    expect(screen.getByText('Portal HLD')).toBeInTheDocument();
+    expect(screen.getByText('RFP / Scope of Work Review')).toBeInTheDocument();
+    expect(screen.getByText(/STRICT/)).toBeInTheDocument();
+    expect(screen.getByText('DOCUMENTS (1)')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('▶ Launch Review'));
+
+    await waitFor(() => expect(calls.some(c => c.method === 'POST' && c.url.includes('/governance/reviews/new-1/inputs/file'))).toBe(true), { timeout: 4000 });
+    const created = calls.find(c => c.method === 'POST' && /\/governance\/reviews$/.test(c.url))!;
+    expect(JSON.parse(created.body)).toMatchObject({ title: 'Portal HLD', reviewType: 'RFP_SOW', aggressiveness: 'STRICT', framework: 'NORA_2_0' });
+    const upload = calls.find(c => c.url.includes('/inputs/file'))!;
+    expect((upload.body as FormData).get('label')).toBe('Portal_HLD.docx');
+  });
+
+  it('keeps what was entered when going back, and a completed step can be reopened from the step indicator', async () => {
+    mockWizardApi();
+    await openWizard();
+    fireEvent.change(screen.getByPlaceholderText('e.g. Customer Portal HLD Review'), { target: { value: 'Kept title' } });
+    fireEvent.click(screen.getByText('Next: Upload Documents →'));
+    await screen.findByText('Next: Review Intelligence →');
+    // the header has its own "← Back" (to the list); the step's Back is the last one
+    fireEvent.click(screen.getAllByText('← Back').slice(-1)[0]);
+    expect(await screen.findByDisplayValue('Kept title')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Next: Upload Documents →'));
+    await screen.findByText('Next: Review Intelligence →');
+    // the completed Identity step shows a tick and reopens step 1
+    fireEvent.click(screen.getByText('✓'));
+    expect(await screen.findByDisplayValue('Kept title')).toBeInTheDocument();
+  });
+
+  it('a refused create shows the reason and stays on the confirm step', async () => {
+    mockWizardApi({ createOk: false });
+    await openWizard();
+    fireEvent.change(screen.getByPlaceholderText('e.g. Customer Portal HLD Review'), { target: { value: 'Refused' } });
+    fireEvent.click(screen.getByText('Next: Upload Documents →'));
+    await screen.findByText('Next: Review Intelligence →');
+    addFile();
+    fireEvent.click(screen.getByText('Next: Review Intelligence →'));
+    fireEvent.click(await screen.findByText('Next: Set Aggressiveness →'));
+    fireEvent.click(await screen.findByText('Next: Confirm & Launch →'));
+    fireEvent.click(await screen.findByText('▶ Launch Review'));
+    expect(await screen.findByText('Review type not allowed')).toBeInTheDocument();
+    expect(screen.getByText('🚀 Confirm & Launch')).toBeInTheDocument();
+  });
+});
+
+describe('GovernancePage - report view: all report tabs', () => {
+  it('opens each tab the review type shows with its own content, and the summary carries the cross-domain view and roadmap', async () => {
+    const review = makeReview({ reviewType: 'SOLUTION_DESIGN', decision: 'REQUIRES_CHANGES', overallScore: 54 });
+    const report = {
+      decision: 'REQUIRES_CHANGES', overallScore: 54, executiveSummary: 'Encryption must be fixed first.', decisionRationale: 'One critical finding.',
+      reportView: { sections: ['executiveSummary', 'domainAssessment', 'validatedFindings', 'strategicAlignment', 'complianceMatrix', 'risksAndActions', 'futureStateAlignment', 'financialAssessment'], scoringDimensions: [] },
+      domainSummaries: { _synthesis: { status: 'COMPLETED', narrative: 'One vendor decision drives both gaps.', themes: [], roadmap: [{ order: 1, action: 'Encrypt card data', horizon: 'BEFORE_APPROVAL', findings: [{ title: 'Missing encryption', domain: 'SECURITY_ARCHITECTURE', severity: 'CRITICAL' }], source: 'AI' }], limitations: [] } },
+      strategicAlignment: { overallAlignmentPercentage: 60, objectives: [{ strategyType: 'BUSINESS_STRATEGY', objectiveName: 'Improve customer retention', alignmentStatus: 'PARTIALLY_ALIGNED', alignmentPercentage: 50, isTenantStrategy: true }] },
+      complianceMatrix: { items: [{ category: 'NCA_STANDARD', principleOrStandard: 'NCA ECC 2-7 Data protection', complianceStatus: 'NON_COMPLIANT', gap: 'No encryption at rest', recommendation: 'Encrypt' }] },
+      riskRegister: { risks: [{ id: 'R-1', riskStatement: 'Card data disclosure', title: 'Card data disclosure', severity: 'CRITICAL', likelihood: 'HIGH', impact: 'HIGH', recommendation: 'Encrypt' }] },
+      futureStateAlignment: { summary: 'Partly aligned with the target platform.', alignmentAreas: [{ area: 'Integration platform', status: 'GAP_IDENTIFIED', currentState: 'Point to point', targetState: 'Service bus', gap: 'Bypasses the bus', recommendation: 'Use the bus' }] },
+      financialOpportunities: { opportunities: [{ title: 'Reuse API gateway licence', type: 'REUSE', annualSaving: 120000 }] },
+    };
+    const findings = [{ id: 'f1', title: 'Missing encryption', severity: 'CRITICAL', domain: 'SECURITY_ARCHITECTURE', description: 'Card data unencrypted.', status: 'OPEN' }];
+    mockReportView(review, report, findings);
+    render(<GovernancePage />);
+    fireEvent.click(await screen.findByText('Payment Gateway HLD Review'));
+    expect(await screen.findByTestId('gov-synthesis')).toBeInTheDocument();
+    expect(screen.getByText('One vendor decision drives both gaps.')).toBeInTheDocument();
+    expect(screen.getByText('Encrypt card data')).toBeInTheDocument();
+
+    const open = async (label: string, content: RegExp) => {
+      fireEvent.click(screen.getAllByText(label)[0]);
+      await waitFor(() => expect(screen.getAllByText(content).length).toBeGreaterThan(0));
+    };
+    await open('Domains & Findings', /Missing encryption/);
+    await open('gov.strategic', /Improve customer retention/);
+    await open('gov.compliance', /NCA ECC 2-7 Data protection/);
+    await open('gov.risk_register', /Card data disclosure/);
+    await open('gov.future_state', /Integration platform/);
+    await open('gov.financial', /Reuse API gateway licence/);
+    // back to the summary
+    fireEvent.click(screen.getAllByText('gov.summary')[0]);
+    expect(await screen.findByTestId('gov-synthesis')).toBeInTheDocument();
+  });
+});
