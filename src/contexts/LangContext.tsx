@@ -19,6 +19,10 @@ import { DASHBOARD_TRANSLATIONS } from '../pages/dashboard/dashboardStrings'
 import { FINVALUE_TRANSLATIONS } from '../pages/finvalue/finValueStrings'
 import { ROADMAP_TRANSLATIONS } from '../pages/planning/roadmapStrings'
 import { ROLE_UPDATE_TRANSLATIONS } from '../pages/access/roleUpdateStrings'
+import { AI_POLICY_TRANSLATIONS } from '../pages/settings/aiPolicyStrings'
+import { DEEP_WORK_TRANSLATIONS } from '../components/deepwork/deepWorkStrings'
+import { PRESENTATION_STYLE_TRANSLATIONS } from '../pages/settings/presentationStyleStrings'
+import { DELIVERABLES_TRANSLATIONS } from '../pages/deliverables/deliverablesStrings'
 
 export type Locale = 'AR' | 'EN'
 
@@ -30,6 +34,10 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   ...FINVALUE_TRANSLATIONS,
   ...ROADMAP_TRANSLATIONS,
   ...ROLE_UPDATE_TRANSLATIONS,
+  ...AI_POLICY_TRANSLATIONS,
+  ...DEEP_WORK_TRANSLATIONS,
+  ...PRESENTATION_STYLE_TRANSLATIONS,
+  ...DELIVERABLES_TRANSLATIONS,
   ...METAMODEL_TRANSLATIONS,
   'strategy.refresh.previous_evidence': { EN: 'Approved previous strategy evidence', AR: 'أدلة الاستراتيجية السابقة المعتمدة' },
   'strategy.refresh.open_baseline': { EN: 'Open approved baseline version', AR: 'فتح الإصدار المرجعي المعتمد' },
@@ -1800,6 +1808,12 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   'repository.profile.not_in_kb': { EN: 'Not in knowledge base', AR: 'ليس في قاعدة المعرفة' },
   'repository.profile.not_in_list': { EN: 'not in the list', AR: 'غير موجود في القائمة' },
   'repository.profile.not_recorded': { EN: 'Not recorded', AR: 'غير مسجّل' },
+  'repository.profile.na.label': { EN: 'Not applicable to this object', AR: 'لا ينطبق على هذا العنصر' },
+  'repository.profile.na.badge': { EN: 'Not applicable', AR: 'لا ينطبق' },
+  'repository.profile.na.reason': { EN: 'Why it does not apply (optional)', AR: 'سبب عدم الانطباق (اختياري)' },
+  'repository.profile.na.value_counts': { EN: 'A recorded value still counts as the value.', AR: 'القيمة المسجلة تبقى هي المعتمدة.' },
+  'repository.profile.na.count': { EN: '{count} not applicable', AR: '{count} لا ينطبق' },
+  'repository.profile.na.help': { EN: 'When an attribute or relationship does not apply to this object (for example a cloud service has no server), mark it not applicable: completeness measures - the object page, Architecture Health and its collection templates - then count it as complete for this object instead of missing.', AR: 'عندما لا تنطبق سمة أو علاقة على هذا العنصر (مثل خدمة سحابية ليس لها خادم)، علّمها بأنها لا تنطبق: عندها تحتسبها مقاييس الاكتمال - صفحة العنصر وسلامة البنية ونماذج جمع البيانات - مكتملة لهذا العنصر بدلاً من اعتبارها ناقصة.' },
   'repository.profile.not_set': { EN: 'Not set', AR: 'غير محدد' },
   'repository.profile.only_recorded': { EN: 'Show only recorded values', AR: 'عرض القيم المسجلة فقط' },
   'repository.profile.other_data': { EN: 'Other recorded data', AR: 'بيانات مسجلة أخرى' },

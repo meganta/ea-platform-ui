@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLang } from '../contexts/LangContext'
+import DeepWorkLauncher from '../components/deepwork/DeepWorkLauncher'
+import { deepWorkApi } from '../components/deepwork/deepWorkApi'
 import { RefreshFinding, StrategyRefresh, strategyRefreshApi } from '../lib/strategy-refresh'
 import './StrategyRefreshPage.css'
 import { ASSESSMENT_TYPES, CONCLUSION_TAB, factType, ReviewSteps, STRUCTURE_TYPES, StrategyLimitsPanel, StrategyMap, StrategySummaryGroups } from '../components/StrategyRefreshSections'
@@ -200,6 +202,7 @@ export default function StrategyRefreshPage() {
         <nav aria-label={t('strategy.refresh.workspace')}>{tabs.map(item => <button key={item} aria-current={tab === item ? 'page' : undefined} onClick={() => { setTab(item); setCategory(null); setDrivenBy(null) }}>{t(`strategy.refresh.tab.${item}`)}</button>)}</nav>
         {tab === 'overview' && !category && (refresh.impact ? <StrategyImpactOverview impact={refresh.impact} t={t} onOpenDomain={domain => { setTab('impact'); setCategory(null); setDrivenBy(null); setImpactDomain(domain) }} /> : <p className="limitation">{t('strategy.refresh.impact.legacy')}</p>)}
         {tab === 'impact' && !category && refresh.impact && <StrategyImpactRegister impact={refresh.impact} findings={findings} t={t} domain={impactDomain} onDomainChange={setImpactDomain} onShowFact={setEvidence} factFilter={drivenBy} onClearFact={() => setDrivenBy(null)} />}
+        {tab === 'overview' && !category && refresh.analysisStatus === 'READY' && <DeepWorkLauncher module="strategy" type={refresh.strategy?.strategyType || null} subjectType="STRATEGY_REFRESH" subjectId={refresh.id} titleKey="deepwork.strategy.title" helpKey="deepwork.strategy.help" startKey="deepwork.strategy.start" start={hasPermission('Strategy.Refresh') ? () => deepWorkApi.startStrategy(refresh.id, isAR ? 'AR' : 'EN') : undefined} />}
         {tab === 'overview' && !category && <section><h2>{t('strategy.refresh.summary')}</h2><p>{t('strategy.refresh.provisional')}</p><StrategySummaryGroups findings={findings} t={t} onOpenFacts={type => { setTab('map'); setCategory(null); setMapType(type) }} onOpenConclusions={c => { setTab(CONCLUSION_TAB[c] || 'review'); setCategory(c); setSummaryFindingIds(null) }} /><StrategyLimitsPanel limits={refresh.limits || []} t={t} /></section>}
         {tab === 'map' && !category && <StrategyMap findings={findings} impact={refresh.impact} t={t} type={mapType} onTypeChange={setMapType} onShowFact={setEvidence} onOpenDriven={f => { setDrivenBy(f); setImpactDomain(''); setTab('impact') }} />}
         {tab === 'changes' && !category && !findings.some(f => f.category === 'STRATEGIC_CHANGE') && <p className="changes-empty" role="status">{t(refresh.baseRefreshId ? 'strategy.refresh.changes.none' : 'strategy.refresh.changes.no_baseline')}</p>}

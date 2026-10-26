@@ -44,6 +44,12 @@
 .ap-item-attrs { font-size: 11px; color: var(--text-dim); }
 .ap-chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); color: var(--text-dim); }
 .ap-chip-warn { border-color: rgba(217, 119, 6, 0.4); color: var(--warning); }
+.ap-chip-na { border-color: rgba(3, 105, 161, 0.35); color: var(--accent); }
+.ap-na { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ap-na-reason { font-size: 12px; color: var(--text-dim); }
+.ap-na-toggle { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; font-size: 12px; }
+.ap-na-reason-input { flex: 1; min-width: 160px; padding: 4px 8px; font-size: 12px; }
+.ap-na-hint { font-size: 11px; color: var(--text-muted); width: 100%; }
 .ap-summary-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .ap-summary-chips button { cursor: pointer; background: var(--navy-light); }
 .ap-field .ap-input-row { display: flex; align-items: center; gap: 6px; }

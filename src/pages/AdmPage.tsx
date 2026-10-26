@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { AdmReferencePanel } from '../components/ReferenceArchitecturePanels'
 import { useNavigate } from 'react-router-dom'
 import { useLang } from '../contexts/LangContext'
+import { useAuth } from '../contexts/AuthContext'
 import ReactMarkdown from 'react-markdown'
 import AdmOutputViews from '../components/AdmOutputViews'
+import DeepWorkLauncher from '../components/deepwork/DeepWorkLauncher'
+import { deepWorkApi } from '../components/deepwork/deepWorkApi'
 import { stripDiagramBlocks } from '../lib/diagramBlocks'
 import { Phase7Workspace } from '../components/Phase7Workspace'
 import HelpTip from '../components/HelpTip'
@@ -1390,6 +1393,8 @@ function EvidenceCollectionForm({ out, cycleId, onEvidenceSaved }: { out: any; c
 // ── Phase Workspace (Step-based) ──────────────────────────
 function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, focusInputId, focusInputMode, onDecisionComplete }: any) {
   const { isAR, t, resolveText } = useLang()
+  const { user } = useAuth() as any
+  const [leadOpen, setLeadOpen] = useState(false)
   const api = useApi()
   const [phaseInputs, setPhaseInputs] = useState<any[]>([])
   const [phaseOutputs, setPhaseOutputs] = useState<any[]>([])
@@ -1559,6 +1564,13 @@ function PhaseWorkspace({ cycle, phase, onClose, focusStep, focusOutputId, focus
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', fontSize: 22, cursor: 'pointer', padding: '0 8px' }}>×</button>
         </div>
+
+        {/* Lead architect review of this stage (deep work at the administrator's ADM level; advisory) */}
+        <details className="adm-lead-review" style={{ padding: '0 24px', borderBottom: '1px solid var(--border)' }} onToggle={e => setLeadOpen((e.target as HTMLDetailsElement).open)}>
+          <summary style={{ cursor: 'pointer', padding: '8px 0', fontSize: 13, color: 'var(--accent)' }}>{t('deepwork.adm.title')}</summary>
+          {leadOpen && <DeepWorkLauncher module="adm" type={phase} subjectType="ADM_CYCLE" subjectId={cycle.id} titleKey="deepwork.adm.title" helpKey="deepwork.adm.help" startKey="deepwork.adm.start"
+            start={['ARCHITECT', 'TENANT_ADMIN', 'SUPERADMIN'].includes(user?.role) ? () => deepWorkApi.startAdmStage(cycle.id, phase, isAR ? 'AR' : 'EN') : undefined} />}
+        </details>
 
         {loading ? (
           <div className="loading-screen" style={{ height: 300 }}><div className="spinner" /></div>

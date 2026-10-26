@@ -270,6 +270,57 @@ describe('asset profile page: edit', () => {
   });
 });
 
+describe('asset profile page: not applicable', () => {
+  const NA_PROFILE = {
+    ...PROFILE,
+    asset: { ...ASSET, metadata: { ...ASSET.metadata, _notApplicable: { 'attr:users': { reason: 'Back-office only' }, 'rel:PROJECT_INVOLVES_APP:INCOMING': { reason: 'Not delivered by a project' } } } },
+    attributeGroups: PROFILE.attributeGroups.map(g => ({ ...g, attributes: g.attributes.map(a => (a.code === 'users' ? { ...a, notApplicable: { reason: 'Back-office only' } } : a)) })),
+    completeness: { filled: 4, total: 5, notApplicable: 1, requiredMissing: [] },
+    relationshipSlots: PROFILE.relationshipSlots.map(s => (s.code === 'PROJECT_INVOLVES_APP' ? { ...s, notApplicable: { reason: 'Not delivered by a project' } } : s)),
+  };
+  const withProfile = (profile: any, extra: any = {}) => props({ api: { ...makeApi(), get: jest.fn(async (path: string) => (path.endsWith('/profile') ? profile : path.includes('findings') ? { findings: [] } : { items: [] })) }, ...extra });
+
+  it('shows marked attributes and relationships as not applicable with the reason, and counts them', async () => {
+    render(<AssetProfileScreen {...withProfile(NA_PROFILE)} />);
+    fireEvent.click(await screen.findByRole('tab', { name: /repository.profile.tab.attributes/ }));
+    expect(await screen.findByText('Back-office only')).toBeInTheDocument();
+    expect(screen.getByText(/repository.profile.na.count/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /repository.profile.tab.relationships/ }));
+    expect(within(await screen.findByTestId('slot-PROJECT_INVOLVES_APP-INCOMING')).getByText('repository.profile.na.badge')).toBeInTheDocument();
+    expect(within(screen.getByTestId('slot-APP_OWNED_BY_ORG-OUTGOING')).getByText('repository.profile.none_recorded')).toBeInTheDocument();
+  });
+
+  it('marks an attribute and a relationship not applicable in the editor and saves the marks with the object, keeping the rest', async () => {
+    const p = withProfile(PROFILE, { startInEdit: true });
+    render(<AssetProfileScreen {...p} />);
+    await screen.findByLabelText(/repository.profile.name_en/);
+    fireEvent.click(screen.getByLabelText('repository.profile.na.label', { selector: '#ap-na-applicationUrl' }));
+    fireEvent.change(screen.getByLabelText('repository.profile.na.reason', { selector: '#ap-na-applicationUrl-reason' }), { target: { value: 'Internal tool' } });
+    fireEvent.click(screen.getByLabelText('repository.profile.na.label', { selector: '#ap-na-APP_OWNED_BY_ORG-OUTGOING' }));
+    expect(screen.getByText(/repository.profile.pending_changes/)).toBeInTheDocument();
+    fireEvent.click(screen.getByText('repository.profile.save'));
+    await waitFor(() => expect(p.onChanged).toHaveBeenCalled());
+    const body = JSON.parse(calls.find(c => c.init?.method === 'PUT')!.init.body);
+    expect(body.metadata._notApplicable).toEqual({
+      'attr:applicationUrl': expect.objectContaining({ reason: 'Internal tool' }),
+      'rel:APP_OWNED_BY_ORG:OUTGOING': expect.objectContaining({ reason: '' }),
+    });
+    expect(body.metadata.legacyField).toBe('kept');
+  });
+
+  it('clearing every mark removes them from the object', async () => {
+    const p = withProfile(NA_PROFILE, { startInEdit: true });
+    render(<AssetProfileScreen {...p} />);
+    await screen.findByLabelText(/repository.profile.name_en/);
+    fireEvent.click(screen.getByLabelText('repository.profile.na.label', { selector: '#ap-na-users' }));
+    fireEvent.click(screen.getByLabelText('repository.profile.na.label', { selector: '#ap-na-PROJECT_INVOLVES_APP-INCOMING' }));
+    fireEvent.click(screen.getByText('repository.profile.save'));
+    await waitFor(() => expect(p.onChanged).toHaveBeenCalled());
+    const body = JSON.parse(calls.find(c => c.init?.method === 'PUT')!.init.body);
+    expect(body.metadata).not.toHaveProperty('_notApplicable');
+  });
+});
+
 describe('attribute value helpers', () => {
   it('turns stored values into input values and back by type', () => {
     expect(toInputValue('BOOLEAN', true)).toBe('true');

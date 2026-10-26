@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import { useBranding } from '../../contexts/BrandingContext'
 import HelpTip from '../../components/HelpTip'
+import PresentationStyleCard from './PresentationStyleCard'
 
 const API_URL = process.env.REACT_APP_API_URL || 'https://archmindworks.com/api/v1'
 const authFetch = (path: string, opts: any = {}) =>
@@ -279,7 +280,7 @@ export default function OrganizationSettingsPage() {
         </button>
         </>}
 
-        {subTab === 'branding' && <div className="card"><OrgBrandingSection /></div>}
+        {subTab === 'branding' && <><div className="card"><OrgBrandingSection /></div><PresentationStyleCard /></>}
         {subTab === 'terminology' && <div className="card"><OrgTerminologySection /></div>}
       </div>
     </div>

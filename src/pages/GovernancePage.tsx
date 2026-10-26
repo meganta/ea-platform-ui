@@ -1,4 +1,5 @@
 import GovernanceReviewActions from '../components/GovernanceReviewActions'
+import GovernanceDeepReviewNote, { DeepReviewBadge } from '../components/GovernanceDeepReview'
 import { useAuth } from '../contexts/AuthContext'
 import GovernanceExportDialog, { GovernanceExportFormat } from '../components/GovernanceExportDialog'
 import React, { useEffect, useState, useRef } from 'react'
@@ -352,6 +353,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer', background: 'var(--navy-mid)' }} onClick={() => !editing && setOpen(o => !o)}>
         <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, background: SEV_COLOR[f.severity] + '33', color: SEV_COLOR[f.severity] }}>{f.severity}</span>
         <span style={{ fontSize: 13, flex: 1, color: 'var(--text)', textDecoration: f.status === 'REJECTED' ? 'line-through' : 'none' }}>{f.title}</span>
+        {f.findingType === 'DEEP_REVIEW' && <DeepReviewBadge />}
         <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 4 }}>{f.category?.replace(/_/g, ' ')}</span>
         {reviewId && !editing && (
           <>
@@ -367,6 +369,7 @@ function FindingCard({ f, reviewId, onUpdate, onDelete, onRescore }: { f: any; r
           <div style={{ marginBottom: 8, color: 'var(--accent)' }}><span style={{ color: 'var(--text-muted)' }}>Recommendation: </span>{f.recommendation}</div>
           {f.businessImpact && <div style={{ marginBottom: 4 }}><span style={{ color: 'var(--text-muted)' }}>Business Impact: </span>{f.businessImpact}</div>}
           {f.relatedStandard && <div><span style={{ color: 'var(--text-muted)' }}>Standard: </span>{f.relatedStandard}</div>}
+          {f.findingType === 'DEEP_REVIEW' && f.evidence && <div style={{ marginTop: 6, fontSize: 12, whiteSpace: 'pre-wrap', color: 'var(--text-dim)' }}>{f.evidence}</div>}
           {isV2Finding && (
             <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--navy-mid)' }}>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
@@ -1988,6 +1991,8 @@ export function ReportView({ review, report, findings, tab, setTab, onRescored }
       {/* Summary Tab */}
       {activeTab === 'summary' && (
         <div>
+          {/* Deep review (administrator's deep levels): ran inside the review before this report; its changes are already in the findings. */}
+          {report.domainSummaries?._deepReview && <GovernanceDeepReviewNote record={report.domainSummaries._deepReview} />}
           {/* Governance Review V2 (spec section 15): evidence coverage and
               extraction quality, shown only when this review actually ran
               through the V2 pipeline (rubricId is only ever set by

@@ -8,9 +8,10 @@ import { ErrorBox, fill, Header, Loading, Pill, StepUpModal } from './ownerUi'
 import { AdoptionPanel, BeneficiaryPanel, ConceptCounts, HealthPanel, MaturityPanel } from './AssessmentPanels'
 import EnrichmentPanel from './EnrichmentPanel'
 import ReferencePackPanel from './ReferencePackPanel'
+import TenantAiPolicyPanel from './TenantAiPolicyPanel'
 import { AuditTable, SessionsTable } from './OwnerAuditPage'
 
-export const DETAIL_TABS = ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'recommendations', 'activity'] as const
+export const DETAIL_TABS = ['overview', 'repository', 'maturity', 'beneficiaries', 'enrichment', 'reference', 'views', 'ai', 'recommendations', 'activity'] as const
 
 export default function OwnerTenantDetailPage() {
   const { tenantId = '', tab: pathTab } = useParams()
@@ -63,6 +64,7 @@ export default function OwnerTenantDetailPage() {
       {tab === 'enrichment' && <EnrichmentPanel tenantId={tenantId} website={detail.profile?.officialWebsite} webSearch={me?.capabilities?.webSearch} aiKnowledge={me?.capabilities?.aiKnowledge} onCommitted={() => { setAssessment(null); load() }} />}
       {tab === 'reference' && <ReferencePackPanel tenantId={tenantId} />}
       {tab === 'views' && <ViewsPanel tenantId={tenantId} />}
+      {tab === 'ai' && <TenantAiPolicyPanel tenantId={tenantId} />}
       {tab === 'recommendations' && <RecommendationsPanel tenantId={tenantId} onNavigate={go} />}
       {tab === 'activity' && <ActivityPanel tenantId={tenantId} />}
 

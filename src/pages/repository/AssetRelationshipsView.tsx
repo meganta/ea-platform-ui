@@ -2,6 +2,7 @@ import { useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { AssetProfile, RelationshipSlot, displayValue, localName } from './assetProfile'
 import OriginTag, { OriginLegend, metaModelLabel } from './OriginTag'
+import { NotApplicableBadge } from './NotApplicable'
 
 type T = (k: string) => string
 const PREVIEW = 12
@@ -61,7 +62,8 @@ export default function AssetRelationshipsView({ profile, t, isAR, onOpenAsset }
               <span className="ap-slot-meta">{s.count}</span>
             </div>
             <div className="ap-slot-body">
-              {!s.count ? <div className="ap-empty" style={{ fontSize: 12 }}>{t('repository.profile.none_recorded')}</div> : (
+              {!s.count && s.notApplicable ? <NotApplicableBadge mark={s.notApplicable} t={t} />
+                : !s.count ? <div className="ap-empty" style={{ fontSize: 12 }}>{t('repository.profile.none_recorded')}</div> : (
                 <ul className="ap-items">
                   {shown.map(i => (
                     <li key={i.relationshipId} className="ap-item">

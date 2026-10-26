@@ -2,6 +2,7 @@ import { useState } from 'react'
 import HelpTip from '../../components/HelpTip'
 import { AssetProfile, displayValue, localName } from './assetProfile'
 import OriginTag, { OriginLegend, metaModelLabel } from './OriginTag'
+import { NotApplicableBadge } from './NotApplicable'
 
 type T = (k: string) => string
 const WIDE = new Set(['LONG_TEXT', 'RICH_TEXT', 'JSON_DATA'])
@@ -14,7 +15,7 @@ const WIDE = new Set(['LONG_TEXT', 'RICH_TEXT', 'JSON_DATA'])
 export default function AssetAttributesView({ profile, t, isAR }: { profile: AssetProfile; t: T; isAR: boolean }) {
   const [onlyRecorded, setOnlyRecorded] = useState(false)
   const groups = profile.attributeGroups || []
-  const { filled, total } = profile.completeness || { filled: 0, total: 0 }
+  const { filled, total, notApplicable = 0 } = profile.completeness || { filled: 0, total: 0 }
   const mm = metaModelLabel(profile, t)
   const detail = (code: string, type: string) => [mm, code, type].filter(Boolean).join(' · ')
 
@@ -24,7 +25,7 @@ export default function AssetAttributesView({ profile, t, isAR }: { profile: Ass
   return (
     <div>
       <div className="ap-toolbar">
-        <span style={{ fontSize: 12 }}>{t('repository.profile.recorded_of').replace('{filled}', String(filled)).replace('{total}', String(total))}</span>
+        <span style={{ fontSize: 12 }}>{t('repository.profile.recorded_of').replace('{filled}', String(filled)).replace('{total}', String(total))}{notApplicable > 0 && ` · ${t('repository.profile.na.count').replace('{count}', String(notApplicable))}`}</span>
         <HelpTip text={t('repository.profile.attributes_help')} />
         <label className="ap-toggle" htmlFor="ap-only-recorded">
           <input id="ap-only-recorded" type="checkbox" checked={onlyRecorded} onChange={e => setOnlyRecorded(e.target.checked)} />
@@ -47,7 +48,8 @@ export default function AssetAttributesView({ profile, t, isAR }: { profile: Ass
                     <div key={a.code} className={`ap-attr${WIDE.has(a.attributeType) ? ' ap-wide' : ''}`}>
                       <dt className="ap-dt"><span>{localName(a, isAR)}{a.isRequired && <span className="ap-required"> *</span>}</span><OriginTag origin="meta" t={t} detail={detail(a.code, a.attributeType)} /></dt>
                       <dd>
-                        {!text ? <span className="ap-empty">{t('repository.profile.not_recorded')}</span>
+                        {!text && a.notApplicable ? <NotApplicableBadge mark={a.notApplicable} t={t} />
+                          : !text ? <span className="ap-empty">{t('repository.profile.not_recorded')}</span>
                           : a.attributeType === 'URL' && /^https?:\/\//i.test(text) ? <a href={text} target="_blank" rel="noopener noreferrer" dir="ltr">{text}</a>
                           : a.attributeType === 'EMAIL' ? <a href={`mailto:${text}`} dir="ltr">{text}</a>
                           : text}

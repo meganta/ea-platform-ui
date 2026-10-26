@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useLang } from '../../contexts/LangContext'
 import { ownerApi } from './ownerApi'
 import KnowledgeLibraryCard from './KnowledgeLibraryCard'
+import AiModelCatalogueCard from './AiModelCatalogueCard'
 import { ErrorBox, fill, Header, Loading, Pill } from './ownerUi'
 
 export default function OwnerSettingsPage() {
@@ -36,6 +37,9 @@ export default function OwnerSettingsPage() {
           </div>
           <KnowledgeLibraryCard />
         </div>
+      )}
+      {me && (
+        <div className="oc-section"><AiModelCatalogueCard /></div>
       )}
     </div>
   )
