@@ -33,8 +33,24 @@ jobs:
           # Node 20 is deprecated on Actions runners (see the backend workflow).
           node-version: '22'
           cache: 'npm'
-      - run: npm ci
-      - run: npx react-scripts test --watchAll=false
+      # node_modules restored whole while the lockfile is unchanged.
+      - id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+      - if: steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      # Jest transform cache and CRA's webpack/babel cache (node_modules/.cache),
+      # kept between runs so unchanged files are not compiled again.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .jest-cache
+            node_modules/.cache
+          key: build-cache-${{ runner.os }}-${{ github.sha }}
+          restore-keys: build-cache-${{ runner.os }}-
+      - run: npx react-scripts test --watchAll=false --cacheDirectory=.jest-cache
         env:
           CI: 'true'
       - run: npm run build
