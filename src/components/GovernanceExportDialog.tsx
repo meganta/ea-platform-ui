@@ -2,9 +2,14 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useLang } from '../contexts/LangContext'
 
 export type GovernanceExportFormat = 'word' | 'powerpoint'
-export default function GovernanceExportDialog({ onClose, onExport, subject = 'governance', powerpointAvailable = true }: { onClose: () => void; onExport: (language: 'en'|'ar', format: GovernanceExportFormat) => void; subject?: 'governance'|'study'; powerpointAvailable?: boolean }) {
+/**
+ * Word and PowerPoint follow one rule (lib/governanceExportReadiness.ts): both
+ * are offered once the review has completed with a saved report (`available`);
+ * a review held for manual review (`held`) exports with a provisional decision.
+ */
+export default function GovernanceExportDialog({ onClose, onExport, subject = 'governance', available = true, held = false }: { onClose: () => void; onExport: (language: 'en'|'ar', format: GovernanceExportFormat) => void; subject?: 'governance'|'study'; available?: boolean; held?: boolean }) {
  const { isAR } = useLang()
- const [format, setFormat] = useState<GovernanceExportFormat>(powerpointAvailable ? 'powerpoint' : 'word')
+ const [format, setFormat] = useState<GovernanceExportFormat>('powerpoint')
  const [language, setLanguage] = useState<'en'|'ar'>(isAR ? 'ar' : 'en')
  const dialog = useRef<HTMLDivElement>(null)
  useEffect(() => {
@@ -28,17 +33,18 @@ export default function GovernanceExportDialog({ onClose, onExport, subject = 'g
    <label htmlFor="governance-export-format">{text('Export format','صيغة التصدير')}</label>
    <select id="governance-export-format" className="form-input" value={format} onChange={e=>setFormat(e.target.value as GovernanceExportFormat)} style={{ width:'100%', margin:'8px 0 20px' }}>
     <option value="word">{text('Word Report','تقرير Word')}</option>
-    <option value="powerpoint" disabled={!powerpointAvailable}>{text('PowerPoint — Executive Presentation','PowerPoint — العرض التنفيذي')}</option>
+    <option value="powerpoint">{text('PowerPoint — Executive Presentation','PowerPoint — العرض التنفيذي')}</option>
    </select>
    <label htmlFor="governance-export-language">{text('Language','اللغة')}</label>
    <select id="governance-export-language" className="form-input" value={language} onChange={e=>setLanguage(e.target.value as 'en'|'ar')} style={{ width:'100%', margin:'8px 0 12px' }}>
     <option value="en">English</option><option value="ar">العربية</option>
    </select>
    <p role="note" style={{ fontSize:13, lineHeight:1.6, color:'var(--text-muted)' }}>{text('The executive presentation preserves the saved results. Evidence quotations remain in their original language.','يحافظ العرض التنفيذي على النتائج المحفوظة وتبقى الاقتباسات بلغتها الأصلية.')}</p>
-   {!powerpointAvailable && <p role="status" style={{ fontSize:13, lineHeight:1.6 }}>{text('PowerPoint is available after the review is finalized. Resolve the manual-review warnings first. You can download the current saved report as Word.','يتاح تصدير PowerPoint بعد اكتمال المراجعة. عالج تنبيهات المراجعة اليدوية أولاً. يمكنك تنزيل التقرير المحفوظ الحالي بصيغة Word.')}</p>}
+   {!available && <p role="status" style={{ fontSize:13, lineHeight:1.6 }}>{text('Word and PowerPoint exports are available once the review has completed.','يتاح التصدير بصيغتي Word وPowerPoint بعد اكتمال المراجعة.')}</p>}
+   {available && held && <p role="status" style={{ fontSize:13, lineHeight:1.6 }}>{text('This review is held for manual review: both exports show the decision as provisional, with the reasons.','هذه المراجعة معلّقة للمراجعة اليدوية: يعرض الملفان القرار على أنه مبدئي مع أسباب التعليق.')}</p>}
    <div style={{ display:'flex', flexWrap:'wrap', gap:12, justifyContent:'flex-end', marginTop:24 }}>
     <button className="btn btn-secondary" onClick={onClose}>{text('Cancel','إلغاء')}</button>
-    <button className="btn btn-primary" onClick={()=>onExport(language,!powerpointAvailable && format==='powerpoint' ? 'word' : format)}>{text('Generate and Download','إنشاء وتنزيل')}</button>
+    <button className="btn btn-primary" disabled={!available} onClick={()=>onExport(language,format)}>{text('Generate and Download','إنشاء وتنزيل')}</button>
    </div>
   </div>
  </div>
