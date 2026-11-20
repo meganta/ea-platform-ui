@@ -23,6 +23,7 @@ import { AI_POLICY_TRANSLATIONS } from '../pages/settings/aiPolicyStrings'
 import { DEEP_WORK_TRANSLATIONS } from '../components/deepwork/deepWorkStrings'
 import { SYNTHESIS_TRANSLATIONS } from '../components/governanceSynthesisStrings'
 import { PRESENTATION_STYLE_TRANSLATIONS } from '../pages/settings/presentationStyleStrings'
+import { DECK_TEMPLATE_TRANSLATIONS } from '../pages/settings/deckTemplateStrings'
 import { DELIVERABLES_TRANSLATIONS } from '../pages/deliverables/deliverablesStrings'
 import { DR_TRANSLATIONS } from '../pages/designreview/designReviewStrings'
 
@@ -40,6 +41,7 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   ...DEEP_WORK_TRANSLATIONS,
   ...SYNTHESIS_TRANSLATIONS,
   ...PRESENTATION_STYLE_TRANSLATIONS,
+  ...DECK_TEMPLATE_TRANSLATIONS,
   ...DELIVERABLES_TRANSLATIONS,
   ...DR_TRANSLATIONS,
   ...METAMODEL_TRANSLATIONS,
