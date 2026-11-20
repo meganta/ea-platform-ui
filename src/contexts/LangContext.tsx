@@ -24,6 +24,7 @@ import { DEEP_WORK_TRANSLATIONS } from '../components/deepwork/deepWorkStrings'
 import { SYNTHESIS_TRANSLATIONS } from '../components/governanceSynthesisStrings'
 import { PRESENTATION_STYLE_TRANSLATIONS } from '../pages/settings/presentationStyleStrings'
 import { DELIVERABLES_TRANSLATIONS } from '../pages/deliverables/deliverablesStrings'
+import { DR_TRANSLATIONS } from '../pages/designreview/designReviewStrings'
 
 export type Locale = 'AR' | 'EN'
 
@@ -40,6 +41,7 @@ const TRANSLATIONS: Record<string, { EN: string; AR: string }> = {
   ...SYNTHESIS_TRANSLATIONS,
   ...PRESENTATION_STYLE_TRANSLATIONS,
   ...DELIVERABLES_TRANSLATIONS,
+  ...DR_TRANSLATIONS,
   ...METAMODEL_TRANSLATIONS,
   'strategy.refresh.previous_evidence': { EN: 'Approved previous strategy evidence', AR: 'أدلة الاستراتيجية السابقة المعتمدة' },
   'strategy.refresh.open_baseline': { EN: 'Open approved baseline version', AR: 'فتح الإصدار المرجعي المعتمد' },
