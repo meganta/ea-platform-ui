@@ -117,6 +117,7 @@ export default function Layout() {
     { to: '/adm', label: t('nav.adm'), icon: '⚙', permission: 'Repository.View' },
     { to: '/copilot', label: t('nav.copilot'), icon: '💬', permission: 'AIArchitect.Use' },
     { to: '/governance', label: '🏛 Governance', icon: '', permission: 'Reviews.View' },
+    { to: '/design-reviews', label: '📐 ' + t('nav.designreview'), icon: '', permission: 'DesignReview.View' },
     { to: '/decision-evaluation', label: '⚖ ' + (locale === 'AR' ? 'القرار والتقييم' : 'Decision & Evaluation'), icon: '', permission: 'DecisionEvaluation.ViewAssessments' },
     { to: '/my-surveys', label: '📝 ' + (locale === 'AR' ? 'استبياناتي' : 'My Surveys'), icon: '', permission: 'Surveys.Respond' },
     { to: '/business-capabilities', label: '🧱 ' + (locale === 'AR' ? 'قدرات الأعمال' : 'Business Capabilities'), icon: '', permission: 'BusinessCapability.View' },

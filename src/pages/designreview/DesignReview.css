@@ -1,0 +1,59 @@
+/* Design & RFP Reviews */
+.dr-page { padding: 24px; max-width: 1400px; margin: 0 auto; }
+.dr-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.dr-title { font-size: 22px; margin: 0; display: flex; align-items: center; gap: 6px; }
+.dr-subtitle { margin: 4px 0 0; color: var(--text-dim); font-size: 13px; }
+.dr-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dr-card { background: var(--navy-light); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 14px; min-width: 0; }
+.dr-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.dr-card-head h2, .dr-card-head h3 { font-size: 15px; margin: 0; display: flex; align-items: center; gap: 6px; }
+.dr-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.dr-form .dr-wide { grid-column: 1 / -1; }
+.dr-table-wrap { overflow-x: auto; }
+.dr-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.dr-table th { text-align: start; background: var(--navy-mid); padding: 6px 8px; font-weight: 600; white-space: nowrap; }
+.dr-table td { padding: 6px 8px; border-top: 1px solid var(--navy-mid); vertical-align: top; line-height: 1.5; }
+.dr-table tr.dr-clickable { cursor: pointer; }
+.dr-table tr.dr-clickable:hover td { background: var(--navy-mid); }
+.dr-badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--navy-mid); color: var(--text-dim); white-space: nowrap; }
+.dr-good { background: rgba(22, 163, 74, 0.14); color: var(--success); }
+.dr-warn { background: rgba(217, 119, 6, 0.14); color: var(--warning); }
+.dr-bad { background: rgba(220, 38, 38, 0.14); color: var(--danger); }
+.dr-neutral { background: var(--navy-mid); color: var(--text-dim); }
+.dr-verdict { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dr-verdict-pill { font-size: 16px; font-weight: 700; padding: 6px 14px; border-radius: 16px; }
+.dr-stats { display: flex; gap: 10px; flex-wrap: wrap; }
+.dr-stat { background: var(--navy-mid); border-radius: var(--radius); padding: 8px 14px; min-width: 96px; }
+.dr-stat strong { display: block; font-size: 20px; }
+.dr-stat span { font-size: 11.5px; color: var(--text-dim); }
+.dr-tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.dr-tab { background: none; border-top: none; border-left: none; border-right: none; border-bottom: 2px solid transparent; padding: 8px 12px; color: var(--text-dim); cursor: pointer; font: inherit; font-size: 13px; }
+.dr-tab-active { color: var(--accent); border-bottom: 2px solid var(--accent); }
+.dr-steps { list-style: none; padding: 0; margin: 10px 0 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.dr-steps li { font-size: 12px; padding: 4px 10px; border-radius: 12px; background: var(--navy-mid); color: var(--text-muted); }
+.dr-steps li.dr-step-done { color: var(--success); }
+.dr-steps li.dr-step-now { color: var(--accent); font-weight: 600; }
+.dr-list { margin: 4px 0 0; padding-inline-start: 18px; font-size: 13px; line-height: 1.6; }
+.dr-dim { color: var(--text-muted); font-size: 12px; }
+.dr-ok { font-size: 12px; color: var(--success); }
+.dr-error { font-size: 12.5px; color: var(--danger); }
+.dr-domains { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+.dr-domain { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; }
+.dr-domain h4 { margin: 0 0 6px; font-size: 13.5px; display: flex; justify-content: space-between; gap: 8px; }
+.dr-rows { display: flex; flex-direction: column; gap: 10px; }
+.dr-row-edit { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; align-items: end; }
+.dr-row-edit .dr-field-area { grid-column: 1 / -1; }
+.dr-field .form-label { font-size: 11.5px; }
+.dr-remove { justify-self: start; }
+.dr-edit-bar { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 900px) {
+  .dr-page { padding: 16px; }
+  .dr-form { grid-template-columns: 1fr; }
+  .dr-header { align-items: stretch; }
+  .dr-domains { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .dr-table th:nth-child(n+4), .dr-table td:nth-child(n+4) { white-space: normal; }
+  .dr-stat { flex: 1 1 40%; }
+}
